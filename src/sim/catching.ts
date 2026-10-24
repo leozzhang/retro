@@ -42,3 +42,12 @@ export function resolveCatch(o: Contender | null, d: Contender | null, rng: Rng)
 export function reachScore(distance: number): number {
   return Math.max(0, 1 - distance / CATCH_REACH);
 }
+
+/** Chance a handoff is cleanly exchanged; the rest are fumbles. */
+export const HANDOFF_ODDS = 0.99;
+
+/** Chance the back hauls in a pitch, given how well he got under it (`pos` as in `Contender`). */
+export function pitchOdds(pos: number, cth: number): number {
+  if (pos <= 0) return 0;
+  return clamp(0.93 + 0.06 * Math.sqrt(pos) + (cth - 70) * 0.001, 0, 0.99);
+}

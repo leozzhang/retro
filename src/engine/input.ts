@@ -6,7 +6,8 @@ export class Input {
   private keys = new Set<string>();
   private pressed = new Set<string>();
   /** `downX/downY` = where the current/last press started, captured at event time. */
-  mouse = { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false };
+  /** `rpressed` = right button went down this step (hand off / pitch). */
+  mouse = { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false };
 
   constructor(private canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (e) => {
@@ -20,6 +21,7 @@ export class Input {
       this.mouse.down = false;
     });
     canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 2) this.mouse.rpressed = true;
       if (e.button !== 0) return;
       this.updatePos(e);
       this.mouse.downX = this.mouse.x;
@@ -63,5 +65,6 @@ export class Input {
     this.pressed.clear();
     this.mouse.pressed = false;
     this.mouse.released = false;
+    this.mouse.rpressed = false;
   }
 }

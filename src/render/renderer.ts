@@ -33,12 +33,13 @@ function drawRoutePreview(g: CanvasRenderingContext2D, cam: Camera, play: Play):
     g.globalAlpha = 0.75;
     if (p.isBlocker) {
       const s = cam.toScreen(p.pos.x, p.pos.y);
+      const dir = play.playDef.block === 'run' ? 1 : -1; // run blocks fire forward, pass sets drop back
       g.beginPath();
       g.moveTo(s.x, s.y);
-      g.lineTo(s.x - 6, s.y);
+      g.lineTo(s.x + dir * 6, s.y);
       g.stroke();
       g.fillStyle = col;
-      g.fillRect(Math.round(s.x - 8), Math.round(s.y - 3), 2, 6);
+      g.fillRect(Math.round(s.x + dir * 7) - 1, Math.round(s.y - 3), 2, 6);
       g.globalAlpha = 1;
       continue;
     }
@@ -159,6 +160,17 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
     g.stroke();
   }
 
+  // Handoff window: the back can take it right now.
+  const ho = play.handoffOption();
+  if (ho) {
+    const s = cam.toScreen(play.rb.pos.x, play.rb.pos.y);
+    g.strokeStyle = '#9ad7ff';
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse(Math.round(s.x), Math.round(s.y), 9, 3.5, 0, 0, Math.PI * 2);
+    g.stroke();
+  }
+
   for (const p of play.players) {
     const s = cam.toScreen(p.pos.x, p.pos.y);
     drawShadow(g, s.x, s.y, 6);
@@ -203,6 +215,11 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
       g.fillStyle = ctl.stamina > 0.3 ? '#5cff7a' : '#ff5a5a';
       g.fillRect(x - 7, Math.round(s.y) + 5, Math.round(14 * ctl.stamina), 1);
     }
+  }
+
+  if (ho) {
+    const s = cam.toScreen(play.rb.pos.x, play.rb.pos.y);
+    text(g, ho === 'pitch' ? 'R-CLICK PITCH' : 'R-CLICK', s.x, s.y + 6, { size: 8, align: 'center', color: '#9ad7ff' });
   }
 
   drawAim(g, cam, play);

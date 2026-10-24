@@ -1,7 +1,8 @@
 import { FIELD_W, HASH_BOT, HASH_TOP, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import { clamp, gauss, type Rng } from '../engine/math';
 
-export type OutcomeType = 'tackle' | 'oob' | 'incomplete' | 'td' | 'int' | 'pick6' | 'sack' | 'safety';
+/** 'fumble' = botched exchange or pitch, recovered by the offense (spotted like a tackle). */
+export type OutcomeType = 'tackle' | 'oob' | 'incomplete' | 'td' | 'int' | 'pick6' | 'sack' | 'safety' | 'fumble';
 
 export interface PlayOutcome {
   type: OutcomeType;
@@ -106,41 +107,69 @@ export function yardsText(yards: number): string {
 
 export interface DriveSim {
   points: number;
-  result: 'TOUCHDOWN' | 'FIELD GOAL' | 'MISSED FG' | 'PUNT' | 'TURNOVER' | 'DOWNS';
+  result: 'TOUCHDOWN' | 'FIELD GOAL' | 'MISSED FG' | 'PUNT' | 'TURNOVER' | 'DOWNS' | 'END OF HALF';
   plays: number;
   yards: number;
   /** Where the drive ended, in yards from the CPU's own goal line. */
   endYard: number;
+  /** Game-clock seconds the drive used. */
+  secs: number;
+}
+
+export interface DriveClock {
+  /** Seconds until halftime / end of game. */
+  timeLeft: number;
+  /** Trailing late: no-huddle, clock-stopping plays. */
+  hurry: boolean;
+  /** Leading late: huddle up and run the play clock down. */
+  milk: boolean;
+}
+
+const NO_CLOCK: DriveClock = { timeLeft: Infinity, hurry: false, milk: false };
+
+/** Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap. */
+function simPlaySecs(c: DriveClock, rng: Rng): number {
+  if (c.hurry) return clamp(15 + gauss(rng) * 4, 7, 25);
+  if (rng() < 0.3) return clamp(7 + gauss(rng) * 2, 4, 12); // incompletion / out of bounds
+  return clamp((c.milk ? 38 : 32) + gauss(rng) * 6, 18, 45);
 }
 
 /**
  * Abstract simulation of an opponent possession (the user only plays offense for now).
  * `start` is in yards from the CPU's own goal line.
  */
-export function simulateDrive(offOvr: number, defOvr: number, start: number, rng: Rng): DriveSim {
+export function simulateDrive(offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK): DriveSim {
   const edge = (offOvr - defOvr) * 0.15;
   let yard = start;
   let down = 1;
   let toGo = 10;
   let plays = 0;
+  let secs = 0;
+  const done = (points: number, result: DriveSim['result'], end = yard): DriveSim => ({
+    points, result, plays, yards: end - start, endYard: end, secs: Math.min(secs, clock.timeLeft),
+  });
   while (plays < 25) {
+    if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
     plays++;
-    if (rng() < 0.022) return { points: 0, result: 'TURNOVER', plays, yards: yard - start, endYard: yard };
+    secs += simPlaySecs(clock, rng);
+    if (rng() < 0.022) return done(0, 'TURNOVER');
     const gain = Math.max(-6, Math.round(4.6 + edge + gauss(rng) * 6.5));
     yard += gain;
     toGo -= gain;
-    if (yard >= 100) return { points: 7, result: 'TOUCHDOWN', plays, yards: 100 - start, endYard: 100 };
+    if (yard >= 100) return done(7, 'TOUCHDOWN', 100);
     if (toGo <= 0) {
       down = 1;
       toGo = Math.min(10, 100 - yard);
       continue;
     }
     down++;
-    if (down === 4) {
-      const fgDist = 100 - yard + 17;
+    const fgDist = 100 - yard + 17;
+    // Out of time with a makeable kick: line up for the field goal now.
+    const lastPlay = secs + 20 >= clock.timeLeft && fgDist <= 52;
+    if (down === 4 || lastPlay) {
       if (fgDist <= 52) {
         const made = rng() < clamp(0.97 - (fgDist - 20) * 0.017, 0.3, 0.97);
-        return { points: made ? 3 : 0, result: made ? 'FIELD GOAL' : 'MISSED FG', plays, yards: yard - start, endYard: yard };
+        return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
       }
       if (toGo <= 2 && yard > 45 && rng() < 0.5) {
         const conv = rng() < 0.55 + edge * 0.02;
@@ -150,12 +179,12 @@ export function simulateDrive(offOvr: number, defOvr: number, start: number, rng
           toGo = 10;
           continue;
         }
-        return { points: 0, result: 'DOWNS', plays, yards: yard - start, endYard: yard };
+        return done(0, 'DOWNS');
       }
-      return { points: 0, result: 'PUNT', plays, yards: yard - start, endYard: yard };
+      return done(0, 'PUNT');
     }
   }
-  return { points: 0, result: 'PUNT', plays, yards: yard - start, endYard: yard };
+  return done(0, 'PUNT');
 }
 
 /** Where the user's next drive starts (yards from own goal) after a CPU possession. */

@@ -20,7 +20,7 @@ Controls are listed in [README.md](README.md).
 - `engine/`: constants, camera projection, input, math and seeded RNG
 - `data/`: teams and roster generation (`teams.ts`), formations, route trees and playbook (`plays.ts`), defensive calls (`defenses.ts`)
 - `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, blocking, pursuit), catch, tackle and pass-aim math
-- `game/`: `playState.ts` (the `Play` class: the state machine for one snap), `rules.ts` (down and distance, scoring, CPU drive sim), `game.ts` (screens: title, play call, play, CPU drive)
+- `game/`: `playState.ts` (the `Play` class: the state machine for one snap, including handoffs), `rules.ts` (down and distance, scoring, CPU drive sim), `clock.ts` (game and play clock rules), `game.ts` (screens: title, play call, play, notices, final)
 - `render/`: procedural pixel sprites with team-color swaps, field, HUD, and the play renderer
 
 ## Conventions
@@ -32,7 +32,8 @@ Controls are listed in [README.md](README.md).
   - `throwErrorSd` (`sim/passing.ts`)
   - `catchOdds` (`sim/catching.ts`)
   - `tackleChance` (`sim/tackling.ts`)
-  - shed and push rates (`Play.updateEngagements`)
+  - shed and push rates (`Play.updateEngagements`), `RUN_BLOCK_EDGE`, `ARM_TACKLE` (`game/playState.ts`)
+  - `pitchOdds`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.

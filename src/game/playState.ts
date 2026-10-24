@@ -8,7 +8,7 @@ import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Ve
 import { teamUniform } from '../render/sprites';
 import { isRusher, returnerAI, seesThrow, thinkDefense, thinkOffense } from '../sim/ai';
 import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
-import { reachScore, resolveCatch } from '../sim/catching';
+import { HANDOFF_ODDS, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
   isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, type Player,
 } from '../sim/player';
@@ -41,6 +41,31 @@ export interface PlaySetup {
 }
 
 const HISTORY_LEN = 60;
+/** Handoff reach; farther than this (up to PITCH_RANGE) the QB pitches it. */
+export const HANDOFF_RANGE = 1.8;
+export const PITCH_RANGE = 8;
+const PITCH_SPEED = 13;
+/** Drive-block advantage for the OL on designed runs (subtracted from the defender's power). */
+const RUN_BLOCK_EDGE = 3;
+/** Tackle odds multiplier for a defender still engaged with a blocker (an arm tackle). */
+const ARM_TACKLE = 0.5;
+/** RB this close to the QB early on a play-action call sells the fake. */
+const FAKE_RANGE = 2;
+
+export type HandoffKind = 'handoff' | 'pitch';
+
+/**
+ * Pure handoff legality: the back must still be behind the line. Out of reach of
+ * a handoff it's a pitch (or a shovel, if he's ahead of the QB), which needs a
+ * yard of cushion behind the line of scrimmage.
+ */
+export function handoffKind(qb: Vec, rb: Vec, los: number): HandoffKind | null {
+  if (rb.x >= los - 0.3) return null;
+  const d = dist(qb, rb);
+  if (d <= HANDOFF_RANGE) return 'handoff';
+  if (d <= PITCH_RANGE && rb.x <= los - 1) return 'pitch';
+  return null;
+}
 
 export class Play {
   readonly off: Player[] = [];
@@ -48,6 +73,9 @@ export class Play {
   readonly players: Player[];
   readonly qb: Player;
   readonly center: Player;
+  readonly rb: Player;
+  /** Where the run is designed to hit (end of the RB's run path); run fits and blocks key on it. */
+  readonly hole: Vec;
   readonly ball: Ball;
   readonly los: number;
   readonly ballY: number;
@@ -73,6 +101,11 @@ export class Play {
   history = new Map<number, Vec[]>();
   jukeTimer = 0;
   private jukeCd = 0;
+  /** Ball has been handed or pitched to the RB. */
+  handedOff = false;
+  /** The ball in the air is a pitch, not a forward pass. */
+  pitch = false;
+  faked = false;
 
   constructor(s: PlaySetup) {
     this.los = s.los;
@@ -91,13 +124,21 @@ export class Play {
       const p = makePlayer('off', s.offRoster[slot], offU, { x: s.los + a.dx, y });
       const rn = s.play.routes[slot];
       p.isBlocker = p.role === 'OL' || rn === 'block';
+      p.thenBlock = !!(rn && ROUTES[rn].thenBlock);
       if (rn && rn !== 'block') this.buildRoute(p, rn);
       this.off.push(p);
       bySlot.set(slot, p);
     }
     this.qb = bySlot.get('QB')!;
     this.center = bySlot.get('C')!;
-    this.qbDrop = { x: this.qb.pos.x - s.play.drop, y: this.qb.pos.y };
+    this.rb = bySlot.get('RB')!;
+    this.qbDrop = { x: this.qb.pos.x - s.play.drop, y: clamp(this.qb.pos.y + (s.play.dropY ?? 0), 2, FIELD_W - 2) };
+    const rbRoute = s.play.routes.RB;
+    if (rbRoute === 'paFake') this.buildFake();
+    this.hole =
+      rbRoute && ROUTES[rbRoute].run && this.rb.route.length
+        ? { ...this.rb.route[this.rb.route.length - 1] }
+        : { x: this.los + 1.5, y: this.ballY };
 
     for (const slot of DEF_SLOTS) {
       const a = s.defCall.assign[slot];
@@ -124,6 +165,21 @@ export class Play {
       last = pt;
     }
     if (r.cont && p.route.length) p.routeDir = norm(sub(last, prev));
+  }
+
+  /**
+   * Play-action fake: meet the QB just in front of where he'll be about half a
+   * second into his drop, carry out the fake across his face, then protect.
+   */
+  private buildFake(): void {
+    const qb = this.qb.pos;
+    const rb = this.rb;
+    const drop = sub(this.qbDrop, qb);
+    const along = Math.min(1, 2.5 / Math.max(len(drop), 0.01));
+    const mesh = { x: qb.x + drop.x * along + 0.9, y: qb.y + drop.y * along };
+    const side = rb.pos.y <= mesh.y ? 1 : -1;
+    rb.route = [mesh, { x: mesh.x + 0.5, y: clamp(mesh.y + side * 1.0, 1, FIELD_W - 1) }];
+    rb.routeDir = null;
   }
 
   private defAlignment(slot: DefSlot, d: Player, off: Map<string, Player>, press: boolean): Vec {
@@ -177,10 +233,45 @@ export class Play {
     const from = { x: this.center.pos.x + 0.3, y: this.center.pos.y, z: 0.4 };
     const to = { x: this.qb.pos.x, y: this.qb.pos.y, z: 1.2 };
     launch(this.ball, from, to, dist(from, to) / 16, 0.15, 'snap');
-    this.assignProtection();
+    if (this.playDef.block === 'run') this.assignRunBlocks();
+    else this.assignProtection();
     for (const d of this.def) {
       const r = d.manTarget;
       if (d.press && r && this.rng() < 0.5 + (d.r.str - r.r.str) / 100) r.jam = 0.45;
+    }
+    // Run blocking is a run key: the second level reads it and comes downhill.
+    if (this.playDef.block === 'run') {
+      for (const d of this.def) {
+        if (d.role === 'DL') continue;
+        const t = d.manTarget;
+        if (t && !t.isBlocker) continue; // still has a receiver (or the back) to mirror
+        const read = 0.35 + (1 - d.r.awr / 100) * 0.5 + (d.assign?.kind === 'deep' ? 0.3 : 0);
+        d.fitAt = this.snapTime + read;
+        d.fitUntil = Infinity;
+      }
+    }
+  }
+
+  /** Down linemen get the nearest lineman, uncovered linemen climb to a backer, the rest stalk. */
+  private assignRunBlocks(): void {
+    const ol = this.off.filter((o) => o.role === 'OL');
+    const dl = this.def.filter((d) => d.role === 'DL');
+    for (const r of dl) {
+      let best: Player | null = null;
+      for (const b of ol) if (!b.mark && (!best || Math.abs(b.pos.y - r.pos.y) < Math.abs(best.pos.y - r.pos.y))) best = b;
+      if (best) best.mark = r;
+    }
+    const marked = () => new Set(this.off.map((o) => o.mark));
+    for (const b of this.off) {
+      if (b.mark || !b.isBlocker) continue;
+      const taken = marked();
+      let best: Player | null = null;
+      for (const d of this.def) {
+        if (taken.has(d) || d.pos.x < b.pos.x - 1) continue;
+        if (b.role === 'OL' && d.role !== 'LB') continue;
+        if (!best || dist(d.pos, b.pos) < dist(best.pos, b.pos)) best = d;
+      }
+      b.mark = best;
     }
   }
 
@@ -288,6 +379,13 @@ export class Play {
       for (const d of this.def) d.reactAt = this.time + 0.2 + (1 - d.r.awr / 100) * 0.4;
       this.popup('SCRAMBLE', qb.pos, '#9ad7ff');
     }
+    if ((input.mouse.rpressed || input.hit('KeyF')) && this.handoffOption()) {
+      this.handoff();
+      return;
+    }
+    if (this.playDef.kind === 'pa' && !this.faked && this.time - this.snapTime < 1.3 && dist(this.rb.pos, qb.pos) < FAKE_RANGE) {
+      this.sellFake();
+    }
     const canThrow = !this.scramble && !qb.down;
     const m = input.mouse;
     if (canThrow && m.pressed) this.aim = { start: { x: m.downX, y: m.downY }, cur: { x: m.x, y: m.y } };
@@ -303,6 +401,92 @@ export class Play {
     } else {
       setPose(qb, 'throw', 0.05);
     }
+  }
+
+  // ------------------------------------------------------------ handoffs
+
+  /** What a right-click would do right now, or null if the RB can't take it. */
+  handoffOption(): HandoffKind | null {
+    const qb = this.qb;
+    const rb = this.rb;
+    if (this.phase !== 'live' || this.carrier !== qb || this.scramble || this.thrown || qb.down) return null;
+    if (rb.isBlocker || rb.down || rb.engaged || rb.stun > 0) return null;
+    return handoffKind(qb.pos, rb.pos, this.los);
+  }
+
+  handoff(): void {
+    const kind = this.handoffOption();
+    if (!kind) return;
+    const qb = this.qb;
+    const rb = this.rb;
+    this.aim = null;
+    this.handedOff = true;
+    this.reactToRun();
+    if (kind === 'pitch') {
+      const t = dist(qb.pos, rb.pos) / PITCH_SPEED;
+      // Lead the back along his path even if he's only just starting to move.
+      const next = rb.route[rb.routeIdx];
+      const vel = len(rb.vel) < 3 && next ? scale(norm(sub(next, rb.pos)), maxSpeed(rb) * 0.75) : rb.vel;
+      const lead = add(rb.pos, scale(vel, t + 0.15));
+      const from = { x: qb.pos.x, y: qb.pos.y, z: 1.1 };
+      const to = { x: lead.x, y: lead.y, z: 1.0 };
+      launch(this.ball, from, to, dist(from, to) / PITCH_SPEED + 0.05, 0.35);
+      this.ballTarget = { x: to.x, y: to.y };
+      this.intended = rb;
+      this.pitch = true;
+      this.carrier = null;
+      this.controlled = null;
+      this.phase = 'air';
+      setPose(qb, 'throwEnd', 0.3);
+      return;
+    }
+    if (this.rng() >= HANDOFF_ODDS) {
+      this.fumble(rb.pos, 'Botched exchange');
+      return;
+    }
+    this.giveBall(rb);
+    this.controlled = rb;
+    this.phase = 'run';
+  }
+
+  /** Defenders key the handoff: front seven fast, defenders turned on receivers slower. */
+  private reactToRun(): void {
+    for (const d of this.def) {
+      const slow = 1 - d.r.awr / 100;
+      const t = d.manTarget;
+      let react: number;
+      if (this.time >= d.fitAt) react = 0.05;
+      else if (d.role === 'DL' || d.role === 'LB' || t === this.rb) react = 0.1 + slow * 0.25;
+      else if (t && !t.isBlocker) react = 0.4 + slow * 0.4;
+      else react = 0.3 + slow * 0.3;
+      d.reactAt = this.time + react;
+    }
+  }
+
+  /** Play-action: the second level bites on the fake for a moment. */
+  private sellFake(): void {
+    this.faked = true;
+    this.popup('FAKE', this.rb.pos, '#9ad7ff');
+    for (const d of this.def) {
+      if (d.role !== 'LB' && d.role !== 'S') continue;
+      const a = d.assign?.kind;
+      const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.awr - 70) * 0.01;
+      if (this.rng() >= chance) continue;
+      d.fitAt = this.time;
+      d.fitUntil = this.time + 0.35 + (1 - d.r.awr / 100) * 0.6;
+    }
+  }
+
+  private fumble(at: Vec, sub: string): void {
+    const spot = at.x;
+    this.ball.pos = { x: at.x, y: at.y, z: 0 };
+    this.ball.state = 'dead';
+    this.carrier = null;
+    if (spot <= OWN_GOAL) {
+      this.end({ type: 'safety', spot, spotY: at.y, text: 'SAFETY', sub: 'Fumble in the end zone', color: '#ff5a5a' });
+      return;
+    }
+    this.end({ type: 'fumble', spot, spotY: at.y, text: 'FUMBLE', sub: `${sub}. Offense recovers`, color: '#ff9a5a' });
   }
 
   /** Current aim point while dragging, for the trajectory preview. */
@@ -359,6 +543,18 @@ export class Play {
 
   private resolveArrival(): void {
     const land = this.ballTarget!;
+    if (this.pitch) {
+      const rb = this.rb;
+      if (!rb.down && this.rng() < pitchOdds(reachScore(dist(rb.pos, land)), rb.r.cth)) {
+        this.giveBall(rb);
+        this.controlled = rb;
+        this.phase = 'run';
+        setPose(rb, 'catch', 0.15);
+      } else {
+        this.fumble(land, 'Pitch on the ground');
+      }
+      return;
+    }
     const oob = land.y < 0 || land.y > FIELD_W || land.x > FIELD_LEN || land.x < 0;
     let bestO: Player | null = null;
     let bestD: Player | null = null;
@@ -462,6 +658,8 @@ export class Play {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
         if (runBlocking && dist(d.pos, this.carrier!.pos) > 10) continue;
         if (d.engagedBy.length === 1 && b.mark !== d) continue;
+        // Blockers with an assignment work to their man rather than grabbing whoever they bump into.
+        if (!runBlocking && b.isBlocker && b.mark && !b.mark.down && b.mark !== d) continue;
         if (dist(b.pos, d.pos) < 1.0) {
           b.engaged = d;
           d.engagedBy.push(b);
@@ -487,7 +685,8 @@ export class Play {
       const n = d.engagedBy.length;
       const dir = norm(sub(d.goal ?? this.qb.pos, d.pos));
       const blk = d.engagedBy.reduce((s, b) => s + b.r.blk, 0) / n;
-      const power = d.r.str * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15;
+      const runBlocking = this.playDef.block === 'run' && !this.thrown;
+      const power = d.r.str * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15 - (runBlocking ? RUN_BLOCK_EDGE : 0);
       const push = clamp(0.8 + power * 0.06, -0.8, 2.2);
       d.want = scale(dir, push);
       for (const b of d.engagedBy) b.want = scale(dir, push);
@@ -496,6 +695,13 @@ export class Play {
       let shedRate = (clamp(0.22 + power * 0.012, 0.05, 0.7) * ramp) / Math.pow(n, 1.5);
       // Once the ball is gone, blocks away from it dissolve as the defender peels off to pursue.
       if (this.thrown && dist(d.pos, d.goal ?? this.qb.pos) > 6) shedRate = 2.5;
+      // Runs: the far side of the play peels off to pursue; the defender at the point of attack fights to make the tackle.
+      const c = this.carrier;
+      if (c && c.side === 'off' && (this.phase === 'run' || this.scramble)) {
+        const dc = dist(d.pos, c.pos);
+        if (dc > 8) shedRate = 2.5;
+        else if (dc < 2.2) shedRate = Math.max(shedRate, clamp(2.2 + power * 0.05, 0.8, 5));
+      }
       if (this.rng() < shedRate * dt) {
         for (const b of d.engagedBy) b.stun = 0.35;
         this.release(d);
@@ -528,12 +734,17 @@ export class Play {
     if (!c || c.down) return;
     const tacklers = c.side === 'off' ? this.def : this.off;
     for (const t of tacklers) {
-      if (t.down || t.tackleCd > 0 || t.engaged || t.engagedBy.length || t.role === 'QB') continue;
-      if (dist(t.pos, c.pos) > TACKLE_RANGE) continue;
+      if (t.down || t.tackleCd > 0 || t.engaged || t.role === 'QB') continue;
+      const arm = t.engagedBy.length > 0;
+      if (dist(t.pos, c.pos) > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
       const juking = this.jukeTimer > 0 && c === this.controlled;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, juking)) {
+      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, juking) * (arm ? ARM_TACKLE : 1)) {
         this.tackled(c, t);
         return;
+      }
+      if (arm) {
+        t.tackleCd = 1.0; // slipped the arm tackle; the blocker still has him
+        continue;
       }
       knockDown(t, 0.9);
       t.tackleCd = 1.6;
@@ -558,7 +769,7 @@ export class Play {
     const yards = spot - this.los;
     if (spot <= OWN_GOAL) {
       this.end({ type: 'safety', spot, spotY, text: 'SAFETY', sub: `Tackled in the end zone`, color: '#ff5a5a' });
-    } else if (c === this.qb && !this.thrown) {
+    } else if (c === this.qb && !this.thrown && this.playDef.block === 'pass' && spot < this.los) {
       this.end({ type: 'sack', spot, spotY, text: 'SACKED', sub: `#${t.num} ${t.name}  ${yardsText(yards)}`, color: '#ff5a5a' });
     } else {
       this.end({

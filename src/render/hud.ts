@@ -7,7 +7,7 @@ function readable(bg: string, fg: string): string {
 }
 
 export function drawScorebug(
-  g: CanvasRenderingContext2D, user: Team, cpu: Team, score: { user: number; cpu: number }, center: string, right: string,
+  g: CanvasRenderingContext2D, user: Team, cpu: Team, score: { user: number; cpu: number }, clock: string, center: string, right: string,
 ): void {
   g.fillStyle = 'rgba(8,10,14,0.88)';
   g.fillRect(0, 0, VIEW_W, 16);
@@ -25,7 +25,10 @@ export function drawScorebug(
     }
     x += 80;
   }
-  text(g, center, 168, 4, { color: '#ffd23f' });
+  g.fillStyle = '#222b38';
+  g.fillRect(160, 0, 78, 16);
+  text(g, clock, 199, 4, { align: 'center' });
+  text(g, center, 246, 4, { color: '#ffd23f' });
   text(g, right, VIEW_W - 6, 4, { align: 'right', color: '#cfd6df' });
 }
 
@@ -44,4 +47,16 @@ export function drawHint(g: CanvasRenderingContext2D, s: string): void {
   g.fillStyle = 'rgba(8,10,14,0.65)';
   g.fillRect(0, 346, VIEW_W, 14);
   text(g, s, VIEW_W / 2, 349, { size: 8, align: 'center', color: '#cfd6df' });
+}
+
+/** Play clock box under the scorebug's right edge: red at 10, flashing at 5. */
+export function drawPlayClock(g: CanvasRenderingContext2D, s: string, secs: number, t: number): void {
+  const x = VIEW_W - 44;
+  g.fillStyle = 'rgba(8,10,14,0.85)';
+  g.fillRect(x, 18, 40, 16);
+  const urgent = secs <= 10;
+  const flash = secs <= 5 && Math.floor(t * 4) % 2 === 0;
+  g.fillStyle = urgent ? '#ff5a5a' : '#5d6b80';
+  g.fillRect(x, 32, 40, 2);
+  text(g, s, x + 20, 22, { align: 'center', color: flash ? '#ffffff' : urgent ? '#ff5a5a' : '#ffffff' });
 }

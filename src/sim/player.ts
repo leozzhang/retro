@@ -36,6 +36,10 @@ export interface Player {
   routeIdx: number;
   routeDir: Vec | null;
   isBlocker: boolean;
+  /** Turns into a pass blocker once the route (a play-action fake) is done. */
+  thenBlock: boolean;
+  /** Became a blocker mid-play (after a fake), so his man defender doesn't hug rush. */
+  lateBlock: boolean;
   engaged: Player | null;
   /** Rusher this blocker is responsible for. */
   mark: Player | null;
@@ -52,6 +56,9 @@ export interface Player {
   engagedBy: Player[];
   noEngage: number;
   goal: Vec | null;
+  /** Run fit window: from `fitAt` until `fitUntil` the defender attacks the run (run read or PA bite). */
+  fitAt: number;
+  fitUntil: number;
 }
 
 let nextId = 1;
@@ -84,6 +91,8 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     routeIdx: 0,
     routeDir: null,
     isBlocker: false,
+    thenBlock: false,
+    lateBlock: false,
     engaged: null,
     mark: null,
     stun: 0,
@@ -97,6 +106,8 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     engagedBy: [],
     noEngage: 0,
     goal: null,
+    fitAt: Infinity,
+    fitUntil: 0,
   };
 }
 

@@ -28,6 +28,10 @@ export function thinkOffense(play: Play, p: Player): void {
     else p.want = scale(p.vel, 0.5);
     return;
   }
+  if (play.phase === 'run' && c === p) {
+    autoRun(play, p); // only when the user isn't steering (balance harness)
+    return;
+  }
   if (play.phase === 'run' && c && c !== p) {
     downfieldBlock(play, p, c);
     return;
@@ -41,7 +45,8 @@ export function thinkOffense(play: Play, p: Player): void {
     return;
   }
   if (p.isBlocker) {
-    passBlock(play, p);
+    if (play.playDef.block === 'run') runBlock(play, p);
+    else passBlock(play, p);
     return;
   }
   runRoute(play, p);
@@ -60,15 +65,27 @@ function runRoute(play: Play, p: Player): void {
     let d = p.routeDir;
     if ((p.pos.y < 1.5 && d.y < 0) || (p.pos.y > FIELD_W - 1.5 && d.y > 0)) d = { x: 1, y: 0 };
     p.want = scale(d, sp);
+  } else if (p.thenBlock) {
+    // Play-action fake carried out: stay in and protect, starting with the man who was covering him.
+    p.isBlocker = true;
+    p.thenBlock = false;
+    p.lateBlock = true;
+    p.mark = play.def.find((d) => d.manTarget === p && !d.down) ?? null;
+    passBlock(play, p);
   } else {
     p.want = ZERO; // settled in a curl/hitch window
     p.facing = play.qb.pos.x < p.pos.x ? -1 : 1;
   }
 }
 
-/** Defender currently attacking the QB: called rushers plus man defenders whose guy stayed in to block. */
+/**
+ * Defender currently attacking the QB: called rushers plus man defenders whose
+ * guy stayed in to block from the snap. A back who stays in after a play-action
+ * fake doesn't trigger the hug rush; his defender sits underneath instead.
+ */
 export function isRusher(d: Player): boolean {
-  return d.assign?.kind === 'rush' || (d.assign?.kind === 'man' && !!d.manTarget?.isBlocker);
+  const t = d.manTarget;
+  return d.assign?.kind === 'rush' || (d.assign?.kind === 'man' && !!t?.isBlocker && !t.lateBlock);
 }
 
 /** Defenders who are facing the QB when he throws and can break on the ball right away. */
@@ -102,6 +119,37 @@ function passBlock(play: Play, p: Player): void {
     p.want = seek(p, tgt, maxSpeed(p) * 0.95, 0.4);
   } else {
     p.want = seek(p, { x: Math.max(qb.pos.x + 1.5, play.los - 2), y: p.start.y }, maxSpeed(p) * 0.6);
+  }
+}
+
+/** Nearest unblocked defender in front of a run blocker, preferring ones nobody has yet. */
+function pickRunTarget(play: Play, p: Player): Player | null {
+  let best: Player | null = null;
+  let bestScore = Infinity;
+  for (const d of play.def) {
+    if (d.down || d.pos.x < p.pos.x - 1) continue;
+    const dd = dist(d.pos, p.pos);
+    if (dd > 8) continue;
+    const helpers = play.off.filter((o) => o !== p && o.mark === d).length;
+    const score = dd + helpers * 5;
+    if (score < bestScore) {
+      bestScore = score;
+      best = d;
+    }
+  }
+  return best;
+}
+
+/** Fire off the ball and wall the defender off from the hole. */
+function runBlock(play: Play, p: Player): void {
+  const hole = play.hole;
+  if (!p.mark || p.mark.down || p.mark === play.carrier) p.mark = pickRunTarget(play, p);
+  if (p.mark) {
+    const r = p.mark;
+    const tgt = add(r.pos, scale(norm(sub(hole, r.pos)), 0.9));
+    p.want = seek(p, tgt, maxSpeed(p) * 0.95, 0.3);
+  } else {
+    p.want = seek(p, { x: play.los + 2.5, y: lerp(p.start.y, hole.y, 0.3) }, maxSpeed(p) * 0.7);
   }
 }
 
@@ -157,7 +205,23 @@ export function thinkDefense(play: Play, d: Player): void {
     pursue(d, c);
     return;
   }
+  if (play.phase === 'live' && play.time >= d.fitAt && play.time < d.fitUntil) {
+    runFit(play, d);
+    return;
+  }
   runAssignment(play, d);
+}
+
+/**
+ * Read run (or bite on the fake): come downhill into the defender's own gap,
+ * shading toward the play side. Fitting the exact hole would make every
+ * linebacker clairvoyant; the back has to find the crease.
+ */
+function runFit(play: Play, d: Player): void {
+  const depth = d.role === 'S' ? 4.5 : d.role === 'CB' ? 3 : 1.8;
+  const tgt = { x: play.los + depth, y: lerp(d.start.y, play.hole.y, 0.35) };
+  d.goal = tgt;
+  d.want = seek(d, tgt, maxSpeed(d) * 0.95, 0.6);
 }
 
 function runAssignment(play: Play, d: Player): void {
@@ -172,7 +236,9 @@ function runAssignment(play: Play, d: Player): void {
       break;
     case 'man':
       // Man defender whose guy stays in to block: "hug" rush after a beat.
-      if (d.manTarget?.isBlocker) {
+      if (d.manTarget?.lateBlock) {
+        robber(play, d);
+      } else if (d.manTarget?.isBlocker) {
         if (play.time - play.snapTime > 0.6) rush(play, d);
         else d.want = ZERO;
       } else {
@@ -258,6 +324,32 @@ function robber(play: Play, d: Player): void {
   }
   const tgt = best ? { x: best.pos.x + 1.5, y: best.pos.y } : home;
   d.want = seek(d, tgt, maxSpeed(d) * 0.9, 1);
+}
+
+/**
+ * Simple ball-carrier AI (used when no human is steering, e.g. the balance
+ * harness): hit the hole, then get downfield, sliding away from tacklers.
+ */
+export function autoRun(play: Play, c: Player): void {
+  if (c.down) {
+    c.want = ZERO;
+    return;
+  }
+  const h = play.hole;
+  const dir =
+    c.pos.x < play.los + 1 ? norm(sub({ x: Math.max(h.x, play.los + 1.5), y: h.y }, c.pos)) : { x: 1, y: 0 };
+  for (const d of play.def) {
+    if (d.down || d.pos.x < c.pos.x - 1) continue;
+    const dd = dist(d.pos, c.pos);
+    if (dd < 5) {
+      const away = norm(sub(c.pos, d.pos));
+      dir.y += away.y * ((5 - dd) / 5) * (d.engagedBy.length ? 0.6 : 1.1); // blocked defenders still grab
+    }
+  }
+  if (c.pos.y < 3) dir.y += 0.6;
+  if (c.pos.y > FIELD_W - 3) dir.y -= 0.6;
+  dir.x = Math.max(dir.x, 0.3);
+  c.want = scale(norm(dir), maxSpeed(c) * 0.95);
 }
 
 /** Interception returner: run for the user's end zone, slipping away from nearby tacklers. */
