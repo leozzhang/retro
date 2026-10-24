@@ -392,6 +392,9 @@ Routes used to run at one speed: top speed about 0.45 s after the snap, every cu
 
 **Tests:** 7 new ones covering the set catch bonus (open and contested, under 6 points), `cutKeep`, the go route's ramp and no set, the slant keeping speed vs the hitch stopping, the curl plant-settle-turn, and run, fake and lead paths left alone.
 
+## Done: cancel a pass aim (2026-10-24)
+- **Space while aiming** drops the aim without throwing (`Play.updateLive`). The release that follows does nothing, and the same press doesn't trigger a juke. The hint bar shows `RELEASE TO THROW  SPACE: CANCEL` while aiming.
+
 ## Balance baseline
 From `npm run balance` (Georgia offense vs Alabama defense), after the route-running work. The single-seed 120-rep rows below move a few points from run to run; use the paired table above for before/after.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.

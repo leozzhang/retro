@@ -24,7 +24,7 @@ npm run balance    # AI balance report -> balance.txt
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
 | Audible (pre-snap) | Esc |
 | Snap | Space or click |
-| Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, and the game goes into slight slow motion while you aim |
+| Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, and the game goes into slight slow motion while you aim. Space cancels the aim without throwing |
 | Hand off / pitch to the RB | Right-click (or F) while he's in the backfield and not blocking. Works on any play, so you can call a draw |
 | Move QB / steer runner | WASD or arrow keys. After a catch the runner keeps going downfield automatically |
 | Sprint | Shift (drains stamina) |

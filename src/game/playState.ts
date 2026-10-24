@@ -125,6 +125,8 @@ export class Play {
   /** The player the user is steering (QB pre-throw, ball carrier after a catch). */
   controlled: Player | null = null;
   aim: Aim | null = null;
+  /** Play time when Space last cancelled an aim, so that same press doesn't also juke. */
+  private aimCancelAt = -1;
   ballTarget: Vec | null = null;
   intended: Player | null = null;
   scramble = false;
@@ -496,6 +498,10 @@ export class Play {
     this.aim.cur = { x: m.x, y: m.y };
     if (!canThrow) {
       this.aim = null;
+    } else if (input.hit('Space')) {
+      // Pull the ball down: drop the aim without throwing. Releasing the button later does nothing.
+      this.aim = null;
+      this.aimCancelAt = this.time;
     } else if (m.released || !m.down) {
       const drag = len(sub(this.aim.start, this.aim.cur));
       const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm);
@@ -805,7 +811,7 @@ export class Play {
     const sp = maxSpeed(c) * (sprint ? 1 : 0.86) * (this.aim ? 0.6 : 1);
     c.want = scale(norm(ax), sp);
 
-    if (input.hit('Space') && this.jukeCd <= 0 && !this.aim) {
+    if (input.hit('Space') && this.jukeCd <= 0 && !this.aim && this.aimCancelAt !== this.time) {
       let dy = ax.y;
       if (!dy) {
         let nearest: Player | null = null;

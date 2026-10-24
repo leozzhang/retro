@@ -754,7 +754,7 @@ export class Game {
       case 'live': {
         const ho = play.handoffOption();
         const give = ho === 'pitch' ? 'R-CLICK PITCH  ' : ho ? 'R-CLICK HAND OFF  ' : '';
-        drawHint(g, play.scramble ? 'WASD RUN  SHIFT SPRINT  SPACE JUKE' : `${give}DRAG + RELEASE TO THROW  WASD MOVE QB`);
+        drawHint(g, play.scramble ? 'WASD RUN  SHIFT SPRINT  SPACE JUKE' : play.aim ? 'RELEASE TO THROW  SPACE: CANCEL' : `${give}DRAG + RELEASE TO THROW  WASD MOVE QB`);
         break;
       }
       case 'air':
