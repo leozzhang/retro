@@ -1,0 +1,1715 @@
+[
+ {
+  "id": "newmexico",
+  "school": "New Mexico",
+  "mascot": "Lobos",
+  "abbr": "UNM",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#BA0C2F",
+   "secondary": "#A7A8AA"
+  },
+  "tier": 4,
+  "prestige": 30,
+  "record2026": "5-1 (2-0)",
+  "target": {
+   "off": 72,
+   "def": 76,
+   "st": 74
+  },
+  "basis": "5-1, preseason MW favorite with the league's most returning production, lost only 6-14 at Oklahoma; QB depth hurt by Jack Layne's season-ending injury.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": -1,
+   "LB": 1,
+   "DL": 1,
+   "K": 1
+  },
+  "standouts": [
+   {
+    "name": "Toa Fa'avae",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Took over as main passer after Layne's injury; 249 yds, 3 TD vs UTEP"
+   },
+   {
+    "name": "Jaxton Eck",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "2026 preseason MW Defensive POY; 2025 MW co-DPOY"
+   },
+   {
+    "name": "Troy Omeire",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "possession",
+    "tier": "star",
+    "note": "2026 preseason All-MW WR"
+   },
+   {
+    "name": "Brian Booker",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "star",
+    "note": "2026 preseason All-MW DL"
+   },
+   {
+    "name": "Grant Glasgow",
+    "pos": "K",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Hit 48, 46 and 49-yard FGs vs Central Michigan"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_New_Mexico_Lobos_football_team",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx",
+   "https://www.rotoballer.com/player-news/new-mexico-starting-quarterback-jack-layne-out-for-season/1918373",
+   "https://golobos.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "northdakotastate",
+  "school": "North Dakota State",
+  "mascot": "Bison",
+  "abbr": "NDSU",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#0A5640",
+   "secondary": "#FFC72A"
+  },
+  "tier": 4,
+  "prestige": 55,
+  "record2026": "6-1 (3-1)",
+  "target": {
+   "off": 71,
+   "def": 76,
+   "st": 75
+  },
+  "basis": "6-1 in first FBS season (football-only MW member) with wins at Air Force and 28-0 over Wyoming; FCS dynasty pedigree, three preseason All-MW picks plus MW ST POY.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "pro"
+  },
+  "units": {
+   "OL": 1,
+   "DL": 1,
+   "WR": 1
+  },
+  "standouts": [
+   {
+    "name": "Nathan Hayes",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Fifth-year starter and captain in a multiple pro-style offense"
+   },
+   {
+    "name": "Jackson Williams",
+    "pos": "WR",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "slot",
+    "tier": "star",
+    "note": "2026 preseason MW Special Teams POY (KR/PR); 134 rec yds vs Sacramento State"
+   },
+   {
+    "name": "Keenan Wilson",
+    "pos": "DT",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Captain; 2026 preseason All-MW DL"
+   },
+   {
+    "name": "Griffin Empey",
+    "pos": "OG",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "run",
+    "tier": "star",
+    "note": "2026 preseason All-MW OL"
+   },
+   {
+    "name": "Darius Givance",
+    "pos": "FS",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "coverage",
+    "tier": "star",
+    "note": "Captain; 2026 preseason All-MW DB (listed injured)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_North_Dakota_State_Bison_football_team",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx",
+   "https://gobison.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "wyoming",
+  "school": "Wyoming",
+  "mascot": "Cowboys",
+  "abbr": "WYO",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#492F24",
+   "secondary": "#FFC425"
+  },
+  "tier": 4,
+  "prestige": 40,
+  "record2026": "5-3 (4-1)",
+  "target": {
+   "off": 65,
+   "def": 73,
+   "st": 75
+  },
+  "basis": "5-3 (4-1 MW) on defense and special teams with a low-scoring offense (shut out 0-28 at NDSU); three preseason All-MW picks.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "pro"
+  },
+  "units": {
+   "P": 2,
+   "LB": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Tyler Hughes",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Senior transfer starter; threw for 2,330 yds and 20 TD in 2025, runs some"
+   },
+   {
+    "name": "Ethan Stuhlsatz",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "Graduate LB; 2026 preseason All-MW"
+   },
+   {
+    "name": "Rex Johnsen",
+    "pos": "OT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "2026 preseason All-MW OL; started all 12 games in 2025"
+   },
+   {
+    "name": "Bart Edmiston",
+    "pos": "P",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "2026 preseason All-MW P; 46.1 avg in 2025 (No. 12 nationally)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Wyoming_Cowboys_football_team",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx"
+  ]
+ },
+ {
+  "id": "unlv",
+  "school": "UNLV",
+  "mascot": "Rebels",
+  "abbr": "UNLV",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#CF0A2C",
+   "secondary": "#666666"
+  },
+  "tier": 4,
+  "prestige": 30,
+  "record2026": "4-3 (2-1)",
+  "target": {
+   "off": 72,
+   "def": 70,
+   "st": 70
+  },
+  "basis": "4-3 under Dan Mullen (beat Cal and NDSU, lost 6-44 at North Texas); league-high five preseason All-MW picks.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "WR": 1,
+   "OL": 1
+  },
+  "standouts": [
+   {
+    "name": "Jackson Arnold",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Senior transfer from Auburn (ex-Oklahoma); 291 yds, 2 TD vs Memphis"
+   },
+   {
+    "name": "Jai'Den Thomas",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Repeat preseason All-MW RB; 2,457 career rush yds, 31 TD"
+   },
+   {
+    "name": "Taeshaun Lyons",
+    "pos": "WR",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "slot",
+    "tier": "star",
+    "note": "2026 preseason All-MW WR"
+   },
+   {
+    "name": "Lucas Conti",
+    "pos": "DT",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "2026 preseason All-MW DL"
+   },
+   {
+    "name": "Jake Pope",
+    "pos": "SS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "hybrid",
+    "tier": "star",
+    "note": "2026 preseason All-MW DB"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_UNLV_Rebels_football_team",
+   "https://www.fox5vegas.com/2026/07/15/unlv-places-league-high-five-preseason-all-mountain-west-team/",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx",
+   "https://unlvrebels.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "airforce",
+  "school": "Air Force",
+  "mascot": "Falcons",
+  "abbr": "AF",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#003087",
+   "secondary": "#8A8D8F"
+  },
+  "tier": 4,
+  "prestige": 50,
+  "record2026": "5-2 (3-2)",
+  "target": {
+   "off": 70,
+   "def": 72,
+   "st": 68
+  },
+  "basis": "5-2 triple-option team (beat Navy and UNLV) with two preseason All-MW picks; lost to NDSU and Wyoming.",
+  "offense": {
+   "qbStyle": "runner",
+   "scheme": "option"
+  },
+  "units": {
+   "QB": 1,
+   "LB": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Liam Szarka",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "scrambler",
+    "tier": "good",
+    "note": "Main option QB; 171 rush yds, 2 TD vs Nevada"
+   },
+   {
+    "name": "Owen Allen",
+    "pos": "FB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "blocking",
+    "tier": "star",
+    "note": "Preseason All-MW RB; option fullback and ball carrier"
+   },
+   {
+    "name": "Blake Fletcher",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "2026 preseason All-MW LB; 85-yd INT return vs NDSU"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Air_Force_Falcons_football_team",
+   "https://goairforcefalcons.com/sports/football/roster",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx"
+  ]
+ },
+ {
+  "id": "sanjosestate",
+  "school": "San Jose State",
+  "mascot": "Spartans",
+  "abbr": "SJSU",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#0055A2",
+   "secondary": "#E5A823"
+  },
+  "tier": 4,
+  "prestige": 30,
+  "record2026": "4-3 (2-1)",
+  "target": {
+   "off": 69,
+   "def": 68,
+   "st": 67
+  },
+  "basis": "4-3 in Ken Niumatalolo's Spread-N-Shred offense; no preseason All-MW selections, losses to USC, Fresno State and Wyoming.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "WR": 1,
+   "OL": -1
+  },
+  "standouts": [
+   {
+    "name": "Luke Weaver",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "About 1,278 yds, 11 TD in the 5 games with listed stats"
+   },
+   {
+    "name": "Jabari Bates",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "elusive",
+    "tier": "good",
+    "note": "450 rush yds in 4 games, 163 vs Cal Poly"
+   },
+   {
+    "name": "Anthony Ivey",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "Penn State transfer; 150-yd game vs Fresno State"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_San_Jose_State_Spartans_football_team",
+   "https://sjsuspartans.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "nevada",
+  "school": "Nevada",
+  "mascot": "Wolf Pack",
+  "abbr": "NEV",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#003366",
+   "secondary": "#807F84"
+  },
+  "tier": 4,
+  "prestige": 35,
+  "record2026": "2-4 (1-2)",
+  "target": {
+   "off": 64,
+   "def": 66,
+   "st": 70
+  },
+  "basis": "2-4 with an unsettled QB spot in a new air raid; preseason All-MW picks LaBarbera, Walker, McFadden and OL Jack Foster.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "air-raid"
+  },
+  "units": {
+   "QB": -1,
+   "DL": 1,
+   "K": 1
+  },
+  "standouts": [
+   {
+    "name": "Carter Jones",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Shares passing duties with AJ Bianco"
+   },
+   {
+    "name": "Dylan LaBarbera",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "speed",
+    "tier": "star",
+    "note": "2026 preseason All-MW DL"
+   },
+   {
+    "name": "Aiden Walker",
+    "pos": "CB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "star",
+    "note": "2026 preseason All-MW DB"
+   },
+   {
+    "name": "Joe McFadden",
+    "pos": "K",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "accurate",
+    "tier": "star",
+    "note": "Graduate; 2026 preseason All-MW PK"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Nevada_Wolf_Pack_football_team",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx",
+   "https://nevadawolfpack.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "hawaii",
+  "school": "Hawaii",
+  "mascot": "Rainbow Warriors",
+  "abbr": "HAW",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#024731",
+   "secondary": "#A2AAAD"
+  },
+  "tier": 5,
+  "prestige": 35,
+  "record2026": "1-6 (0-4)",
+  "target": {
+   "off": 68,
+   "def": 61,
+   "st": 64
+  },
+  "basis": "1-6 despite preseason MW Offensive POY Micah Alejado in the run-and-shoot; defense and run game have been the problem.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "air-raid"
+  },
+  "units": {
+   "QB": 2,
+   "WR": 1,
+   "RB": -1,
+   "DL": -1
+  },
+  "standouts": [
+   {
+    "name": "Micah Alejado",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "star",
+    "note": "2026 preseason MW Offensive POY; 3,106 yds, 24 TD as a 2025 freshman"
+   },
+   {
+    "name": "Pofele Ashlock",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "possession",
+    "tier": "star",
+    "note": "2026 preseason All-MW; 76 catches, 827 yds, 8 TD in 2025"
+   },
+   {
+    "name": "Elijah Palmer",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "star",
+    "note": "Captain; 2026 preseason All-MW DB"
+   },
+   {
+    "name": "Jamih Otis",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "Captain; 2026 preseason All-MW LB"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Hawaii_Rainbow_Warriors_football_team",
+   "https://hawaiiathletics.com/news/2026/7/15/football-four-warriors-named-preseason-all-mountain-west-alejado-selected-as-preseason-player-of-the-year.aspx",
+   "https://gowyo.com/news/2026/7/15/football-johnsen-and-stuhlsatz-named-preseason-all-mw.aspx"
+  ]
+ },
+ {
+  "id": "northernillinois",
+  "school": "Northern Illinois",
+  "mascot": "Huskies",
+  "abbr": "NIU",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#BA0C2F",
+   "secondary": "#000000"
+  },
+  "tier": 5,
+  "prestige": 40,
+  "record2026": "0-6 (0-2)",
+  "target": {
+   "off": 60,
+   "def": 62,
+   "st": 64
+  },
+  "basis": "0-6 in first MW season (football-only) under interim coach Rob Harley after Thomas Hammock resigned; 2025 pass offense ranked 132nd.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "pro"
+  },
+  "units": {
+   "QB": 1,
+   "OL": -1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Taron Dickens",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Western Carolina transfer (3,508 yds, 38 TD in 2025); 320 yds at Georgia State"
+   },
+   {
+    "name": "DeAree Rogers",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "107 yds, TD at Georgia State"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Northern_Illinois_Huskies_football_team",
+   "https://www.fox32chicago.com/sports/northern-illinois-football-preview-predictions-niu-2026",
+   "https://niuhuskies.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "utep",
+  "school": "UTEP",
+  "mascot": "Miners",
+  "abbr": "UTEP",
+  "conference": "Mountain West",
+  "colors": {
+   "primary": "#041E42",
+   "secondary": "#FF8200"
+  },
+  "tier": 5,
+  "prestige": 20,
+  "record2026": "1-6 (0-3)",
+  "target": {
+   "off": 58,
+   "def": 58,
+   "st": 62
+  },
+  "basis": "1-6 in first MW season, routed by FBS opponents (0-51 at Oklahoma, 7-61 at New Mexico); only win vs FCS Texas Southern.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "OL": -1,
+   "CB": -1
+  },
+  "standouts": [
+   {
+    "name": "EJ Colson Jr.",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Transfer from Incarnate Word; 239 yds, 4 TD vs Texas Southern"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mountain_West_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_UTEP_Miners_football_team",
+   "https://utepminers.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "toledo",
+  "school": "Toledo",
+  "mascot": "Rockets",
+  "abbr": "TOL",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#15397F",
+   "secondary": "#FFDA00"
+  },
+  "tier": 4,
+  "prestige": 50,
+  "record2026": "6-2 (3-1)",
+  "target": {
+   "off": 75,
+   "def": 73,
+   "st": 72
+  },
+  "basis": "6-2 under first-year coach Mike Jacobs with wins over SDSU and Temple; picked 3rd in MAC, 15 Athlon preseason All-MAC picks.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "WR": 1,
+   "DL": 1,
+   "S": 1
+  },
+  "standouts": [
+   {
+    "name": "John Alan Richter",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "First-year starter; 429 yds, 4 TD vs Temple"
+   },
+   {
+    "name": "Adjatay Dabbs",
+    "pos": "WR",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "deep",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC (PFN, Athlon); 196 yds, 2 TD vs Ball State"
+   },
+   {
+    "name": "CJ Miller",
+    "pos": "HB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "196 rush yds, 2 TD vs Ball State"
+   },
+   {
+    "name": "Andrew Zock",
+    "pos": "DE",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "speed",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC EDGE"
+   },
+   {
+    "name": "Julian Fox",
+    "pos": "MLB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC LB (PFN)"
+   },
+   {
+    "name": "Kaleb Hutchinson",
+    "pos": "FS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "coverage",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC S (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Toledo_Rockets_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://utrockets.com/sports/football/roster",
+   "https://abcnews.com/Sports/wireStory/john-alan-richter-tosses-4-tds-toledo-rallies-136591818"
+  ]
+ },
+ {
+  "id": "ohio",
+  "school": "Ohio",
+  "mascot": "Bobcats",
+  "abbr": "OHIO",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#00694E",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 4,
+  "prestige": 40,
+  "record2026": "5-2 (3-0)",
+  "target": {
+   "off": 68,
+   "def": 74,
+   "st": 70
+  },
+  "basis": "5-2 and unbeaten in MAC under first-year coach John Hauser, winning with defense (13-10 at Kent State); picked 4th preseason.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "LB": 1,
+   "S": 1,
+   "DL": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Nick Poulos",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Graduate 6-6 QB who also runs; missed time with injury"
+   },
+   {
+    "name": "DJ Walker",
+    "pos": "FS",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "coverage",
+    "tier": "star",
+    "note": "Captain; Thorpe and Bednarik watch lists; preseason All-MAC"
+   },
+   {
+    "name": "Michael Molnar",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "run",
+    "tier": "star",
+    "note": "MAC Defensive Player of the Week; 16 tackles vs South Alabama"
+   },
+   {
+    "name": "Nehemiah Dukes",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC DT (PFN)"
+   },
+   {
+    "name": "Darren James-Hamilton",
+    "pos": "SS",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "hybrid",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC DB (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Ohio_Bobcats_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://ohiobobcats.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "westernmichigan",
+  "school": "Western Michigan",
+  "mascot": "Broncos",
+  "abbr": "WMU",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#6C4023",
+   "secondary": "#B5A167"
+  },
+  "tier": 4,
+  "prestige": 42,
+  "record2026": "5-3 (3-1)",
+  "target": {
+   "off": 71,
+   "def": 74,
+   "st": 73
+  },
+  "basis": "5-3, reigning MAC champion and preseason MAC favorite; nearly beat Michigan (12-13), 17 Athlon preseason All-MAC picks.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "CB": 1,
+   "P": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Broc Lowry",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "star",
+    "note": "Reigning MAC Offensive POY (1,803 pass yds, 963 rush yds, 14 rush TD in 2025)"
+   },
+   {
+    "name": "Jalen Buckley",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "star",
+    "note": "1,003 yds in 2025; Maxwell watch list; preseason first-team All-MAC"
+   },
+   {
+    "name": "Scoop Gardner Jr.",
+    "pos": "DE",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "speed",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC EDGE"
+   },
+   {
+    "name": "Joey Pope",
+    "pos": "SS",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "hybrid",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC S (PFN)"
+   },
+   {
+    "name": "Jarvarius Sims",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "man",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC CB (Athlon)"
+   },
+   {
+    "name": "Ryan Millmore",
+    "pos": "P",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC P (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Western_Michigan_Broncos_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://getsomemaction.com/news/2026/8/3/football-buckley-gant-and-lowry-named-to-maxwell-award-watch-list.aspx",
+   "https://wmubroncos.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "miamioh",
+  "school": "Miami (OH)",
+  "mascot": "RedHawks",
+  "abbr": "M-OH",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#C3142D",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 4,
+  "prestige": 50,
+  "record2026": "5-3 (3-1)",
+  "target": {
+   "off": 68,
+   "def": 73,
+   "st": 73
+  },
+  "basis": "5-3 with one-score wins over UConn, UMass and CMU; most Athlon preseason All-MAC picks (19), strong defense and specialists with a young QB.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "pro"
+  },
+  "units": {
+   "LB": 1,
+   "DL": 1,
+   "P": 1,
+   "QB": -1
+  },
+  "standouts": [
+   {
+    "name": "David McComb",
+    "pos": "QB",
+    "year": "FR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Redshirt freshman starter; 334 yds at Cincinnati, 312 vs UConn"
+   },
+   {
+    "name": "Rodney Nelson",
+    "pos": "HB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "receiving",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC all-purpose back (Athlon)"
+   },
+   {
+    "name": "Maleek Huggins",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "128 yds, TD at Cincinnati"
+   },
+   {
+    "name": "Bai Jobe",
+    "pos": "DE",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "speed",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC DL (Athlon)"
+   },
+   {
+    "name": "CJ Young",
+    "pos": "MLB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "run",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC LB (Athlon)"
+   },
+   {
+    "name": "Pierse Stainton",
+    "pos": "P",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC P (Athlon)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Miami_RedHawks_football_team",
+   "https://www.yardbarker.com/college_football/articles/mac_football_2026_all_conference_team/s1_17615_44012321",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://miamiredhawks.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "buffalo",
+  "school": "Buffalo",
+  "mascot": "Bulls",
+  "abbr": "BUFF",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#005BBB",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 4,
+  "prestige": 25,
+  "record2026": "5-3 (3-1)",
+  "target": {
+   "off": 64,
+   "def": 70,
+   "st": 68
+  },
+  "basis": "5-3 with a 23-8 win at Toledo, built on defense; picked 6th in MAC, QB snaps split between Elijah Holmes and Jason Wright.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": -1,
+   "DL": 1,
+   "WR": 1
+  },
+  "standouts": [
+   {
+    "name": "Chance Morrow",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "11 catches, 170 yds, 2 TD at FIU"
+   },
+   {
+    "name": "Cornell Evans",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Preseason second-team All-MAC DT (PFN)"
+   },
+   {
+    "name": "SaVeon Brown",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "coverage",
+    "tier": "good",
+    "note": "Preseason second-team All-MAC LB (PFN); plays nickel"
+   },
+   {
+    "name": "Oliver Hautanen",
+    "pos": "K",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Made a 51-yard FG"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Buffalo_Bulls_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://ubbulls.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "easternmichigan",
+  "school": "Eastern Michigan",
+  "mascot": "Eagles",
+  "abbr": "EMU",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#046A38",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 4,
+  "prestige": 22,
+  "record2026": "4-4 (3-1)",
+  "target": {
+   "off": 68,
+   "def": 64,
+   "st": 71
+  },
+  "basis": "4-4 (3-1 MAC) behind veteran QB Noah Kim; defense allowed 35+ to Michigan State and Wisconsin and 34 to Toledo.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": 1,
+   "TE": 1,
+   "K": 1,
+   "CB": -1
+  },
+  "standouts": [
+   {
+    "name": "Noah Kim",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "star",
+    "note": "Led MAC in passing in 2025 (2,817 yds); MAC Offensive POW in opener"
+   },
+   {
+    "name": "Joshua Long",
+    "pos": "TE",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "receiving",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC TE (Athlon)"
+   },
+   {
+    "name": "Nick Devereaux",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC WR (Athlon)"
+   },
+   {
+    "name": "Rudy Kessinger",
+    "pos": "K",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "accurate",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC K (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Eastern_Michigan_Eagles_football_team",
+   "https://emueagles.com/news/2026/1/7/football-kim-granted-extra-year-of-eligibility-set-to-return-for-2026-season",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://emueagles.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "kentstate",
+  "school": "Kent State",
+  "mascot": "Golden Flashes",
+  "abbr": "KENT",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#002664",
+   "secondary": "#EAAB00"
+  },
+  "tier": 5,
+  "prestige": 20,
+  "record2026": "3-5 (2-2)",
+  "target": {
+   "off": 60,
+   "def": 64,
+   "st": 69
+  },
+  "basis": "3-5 with blowout losses to South Carolina, Ohio State and USF; offense has struggled, return game is a strength (Phil Steele first-team KR/PR).",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "DL": 1,
+   "QB": -1
+  },
+  "standouts": [
+   {
+    "name": "Dru DeShields",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Starter; 248 pass and 74 rush yds vs Wofford"
+   },
+   {
+    "name": "Thomas Aden",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC DT"
+   },
+   {
+    "name": "Da'Realyst Clark",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC kick returner"
+   },
+   {
+    "name": "Wayne Harris",
+    "pos": "WR",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "slot",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC punt returner"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Kent_State_Golden_Flashes_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://kentstatesports.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "ballstate",
+  "school": "Ball State",
+  "mascot": "Cardinals",
+  "abbr": "BALL",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#BA0C2F",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 5,
+  "prestige": 25,
+  "record2026": "3-5 (2-2)",
+  "target": {
+   "off": 62,
+   "def": 62,
+   "st": 66
+  },
+  "basis": "3-5 in year two under Mike Uremovich, picked 10th in MAC; lopsided losses to Ohio State, Liberty and Northwestern.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "pro"
+  },
+  "units": {
+   "K": 1,
+   "OL": -1
+  },
+  "standouts": [
+   {
+    "name": "Keldric Luster",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Starter; 256 yds, 3 TD vs Stony Brook"
+   },
+   {
+    "name": "Ameir Glenn",
+    "pos": "DT",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Preseason second-team All-MAC DT (PFN)"
+   },
+   {
+    "name": "TJ Horton",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "good",
+    "note": "125 rush yds vs Stony Brook; preseason All-MAC KR"
+   },
+   {
+    "name": "Brody Boehm",
+    "pos": "K",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Made a 54-yard FG at Ohio State"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Ball_State_Cardinals_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://ballstatesports.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "bowlinggreen",
+  "school": "Bowling Green",
+  "mascot": "Falcons",
+  "abbr": "BGSU",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#FE5000",
+   "secondary": "#4F2C1D"
+  },
+  "tier": 5,
+  "prestige": 30,
+  "record2026": "2-6 (2-2)",
+  "target": {
+   "off": 59,
+   "def": 66,
+   "st": 63
+  },
+  "basis": "2-6 under Eddie George with an FCS loss to Tarleton State; defense (Myles Bradley, JoJo Johnson) carries a weak offense.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "DL": 1,
+   "CB": 1,
+   "OL": -1
+  },
+  "standouts": [
+   {
+    "name": "Jay Kastantin",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Assumption transfer; 305 yds, 2 TD at Miami"
+   },
+   {
+    "name": "Myles Bradley",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "speed",
+    "tier": "star",
+    "note": "Program-record 4.5 sacks vs USF; MAC Defensive POW"
+   },
+   {
+    "name": "JoJo Johnson",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC CB (PFN)"
+   },
+   {
+    "name": "Dorian Pringle",
+    "pos": "MLB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC LB (Athlon)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Bowling_Green_Falcons_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://bgsufalcons.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "umass",
+  "school": "UMass",
+  "mascot": "Minutemen",
+  "abbr": "MASS",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#881C1C",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 5,
+  "prestige": 15,
+  "record2026": "4-4 (1-3)",
+  "target": {
+   "off": 64,
+   "def": 65,
+   "st": 72
+  },
+  "basis": "4-4 after a 4-0 start that included a 37-21 win at Rutgers, then four straight losses; picked last in MAC, excellent specialists.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": 1,
+   "K": 1,
+   "P": 1,
+   "OL": -1
+  },
+  "standouts": [
+   {
+    "name": "Pop Watson",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "star",
+    "note": "Davey O'Brien Great 8; MAC Offensive POW Week 1; 19/22, 3 TD at Rutgers"
+   },
+   {
+    "name": "Joshua Iseah",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC LB (PFN)"
+   },
+   {
+    "name": "Jahmad Harmon",
+    "pos": "SS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "hybrid",
+    "tier": "good",
+    "note": "MAC Defensive POW"
+   },
+   {
+    "name": "Derek Morris",
+    "pos": "K",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "55-yd FG; two MAC Special Teams POW awards"
+   },
+   {
+    "name": "Edward Phillipson",
+    "pos": "P",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Ray Guy Award Ray's 8"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_UMass_Minutemen_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://umassathletics.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "centralmichigan",
+  "school": "Central Michigan",
+  "mascot": "Chippewas",
+  "abbr": "CMU",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#6A0032",
+   "secondary": "#FFC82E"
+  },
+  "tier": 5,
+  "prestige": 35,
+  "record2026": "3-5 (1-3)",
+  "target": {
+   "off": 62,
+   "def": 64,
+   "st": 63
+  },
+  "basis": "3-5 with a run-first offense led by QB Angel Flores; beat Wyoming and Akron, blown out by New Mexico and Miami (FL).",
+  "offense": {
+   "qbStyle": "runner",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": 1,
+   "CB": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Angel Flores",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "scrambler",
+    "tier": "good",
+    "note": "163 rush yds, 2 TD vs Wyoming; 154 vs Akron"
+   },
+   {
+    "name": "Donavan Philord",
+    "pos": "CB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "star",
+    "note": "Preseason first-team All-MAC CB (PFN)"
+   },
+   {
+    "name": "Langston Lewis",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC WR (Athlon); 71-yd TD vs Akron"
+   },
+   {
+    "name": "Justin Taylor",
+    "pos": "SS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "hybrid",
+    "tier": "good",
+    "note": "Preseason second-team All-MAC S (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Central_Michigan_Chippewas_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://cmuchippewas.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "akron",
+  "school": "Akron",
+  "mascot": "Zips",
+  "abbr": "AKR",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#041E42",
+   "secondary": "#A89968"
+  },
+  "tier": 5,
+  "prestige": 12,
+  "record2026": "1-7 (0-4)",
+  "target": {
+   "off": 59,
+   "def": 58,
+   "st": 63
+  },
+  "basis": "1-7 (0-4 MAC) in Joe Moorhead's fifth year, only win vs FCS Robert Morris; QB play split between Cibastian Broughton and Brayden Roggow.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "QB": -1,
+   "OL": -1
+  },
+  "standouts": [
+   {
+    "name": "Jordan Gant",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "power",
+    "tier": "star",
+    "note": "1,032 yds in 2025; Maxwell watch list; preseason first-team All-MAC RB"
+   },
+   {
+    "name": "Marcel Williams",
+    "pos": "WR",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC WR (Athlon, Phil Steele)"
+   },
+   {
+    "name": "Vaughn Highland",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Preseason third-team All-MAC DT (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Akron_Zips_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac",
+   "https://gozips.com/sports/football/roster"
+  ]
+ },
+ {
+  "id": "sacramentostate",
+  "school": "Sacramento State",
+  "mascot": "Hornets",
+  "abbr": "SAC",
+  "conference": "MAC",
+  "colors": {
+   "primary": "#043927",
+   "secondary": "#C4B581"
+  },
+  "tier": 5,
+  "prestige": 15,
+  "record2026": "1-7 (0-5)",
+  "target": {
+   "off": 58,
+   "def": 56,
+   "st": 63
+  },
+  "basis": "1-7 (0-5) in first FBS season as a MAC football-only member; only win vs FCS Mississippi Valley State.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "DL": 1,
+   "TE": 1,
+   "OL": -1,
+   "CB": -1
+  },
+  "standouts": [
+   {
+    "name": "Jackson Sharman",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Starter for most games; 247 yds, 4 TD vs MVSU"
+   },
+   {
+    "name": "Matt Coleman",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "San Jose State transfer; 141 yds, 3 TD vs MVSU"
+   },
+   {
+    "name": "Xavier Williams",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "Preseason second-team All-MAC (Athlon, PFN); 6 sacks in 2025"
+   },
+   {
+    "name": "Jordan Williams",
+    "pos": "TE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "receiving",
+    "tier": "good",
+    "note": "Preseason first-team All-MAC TE (PFN)"
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Mid-American_Conference_football_season",
+   "https://en.wikipedia.org/wiki/2026_Sacramento_State_Hornets_football_team",
+   "https://hornetsports.com/news/2026/7/8/football-athlon-sports-names-six-hornets-to-preseason-all-mac-football-team.aspx",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/mac"
+  ]
+ }
+]

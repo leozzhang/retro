@@ -1,6 +1,7 @@
 import { clamp, len, scale, sub, type Vec } from '../engine/math';
 import type { Camera } from '../engine/camera';
 import { FIELD_W } from '../engine/constants';
+import type { Ratings } from '../data/ratings';
 
 /** Screen-space multiplier: the target lands this many times the pull-back distance in front of the QB. */
 export const AIM_GAIN = 2.6;
@@ -31,7 +32,31 @@ export function aimTarget(aim: Aim, qbPos: Vec, cam: Camera, arm: number): Vec {
   return { x: qbPos.x + off.x, y: clamp(qbPos.y + off.y, -4, FIELD_W + 4) };
 }
 
+export type PasserRatings = Pick<Ratings, 'sac' | 'mac' | 'dac' | 'tup' | 'pac'>;
+
+/** Accuracy blends short -> medium over 8-14 yd and medium -> deep over 20-28 yd. */
+export const ACC_BANDS = { shortEnd: 8, medStart: 14, medEnd: 20, deepStart: 28 };
+
+/** The QB's accuracy rating for a throw of `dist` yards. */
+export function accuracyAt(dist: number, r: PasserRatings): number {
+  const b = ACC_BANDS;
+  if (dist <= b.shortEnd) return r.sac;
+  if (dist < b.medStart) return r.sac + ((r.mac - r.sac) * (dist - b.shortEnd)) / (b.medStart - b.shortEnd);
+  if (dist <= b.medEnd) return r.mac;
+  if (dist < b.deepStart) return r.mac + ((r.dac - r.mac) * (dist - b.medEnd)) / (b.deepStart - b.medEnd);
+  return r.dac;
+}
+
+/** Scales the pressure (`pac`) and on-the-run (`tup`) penalties: 1 at 80, 1.5 at 55, 0.7 at 95. */
+export function composure(rating: number): number {
+  return Math.max(0.4, 1 + (80 - rating) / 50);
+}
+
 /** Standard deviation (yards) of throw error. */
-export function throwErrorSd(dist: number, thr: number, pressure: number, moving: number): number {
-  return (0.25 + dist * 0.022) * (1.6 - thr / 100) * (1 + pressure * 1.2 + moving * 0.6);
+export function throwErrorSd(dist: number, r: PasserRatings, pressure: number, moving: number): number {
+  return (
+    (0.25 + dist * 0.022) *
+    (1.6 - accuracyAt(dist, r) / 100) *
+    (1 + pressure * 1.2 * composure(r.pac) + moving * 0.6 * composure(r.tup))
+  );
 }

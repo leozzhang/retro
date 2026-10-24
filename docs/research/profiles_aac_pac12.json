@@ -1,0 +1,1504 @@
+[
+ {
+  "id": "utsa",
+  "school": "UTSA",
+  "mascot": "Roadrunners",
+  "abbr": "UTSA",
+  "conference": "American",
+  "colors": {
+   "primary": "#0C2340",
+   "secondary": "#F15A22"
+  },
+  "tier": 4,
+  "prestige": 40,
+  "record2026": "6-1 (3-0)",
+  "target": {
+   "off": 77,
+   "def": 74,
+   "st": 76
+  },
+  "basis": "6-1 and unbeaten in league play, up-tempo spread with a deep backfield; solid G5 talent under Traylor.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "K": 1
+  },
+  "standouts": [
+   {
+    "name": "Owen McCown",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Multi-year starter; 20/20 for 303 yds, 3 TD vs. Colorado State; PFN 2nd-team preseason all-conference."
+   },
+   {
+    "name": "Will Henderson III",
+    "pos": "HB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "star",
+    "note": "Lead back, PFN 1st-team preseason all-conference; 75-yd TD run vs. UTRGV."
+   },
+   {
+    "name": "Michael Petro",
+    "pos": "K",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "accurate",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason kicker."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_UTSA_Roadrunners_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "northtexas",
+  "school": "North Texas",
+  "mascot": "Mean Green",
+  "abbr": "UNT",
+  "conference": "American",
+  "colors": {
+   "primary": "#00853E",
+   "secondary": "#000000"
+  },
+  "tier": 4,
+  "prestige": 42,
+  "record2026": "5-2 (3-0)",
+  "target": {
+   "off": 76,
+   "def": 69,
+   "st": 72
+  },
+  "basis": "5-2, 3-0 in the American under first-year coach Neal Brown; productive spread passing game, rebuilt defense.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": 1,
+   "RB": 1,
+   "DL": -1
+  },
+  "standouts": [
+   {
+    "name": "Tayven Jackson",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Indiana/UCF transfer; 483 yds, 3 TD vs. Texas State; league offensive player of the week."
+   },
+   {
+    "name": "Jahiem White",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "good",
+    "note": "124 rush yds and a TD vs. UNLV."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_North_Texas_Mean_Green_football_team",
+   "https://en.wikipedia.org/wiki/2026_American_Conference_football_season"
+  ]
+ },
+ {
+  "id": "army",
+  "school": "Army",
+  "mascot": "Black Knights",
+  "abbr": "ARMY",
+  "conference": "American",
+  "colors": {
+   "primary": "#000000",
+   "secondary": "#D3BC8D"
+  },
+  "tier": 4,
+  "prestige": 70,
+  "record2026": "5-2 (4-1)",
+  "target": {
+   "off": 74,
+   "def": 74,
+   "st": 72
+  },
+  "basis": "5-2 (4-1) with an under-center triple option; disciplined defense and OL with nine Athlon preseason all-conference picks.",
+  "offense": {
+   "qbStyle": "runner",
+   "scheme": "option"
+  },
+  "units": {
+   "QB": 1,
+   "OL": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Cale Hellums",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "scrambler",
+    "tier": "star",
+    "note": "Option QB; 195 rush yds and 5 TD vs. FAU, 223 yds vs. Tulane; league offensive player of the week."
+   },
+   {
+    "name": "Jack Bousum",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "speed",
+    "tier": "star",
+    "note": "Edge; Athlon and PFN 1st-team preseason all-conference."
+   },
+   {
+    "name": "Teddy Williams",
+    "pos": "OG",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 1st-team preseason all-conference OL."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Army_Black_Knights_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american",
+   "https://goarmywestpoint.com/news/2026/7/8/football-garners-nine-spots-on-preseason-athlon-sports-all-conference-team"
+  ]
+ },
+ {
+  "id": "memphis",
+  "school": "Memphis",
+  "mascot": "Tigers",
+  "abbr": "MEM",
+  "conference": "American",
+  "colors": {
+   "primary": "#003087",
+   "secondary": "#898D8D"
+  },
+  "tier": 3,
+  "prestige": 52,
+  "record2026": "6-2 (3-1)",
+  "target": {
+   "off": 77,
+   "def": 74,
+   "st": 74
+  },
+  "basis": "6-2 (3-1) in Charles Huff's first year; 11 Athlon preseason all-conference selections and a strong front seven.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "DL": 1,
+   "S": 1
+  },
+  "standouts": [
+   {
+    "name": "Marcus Stokes",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Florida transfer; 384 yds at Boise State, 4 TD vs. UT Martin."
+   },
+   {
+    "name": "Jaylin Carter",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "183 yds, 4 TD vs. Arkansas State."
+   },
+   {
+    "name": "J'Mond Tapp",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "Phil Steele, Athlon and PFN 1st-team preseason all-conference edge."
+   },
+   {
+    "name": "Ian Foster",
+    "pos": "SS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "hybrid",
+    "tier": "star",
+    "note": "Athlon/Phil Steele/PFN 1st-team preseason safety; also returns kicks."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Memphis_Tigers_football_team",
+   "https://gotigersgo.com/news/2026/7/1/football-11-tigers-named-to-12-spots-on-athlon-sports-preseason-american-conference-teams",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "fau",
+  "school": "Florida Atlantic",
+  "mascot": "Owls",
+  "abbr": "FAU",
+  "conference": "American",
+  "colors": {
+   "primary": "#003366",
+   "secondary": "#CC0000"
+  },
+  "tier": 4,
+  "prestige": 30,
+  "record2026": "5-2 (2-1)",
+  "target": {
+   "off": 77,
+   "def": 70,
+   "st": 74
+  },
+  "basis": "5-2 behind Kittley's air raid and the league's top preseason QB; several preseason all-conference DL/CB picks.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "air-raid"
+  },
+  "units": {
+   "QB": 2,
+   "WR": 1,
+   "RB": -1
+  },
+  "standouts": [
+   {
+    "name": "Caden Veltkamp",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "star",
+    "note": "PFN 1st-team preseason QB; 386 yds, 5 TD vs. Navy."
+   },
+   {
+    "name": "Easton Messer",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "slot",
+    "tier": "good",
+    "note": "PFN 2nd-team WR/PR; 8-179-2 vs. Navy."
+   },
+   {
+    "name": "Damarius McGhee",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "good",
+    "note": "PFN 1st-team preseason CB."
+   },
+   {
+    "name": "CJ Doggette Jr.",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "quick",
+    "tier": "good",
+    "note": "PFN 1st-team preseason DT."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Florida_Atlantic_Owls_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "uab",
+  "school": "UAB",
+  "mascot": "Blazers",
+  "abbr": "UAB",
+  "conference": "American",
+  "colors": {
+   "primary": "#1E6B52",
+   "secondary": "#F4C300"
+  },
+  "tier": 4,
+  "prestige": 30,
+  "record2026": "4-3 (2-1)",
+  "target": {
+   "off": 70,
+   "def": 67,
+   "st": 68
+  },
+  "basis": "4-3 in Alex Mortensen's first year; run-led multiple offense with a preseason all-conference OL.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "pro"
+  },
+  "units": {
+   "RB": 1,
+   "OL": 1
+  },
+  "standouts": [
+   {
+    "name": "Ryder Burton",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Primary passer; 219 yds vs. Illinois."
+   },
+   {
+    "name": "Roderick Robinson II",
+    "pos": "HB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "114 yds on 21 carries vs. Louisiana-Monroe."
+   },
+   {
+    "name": "Adam Lepkowski",
+    "pos": "OG",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 1st-team preseason all-conference OL."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_UAB_Blazers_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "tulane",
+  "school": "Tulane",
+  "mascot": "Green Wave",
+  "abbr": "TULN",
+  "conference": "American",
+  "colors": {
+   "primary": "#006747",
+   "secondary": "#418FDE"
+  },
+  "tier": 3,
+  "prestige": 48,
+  "record2026": "3-3 (1-1)",
+  "target": {
+   "off": 70,
+   "def": 73,
+   "st": 72
+  },
+  "basis": "3-3 after a 2025 CFP run, new coach Will Hall and heavy roster turnover; transfer-built backfield, solid secondary.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "CB": 1,
+   "QB": -1
+  },
+  "standouts": [
+   {
+    "name": "Kadin Semonza",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Ball State transfer; 212 yds, TD vs. South Alabama."
+   },
+   {
+    "name": "Jaylin Lucas",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "good",
+    "note": "Florida State transfer; 214 yds on 11 carries vs. South Alabama."
+   },
+   {
+    "name": "Chris Rodgers",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason LB."
+   },
+   {
+    "name": "Anthony Rogers",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason CB."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Tulane_Green_Wave_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "southflorida",
+  "school": "South Florida",
+  "mascot": "Bulls",
+  "abbr": "USF",
+  "conference": "American",
+  "colors": {
+   "primary": "#006747",
+   "secondary": "#CFC493"
+  },
+  "tier": 4,
+  "prestige": 40,
+  "record2026": "5-2 (1-2)",
+  "target": {
+   "off": 74,
+   "def": 74,
+   "st": 77
+  },
+  "basis": "5-2 in Brian Hartline's first year; power spread, deep preseason all-conference defense and the league's top kicker.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "K": 2,
+   "DL": 1,
+   "LB": 1
+  },
+  "standouts": [
+   {
+    "name": "Michael Van Buren Jr.",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "LSU transfer; 300 yds vs. Delaware State, 2 rush TD vs. Army."
+   },
+   {
+    "name": "Nico Gramatica",
+    "pos": "K",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "accurate",
+    "tier": "star",
+    "note": "PFN 1st-team preseason K; 4 FGs vs. FIU."
+   },
+   {
+    "name": "Asani Redwood",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 1st-team preseason DT."
+   },
+   {
+    "name": "Ayden Jackson",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 1st-team preseason LB."
+   },
+   {
+    "name": "D. J. Crowther",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "143 yds vs. Bowling Green; 3 TD vs. Delaware State."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_South_Florida_Bulls_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "eastcarolina",
+  "school": "East Carolina",
+  "mascot": "Pirates",
+  "abbr": "ECU",
+  "conference": "American",
+  "colors": {
+   "primary": "#592A8A",
+   "secondary": "#FDC82F"
+  },
+  "tier": 4,
+  "prestige": 40,
+  "record2026": "3-4 (1-2)",
+  "target": {
+   "off": 71,
+   "def": 70,
+   "st": 70
+  },
+  "basis": "3-4 with two OT league losses; veteran transfer QB, preseason all-conference CB and edge.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": 1,
+   "CB": 1
+  },
+  "standouts": [
+   {
+    "name": "Mitch Griffis",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Wake Forest/Texas Tech transfer; 230 yds, 2 TD vs. App State."
+   },
+   {
+    "name": "Zyeir Gamble",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "good",
+    "note": "PFN 1st-team preseason CB."
+   },
+   {
+    "name": "Jasiyah Robinson",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "speed",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason edge."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_East_Carolina_Pirates_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "temple",
+  "school": "Temple",
+  "mascot": "Owls",
+  "abbr": "TEM",
+  "conference": "American",
+  "colors": {
+   "primary": "#9D2235",
+   "secondary": "#FFFFFF"
+  },
+  "tier": 4,
+  "prestige": 35,
+  "record2026": "2-5 (1-3)",
+  "target": {
+   "off": 67,
+   "def": 65,
+   "st": 70
+  },
+  "basis": "2-5 with a QB carousel (Smolik/Sheppard); experienced OL, TE and punter but poor results.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "pro"
+  },
+  "units": {
+   "OL": 1,
+   "TE": 1,
+   "P": 1,
+   "QB": -1
+  },
+  "standouts": [
+   {
+    "name": "Jaxon Smolik",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Back as starter after a Week 3 injury; has split time with Ajani Sheppard."
+   },
+   {
+    "name": "Peter Clarke",
+    "pos": "TE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "receiving",
+    "tier": "good",
+    "note": "PFN 1st-team preseason TE."
+   },
+   {
+    "name": "Jayce Freeman",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "PFN 1st-team preseason WR."
+   },
+   {
+    "name": "Dante Atton",
+    "pos": "P",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 1st-team preseason punter."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Temple_Owls_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american",
+   "https://www.inquirer.com/college-sports/temple/ajani-sheppard-temple-quarterback-jaxon-smolik-injury-update-20261006"
+  ]
+ },
+ {
+  "id": "charlotte",
+  "school": "Charlotte",
+  "mascot": "49ers",
+  "abbr": "CLT",
+  "conference": "American",
+  "colors": {
+   "primary": "#046A38",
+   "secondary": "#B9975B"
+  },
+  "tier": 5,
+  "prestige": 15,
+  "record2026": "1-6 (1-2)",
+  "target": {
+   "off": 64,
+   "def": 61,
+   "st": 64
+  },
+  "basis": "1-6 including an FCS loss; transfer-heavy spread option roster, among the weakest in FBS.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "WR": 1,
+   "DL": -1
+  },
+  "standouts": [
+   {
+    "name": "Cole Gonzales",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Pitt transfer; 322 yds, 3 TD plus 2 rush TD vs. The Citadel."
+   },
+   {
+    "name": "Derrick Eley",
+    "pos": "WR",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "PFN 1st-team preseason KR; 43-yd TD vs. The Citadel."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Charlotte_49ers_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "tulsa",
+  "school": "Tulsa",
+  "mascot": "Golden Hurricane",
+  "abbr": "TLSA",
+  "conference": "American",
+  "colors": {
+   "primary": "#002D72",
+   "secondary": "#C8102E"
+  },
+  "tier": 4,
+  "prestige": 42,
+  "record2026": "4-4 (1-3)",
+  "target": {
+   "off": 70,
+   "def": 70,
+   "st": 68
+  },
+  "basis": "4-4 with a win over Oklahoma State; experienced backs/WR and a preseason all-conference secondary.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "CB": 1,
+   "S": 1
+  },
+  "standouts": [
+   {
+    "name": "Baylor Hayes",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Primary QB in most games; 249 yds, 3 TD at Rice."
+   },
+   {
+    "name": "Oran Singleton Jr.",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "99 and 104 rec yds vs. Oklahoma State and North Texas."
+   },
+   {
+    "name": "Elijah Green",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "star",
+    "note": "PFN 1st-team preseason CB."
+   },
+   {
+    "name": "Zach Williams",
+    "pos": "FS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "coverage",
+    "tier": "good",
+    "note": "PFN 1st-team preseason safety."
+   },
+   {
+    "name": "Devin Robinson",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 1st-team preseason LB."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Tulsa_Golden_Hurricane_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "navy",
+  "school": "Navy",
+  "mascot": "Midshipmen",
+  "abbr": "NAVY",
+  "conference": "American",
+  "colors": {
+   "primary": "#00205B",
+   "secondary": "#C5B783"
+  },
+  "tier": 4,
+  "prestige": 62,
+  "record2026": "2-5 (1-4)",
+  "target": {
+   "off": 71,
+   "def": 66,
+   "st": 68
+  },
+  "basis": "2-5 despite a prolific option run game (506 rush yds in the opener); defense has struggled.",
+  "offense": {
+   "qbStyle": "runner",
+   "scheme": "option"
+  },
+  "units": {
+   "QB": 1,
+   "RB": 1,
+   "CB": -1
+  },
+  "standouts": [
+   {
+    "name": "Jackson Gutierrez",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "scrambler",
+    "tier": "good",
+    "note": "Took over from Braxton Woodson; 232 rush yds, 3 TD vs. Tulsa."
+   },
+   {
+    "name": "Braxton Woodson",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "scrambler",
+    "tier": "good",
+    "note": "Team captain; 200 rush yds, 3 TD vs. Towson."
+   },
+   {
+    "name": "Griffen Willis",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason DT."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Navy_Midshipmen_football_team",
+   "https://clutchpoints.com/ncaa-football/navy-football-news-jackson-gutierrez-expected-1st-career-start-uab",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/american"
+  ]
+ },
+ {
+  "id": "rice",
+  "school": "Rice",
+  "mascot": "Owls",
+  "abbr": "RICE",
+  "conference": "American",
+  "colors": {
+   "primary": "#00205B",
+   "secondary": "#C1C6C8"
+  },
+  "tier": 5,
+  "prestige": 30,
+  "record2026": "1-7 (0-4)",
+  "target": {
+   "off": 63,
+   "def": 63,
+   "st": 64
+  },
+  "basis": "1-7 and winless in league play; run-heavy option-style attack built around a dual-threat QB.",
+  "offense": {
+   "qbStyle": "runner",
+   "scheme": "option"
+  },
+  "units": {
+   "QB": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Jacurri Brown",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "scrambler",
+    "tier": "good",
+    "note": "Rice's leading rusher; 141 yds vs. Fresno State."
+   },
+   {
+    "name": "Quinton Jackson",
+    "pos": "HB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "good",
+    "note": "Lindy's 1st-team all-purpose; Phil Steele/Athlon 2nd-team RB."
+   },
+   {
+    "name": "Daveon Hook",
+    "pos": "SS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "box",
+    "tier": "good",
+    "note": "Phil Steele/Athlon 2nd-team preseason safety."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Rice_Owls_football_team",
+   "https://attheroost.com/2026/07/03/rice-football-2026-preseason-honors/"
+  ]
+ },
+ {
+  "id": "boisestate",
+  "school": "Boise State",
+  "mascot": "Broncos",
+  "abbr": "BSU",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#0033A0",
+   "secondary": "#D64309"
+  },
+  "tier": 3,
+  "prestige": 68,
+  "record2026": "5-1 (2-0)",
+  "target": {
+   "off": 80,
+   "def": 81,
+   "st": 78
+  },
+  "basis": "5-1, AP No. 21, only loss at No. 2 Oregon; preseason Pac-12 favorite with 20 Athlon all-conference picks.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "pro"
+  },
+  "units": {
+   "RB": 1,
+   "DL": 1,
+   "CB": 1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Maddux Madsen",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Veteran starter; 3 TD at Oregon, PFN 2nd-team preseason QB."
+   },
+   {
+    "name": "Dylan Riley",
+    "pos": "HB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "star",
+    "note": "198 yds, 2 TD vs. South Dakota; 150 rush yds vs. Fresno State."
+   },
+   {
+    "name": "Sire Gaines",
+    "pos": "HB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 1st-team preseason RB."
+   },
+   {
+    "name": "Max Stege",
+    "pos": "DE",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "PFN 1st-team preseason edge."
+   },
+   {
+    "name": "Jaden Mickey",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "star",
+    "note": "PFN 1st-team preseason CB."
+   },
+   {
+    "name": "Jake Ripp",
+    "pos": "OLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "Pick-six at Utah State."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Boise_State_Broncos_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12",
+   "https://www.denvergazette.com/2026/08/02/pac-12-preseason-media-poll-boise-state-consensus-champ-in-first-year-of-new-look-conference/"
+  ]
+ },
+ {
+  "id": "oregonstate",
+  "school": "Oregon State",
+  "mascot": "Beavers",
+  "abbr": "ORST",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#DC4405",
+   "secondary": "#000000"
+  },
+  "tier": 3,
+  "prestige": 55,
+  "record2026": "5-2 (3-0)",
+  "target": {
+   "off": 79,
+   "def": 70,
+   "st": 75
+  },
+  "basis": "5-2 and 3-0 in the Pac-12 in Shephard's first year; explosive passing game (400-yd games), middling defense.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": 1,
+   "WR": 2,
+   "P": 1,
+   "DL": -1
+  },
+  "standouts": [
+   {
+    "name": "Braden Atkinson",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "star",
+    "note": "About 370 pass yds per game; 5 TD vs. Montana and San Diego State."
+   },
+   {
+    "name": "Jesse Legree",
+    "pos": "WR",
+    "year": "FR",
+    "redshirt": false,
+    "archetype": "deep",
+    "tier": "star",
+    "note": "8-240-2 vs. Texas Tech, 10-191-3 vs. San Diego State."
+   },
+   {
+    "name": "AJ Newberry",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "receiving",
+    "tier": "good",
+    "note": "105 rush, 120 rec yds vs. Washington State."
+   },
+   {
+    "name": "Dylan Layne",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 1st-team preseason LB."
+   },
+   {
+    "name": "AJ Winsor",
+    "pos": "P",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 1st-team preseason punter."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Oregon_State_Beavers_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12"
+  ]
+ },
+ {
+  "id": "sandiegostate",
+  "school": "San Diego State",
+  "mascot": "Aztecs",
+  "abbr": "SDSU",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#A6192E",
+   "secondary": "#000000"
+  },
+  "tier": 4,
+  "prestige": 48,
+  "record2026": "3-4 (2-1)",
+  "target": {
+   "off": 66,
+   "def": 74,
+   "st": 74
+  },
+  "basis": "3-4 after being picked 2nd; defense-first team with a limited passing game and a strong run game/OL.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "RB": 1,
+   "OL": 1,
+   "QB": -1,
+   "WR": -1
+  },
+  "standouts": [
+   {
+    "name": "Jayden Denegal",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Starter; modest passing totals (112-209 yds per game)."
+   },
+   {
+    "name": "Lucky Sutton",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "star",
+    "note": "PFN 1st-team preseason RB; 110 yds vs. Fresno State."
+   },
+   {
+    "name": "Joseph Borjon",
+    "pos": "OG",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 1st-team preseason OL."
+   },
+   {
+    "name": "Sione Hala",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason LB."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_San_Diego_State_Aztecs_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12"
+  ]
+ },
+ {
+  "id": "texasstate",
+  "school": "Texas State",
+  "mascot": "Bobcats",
+  "abbr": "TXST",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#501214",
+   "secondary": "#8D734A"
+  },
+  "tier": 4,
+  "prestige": 28,
+  "record2026": "3-3 (1-1)",
+  "target": {
+   "off": 77,
+   "def": 68,
+   "st": 70
+  },
+  "basis": "3-3 in first Pac-12 season; returning dual-threat QB and top preseason WR duo drive a run-and-gun offense.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "air-raid"
+  },
+  "units": {
+   "QB": 1,
+   "WR": 1,
+   "RB": 1,
+   "CB": -1
+  },
+  "standouts": [
+   {
+    "name": "Brad Jackson",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "star",
+    "note": "PFN 1st-team preseason QB; 3,050 pass and 692 rush yds in 2025."
+   },
+   {
+    "name": "Beau Sparks",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "possession",
+    "tier": "good",
+    "note": "PFN 1st-team preseason WR."
+   },
+   {
+    "name": "Chris Dawn Jr.",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "deep",
+    "tier": "good",
+    "note": "PFN 1st-team preseason WR; 4-107-2 vs. North Texas."
+   },
+   {
+    "name": "Torrance Burgess Jr.",
+    "pos": "HB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "214 rush yds vs. North Texas."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Texas_State_Bobcats_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12",
+   "https://www.texasfootball.com/article/2026/07/30/texas-state-offense-defense-preview"
+  ]
+ },
+ {
+  "id": "utahstate",
+  "school": "Utah State",
+  "mascot": "Aggies",
+  "abbr": "USU",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#0F2439",
+   "secondary": "#8A8D8F"
+  },
+  "tier": 4,
+  "prestige": 38,
+  "record2026": "2-4 (1-1)",
+  "target": {
+   "off": 68,
+   "def": 69,
+   "st": 68
+  },
+  "basis": "2-4 under Mendenhall in year 2; turnover-prone power spread, preseason all-conference front seven pieces.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "DL": 1,
+   "S": 1,
+   "QB": -1
+  },
+  "standouts": [
+   {
+    "name": "Grady Brosterhous",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Took over after the opener; 242 yds, 2 TD vs. Troy."
+   },
+   {
+    "name": "Carson Tujague",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 1st-team preseason DT."
+   },
+   {
+    "name": "Brevin Hamblin",
+    "pos": "SS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "box",
+    "tier": "good",
+    "note": "PFN 1st-team preseason safety."
+   },
+   {
+    "name": "Jimmy Liston",
+    "pos": "OT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "pass",
+    "tier": "good",
+    "note": "PFN 1st-team preseason OL."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Utah_State_Aggies_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12"
+  ]
+ },
+ {
+  "id": "fresnostate",
+  "school": "Fresno State",
+  "mascot": "Bulldogs",
+  "abbr": "FRES",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#DB0032",
+   "secondary": "#002E6D"
+  },
+  "tier": 4,
+  "prestige": 50,
+  "record2026": "4-3 (1-2)",
+  "target": {
+   "off": 72,
+   "def": 72,
+   "st": 72
+  },
+  "basis": "4-3 in Entz's second year; balanced pistol offense, preseason all-conference CB and returner.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "pro"
+  },
+  "units": {
+   "RB": 1,
+   "CB": 1
+  },
+  "standouts": [
+   {
+    "name": "Jayden Mandal",
+    "pos": "QB",
+    "year": "JR",
+    "redshirt": false,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "23/26, 316 yds vs. Sacramento State."
+   },
+   {
+    "name": "Rayshon Luke",
+    "pos": "HB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "elusive",
+    "tier": "good",
+    "note": "PFN 1st-team preseason KR; 167 rush yds vs. Rice."
+   },
+   {
+    "name": "Simeon Harris",
+    "pos": "CB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "man",
+    "tier": "good",
+    "note": "PFN 1st-team preseason CB."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Fresno_State_Bulldogs_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12"
+  ]
+ },
+ {
+  "id": "coloradostate",
+  "school": "Colorado State",
+  "mascot": "Rams",
+  "abbr": "CSU",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#1E4D2B",
+   "secondary": "#C8C372"
+  },
+  "tier": 4,
+  "prestige": 35,
+  "record2026": "2-4 (0-2)",
+  "target": {
+   "off": 68,
+   "def": 64,
+   "st": 66
+  },
+  "basis": "2-4 in Jim L. Mora's first year; spread offense with an Oklahoma State transfer QB, porous defense.",
+  "offense": {
+   "qbStyle": "dual",
+   "scheme": "spread"
+  },
+  "units": {
+   "WR": 1,
+   "DL": -1
+  },
+  "standouts": [
+   {
+    "name": "Hauss Hejny",
+    "pos": "QB",
+    "year": "SR",
+    "redshirt": true,
+    "archetype": "dual",
+    "tier": "good",
+    "note": "Oklahoma State transfer; 5 TD vs. Wyoming."
+   },
+   {
+    "name": "Quinton Harris",
+    "pos": "OT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "pass",
+    "tier": "good",
+    "note": "PFN 1st-team preseason OL."
+   },
+   {
+    "name": "Oumar Diomande",
+    "pos": "MLB",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "run",
+    "tier": "good",
+    "note": "PFN 2nd-team preseason LB."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Colorado_State_Rams_football_team",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12"
+  ]
+ },
+ {
+  "id": "washingtonstate",
+  "school": "Washington State",
+  "mascot": "Cougars",
+  "abbr": "WSU",
+  "conference": "Pac-12",
+  "colors": {
+   "primary": "#981E32",
+   "secondary": "#5E6A71"
+  },
+  "tier": 4,
+  "prestige": 52,
+  "record2026": "1-6 (0-3)",
+  "target": {
+   "off": 66,
+   "def": 66,
+   "st": 70
+  },
+  "basis": "1-6 in Kirby Moore's first year with a QB change to Owen Eshelman; a few preseason all-conference defenders.",
+  "offense": {
+   "qbStyle": "pocket",
+   "scheme": "spread"
+  },
+  "units": {
+   "QB": -1
+  },
+  "standouts": [
+   {
+    "name": "Owen Eshelman",
+    "pos": "QB",
+    "year": "SO",
+    "redshirt": true,
+    "archetype": "pocket",
+    "tier": "good",
+    "note": "Replaced Caden Pinnick; 289 yds, 2 TD in first start at Oregon State."
+   },
+   {
+    "name": "Paul Hutson III",
+    "pos": "DT",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "power",
+    "tier": "good",
+    "note": "PFN 1st-team preseason DT."
+   },
+   {
+    "name": "Jaylen Thomas",
+    "pos": "FS",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "hybrid",
+    "tier": "good",
+    "note": "PFN 1st-team preseason safety; 47-yd INT return vs. Kansas State."
+   },
+   {
+    "name": "Tony Freeman",
+    "pos": "WR",
+    "year": "SR",
+    "redshirt": false,
+    "archetype": "slot",
+    "tier": "good",
+    "note": "PFN 1st-team preseason PR, 2nd-team WR."
+   }
+  ],
+  "sources": [
+   "https://en.wikipedia.org/wiki/2026_Washington_State_Cougars_football_team",
+   "https://www.rotowire.com/cfootball/player.php?id=50420",
+   "https://www.profootballnetwork.com/cfb-hq/preseason-honors/pac-12"
+  ]
+ }
+]

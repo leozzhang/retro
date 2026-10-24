@@ -4,7 +4,10 @@ import { clamp, type Rng } from '../engine/math';
 export interface Contender {
   pos: number;
   cth: number;
-  awr?: number;
+  /** Receiver: catch in traffic, for his share of a contested ball (defaults to `cth`). */
+  cit?: number;
+  /** Defender: play recognition, 40% of his ball skills (defaults to `cth`). */
+  prc?: number;
   /** Receiver only: 0..1, how set he is (settled and facing the QB on a hitch, curl, comeback or screen). */
   set?: number;
 }
@@ -26,11 +29,12 @@ export function catchOdds(o: Contender | null, d: Contender | null): { catch: nu
   const open = o ? clamp(0.2 + 0.8 * oPos * hands, 0, 0.98) : 0;
   if (!d) return { catch: open, int: 0 };
 
-  const dHands = d.cth * 0.6 + (d.awr ?? d.cth) * 0.4;
+  const dHands = d.cth * 0.6 + (d.prc ?? d.cth) * 0.4;
   const intBase = clamp(0.08 + 0.5 * dPos * (dHands / 100), 0, 0.7);
   if (!o) return { catch: 0, int: intBase };
 
-  const oSkill = oPos * hands * (1 + SET_CONTEST * set);
+  const traffic = o.cit === undefined ? hands : 0.75 + (0.25 * o.cit) / 100 + SET_HANDS * set;
+  const oSkill = oPos * traffic * (1 + SET_CONTEST * set);
   const dSkill = dPos * (0.6 + (0.4 * dHands) / 100);
   const share = oSkill / (oSkill + dSkill * 0.9 + 1e-6);
   const pc = open * share;

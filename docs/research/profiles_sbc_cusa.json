@@ -1,0 +1,1622 @@
+[
+  {
+    "id": "jamesmadison",
+    "school": "James Madison",
+    "mascot": "Dukes",
+    "abbr": "JMU",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#450084",
+      "secondary": "#CBB677"
+    },
+    "tier": 3,
+    "prestige": 56,
+    "record2026": "7-1 (4-1)",
+    "target": {
+      "off": 77,
+      "def": 79,
+      "st": 74
+    },
+    "basis": "7-1 Sun Belt East leader (only loss in OT at App State), preseason East favorite after a 2025 CFP run; top G5 roster depth, defense led by preseason first-team DL Amar Thomas.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "OL": 1,
+      "DL": 1,
+      "RB": 1
+    },
+    "standouts": [
+      {
+        "name": "Camden Coleman",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Richmond transfer; took over as starter, 263 yds 3 TD vs Marshall."
+      },
+      {
+        "name": "George Pettaway",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "elusive",
+        "tier": "star",
+        "note": "Preseason 2nd-team All-Sun Belt; 206 yds 2 TD vs Marshall."
+      },
+      {
+        "name": "Zach Greenberg",
+        "pos": "C",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Graduate; preseason 1st-team All-Sun Belt OL."
+      },
+      {
+        "name": "Amar Thomas",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt DL; Group of Six preseason All-American."
+      },
+      {
+        "name": "Morgan Suarez",
+        "pos": "K",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "accurate",
+        "tier": "good",
+        "note": "Senior placekicker."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_James_Madison_Dukes_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx",
+      "https://jmusports.com/news/2026/6/22/football-greenberg-and-thomas-garner-preseason-all-sun-belt-nod-from-athlon-sports"
+    ]
+  },
+  {
+    "id": "appstate",
+    "school": "App State",
+    "mascot": "Mountaineers",
+    "abbr": "APP",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#222222",
+      "secondary": "#FFCC00"
+    },
+    "tier": 4,
+    "prestige": 62,
+    "record2026": "5-2 (2-1)",
+    "target": {
+      "off": 74,
+      "def": 72,
+      "st": 70
+    },
+    "basis": "5-2 with wins over JMU and ECU, close loss at NC State; efficient passing from Purdue transfer Malachi Singleton, two preseason first-team All-Sun Belt defenders.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "LB": 1
+    },
+    "standouts": [
+      {
+        "name": "Malachi Singleton",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "Purdue transfer; 331 yds vs Charlotte, 22/24 for 291 vs Maine."
+      },
+      {
+        "name": "Aiden Benton",
+        "pos": "DE",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt DL."
+      },
+      {
+        "name": "Colton Phares",
+        "pos": "MLB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt LB."
+      },
+      {
+        "name": "Tyriq Poindexter",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pass",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt OL."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Appalachian_State_Mountaineers_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "georgiasouthern",
+    "school": "Georgia Southern",
+    "mascot": "Eagles",
+    "abbr": "GASO",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#011E41",
+      "secondary": "#87714D"
+    },
+    "tier": 4,
+    "prestige": 55,
+    "record2026": "3-4 (2-1)",
+    "target": {
+      "off": 70,
+      "def": 69,
+      "st": 72
+    },
+    "basis": "3-4 with losses to Clemson and Houston, seven preseason All-Sun Belt picks; pass-first offense with UNC transfer Max Johnson, solid DL and kicking.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "WR": 1,
+      "DL": 1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Max Johnson",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "North Carolina transfer; 284 yds 3 TD vs Houston."
+      },
+      {
+        "name": "MJ Stroud",
+        "pos": "DT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt DL."
+      },
+      {
+        "name": "Chance Gamble",
+        "pos": "CB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "man",
+        "tier": "star",
+        "note": "6th-year; preseason 1st-team All-Sun Belt DB."
+      },
+      {
+        "name": "Tripp Bryant",
+        "pos": "K",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "accurate",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt K."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Georgia_Southern_Eagles_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "georgiastate",
+    "school": "Georgia State",
+    "mascot": "Panthers",
+    "abbr": "GAST",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#0039A6",
+      "secondary": "#C60C30"
+    },
+    "tier": 4,
+    "prestige": 30,
+    "record2026": "4-2 (1-1)",
+    "target": {
+      "off": 70,
+      "def": 66,
+      "st": 68
+    },
+    "basis": "4-2 (wins over Kennesaw State, NIU, ODU; lost to UCF and 49-22 at JMU); balanced pro-style run game, no preseason all-conference honorees.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "pro"
+    },
+    "units": {
+      "RB": 1,
+      "DL": -1
+    },
+    "standouts": [
+      {
+        "name": "Cameran Brown",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "5th-year starter; 282 yds 2 TD at UCF."
+      },
+      {
+        "name": "Lanear McCrary Jr.",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Rushing TD in each listed game, 112 yds vs NIU."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Georgia_State_Panthers_football_team"
+    ]
+  },
+  {
+    "id": "coastalcarolina",
+    "school": "Coastal Carolina",
+    "mascot": "Chanticleers",
+    "abbr": "CCU",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#006F71",
+      "secondary": "#A27752"
+    },
+    "tier": 4,
+    "prestige": 48,
+    "record2026": "2-5 (1-2)",
+    "target": {
+      "off": 66,
+      "def": 67,
+      "st": 70
+    },
+    "basis": "2-5 in first year under Ryan Beard; secondary has three preseason All-Sun Belt picks, offense inconsistent.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "CB": 1,
+      "OL": -1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Deuce Bailey",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "373 yds 3 TD at West Virginia."
+      },
+      {
+        "name": "Ja'Marion Wayne",
+        "pos": "CB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "man",
+        "tier": "star",
+        "note": "Graduate; preseason 1st-team All-Sun Belt DB."
+      },
+      {
+        "name": "Tray Brown",
+        "pos": "MLB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt LB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Coastal_Carolina_Chanticleers_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "marshall",
+    "school": "Marshall",
+    "mascot": "Thundering Herd",
+    "abbr": "MRSH",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#00B140",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 4,
+    "prestige": 62,
+    "record2026": "4-3 (1-2)",
+    "target": {
+      "off": 72,
+      "def": 69,
+      "st": 70
+    },
+    "basis": "4-3 with a league-high nine preseason All-Sun Belt picks, including Preseason OPOY Carlos Del Rio-Wilson and two first-team OL; defense has been shaky in league play.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "OL": 1,
+      "TE": 1
+    },
+    "standouts": [
+      {
+        "name": "Carlos Del Rio-Wilson",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "star",
+        "note": "Preseason Sun Belt Offensive Player of the Year; 386 yds 3 TD vs Gardner-Webb."
+      },
+      {
+        "name": "Toby Payne",
+        "pos": "TE",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "receiving",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt TE."
+      },
+      {
+        "name": "Adrian Norton",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt WR."
+      },
+      {
+        "name": "Tariq Montgomery",
+        "pos": "OG",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt OL."
+      },
+      {
+        "name": "Daytione Smith",
+        "pos": "FS",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "hybrid",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt DB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Marshall_Thundering_Herd_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "olddominion",
+    "school": "Old Dominion",
+    "mascot": "Monarchs",
+    "abbr": "ODU",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#003057",
+      "secondary": "#7C878E"
+    },
+    "tier": 4,
+    "prestige": 35,
+    "record2026": "2-5 (1-3)",
+    "target": {
+      "off": 66,
+      "def": 68,
+      "st": 69
+    },
+    "basis": "2-5 despite a preseason No. 2 East pick; run-heavy veer-and-shoot led by first-team RB Devin Roche, defense held App State to 3 points.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 1,
+      "QB": -1,
+      "S": 1
+    },
+    "standouts": [
+      {
+        "name": "Quinn Henicle",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "scrambler",
+        "tier": "good",
+        "note": "Run-first passer; 83 rush yds and TD at Virginia Tech."
+      },
+      {
+        "name": "Devin Roche",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt RB; two 100-yard games."
+      },
+      {
+        "name": "Chris Forbes",
+        "pos": "DE",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "speed",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt DL."
+      },
+      {
+        "name": "Mario Easterly",
+        "pos": "SS",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "hybrid",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt DB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Old_Dominion_Monarchs_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "louisianatech",
+    "school": "Louisiana Tech",
+    "mascot": "Bulldogs",
+    "abbr": "LT",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#002F8B",
+      "secondary": "#E31B23"
+    },
+    "tier": 4,
+    "prestige": 52,
+    "record2026": "4-2 (2-0)",
+    "target": {
+      "off": 69,
+      "def": 72,
+      "st": 68
+    },
+    "basis": "4-2 in first Sun Belt season (moved from C-USA), unbeaten in league with wins over Army and Louisiana and a ULM shutout; defense ahead of the offense.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "air-raid"
+    },
+    "units": {
+      "LB": 1,
+      "TE": 1,
+      "QB": -1
+    },
+    "standouts": [
+      {
+        "name": "Blake Baker",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Primary passer; 232 yds 3 TD in opener; shares snaps with Trey Kukuk."
+      },
+      {
+        "name": "Kolbe Fields",
+        "pos": "MLB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Graduate; preseason 1st-team All-Sun Belt LB."
+      },
+      {
+        "name": "Eli Finley",
+        "pos": "TE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "receiving",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt TE."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Louisiana_Tech_Bulldogs_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "louisiana",
+    "school": "Louisiana",
+    "mascot": "Ragin' Cajuns",
+    "abbr": "ULL",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#CE181E",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 4,
+    "prestige": 50,
+    "record2026": "5-2 (2-1)",
+    "target": {
+      "off": 71,
+      "def": 70,
+      "st": 70
+    },
+    "basis": "5-2 (losses at USC and by one at La Tech), 33-6 over Troy; run-heavy offense with dual-threat QB Lunch Winfield, first-team CB Brent Gordon Jr.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 1,
+      "CB": 1
+    },
+    "standouts": [
+      {
+        "name": "Lunch Winfield",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "91 rush yds and 2 TD in both USC and UAB games."
+      },
+      {
+        "name": "Shelton Sampson Jr.",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "deep",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt WR."
+      },
+      {
+        "name": "Brent Gordon Jr.",
+        "pos": "CB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "man",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt DB."
+      },
+      {
+        "name": "Fitzgerald West Jr.",
+        "pos": "DT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt DL."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Louisiana_Ragin%27_Cajuns_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "southalabama",
+    "school": "South Alabama",
+    "mascot": "Jaguars",
+    "abbr": "USA",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#00205B",
+      "secondary": "#BF0D3E"
+    },
+    "tier": 4,
+    "prestige": 35,
+    "record2026": "4-3 (2-1)",
+    "target": {
+      "off": 70,
+      "def": 68,
+      "st": 69
+    },
+    "basis": "4-3 with a QB change to Jared Hollins; four preseason 2nd-team All-Sun Belt offensive players (two OL), defense middling.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "OL": 1,
+      "RB": 1
+    },
+    "standouts": [
+      {
+        "name": "Jared Hollins",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Took over from Bishop Davenport; 266 yds 2 TD vs Kentucky."
+      },
+      {
+        "name": "Keenan Phillips",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt RB; 116 yds vs Ohio."
+      },
+      {
+        "name": "Anthony Eager",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "deep",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt WR."
+      },
+      {
+        "name": "Kenton Jerido",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt OL."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_South_Alabama_Jaguars_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "troy",
+    "school": "Troy",
+    "mascot": "Trojans",
+    "abbr": "TROY",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#8A2432",
+      "secondary": "#B1B3B3"
+    },
+    "tier": 4,
+    "prestige": 55,
+    "record2026": "3-3 (1-1)",
+    "target": {
+      "off": 68,
+      "def": 72,
+      "st": 74
+    },
+    "basis": "3-3 after being picked to win the West; defense anchored by Preseason Sun Belt DPOY Donnie Smith, best punter in the league, offense inconsistent (57% passing).",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "DL": 1,
+      "P": 2,
+      "K": 1,
+      "QB": -1
+    },
+    "standouts": [
+      {
+        "name": "Goose Crowder",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt; ~1,050 yds 9 TD 4 INT in five games."
+      },
+      {
+        "name": "Donnie Smith",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason Sun Belt Defensive Player of the Year."
+      },
+      {
+        "name": "Evan Crenshaw",
+        "pos": "P",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason Sun Belt Special Teams Player of the Year."
+      },
+      {
+        "name": "Justin Powe",
+        "pos": "CB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "zone",
+        "tier": "good",
+        "note": "Preseason 2nd-team All-Sun Belt DB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Troy_Trojans_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "arkansasstate",
+    "school": "Arkansas State",
+    "mascot": "Red Wolves",
+    "abbr": "ARST",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#CC092F",
+      "secondary": "#000000"
+    },
+    "tier": 4,
+    "prestige": 48,
+    "record2026": "3-4 (1-2)",
+    "target": {
+      "off": 71,
+      "def": 66,
+      "st": 74
+    },
+    "basis": "3-4; league-high seven preseason first-team All-Sun Belt picks, prolific passing with Texas transfer Trey Owens (418 yds vs South Alabama) but turnover-prone, defense leaky.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "WR": 1,
+      "OL": 1,
+      "K": 1,
+      "DL": -1
+    },
+    "standouts": [
+      {
+        "name": "Trey Owens",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Texas transfer; 32/43, 418 yds, 4 TD vs South Alabama."
+      },
+      {
+        "name": "Kenyon Clay",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt RB."
+      },
+      {
+        "name": "Chauncy Cobb",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "slot",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt WR, return specialist and all-purpose."
+      },
+      {
+        "name": "AG McGhee",
+        "pos": "CB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "man",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt DB."
+      },
+      {
+        "name": "Clune Van Andel",
+        "pos": "K",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "accurate",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt K."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Arkansas_State_Red_Wolves_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "southernmiss",
+    "school": "Southern Miss",
+    "mascot": "Golden Eagles",
+    "abbr": "USM",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#000000",
+      "secondary": "#FFAB00"
+    },
+    "tier": 4,
+    "prestige": 58,
+    "record2026": "1-5 (0-2)",
+    "target": {
+      "off": 64,
+      "def": 62,
+      "st": 66
+    },
+    "basis": "1-5 in Blake Anderson's first season, picked 5th in the West with no preseason all-conference picks; gave up 55 to Troy.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "WR": 1,
+      "S": -1
+    },
+    "standouts": [
+      {
+        "name": "Landry Lyddy",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Replaced Ethan Hampton; 316 yds 2 TD vs Troy."
+      },
+      {
+        "name": "Mario Sanders",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "Leading target; two TD catches vs Troy."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Southern_Miss_Golden_Eagles_football_team"
+    ]
+  },
+  {
+    "id": "ulm",
+    "school": "ULM",
+    "mascot": "Warhawks",
+    "abbr": "ULM",
+    "conference": "Sun Belt",
+    "colors": {
+      "primary": "#840029",
+      "secondary": "#BC9B6A"
+    },
+    "tier": 5,
+    "prestige": 32,
+    "record2026": "0-6 (0-2)",
+    "target": {
+      "off": 60,
+      "def": 58,
+      "st": 64
+    },
+    "basis": "0-6 including a loss to FCS Southeastern Louisiana and a 24-0 shutout at La Tech; picked last in the West.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "OL": 1,
+      "LB": 1,
+      "DL": -1
+    },
+    "standouts": [
+      {
+        "name": "Aidan Armenta",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "355 yds 2 TD at South Alabama; splits time with Houston transfer Austin Carlisle."
+      },
+      {
+        "name": "AJ Vinson",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt OL."
+      },
+      {
+        "name": "Noah Flemmings",
+        "pos": "MLB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason 1st-team All-Sun Belt LB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Louisiana%E2%80%93Monroe_Warhawks_football_team",
+      "https://sunbeltsports.org/news/2026/7/13/sun-belt-announces-2026-football-preseason-awards-poll.aspx"
+    ]
+  },
+  {
+    "id": "liberty",
+    "school": "Liberty",
+    "mascot": "Flames",
+    "abbr": "LIB",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#0A254E",
+      "secondary": "#C8102E"
+    },
+    "tier": 3,
+    "prestige": 50,
+    "record2026": "6-1 (3-0)",
+    "target": {
+      "off": 75,
+      "def": 72,
+      "st": 70
+    },
+    "basis": "6-1 C-USA leader (only loss 20-13 to JMU); most Athlon preseason All-CUSA picks (17), deep transfer-built backfield in a no-huddle spread option.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 1,
+      "WR": 1
+    },
+    "standouts": [
+      {
+        "name": "Deshawn Purdie",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "Wake Forest transfer; efficient starter (11/16, 216 yds, 2 TD at Coastal)."
+      },
+      {
+        "name": "Kam Davis",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "star",
+        "note": "Florida State transfer; 166 yds vs Coastal, 147 yds 2 TD vs Delaware."
+      },
+      {
+        "name": "Makai Jackson",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "star",
+        "note": "Indiana transfer; 149 yds 2 TD vs Coastal Carolina."
+      },
+      {
+        "name": "Aidan Vaughan",
+        "pos": "MLB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "good",
+        "note": "Graduate; C-USA Defensive Player of the Week (Week 6)."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Liberty_Flames_football_team",
+      "https://libertyflames.com/news/2026/7/16/football-five-flames-named-to-2026-cusa-preseason-watch-list"
+    ]
+  },
+  {
+    "id": "jacksonvillestate",
+    "school": "Jacksonville State",
+    "mascot": "Gamecocks",
+    "abbr": "JVST",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#CC0000",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 4,
+    "prestige": 42,
+    "record2026": "5-2 (3-0)",
+    "target": {
+      "off": 73,
+      "def": 69,
+      "st": 76
+    },
+    "basis": "5-2 and unbeaten in C-USA after back-to-back title-game trips; dual-threat QB Caden Creel (2x C-USA OPOW) drives the offense, Preseason C-USA STPOY kicker.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "K": 2,
+      "S": 1
+    },
+    "standouts": [
+      {
+        "name": "Caden Creel",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "star",
+        "note": "327 yds 5 TD vs EKU; 120 rush yds at Ohio; two C-USA OPOW awards."
+      },
+      {
+        "name": "Caleb Nix",
+        "pos": "SS",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "hybrid",
+        "tier": "star",
+        "note": "2025 first-team All-C-USA safety; pick-six and punt-return TD in 2026."
+      },
+      {
+        "name": "Garrison Rippa",
+        "pos": "K",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "accurate",
+        "tier": "star",
+        "note": "Preseason C-USA Special Teams Player of the Year."
+      },
+      {
+        "name": "Jamill Williams",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "good",
+        "note": "144 yds 4 TD vs Eastern Kentucky."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Jacksonville_State_Gamecocks_football_team",
+      "https://conferenceusa.com/news/2026/7/17/football-fb-cusa-announces-2026-preseason-awards.aspx",
+      "https://nfldraftbuzz.com/Colleges/FBS/C-USA-FBS/jacksonville-state-gamecocks/preview"
+    ]
+  },
+  {
+    "id": "middletennessee",
+    "school": "Middle Tennessee",
+    "mascot": "Blue Raiders",
+    "abbr": "MTSU",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#0066CC",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 4,
+    "prestige": 40,
+    "record2026": "4-3 (2-1)",
+    "target": {
+      "off": 68,
+      "def": 67,
+      "st": 71
+    },
+    "basis": "4-3 with wins over Nevada, FIU and Delaware; steady RB Antonio Martin and WR Cam'ron Lacy, Phil Steele first-team punter.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 1,
+      "P": 1
+    },
+    "standouts": [
+      {
+        "name": "Roman Gagliano",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Starter; 2 TD passes in each of four listed games, C-USA OPOW Week 7."
+      },
+      {
+        "name": "Antonio Martin",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Three 100-yard games."
+      },
+      {
+        "name": "Cam'ron Lacy",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "8-118-1 vs Murray State; top target."
+      },
+      {
+        "name": "Ashton Logan",
+        "pos": "P",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Phil Steele preseason 1st-team All-C-USA punter."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Middle_Tennessee_Blue_Raiders_football_team",
+      "https://goblueraiders.com/news/2026/6/15/football-10-blue-raiders-recognized-by-phil-steele"
+    ]
+  },
+  {
+    "id": "newmexicostate",
+    "school": "New Mexico State",
+    "mascot": "Aggies",
+    "abbr": "NMSU",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#861F41",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 5,
+    "prestige": 25,
+    "record2026": "3-4 (2-1)",
+    "target": {
+      "off": 66,
+      "def": 67,
+      "st": 66
+    },
+    "basis": "3-4 (2-1 C-USA) with a 34-13 win over WKU; spread passing with Trey Hedden, opportunistic defense (several return TDs).",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "S": 1,
+      "RB": 1
+    },
+    "standouts": [
+      {
+        "name": "Trey Hedden",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "272 yds 2 TD at Florida State; C-USA OPOW Week 0."
+      },
+      {
+        "name": "James Jones",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "137 yds vs Mercyhurst, 112 vs New Mexico."
+      },
+      {
+        "name": "Nick Session",
+        "pos": "FS",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "coverage",
+        "tier": "good",
+        "note": "Graduate safety; pick-six, C-USA DPOW Week 1."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_New_Mexico_State_Aggies_football_team",
+      "https://nmstatesports.com/news/2026/9/7/football-nick-session-collects-conference-usa-defensive-player-of-the-week-honors.aspx"
+    ]
+  },
+  {
+    "id": "westernkentucky",
+    "school": "Western Kentucky",
+    "mascot": "Hilltoppers",
+    "abbr": "WKU",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#C60C30",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 4,
+    "prestige": 50,
+    "record2026": "3-4 (2-1)",
+    "target": {
+      "off": 64,
+      "def": 66,
+      "st": 67
+    },
+    "basis": "3-4; blown out by Nevada, Georgia, Indiana and NMSU, air raid has stalled (QB change to Brock Glenn); Athlon/Phil Steele preseason honors for WR and S.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "air-raid"
+    },
+    "units": {
+      "QB": -1,
+      "WR": 1,
+      "S": 1
+    },
+    "standouts": [
+      {
+        "name": "Brock Glenn",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "Took over after the opener; 70 rush yds 2 TD at Georgia."
+      },
+      {
+        "name": "K.D. Hutchinson",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "slot",
+        "tier": "star",
+        "note": "Phil Steele and Athlon preseason 1st-team All-C-USA."
+      },
+      {
+        "name": "Jaylen Lewis",
+        "pos": "SS",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "hybrid",
+        "tier": "star",
+        "note": "Athlon preseason 1st-team All-C-USA safety."
+      },
+      {
+        "name": "Ajay Allen",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "102 yds 2 TD at Nevada."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Western_Kentucky_Hilltoppers_football_team",
+      "https://wkusports.com/news/2026/6/16/football-seven-hilltoppers-named-to-phil-steele-preseason-all-cusa-team"
+    ]
+  },
+  {
+    "id": "delaware",
+    "school": "Delaware",
+    "mascot": "Fightin' Blue Hens",
+    "abbr": "DEL",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#00539F",
+      "secondary": "#FFD200"
+    },
+    "tier": 5,
+    "prestige": 50,
+    "record2026": "3-4 (1-2)",
+    "target": {
+      "off": 71,
+      "def": 63,
+      "st": 66
+    },
+    "basis": "3-4 in second FBS season; potent passing game with Preseason C-USA OPOY Nick Minicucci and WR Sean Wilson, defense gave up 38 to Missouri State.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "WR": 1,
+      "OL": 1,
+      "CB": -1
+    },
+    "standouts": [
+      {
+        "name": "Nick Minicucci",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "star",
+        "note": "Preseason C-USA Offensive Player of the Year; 330 and 302-yard games."
+      },
+      {
+        "name": "Sean Wilson",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "star",
+        "note": "Phil Steele/Athlon preseason 1st-team; 9-185-2 vs Coastal Carolina."
+      },
+      {
+        "name": "Steven Demboski",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pass",
+        "tier": "good",
+        "note": "PFN and Athlon preseason 1st-team All-C-USA OL."
+      },
+      {
+        "name": "Noah Matthews",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "speed",
+        "tier": "good",
+        "note": "PFN preseason 1st-team All-C-USA DE."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Delaware_Fightin%27_Blue_Hens_football_team",
+      "https://bluehens.com/news/2026/8/10/11-football-student-athletes-earn-2026-pro-football-network-preseason-all-cusa-honors",
+      "https://bluehens.com/news/2026/7/9/16-football-student-athletes-earn-2026-athlon-sports-preseason-all-conference-usa-honors"
+    ]
+  },
+  {
+    "id": "fiu",
+    "school": "FIU",
+    "mascot": "Panthers",
+    "abbr": "FIU",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#081E3F",
+      "secondary": "#B6862C"
+    },
+    "tier": 5,
+    "prestige": 25,
+    "record2026": "3-4 (1-2)",
+    "target": {
+      "off": 67,
+      "def": 65,
+      "st": 68
+    },
+    "basis": "3-4 with wins over Buffalo, LIU and NMSU; strong-armed J.J. Kohl throws a lot but turnover-prone, six Phil Steele preseason first-team picks.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "TE": 1,
+      "WR": 1,
+      "LB": 1
+    },
+    "standouts": [
+      {
+        "name": "J.J. Kohl",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "367 yds 3 TD vs Buffalo; C-USA OPOW Week 2."
+      },
+      {
+        "name": "Maguire Anderson",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "slot",
+        "tier": "good",
+        "note": "Phil Steele 1st-team punt returner; 133 yds 2 TD at Jax State."
+      },
+      {
+        "name": "James Resar",
+        "pos": "TE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "receiving",
+        "tier": "star",
+        "note": "Phil Steele preseason 1st-team All-C-USA TE."
+      },
+      {
+        "name": "Josiah Taylor",
+        "pos": "MLB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Phil Steele preseason 1st-team All-C-USA LB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_FIU_Panthers_football_team",
+      "https://fiusports.com/news/2026/6/15/football-total-15-selections-on-2026-phil-steele-preseason-teams.aspx"
+    ]
+  },
+  {
+    "id": "missouristate",
+    "school": "Missouri State",
+    "mascot": "Bears",
+    "abbr": "MOST",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#5E0009",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 5,
+    "prestige": 28,
+    "record2026": "2-5 (1-2)",
+    "target": {
+      "off": 64,
+      "def": 60,
+      "st": 67
+    },
+    "basis": "2-5 in second FBS season; shut out by Texas A&M, allowed 61 at Delaware; passing game with UTEP transfer Skyler Locklear and WR Isaiah Myers is the strength.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "WR": 1,
+      "DL": -1,
+      "S": -1
+    },
+    "standouts": [
+      {
+        "name": "Skyler Locklear",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "UTEP transfer; 309 yds 2 TD vs Marshall."
+      },
+      {
+        "name": "Isaiah Myers",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "good",
+        "note": "WKU transfer; 155 and 141-yard games."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Missouri_State_Bears_football_team",
+      "https://missouristatebears.com/news/2026/6/17/football-ten-bears-honored-on-phil-steeles-preseason-all-conference-team"
+    ]
+  },
+  {
+    "id": "kennesawstate",
+    "school": "Kennesaw State",
+    "mascot": "Owls",
+    "abbr": "KENN",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#FDBB30",
+      "secondary": "#0B1315"
+    },
+    "tier": 5,
+    "prestige": 25,
+    "record2026": "1-6 (0-3)",
+    "target": {
+      "off": 62,
+      "def": 65,
+      "st": 64
+    },
+    "basis": "Reigning 2025 C-USA champion but 1-6 in 2026; defense still has Preseason C-USA DPOY Baron Hopson, veer-and-shoot offense sputtering.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "LB": 2,
+      "OL": 1,
+      "WR": -1
+    },
+    "standouts": [
+      {
+        "name": "Rickie Collins",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "293 yds vs Jax State; rushing TDs in three games."
+      },
+      {
+        "name": "Baron Hopson",
+        "pos": "MLB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Graduate; Preseason C-USA Defensive Player of the Year."
+      },
+      {
+        "name": "Nikola Milovac",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "good",
+        "note": "Phil Steele preseason 1st-team All-C-USA OL."
+      },
+      {
+        "name": "Tyler Hallum",
+        "pos": "CB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "zone",
+        "tier": "good",
+        "note": "Phil Steele preseason 1st-team All-C-USA DB."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Kennesaw_State_Owls_football_team",
+      "https://ksuowls.com/news/2026/6/12/football-14-owls-selected-to-phil-steeles-preseason-all-cusa.aspx",
+      "https://conferenceusa.com/news/2026/7/17/football-fb-cusa-announces-2026-preseason-awards.aspx"
+    ]
+  },
+  {
+    "id": "samhouston",
+    "school": "Sam Houston",
+    "mascot": "Bearkats",
+    "abbr": "SHSU",
+    "conference": "C-USA",
+    "colors": {
+      "primary": "#F47321",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 5,
+    "prestige": 40,
+    "record2026": "1-6 (0-3)",
+    "target": {
+      "off": 63,
+      "def": 59,
+      "st": 63
+    },
+    "basis": "1-6; air raid with sophomore Landyn Locke posts yards (three 300-yard games) but the defense is among the worst in FBS.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "air-raid"
+    },
+    "units": {
+      "QB": 1,
+      "WR": 1,
+      "DL": -1,
+      "CB": -1
+    },
+    "standouts": [
+      {
+        "name": "Landyn Locke",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "335 yds 3 TD at Troy; 322 yds 4 TD vs Nicholls."
+      },
+      {
+        "name": "Alton McCaskill",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "good",
+        "note": "Graduate veteran back."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Sam_Houston_Bearkats_football_team"
+    ]
+  }
+]

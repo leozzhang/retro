@@ -6,7 +6,7 @@ _Last updated: 2026-10-24_
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
 - **Field:** grass stripes, yard lines, college hash marks, numbers, end zones in team colors, midfield logo, crowd. The camera scrolls horizontally in Retro Bowl style.
 - **Sprites:** procedural pixel-art players with team uniforms (home and away). Poses: stand, three-point stance, 4-frame run, throw, catch, down.
-- **Teams:** 8 FBS teams (UGA, BAMA, OSU, TEX, ORE, MICH, ND, CLEM) with real colors and conferences. Off/def ratings are rough estimates. Rosters are generated and seeded per team, scaled by team strength.
+- **Teams:** 8 FBS teams (UGA, BAMA, OSU, TEX, ORE, MICH, ND, CLEM) with real colors and conferences. Off/def ratings are rough estimates. Rosters are generated and seeded per team, scaled by team strength. (Now all 138 FBS teams with researched rosters; see the ratings and rosters section.)
 - **Playbook:** 6 plays from 2 shotgun formations (Four Verts, Slant Flat, Smash, Mesh, Dagger, Curl Flat). The play-call screen shows a route diagram for each.
 - **Defensive calls:** 2 Man Under, Cover 1 Robber and Cover 0 Blitz, each with a distinct pre-snap look. Corners press at random. There's a pre-snap coverage read hint, and Esc lets you audible.
 - **Passing:** slingshot drag-and-release with an arc preview and slow motion while aiming. Throw error depends on distance, the QB's accuracy, pressure and movement.
@@ -457,58 +457,118 @@ Bug: pitches were fumbled far too often, most visibly on I-form play action, whe
 - **Tests:** 6 new ones: mistime direction and growth, a wider green for better kickers, a live FG (on the green is good, early lands left of the posts, no press auto-pushes right, the kicker is at the ball at the strike), kickoff coverage staying onside on a late press, and endurance ordering. The tackling test lost its juke assertion. 86 tests in total.
 - **Not checked by hand yet:** the meter's look and feel in the browser.
 
+## Done: ratings, rosters and every FBS team (2026-10-24)
+Design notes are in [RATINGS.md](RATINGS.md) (what every rating does, overall formulas, the evidence) and [ROSTERS.md](ROSTERS.md) (the research, the generator, depth charts).
+
+### Ratings: 12 → 26, each with a job (`data/ratings.ts`)
+- The old ratings each fed several unrelated formulas, so they were split along code paths that already existed:
+  - `thr` → `sac`/`mac`/`dac` (accuracy by distance, `accuracyAt`), `tup` (on the run) and `pac` (poise under pressure)
+  - `awr` → `mcv` (man), `zcv` (zone) and `prc` (run, play-action and pitch reads)
+  - `blk` → `pbk`/`rbk`
+  - `str` as the defender's power → `rsh` (pass rush) and `bsh` (shedding run and ST blocks); `str` in the press jam → `prs` (corner) vs `rls` (receiver)
+  - `acc` in route running → `rte`
+  - the spd/acc stamina formula → `sta`
+  - new `cit` (catch in traffic) for the receiver's share of a contested ball
+- **Pure refactor first:** with every new rating filled from the old one, `balance.txt` came out byte-identical.
+- **One new effect:** a blocker's strength is 20% of his block (`ANCHOR_STR`); before, an OL's `str` did nothing. On the old rosters this moved runs from 4.6 to 4.8 YPC (stuffs 14% → 12%) and short yardage up 2-10 points. The pass rows moved within noise.
+- **Not ratings, because nothing reads them yet:** ball security, carrier vision, underneath zone drops, QB decisions, and height and weight (they only shape ratings when a player is generated).
+
+### Positions and overall (`data/positions.ts`)
+- 17 positions (QB, HB, FB, WR, TE, OT, OG, C, DE, DT, OLB, MLB, CB, FS, SS, K, P); each on-field slot is rated at one.
+- **Overall is relative to the position:** measured against the position's rating template at a 75, so a template player at level L rates exactly L, a pocket QB isn't punished for lineman speed, and a point of each rating is worth `w / Σ(w·slope)`.
+- **The weights only include ratings that matter at that position**, set from the new sensitivity report (below). Linemen's `str` weight follows from the anchor: a quarter of pass block plus a quarter of run block.
+
+### Sensitivity report: `npm run ratings` (new, about 10 min)
+- Lowers one rating by 15 on one group of starters and replays the same plays, paired rep by rep (each rep has its own seed). The output is in `ratings.txt`; the summary is in RATINGS.md.
+- It found two harness problems along the way: a +15 bump clipped at 99 for good starters (so it lowers instead), and a shared RNG stream made the noise as big as the effects (so each rep gets its own seed).
+
+### 138 FBS teams, researched (`data/fbs/`)
+- Seven research agents covered all 2026 conferences in parallel (records as of Oct 24, AP ranks, preseason honors, team-season pages). They found 486 real standouts on 2026 rosters, each with position, class, archetype and tier, plus each team's QB style, scheme, unit strengths, tier, prestige, colors and offense/defense/ST targets.
+- The raw JSON is in `docs/research/`. `python scripts/build_profiles.py` validates it and regenerates `profiles.ts`. Sources per team and known weak spots (guessed class years, QB situations in flux) are in ROSTERS.md.
+- The hand-tuned uniforms of the original 8 teams are kept; the rest are derived from two colors (`uniform`).
+
+### Rosters, depth charts, team ratings
+- **Player schema** (`Athlete`): name, number, position, archetype, class, redshirt, height, weight, hometown, recruiting stars, potential, development trait, ratings, injury, and `real` for researched players. The sim still sees only `RosterPlayer`, built by `onField`.
+- **Generator** (`rosterGen.ts`): 85 players per team, seeded by team id. Standouts go in first under their real names. Classes set levels, archetypes follow the scheme, and builds nudge ratings. Calibration makes each position's starters average the unit target, and every standout starts. Hometowns weight the home state, the region and national talent by program tier.
+- **Templates** (`athletes.ts`) are anchored so a level-88 player matches the old 89-team template the playbook was balanced on. Special-teams `bsh`/`rbk` for players off their own side of the ball follow the old strength and block values, because return TDs jumped when coverage players had junk shed values.
+- **Depth chart and injuries** (`depth.ts`): an auto depth chart by fit at each slot (out of position -4); starters are filled in slot order, first healthy player. An injury takes a starter off the field and the backup starts on the next snap.
+- **Team ratings are computed, never stored:** offense (QB 30%, line 35%, receivers 21%, RB 8%, TE 6%), defense (front 36%, backers 16%, corners 28%, safeties 20%), ST (K 50%, P 35%, returners 15%). `simulateDrive` uses them. Across the 138 teams they land within about half a point of the research targets on average.
+
+### Screens
+- **Title:** A/D picks your team within its conference and W/S changes conference; the arrow keys do the same for the opponent. Each panel shows OVR / OFF / DEF.
+- **Roster screen (R or T):** offense, then defense and ST starters with the four ratings that weigh most in their overall (real players in gold, out-of-position flagged), then the full 85-man roster with class, height, weight, stars, potential and hometown. Checked in the browser (headless Chrome screenshots); no console errors.
+
+### Harness changes
+- `src/harness.ts` holds the auto-QB, auto-runner and auto-kicker for both reports (`balance.txt` was byte-identical after the move).
+- **Reference matchup:** the balance and ratings reports now play template players (offense 90 vs defense 88, the old harness's gap), not generated rosters, so research updates and roster rolls don't move the baseline.
+
+### Tests
+14 new, 100 in total:
+- ratings: template players rate their level; overall rises with every weighted rating and ignores the rest; accuracy bands; `composure`; the anchor; every rating documented
+- rosters: all teams have a state, colors and a unique abbreviation; composition and determinism; every slot gets a different healthy starter; ratings and bios in range; an injury promotes the backup and lowers only the right team rating; team ratings within 6 of every target (mean under 2.5) and tier 1 > tier 3 > tier 5; standouts on the roster in the two-deep; mobile-QB teams start a mobile QB
+- the route-running tests now pin the receivers to a fixed profile, since an elite generated route runner hit a test boundary
+
+### Flags (not tuned)
+- **Talent gaps are far too steep in the live sim.** With real FBS spreads, Georgia's offense (88) against Sacramento State's defense (56) runs for 35.7 YPC (nearly every run a TD) and 15.8 per pass; Sacramento State against Georgia's defense gets -1.8 and -2.5. Even matchups play normally at any level (Sac State vs UTEP: 3.4 YPC). The rating-to-outcome curves (speed, tackling, block power) need compressing before full seasons are playable. The CPU drive sim is milder (5.1 points per drive vs 0.01).
+- **The run game is very sensitive to the ball carrier.** The old baseline's Georgia back was a lucky roll (99 elusiveness, 87 strength), and swapping him for a template back cost about 1.2 YPC on the core runs. The new reference baseline is lower for that reason (see below), not because of a change in the sim.
+- **Elite returners beat punt coverage:** with the real Alabama returner (99 speed, 90 elusiveness), punts gave up 8-9 return TDs per 300; at elusiveness 80 it's 2. Watch it once playable returns exist.
+- **The press jam is weak** (short, and only on 35% of snaps: `prs`/`rls` worth 0.03-0.21 yards per play across the two sensitivity runs), and **zone coverage is nearly unused** until zone calls exist. Their weights assume they'll matter.
+- **QB ratings can't be measured** by the auto-QB harness (it throws to the most open man at a fixed time). Their overall weights are judgment.
+
 ## Balance baseline
-From `npm run balance` (Georgia offense vs Alabama defense), after the route-running work. The single-seed 120-rep rows below move a few points from run to run; use the paired table above for before/after.
+From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
 - **Run rows:** the auto-QB hands off as soon as it can (it reads the zone-read key, waits out the draw, and pitches the option on the key), and `autoRun` reads the line for a lane. It doesn't steer around tacklers, so expect real players to do better.
 
 | All pass plays, defense | Hold | Comp | INT | Sacks | YPP |
 | --- | --- | --- | --- | --- | --- |
-| 2 Man Under | 1.2s | 70% | 4.2% | 0/120 | 4.9 |
-| 2 Man Under | 2.2s | 65% | 5.4% | 8/120 | 6.3 |
-| Cover 1 Robber | 2.2s | 72% | 0.0% | 8/120 | 8.4 |
-| Cover 0 Blitz | 1.2s | 67% | 2.5% | 0/120 | 7.3 |
-| Cover 0 Blitz | 2.2s | 64% | 4.0% | 95/120 | -2.1 |
+| 2 Man Under | 1.2s | 70% | 5.0% | 0/120 | 4.7 |
+| 2 Man Under | 2.2s | 68% | 5.3% | 6/120 | 6.3 |
+| Cover 1 Robber | 2.2s | 66% | 4.4% | 7/120 | 6.6 |
+| Cover 0 Blitz | 1.2s | 70% | 4.2% | 0/120 | 6.6 |
+| Cover 0 Blitz | 2.2s | 58% | 7.7% | 94/120 | -1.1 |
 
 | PA plays (dropback), defense | Hold | Comp | INT | Sacks | YPP |
 | --- | --- | --- | --- | --- | --- |
-| 2 Man Under | 2.2s | 78% | 2.6% | 4/120 | 8.7 |
-| Cover 1 Robber | 2.2s | 80% | 1.8% | 7/120 | 15.8 |
-| Cover 0 Blitz | 1.2s | 72% | 3.3% | 0/120 | 14.1 |
+| 2 Man Under | 2.2s | 70% | 7.0% | 5/120 | 7.4 |
+| Cover 1 Robber | 2.2s | 71% | 4.5% | 8/120 | 7.7 |
+| Cover 0 Blitz | 1.2s | 68% | 5.0% | 0/120 | 14.5 |
 
 **Runs:**
-- All 26 run rows (with RPO gives and QB runs): 3.9 YPC, median 2.1, 18% stuffs, 22% gaining 4+, 10% gaining 10+. Run code didn't change; this moved by 0.1 only because the pass rows ahead of it use the shared RNG differently.
-- The original five runs: 5.1 YPC, median 2.9, 16% stuffs. See the table above.
-- Against Cover 0, interior runs give 2–4 YPC. Toss and Lead Toss used to lose yards; since the pitch fix they don't (see the flag there).
-- **Kicks:** the table below is from after the timing meter (see that section). Kick coverage keeps the old pursuit lead; only scrimmage pursuers use `PURSUIT_LEAD`.
+- All 26 run rows (with RPO gives and QB runs): 3.6 YPC, median 2.1, 16% stuffs, 20% gaining 4+, 8% gaining 10+.
+- The original five runs (IZ, OZ, Power, Toss, Zone Read): 4.4 YPC, median 2.8, 12% stuffs, 28% gaining 4+, 11% gaining 10+. The FBS target is 4.5-5.5 YPC, about 18% stuffs and about 45% gaining 4+.
 
-**Short yardage (3rd and 1):** Power 84%, Iso 90%, QB Sneak 77%, QB Power 58% (1% against Cover 0).
+**Short yardage (3rd and 1):** Power 69-78%, Iso 82-85%, QB Sneak 82-89%, QB Power 58-63% (14% against Cover 0).
 
 The per-play `RUN` and `PLAY` rows in `balance.txt` have the details. Reading the defense still matters: don't pitch into the zero blitz, and don't hold the ball against it.
 
 ### Future tuning targets: NFL results by route
 The NFL completion %, yards per target and man/zone splits by route are in [TARGETS.md](TARGETS.md). They're not tuned toward yet; they belong with the defense work.
-These need a harness that targets by route (or by read), not "most open". The current one over-throws flats and checkdowns. The new `ROUTE` rows are a first step: they target one route per row, against man calls only.
+These need a harness that targets by route (or by read), not "most open". The current one over-throws flats and checkdowns. The `ROUTE` rows are a first step: they target one route per row, against man calls only.
 
 **Special teams:** an auto-kicker with fixed aim per kick type and perfect meter timing, 200 reps each, in random wind. Kicks use their own seed, so the scrimmage rows don't move.
 
 | Kick | Result |
 | --- | --- |
-| Punt from own 30 (full power) | Gross 42.2, net 40.0. 71% fair caught, 6.9-yard average return, 0 blocks |
-| Pooch from opp 40 (74% power) | 83% downed or caught inside the 20, 93% fair caught |
-| Coffin corner from opp 38 | 99% inside the 20: 61% out of bounds, 26% touchbacks |
-| Line drive from own 30 | Gross 45.0, net 34.4. 99% returned (11.3 average), 1.5% returned for TDs |
-| Deep kickoff | 60% touchbacks. CPU starts at its 23.0; 15.9-yard average return |
-| Sky kickoff | CPU starts at its 31. 14% fair caught |
-| Squib | CPU starts at its 36. 0 returned for TDs |
-| Corner kickoff | CPU starts at its 22. 7% out of bounds |
-| FG, straight aim, calm | 20-29: 93%, 30-39: 80%, 40-49: 69%, 50-59: 32%. Blocks about 1% |
-| FG, straight aim, wind | 20-29: 91%, 30-39: 83%, 40-49: 57%, 50-59: 26%. The auto-kicker doesn't allow for wind |
+| Punt from own 30 (full power) | Gross 41.1, net 37.9. 67% fair caught, 10.0-yard average return, 0 blocks, 1 return TD |
+| Pooch from opp 40 (74% power) | 82% downed or caught inside the 20, 92% fair caught, 7 muffs recovered |
+| Coffin corner from opp 38 | 100% inside the 20: 50% out of bounds, 28% touchbacks |
+| Line drive from own 30 | Gross 43.4, net 31.7. 97% returned (13.0 average), 3% returned for TDs |
+| Deep kickoff | 72% touchbacks. CPU starts at its 24.3; 17.5-yard average return |
+| Sky kickoff | CPU starts at its 30.6. 18% fair caught |
+| Squib | CPU starts at its 34.7. 6 returned for TDs |
+| Corner kickoff | CPU starts at its 23.1. 9% out of bounds |
+| FG, straight aim, calm | 20-29: 96%, 30-39: 88%, 40-49: 72%, 50-59: 35% |
+| FG, straight aim, wind | 20-29: 94%, 30-39: 78%, 40-49: 65%, 50-59: 41%. The auto-kicker doesn't allow for wind |
 
 ## In progress
-- Nothing right now.
+- Nothing right now. Not checked by hand yet: playing a full game with the new rosters (only screenshots of the title, roster and call screens).
 
 ## Known bugs and rough edges
+- **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
+- **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
+- **No injury mechanic yet:** `Athlete.injury` and the depth chart are ready for it.
+- **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
 - **The run game's 4+ rate is low** (about 30% for the core runs, against FBS about 45%). Too many runs end at 1–3 yards. Second-level fits still beat climbing linemen too often.
@@ -539,11 +599,12 @@ These need a harness that targets by route (or by read), not "most open". The cu
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 
 ## Next up (rough priority)
+1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
+1. **Use the roster model:** injuries during games, the user's depth chart editing, fatigue and substitutions; then seasons (schedules, standings), progression from `potential`/`dev`, and recruiting from `stars`/hometowns.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
 1. **An RPO read on a defender,** and give the harness a pull decision.
-1. Full FBS database: all conferences and teams, realistic strength tiers, then real rosters.
 2. Clock tools: timeouts (3 per half), spike, kneel, college overtime.
 3. Run-defense calls (8-man box, run blitzes; light boxes are currently too easy to run on) and zone coverages (Cover 2, 3, 4, and underneath zones) and smarter defensive play-calling by down and distance.
 4. Playbook UI, part 2: filter by situation (short yardage, red zone, 2-minute).

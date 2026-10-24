@@ -1,0 +1,306 @@
+[
+  {
+    "id": "ohiostate", "school": "Ohio State", "mascot": "Buckeyes", "abbr": "OSU", "conference": "Big Ten",
+    "colors": { "primary": "#BB0000", "secondary": "#666666" },
+    "tier": 1, "prestige": 97, "record2026": "6-1 (4-0)",
+    "target": { "off": 88, "def": 92, "st": 82 },
+    "basis": "AP No. 3, only loss 24-23 at Texas, elite defense (Patricia 4-2-5) and top-3 talent; offense docked slightly with QB Sayin out indefinitely and a true freshman starting.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "QB": -1, "WR": 2, "OL": 1, "S": 1, "DL": 1 },
+    "standouts": [
+      { "name": "Jeremiah Smith", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "elite", "note": "Preseason Big Ten OPOY and first-team All-American; broke OSU career receiving yards, receptions and TD catch records in 2026." },
+      { "name": "Julian Sayin", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "pocket", "tier": "star", "note": "Preseason first-team All-Big Ten QB and captain; throwing-shoulder injury at Indiana (Oct 17), out indefinitely." },
+      { "name": "Luke Fahey", "pos": "QB", "year": "FR", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "True freshman, replaced Sayin and is the default starter during his absence." },
+      { "name": "Bo Jackson", "pos": "HB", "year": "SO", "redshirt": false, "archetype": "power", "tier": "star", "note": "Preseason first-team All-Big Ten RB and leading rusher." },
+      { "name": "Jaylen McClain", "pos": "SS", "year": "JR", "redshirt": false, "archetype": "hybrid", "tier": "star", "note": "Captain; preseason first-team All-Big Ten DB." },
+      { "name": "Kenyatta Jackson Jr.", "pos": "DE", "year": "SR", "redshirt": false, "archetype": "speed", "tier": "star", "note": "Captain; preseason second-team All-Big Ten edge." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Ohio_State_Buckeyes_football_team", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way", "https://www.clickondetroit.com/sports/2026/10/21/ohio-state-qb-julian-sayin-out-indefinitely-after-injuring-throwing-arm/"]
+  },
+  {
+    "id": "indiana", "school": "Indiana", "mascot": "Hoosiers", "abbr": "IU", "conference": "Big Ten",
+    "colors": { "primary": "#990000", "secondary": "#EEEDEB" },
+    "tier": 2, "prestige": 62, "record2026": "7-1 (4-1)",
+    "target": { "off": 88, "def": 90, "st": 82 },
+    "basis": "Defending Big Ten champ, AP No. 6, only loss 19-15 to Ohio State; multiple first-team All-Americans (Carter Smith, Hardy) and a top-10 defense.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "OL": 1, "RB": 1, "DL": 1, "LB": 2 },
+    "standouts": [
+      { "name": "Josh Hoover", "pos": "QB", "year": "SR", "redshirt": true, "archetype": "pocket", "tier": "star", "note": "TCU transfer starter; multiple 4-TD games (North Texas, Howard, Rutgers)." },
+      { "name": "Charlie Becker", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "star", "note": "Preseason first-team All-Big Ten; 100+ yards vs WKU and at Rutgers." },
+      { "name": "Carter Smith", "pos": "OT", "year": "JR", "redshirt": false, "archetype": "pass", "tier": "elite", "note": "First-team All-American on multiple preseason lists." },
+      { "name": "Rolijah Hardy", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "elite", "note": "First-team All-American on multiple preseason lists; pick-six vs Howard." },
+      { "name": "Tyrique Tucker", "pos": "DT", "year": "SR", "redshirt": false, "archetype": "quick", "tier": "elite", "note": "Preseason All-American; first-team All-Big Ten on every list." },
+      { "name": "Turbo Richard", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "204 rushing yards at Rutgers, 149 vs WKU." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Indiana_Hoosiers_football_team", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "ucla", "school": "UCLA", "mascot": "Bruins", "abbr": "UCLA", "conference": "Big Ten",
+    "colors": { "primary": "#2D68C4", "secondary": "#F2A900" },
+    "tier": 2, "prestige": 74, "record2026": "7-0 (5-0)",
+    "target": { "off": 80, "def": 85, "st": 85 },
+    "basis": "Unbeaten and AP No. 9 under first-year coach Chesney, winning on defense (17-15 at Oregon, 17-7 vs Wisconsin); offense docked with starter Iamaleava lost to a knee injury.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "QB": -1, "RB": 1, "S": 1, "CB": 1, "K": 2 },
+    "standouts": [
+      { "name": "Ty Dieffenbach", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Starting since Iamaleava's knee injury at Oregon; 264 yards in his first start vs Wisconsin." },
+      { "name": "Wayne Knight", "pos": "HB", "year": "SR", "redshirt": true, "archetype": "elusive", "tier": "star", "note": "Leading rusher (177 yds, 2 TD vs Purdue); preseason third-team All-Big Ten PR." },
+      { "name": "Semaj Morgan", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "slot", "tier": "good", "note": "Two TDs vs Purdue." },
+      { "name": "Tao Johnson", "pos": "FS", "year": "SR", "redshirt": false, "archetype": "coverage", "tier": "star", "note": "PFN preseason first-team All-Big Ten safety." },
+      { "name": "Ta'Shawn James", "pos": "SS", "year": "JR", "redshirt": true, "archetype": "hybrid", "tier": "good", "note": "Two INTs at California; preseason second-team All-Big Ten (PFN)." },
+      { "name": "Mateen Bhaghani", "pos": "K", "year": "JR", "redshirt": false, "archetype": "accurate", "tier": "star", "note": "Preseason first-team All-Big Ten kicker." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_UCLA_Bruins_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten", "https://abc7.com/post/sources-ucla-qb-iamaleava-indefinitely-knee-injury/19932749"]
+  },
+  {
+    "id": "usc", "school": "USC", "mascot": "Trojans", "abbr": "USC", "conference": "Big Ten",
+    "colors": { "primary": "#990000", "secondary": "#FFC72C" },
+    "tier": 1, "prestige": 90, "record2026": "6-1 (3-1)",
+    "target": { "off": 86, "def": 79, "st": 81 },
+    "basis": "AP No. 16, high-scoring Riley offense with a veteran QB; defense under new DC Gary Patterson gave up 41 to Oregon and 35 to Rutgers.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "QB": 1, "WR": 1, "LB": -1 },
+    "standouts": [
+      { "name": "Jayden Maiava", "pos": "QB", "year": "SR", "redshirt": true, "archetype": "pocket", "tier": "star", "note": "Captain and starter; PFN preseason first-team All-Big Ten QB." },
+      { "name": "King Miller", "pos": "HB", "year": "SR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "Lead back; 128 yds vs Louisiana, 102 vs Rutgers." },
+      { "name": "Tanook Hines", "pos": "WR", "year": "SO", "redshirt": false, "archetype": "deep", "tier": "good", "note": "Preseason third-team All-Big Ten; TDs vs Oregon and Washington." },
+      { "name": "Trent Mosley", "pos": "WR", "year": "FR", "redshirt": false, "archetype": "slot", "tier": "good", "note": "Freshman leading receiver (118 vs SJSU, 111 at Penn State) and punt returner." },
+      { "name": "Jontez Williams", "pos": "CB", "year": "SR", "redshirt": false, "archetype": "man", "tier": "star", "note": "Preseason first-team All-Big Ten DB (Eleven Warriors list)." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_USC_Trojans_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way"]
+  },
+  {
+    "id": "oregon", "school": "Oregon", "mascot": "Ducks", "abbr": "ORE", "conference": "Big Ten",
+    "colors": { "primary": "#154733", "secondary": "#FEE123" },
+    "tier": 1, "prestige": 84, "record2026": "4-3 (2-2)",
+    "target": { "off": 84, "def": 86, "st": 80 },
+    "basis": "Preseason No. 2 Big Ten pick with top-10 talent and many All-Big Ten picks, but 4-3 with QB Dante Moore's concussion and losses to Oklahoma State, UCLA and Illinois.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "QB": 1, "WR": 1, "OL": 1, "DL": 1, "CB": 1 },
+    "standouts": [
+      { "name": "Dante Moore", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "pocket", "tier": "elite", "note": "Preseason first-team All-American on several lists; concussion vs USC in September, missed time." },
+      { "name": "Dylan Raiola", "pos": "QB", "year": "JR", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "Nebraska transfer; started in Moore's absence (289 yds, 2 TD vs USC)." },
+      { "name": "Dakorien Moore", "pos": "WR", "year": "SO", "redshirt": false, "archetype": "deep", "tier": "star", "note": "Preseason second-team All-Big Ten; 62-yd TD vs Boise State." },
+      { "name": "Matayo Uiagalelei", "pos": "DE", "year": "SR", "redshirt": false, "archetype": "speed", "tier": "star", "note": "Preseason first-team All-Big Ten edge (Eleven Warriors)." },
+      { "name": "Brandon Finney Jr.", "pos": "CB", "year": "JR", "redshirt": false, "archetype": "man", "tier": "elite", "note": "Preseason first-team All-Big Ten CB and national defensive award contender." },
+      { "name": "Koi Perich", "pos": "FS", "year": "JR", "redshirt": false, "archetype": "coverage", "tier": "star", "note": "Minnesota transfer; preseason first-team All-Big Ten DB and KR." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Oregon_Ducks_football_team", "https://www.yardbarker.com/r/20261008/0/ar/44400906_127", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way"]
+  },
+  {
+    "id": "iowa", "school": "Iowa", "mascot": "Hawkeyes", "abbr": "IOWA", "conference": "Big Ten",
+    "colors": { "primary": "#FFCD00", "secondary": "#000000" },
+    "tier": 2, "prestige": 76, "record2026": "5-1 (2-1)",
+    "target": { "off": 74, "def": 86, "st": 87 },
+    "basis": "AP No. 15 with a classic Ferentz/Parker defense (2 shutouts) and elite special teams, balanced by a run-first, modest passing offense.",
+    "offense": { "qbStyle": "pocket", "scheme": "pro" },
+    "units": { "OL": 1, "RB": 1, "WR": -1, "S": 1, "K": 1 },
+    "standouts": [
+      { "name": "Hank Brown", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Primary starter; threw the walk-off TD at Michigan." },
+      { "name": "Kamari Moulton", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "Leading rusher; 183 yds vs NIU, 208 yds and 2 TD at Washington." },
+      { "name": "Kade Pieper", "pos": "C", "year": "SR", "redshirt": true, "archetype": "run", "tier": "star", "note": "Preseason second-team All-Big Ten center." },
+      { "name": "Trevor Lauck", "pos": "OT", "year": "SR", "redshirt": false, "archetype": "run", "tier": "star", "note": "Preseason first-team All-Big Ten OT (Eleven Warriors)." },
+      { "name": "Zach Lutmer", "pos": "SS", "year": "SR", "redshirt": true, "archetype": "hybrid", "tier": "star", "note": "Preseason All-American (TSN 2nd team); 71 tackles, 3 INT in 2025." },
+      { "name": "Caden Buhr", "pos": "K", "year": "FR", "redshirt": false, "archetype": "accurate", "tier": "good", "note": "Hit 42-yard game-winner vs Iowa State." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Iowa_Hawkeyes_football_team", "https://www.si.com/college/iowa/football/iowa-football-roster-preview-2026", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way"]
+  },
+  {
+    "id": "northwestern", "school": "Northwestern", "mascot": "Wildcats", "abbr": "NU", "conference": "Big Ten",
+    "colors": { "primary": "#4E2A84", "secondary": "#FFFFFF" },
+    "tier": 3, "prestige": 52, "record2026": "6-1 (3-1)",
+    "target": { "off": 80, "def": 80, "st": 81 },
+    "basis": "AP No. 24, only loss 29-23 at Indiana, with Chip Kelly's new offense; overachieving relative to a mid-pack Big Ten talent base.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "QB": 1, "RB": 1, "K": 1 },
+    "standouts": [
+      { "name": "Aidan Chiles", "pos": "QB", "year": "SR", "redshirt": false, "archetype": "dual", "tier": "good", "note": "Starter; 293 pass yds plus a rushing TD at Indiana." },
+      { "name": "Caleb Komolafe", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Leading rusher (188 yds vs Penn State); preseason third-team All-Big Ten." },
+      { "name": "Griffin Wilde", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "possession", "tier": "good", "note": "Top receiver; 144 yds vs Ball State." },
+      { "name": "Robert Fitzgerald", "pos": "CB", "year": "SR", "redshirt": false, "archetype": "zone", "tier": "star", "note": "Preseason second-team All-Big Ten DB." },
+      { "name": "Michael Kilbane", "pos": "DE", "year": "SR", "redshirt": true, "archetype": "power", "tier": "good", "note": "Preseason third-team All-Big Ten edge." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Northwestern_Wildcats_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "minnesota", "school": "Minnesota", "mascot": "Golden Gophers", "abbr": "MINN", "conference": "Big Ten",
+    "colors": { "primary": "#7A0019", "secondary": "#FFCC33" },
+    "tier": 3, "prestige": 55, "record2026": "4-2 (2-1)",
+    "target": { "off": 73, "def": 82, "st": 82 },
+    "basis": "Mid-pack Big Ten team (lost big to Mississippi State and Purdue) with a defense led by preseason Big Ten DPOY Anthony Smith; young pocket QB.",
+    "offense": { "qbStyle": "pocket", "scheme": "pro" },
+    "units": { "DL": 2, "LB": 1, "WR": -1 },
+    "standouts": [
+      { "name": "Drake Lindsey", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Starter; 3 TD passes vs Akron and at Washington." },
+      { "name": "Anthony Smith", "pos": "DE", "year": "SR", "redshirt": false, "archetype": "power", "tier": "elite", "note": "Big Ten preseason Defensive Player of the Year; Athlon second-team All-American." },
+      { "name": "Maverick Baranowski", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "star", "note": "Preseason second-team All-Big Ten; Big Ten Defensive POW after sack + INT at Washington." },
+      { "name": "John Nestor", "pos": "CB", "year": "JR", "redshirt": false, "archetype": "zone", "tier": "star", "note": "PFN preseason first-team All-Big Ten CB." },
+      { "name": "Javon Tracy", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "slot", "tier": "good", "note": "Two punt-return TDs vs Eastern Illinois." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Minnesota_Golden_Gophers_football_team", "https://www.fox9.com/sports/anthony-smith-named-big-ten-preseason-defensive-player-year", "https://gophersports.com/news/2026/7/1/football-athlon-sports-names-nine-gophers-preseason-all-big-ten"]
+  },
+  {
+    "id": "wisconsin", "school": "Wisconsin", "mascot": "Badgers", "abbr": "WIS", "conference": "Big Ten",
+    "colors": { "primary": "#C5050C", "secondary": "#FFFFFF" },
+    "tier": 2, "prestige": 75, "record2026": "4-2 (2-1)",
+    "target": { "off": 75, "def": 80, "st": 76 },
+    "basis": "Rebound year (win at Penn State, routed MSU) behind transfer QB Colton Joseph; lost to Notre Dame and UCLA, scoring only 7 in Pasadena.",
+    "offense": { "qbStyle": "dual", "scheme": "pro" },
+    "units": { "QB": 1, "DL": 1, "WR": -1 },
+    "standouts": [
+      { "name": "Colton Joseph", "pos": "QB", "year": "JR", "redshirt": false, "archetype": "dual", "tier": "good", "note": "Old Dominion transfer; 362 pass yds vs EMU, 141 rush yds vs MSU." },
+      { "name": "Abu Sama III", "pos": "HB", "year": "SR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "Iowa State transfer; 112 yds vs Western Illinois." },
+      { "name": "Tyrell Henry", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "possession", "tier": "good", "note": "14 catches, 160 yds vs EMU." },
+      { "name": "Jacob Harris", "pos": "TE", "year": "JR", "redshirt": false, "archetype": "receiving", "tier": "good", "note": "Bowling Green transfer; 105 yds and a TD at Penn State." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Wisconsin_Badgers_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "nebraska", "school": "Nebraska", "mascot": "Cornhuskers", "abbr": "NEB", "conference": "Big Ten",
+    "colors": { "primary": "#E41C38", "secondary": "#FDF2D9" },
+    "tier": 2, "prestige": 82, "record2026": "5-2 (2-2)",
+    "target": { "off": 80, "def": 79, "st": 84 },
+    "basis": "5-2 with high-scoring wins over weaker teams and 3-point losses to Indiana and Oregon; veteran dual-threat QB and strong return game.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "WR": 1, "TE": 1, "OL": 1 },
+    "standouts": [
+      { "name": "Anthony Colandrea", "pos": "QB", "year": "SR", "redshirt": false, "archetype": "dual", "tier": "good", "note": "Starter; 108 rush yds vs Maryland, Big Ten Offensive POW in Week 2." },
+      { "name": "Jacory Barney Jr.", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "slot", "tier": "star", "note": "Preseason first-team All-Big Ten return man; 115 yds and 2 TD vs Bowling Green." },
+      { "name": "Kwazi Gilmer", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "11 catches, 147 yds, 2 TD vs Maryland." },
+      { "name": "Luke Lindenmeyer", "pos": "TE", "year": "SR", "redshirt": false, "archetype": "receiving", "tier": "star", "note": "PFN preseason first-team All-Big Ten TE." },
+      { "name": "Owen Chambliss", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "good", "note": "Preseason third-team All-Big Ten LB." },
+      { "name": "Jamal Rule", "pos": "HB", "year": "FR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Big Ten Freshman of the Week, 122 yds and 2 TD vs Ohio." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Nebraska_Cornhuskers_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "purdue", "school": "Purdue", "mascot": "Boilermakers", "abbr": "PUR", "conference": "Big Ten",
+    "colors": { "primary": "#CEB888", "secondary": "#000000" },
+    "tier": 3, "prestige": 56, "record2026": "3-4 (2-2)",
+    "target": { "off": 75, "def": 70, "st": 76 },
+    "basis": "Improving in Odom's 2nd year (snapped 18-game Big Ten skid, beat Illinois and Minnesota) with a productive passing game; defense allowed 49-52 to Notre Dame and UCLA.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "WR": 1, "RB": 1, "CB": -1, "S": -1 },
+    "standouts": [
+      { "name": "Ryan Browne", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Captain; 378 yds, 3 TD at UCLA and 317 vs Indiana State." },
+      { "name": "Fame Ijeboi", "pos": "HB", "year": "SO", "redshirt": true, "archetype": "power", "tier": "good", "note": "Minnesota transfer; 195 yds and 3 TD vs Minnesota." },
+      { "name": "Xavier Townsend", "pos": "WR", "year": "SR", "redshirt": true, "archetype": "deep", "tier": "good", "note": "6 catches, 162 yds, 2 TD at UCLA." },
+      { "name": "Charles Correa", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "good", "note": "Captain; preseason third-team All-Big Ten LB." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Purdue_Boilermakers_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "michigan", "school": "Michigan", "mascot": "Wolverines", "abbr": "MICH", "conference": "Big Ten",
+    "colors": { "primary": "#00274C", "secondary": "#FFCB05" },
+    "tier": 1, "prestige": 96, "record2026": "4-3 (1-3)",
+    "target": { "off": 73, "def": 86, "st": 79 },
+    "basis": "Strong defense (held Indiana to 13, Oklahoma to 10) under first-year coach Whittingham, but a struggling passing offense with Underwood benched; unranked since Week 7.",
+    "offense": { "qbStyle": "dual", "scheme": "power-run" },
+    "units": { "QB": -2, "RB": 1, "DL": 1, "S": 1 },
+    "standouts": [
+      { "name": "Bryce Underwood", "pos": "QB", "year": "SO", "redshirt": false, "archetype": "dual", "tier": "good", "note": "Captain and opening starter; benched vs Penn State (58%, 5 TD, 6 INT through 6 games)." },
+      { "name": "Tommy Carr", "pos": "QB", "year": "FR", "redshirt": false, "archetype": "dual", "tier": "good", "note": "Replaced Underwood vs Penn State; expected starter vs Indiana." },
+      { "name": "Jordan Marshall", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "Captain; preseason first-team All-Big Ten RB." },
+      { "name": "John Henry Daley", "pos": "DE", "year": "SR", "redshirt": false, "archetype": "speed", "tier": "elite", "note": "Preseason All-American and first-team All-Big Ten edge; Big Ten Defensive POW (Sept. 14)." },
+      { "name": "Rod Moore", "pos": "FS", "year": "SR", "redshirt": true, "archetype": "coverage", "tier": "star", "note": "Captain, graduate starter; preseason second-team All-Big Ten." },
+      { "name": "Andrew Marsh", "pos": "WR", "year": "SO", "redshirt": false, "archetype": "slot", "tier": "star", "note": "Preseason second-team All-Big Ten; 105 yds and a TD vs UTEP." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Michigan_Wolverines_football_team", "https://bvmsports.com/2026/10/20/michigan-starts-tommy-carr-vs-indiana-whats-next-for-bryce-underwood/", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way"]
+  },
+  {
+    "id": "illinois", "school": "Illinois", "mascot": "Fighting Illini", "abbr": "ILL", "conference": "Big Ten",
+    "colors": { "primary": "#E84A27", "secondary": "#13294B" },
+    "tier": 3, "prestige": 58, "record2026": "4-3 (2-2)",
+    "target": { "off": 77, "def": 74, "st": 78 },
+    "basis": "Up-and-down 4-3 (beat Oregon 21-10, lost to Duke and Purdue) with a heavily transfer-rebuilt roster and a new 3-3-5 defense.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "WR": 1, "CB": 1, "DL": -1 },
+    "standouts": [
+      { "name": "Katin Houser", "pos": "QB", "year": "SR", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "East Carolina transfer starter; 305 yds vs Southern Illinois." },
+      { "name": "Collin Dixon", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "possession", "tier": "good", "note": "Leading receiver; 11 catches, 166 yds, 3 TD vs Duke." },
+      { "name": "Aidan Laughery", "pos": "HB", "year": "SR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "113 rush yds at Ohio State." },
+      { "name": "Xavier Scott", "pos": "CB", "year": "SR", "redshirt": false, "archetype": "man", "tier": "star", "note": "Preseason second-team All-Big Ten DB." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Illinois_Fighting_Illini_football_team", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way"]
+  },
+  {
+    "id": "rutgers", "school": "Rutgers", "mascot": "Scarlet Knights", "abbr": "RUTG", "conference": "Big Ten",
+    "colors": { "primary": "#CC0033", "secondary": "#000000" },
+    "tier": 3, "prestige": 42, "record2026": "2-5 (1-3)",
+    "target": { "off": 76, "def": 66, "st": 72 },
+    "basis": "Dangerous skill players (Duff, Raymond) but a porous defense; lost to UMass and Boston College and was routed by Indiana and Northwestern.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "WR": 2, "RB": 1, "QB": -1, "CB": -1, "S": -1 },
+    "standouts": [
+      { "name": "Dylan Lonergan", "pos": "QB", "year": "SR", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "Primary starter; turnover-prone (5 INT in first two games)." },
+      { "name": "KJ Duff", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "star", "note": "PFN preseason first-team All-Big Ten; 196 yds and 3 TD vs UMass; Big Ten Offensive POW (Oct. 21)." },
+      { "name": "Antwan Raymond", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "elusive", "tier": "star", "note": "PFN preseason first-team All-Big Ten RB; 140 yds and 3 TD vs Howard." },
+      { "name": "Rondo Porter", "pos": "DT", "year": "SR", "redshirt": false, "archetype": "power", "tier": "star", "note": "PFN preseason first-team All-Big Ten DT." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Rutgers_Scarlet_Knights_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten", "https://www.siriusxm.com/blog/around-the-big-ten-october-21"]
+  },
+  {
+    "id": "washington", "school": "Washington", "mascot": "Huskies", "abbr": "WASH", "conference": "Big Ten",
+    "colors": { "primary": "#4B2E83", "secondary": "#B7A57A" },
+    "tier": 2, "prestige": 78, "record2026": "4-3 (1-3)",
+    "target": { "off": 79, "def": 77, "st": 83 },
+    "basis": "Preseason No. 17 with a dynamic QB and experienced defense, but 1-3 in league play with close losses to Minnesota and USC and a 41-24 loss to Iowa.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "QB": 1, "K": 1, "P": 1 },
+    "standouts": [
+      { "name": "Demond Williams Jr.", "pos": "QB", "year": "JR", "redshirt": false, "archetype": "dual", "tier": "star", "note": "Led the Big Ten in total yards in 2025 (3,676); 24/25 vs Washington State." },
+      { "name": "Dezmen Roebuck", "pos": "WR", "year": "SO", "redshirt": false, "archetype": "possession", "tier": "good", "note": "121 yds vs Eastern Washington." },
+      { "name": "Jacob Manu", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "good", "note": "Veteran LB back from a 2025 injury." },
+      { "name": "Tyler Robles", "pos": "K", "year": "JR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Preseason third-team All-Big Ten K; 48-yd FG." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Washington_Huskies_football_team", "https://roundtable.io/sports/ncaa/washington/news/washington-huskies-defense-has-lofty-expectations-for-2026", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "pennstate", "school": "Penn State", "mascot": "Nittany Lions", "abbr": "PSU", "conference": "Big Ten",
+    "colors": { "primary": "#041E42", "secondary": "#FFFFFF" },
+    "tier": 1, "prestige": 88, "record2026": "3-4 (0-4)",
+    "target": { "off": 78, "def": 76, "st": 84 },
+    "basis": "Preseason No. 18 in Matt Campbell's first year, but 0-4 in the Big Ten after losses to Wisconsin, Northwestern, USC and Michigan; offense built on Iowa State transfers.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "RB": 1, "K": 1, "OL": -1 },
+    "standouts": [
+      { "name": "Rocco Becht", "pos": "QB", "year": "SR", "redshirt": true, "archetype": "dual", "tier": "good", "note": "Iowa State transfer starter; 200+ pass yds in 6 of 7 games." },
+      { "name": "Carson Hansen", "pos": "HB", "year": "SR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Leading rusher; preseason second-team All-Big Ten (PFN)." },
+      { "name": "Chase Sowell", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "Top receiver; 11 catches, 151 yds at Michigan." },
+      { "name": "Tony Rojas", "pos": "OLB", "year": "SR", "redshirt": false, "archetype": "rusher", "tier": "star", "note": "Preseason first-team All-Big Ten LB (Eleven Warriors)." },
+      { "name": "Ryan Barker", "pos": "K", "year": "JR", "redshirt": false, "archetype": "accurate", "tier": "star", "note": "PFN preseason first-team All-Big Ten kicker." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Penn_State_Nittany_Lions_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten", "https://www.elevenwarriors.com/the-big-ten/2026/07/163134/2026-preseason-all-big-ten-team-ohio-state-indiana-and-oregon-stars-lead-the-way"]
+  },
+  {
+    "id": "maryland", "school": "Maryland", "mascot": "Terrapins", "abbr": "MD", "conference": "Big Ten",
+    "colors": { "primary": "#E03A3E", "secondary": "#FFD520" },
+    "tier": 3, "prestige": 48, "record2026": "2-5 (0-4)",
+    "target": { "off": 71, "def": 65, "st": 72 },
+    "basis": "2-5 with five straight losses (lost 54-3 to UCLA), coach Locksley fired Oct. 21; young QB in a pass-heavy run-and-gun.",
+    "offense": { "qbStyle": "pocket", "scheme": "air-raid" },
+    "units": { "QB": -1, "WR": 1, "DL": -1, "CB": -1 },
+    "standouts": [
+      { "name": "Malik Washington", "pos": "QB", "year": "SO", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "Starter; 359 yds and 3 TD vs Virginia Tech, but 4 INT vs UCLA." },
+      { "name": "Chris Durr Jr.", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "possession", "tier": "good", "note": "12 catches, 109 yds, 2 TD vs Virginia Tech; 149 yds at Nebraska." },
+      { "name": "Daniel Wingate", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "coverage", "tier": "star", "note": "PFN preseason second-team All-Big Ten LB; pick-six at Ohio State." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Maryland_Terrapins_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  },
+  {
+    "id": "michiganstate", "school": "Michigan State", "mascot": "Spartans", "abbr": "MSU", "conference": "Big Ten",
+    "colors": { "primary": "#18453B", "secondary": "#FFFFFF" },
+    "tier": 3, "prestige": 66, "record2026": "2-6 (0-5)",
+    "target": { "off": 69, "def": 67, "st": 76 },
+    "basis": "Winless in Big Ten play in Pat Fitzgerald's first season, with only Toledo and EMU wins and a low-scoring offense (3 at Wisconsin); veteran OL is the strength.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "OL": 1, "K": 1, "WR": -1, "LB": -1 },
+    "standouts": [
+      { "name": "Alessio Milivojevic", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Started every game; 247 yds vs Toledo." },
+      { "name": "Cam Edwards", "pos": "HB", "year": "SR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "152 yds and 2 TD vs Eastern Michigan." },
+      { "name": "Liam Boyd", "pos": "K", "year": "SR", "redshirt": true, "archetype": "power", "tier": "good", "note": "5th-year kicker; 51-yd FG vs Toledo." }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Michigan_State_Spartans_football_team", "https://www.profootballnetwork.com/cfb-hq/preseason-honors/big-ten"]
+  }
+]

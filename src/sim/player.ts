@@ -166,11 +166,11 @@ export function maxSpeed(p: Player): number {
 }
 
 /**
- * Sprint endurance, 0..1, from speed and burst: a pocket QB is about 0.4, a TE
- * about 0.5, backs and receivers about 0.85. It sets how long the sprint bar lasts.
+ * Sprint endurance, 0..1, from stamina: a pocket QB is about 0.4, a TE about 0.5,
+ * backs and receivers about 0.85. It sets how long the sprint bar lasts.
  */
 export function endurance(p: Player): number {
-  return clamp((p.r.spd * 0.6 + p.r.acc * 0.4 - 60) / 35, 0, 1);
+  return clamp((p.r.sta - 60) / 35, 0, 1);
 }
 
 export function accelOf(p: Player): number {

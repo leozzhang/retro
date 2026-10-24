@@ -1,5 +1,6 @@
 import { clamp, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import type { Player } from './player';
+import { runBlockValue } from '../data/ratings';
 
 /**
  * Side-agnostic blocking for special teams: `blockers` lock onto `targets`
@@ -51,8 +52,8 @@ export function updateEngagements(targets: Player[], goalOf: (d: Player) => Vec,
     }
     const n = d.engagedBy.length;
     const dir = norm(sub(goalOf(d), d.pos));
-    const blk = d.engagedBy.reduce((s, b) => s + b.r.blk, 0) / n;
-    const power = d.r.str * 0.6 + d.r.spd * 0.4 - blk - (n - 1) * 15 - (t.edge ?? 0);
+    const blk = d.engagedBy.reduce((s, b) => s + runBlockValue(b.r), 0) / n;
+    const power = d.r.bsh * 0.6 + d.r.spd * 0.4 - blk - (n - 1) * 15 - (t.edge ?? 0);
     const push = clamp(0.8 + power * 0.06, -0.8, 2.2);
     d.want = scale(dir, push);
     for (const b of d.engagedBy) b.want = scale(dir, push);

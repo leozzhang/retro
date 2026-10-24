@@ -1,0 +1,1433 @@
+[
+  {
+    "id": "miami",
+    "school": "Miami",
+    "mascot": "Hurricanes",
+    "abbr": "MIA",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#F47321",
+      "secondary": "#005030"
+    },
+    "tier": 1,
+    "prestige": 90,
+    "record2026": "7-0 (5-0)",
+    "target": {
+      "off": 90,
+      "def": 91,
+      "st": 82
+    },
+    "basis": "7-0 and AP No. 1, preseason ACC favorite with a third of the preseason All-ACC team; elite DL and secondary talent.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "air-raid"
+    },
+    "units": {
+      "QB": 1,
+      "WR": 1,
+      "DL": 2,
+      "S": 1
+    },
+    "standouts": [
+      {
+        "name": "Darian Mensah",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "elite",
+        "note": "Preseason ACC POY; set ACC records for consecutive completions (24 in a game, 35 across games)."
+      },
+      {
+        "name": "Malachi Toney",
+        "pos": "WR",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "slot",
+        "tier": "elite",
+        "note": "Preseason All-American; 12-234-3 vs Stanford; also all-ACC returner."
+      },
+      {
+        "name": "Mark Fletcher Jr.",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason All-ACC running back."
+      },
+      {
+        "name": "Ahmad Moten Sr.",
+        "pos": "DT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason All-ACC defensive tackle."
+      },
+      {
+        "name": "Bryce Fitzgerald",
+        "pos": "FS",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "coverage",
+        "tier": "elite",
+        "note": "Preseason All-American safety."
+      },
+      {
+        "name": "Damon Wilson II",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "speed",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC edge (PFN)."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Miami_Hurricanes_football_team",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "smu",
+    "school": "SMU",
+    "mascot": "Mustangs",
+    "abbr": "SMU",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#0033A0",
+      "secondary": "#C8102E"
+    },
+    "tier": 2,
+    "prestige": 68,
+    "record2026": "6-1 (4-1)",
+    "target": {
+      "off": 84,
+      "def": 79,
+      "st": 72
+    },
+    "basis": "6-1 and AP No. 23 with a veteran explosive offense (3rd-year starter Jennings); preseason No. 2 in ACC poll; kicking has been shaky.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "OL": 1,
+      "TE": 1,
+      "K": -1
+    },
+    "standouts": [
+      {
+        "name": "Kevin Jennings",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "star",
+        "note": "Third-year starter, runner-up for preseason ACC POY; big-play passer but turnover-prone."
+      },
+      {
+        "name": "Kendrick Raphael",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Cal transfer; career-high 197 yards and 3 TD at Louisville."
+      },
+      {
+        "name": "Yamir Knight",
+        "pos": "TE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "receiving",
+        "tier": "good",
+        "note": "11-164-1 vs Missouri State."
+      },
+      {
+        "name": "PJ Williams",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pass",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC tackle."
+      },
+      {
+        "name": "Jimmy Wyrick",
+        "pos": "FS",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "coverage",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC safety (PFN)."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_SMU_Mustangs_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "wakeforest",
+    "school": "Wake Forest",
+    "mascot": "Demon Deacons",
+    "abbr": "WAKE",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#9E7E38",
+      "secondary": "#000000"
+    },
+    "tier": 3,
+    "prestige": 52,
+    "record2026": "6-1 (4-1)",
+    "target": {
+      "off": 83,
+      "def": 81,
+      "st": 79
+    },
+    "basis": "6-1 and AP No. 17 in year two under Dickert after a 9-win 2025; only loss to No. 1 Miami; returning pass rusher Hardy.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "WR": 1,
+      "DL": 1
+    },
+    "standouts": [
+      {
+        "name": "Gio Lopez",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "star",
+        "note": "UNC transfer; five total TDs vs Stanford, multiple rushing TD games."
+      },
+      {
+        "name": "Carlos Hernandez",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "slot",
+        "tier": "star",
+        "note": "194 yards vs Louisville, 165 vs Akron; preseason second-team All-ACC punt returner."
+      },
+      {
+        "name": "Jack Foley",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "156 yards vs NC State, 118 vs Miami."
+      },
+      {
+        "name": "Langston Hardy",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "star",
+        "note": "7 sacks in 2025; preseason second-team All-ACC edge."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Wake_Forest_Demon_Deacons_football_team",
+      "https://ncfootballnews.com/wake-forest-football-preview-2026/",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "clemson",
+    "school": "Clemson",
+    "mascot": "Tigers",
+    "abbr": "CLEM",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#F56600",
+      "secondary": "#522D80"
+    },
+    "tier": 1,
+    "prestige": 88,
+    "record2026": "4-2 (2-1)",
+    "target": {
+      "off": 78,
+      "def": 83,
+      "st": 82
+    },
+    "basis": "4-2 but blown out by LSU and Miami; unranked with a freshman QB, yet still a top-15 talent roster and strong LB/CB core; reliable K Hauser.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": -1,
+      "LB": 2,
+      "CB": 1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Tait Reynolds",
+        "pos": "QB",
+        "year": "FR",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Took over after the opener; 295 yards vs Miami."
+      },
+      {
+        "name": "Gideon Davidson",
+        "pos": "HB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "good",
+        "note": "159 yards and 2 TD vs California."
+      },
+      {
+        "name": "Bryant Wesco Jr.",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "star",
+        "note": "Preseason All-ACC wide receiver."
+      },
+      {
+        "name": "Sammy Brown",
+        "pos": "MLB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "elite",
+        "note": "Preseason All-American; top LB vote-getter on preseason All-ACC."
+      },
+      {
+        "name": "Will Heldt",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason All-ACC defensive end."
+      },
+      {
+        "name": "Ashton Hampton",
+        "pos": "CB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "man",
+        "tier": "star",
+        "note": "Preseason All-ACC cornerback."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Clemson_Tigers_football_team",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "northcarolina",
+    "school": "North Carolina",
+    "mascot": "Tar Heels",
+    "abbr": "UNC",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#7BAFD4",
+      "secondary": "#13294B"
+    },
+    "tier": 3,
+    "prestige": 68,
+    "record2026": "4-2 (2-1)",
+    "target": {
+      "off": 76,
+      "def": 78,
+      "st": 74
+    },
+    "basis": "4-2 in Belichick's second year with grad transfer QB Edwards and Bobby Petrino's offense; unranked, middle of ACC.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "pro"
+    },
+    "units": {
+      "TE": 1,
+      "WR": 1
+    },
+    "standouts": [
+      {
+        "name": "Billy Edwards Jr.",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Wisconsin transfer; steady 190-250 yard games."
+      },
+      {
+        "name": "Jordan Shipp",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "109 yards vs Notre Dame, 93 at Pitt."
+      },
+      {
+        "name": "Jelani Thurman",
+        "pos": "TE",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "receiving",
+        "tier": "good",
+        "note": "Two TD catches vs Notre Dame."
+      },
+      {
+        "name": "Benjamin Hall",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "good",
+        "note": "130 rushing yards at Clemson."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_North_Carolina_Tar_Heels_football_team"
+    ]
+  },
+  {
+    "id": "louisville",
+    "school": "Louisville",
+    "mascot": "Cardinals",
+    "abbr": "LOU",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#AD0000",
+      "secondary": "#000000"
+    },
+    "tier": 2,
+    "prestige": 66,
+    "record2026": "4-3 (3-2)",
+    "target": {
+      "off": 82,
+      "def": 80,
+      "st": 80
+    },
+    "basis": "4-3 after starting ranked (peaked No. 16); preseason No. 3 in ACC with several preseason All-ACC picks; strong run game.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 2,
+      "OL": 1,
+      "DL": 1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Lincoln Kienholz",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "Ohio State transfer; three 300-yard passing games plus rushing TDs."
+      },
+      {
+        "name": "Isaac Brown",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "elite",
+        "note": "Preseason All-American; 235 yards on 17 carries vs Florida State."
+      },
+      {
+        "name": "Lance Robinson",
+        "pos": "C",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Outland watch list; preseason first-team All-ACC (PFN)."
+      },
+      {
+        "name": "Clev Lubin",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "speed",
+        "tier": "star",
+        "note": "Preseason All-ACC; Nagurski, Bednarik and Lott watch lists."
+      },
+      {
+        "name": "Antonio Watts",
+        "pos": "OLB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "coverage",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC linebacker (PFN)."
+      },
+      {
+        "name": "Carson Hilbert",
+        "pos": "K",
+        "year": "FR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Made a 54-yarder vs Wake Forest."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Louisville_Cardinals_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "duke",
+    "school": "Duke",
+    "mascot": "Blue Devils",
+    "abbr": "DUKE",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#003087",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 3,
+    "prestige": 50,
+    "record2026": "5-2 (2-2)",
+    "target": {
+      "off": 79,
+      "def": 76,
+      "st": 76
+    },
+    "basis": "Defending ACC champion, 5-2 and receiving votes; lost QB Mensah to Miami, replaced by SJSU grad transfer Eget; strong run game.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 2,
+      "TE": 1
+    },
+    "standouts": [
+      {
+        "name": "Walker Eget",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "San Jose State grad transfer (3,051 yards in 2025); 249 yards vs UNC."
+      },
+      {
+        "name": "Nate Sheppard",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC (PFN); 227 yards vs Tulane, 154 vs Stanford."
+      },
+      {
+        "name": "Jeremiah Hasley",
+        "pos": "TE",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "receiving",
+        "tier": "star",
+        "note": "Preseason All-ACC tight end; 88 yards vs Stanford."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Duke_Blue_Devils_football_team",
+      "https://goduke.com/news/2026/8/25/football-eget-named-duke-starting-quarterback",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "virginiatech",
+    "school": "Virginia Tech",
+    "mascot": "Hokies",
+    "abbr": "VT",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#630031",
+      "secondary": "#CF4420"
+    },
+    "tier": 2,
+    "prestige": 72,
+    "record2026": "5-2 (2-2)",
+    "target": {
+      "off": 80,
+      "def": 78,
+      "st": 81
+    },
+    "basis": "5-2 in James Franklin's first year; prolific passing (434 yards vs Pitt) and preseason No. 8 in ACC; All-ACC DT and punter.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "pro"
+    },
+    "units": {
+      "QB": 1,
+      "TE": 1,
+      "DL": 1,
+      "P": 1
+    },
+    "standouts": [
+      {
+        "name": "Ethan Grunkemeyer",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "434 yards vs Pitt, 327 vs ODU, 314 at Maryland."
+      },
+      {
+        "name": "Que'Sean Brown",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "deep",
+        "tier": "good",
+        "note": "182 yards vs Georgia Tech, 147 vs Pitt."
+      },
+      {
+        "name": "Jeffrey Overton Jr.",
+        "pos": "HB",
+        "year": "FR",
+        "redshirt": true,
+        "archetype": "elusive",
+        "tier": "good",
+        "note": "209 yards including a 76-yard TD at Boston College."
+      },
+      {
+        "name": "Luke Reynolds",
+        "pos": "TE",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "receiving",
+        "tier": "good",
+        "note": "12-107-1 at Maryland, 8-108-2 vs ODU."
+      },
+      {
+        "name": "Kemari Copeland",
+        "pos": "DT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC defensive tackle."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Virginia_Tech_Hokies_football_team",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "bostoncollege",
+    "school": "Boston College",
+    "mascot": "Eagles",
+    "abbr": "BC",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#8A100B",
+      "secondary": "#BC9B6A"
+    },
+    "tier": 3,
+    "prestige": 60,
+    "record2026": "4-3 (2-2)",
+    "target": {
+      "off": 74,
+      "def": 76,
+      "st": 79
+    },
+    "basis": "4-3 with a Division II transfer QB; preseason No. 16 in ACC poll but improved; All-ACC safety and kicker.",
+    "offense": {
+      "qbStyle": "runner",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": -1,
+      "S": 1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Mason McKenzie",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "scrambler",
+        "tier": "good",
+        "note": "D-II transfer (Saginaw Valley); 138 rushing yards and 2 TD vs Virginia Tech."
+      },
+      {
+        "name": "Dawson Pough",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "good",
+        "note": "78-yard TD catch vs Rutgers."
+      },
+      {
+        "name": "KP Price",
+        "pos": "SS",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "hybrid",
+        "tier": "star",
+        "note": "Preseason All-ACC safety."
+      },
+      {
+        "name": "Luca Lombardo",
+        "pos": "K",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "accurate",
+        "tier": "good",
+        "note": "Preseason second-team All-ACC kicker."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Boston_College_Eagles_football_team",
+      "https://www.si.com/college/bostoncollege/football/report-boston-college-football-signs-former-saginaw-valley-state-quarterback-mason-mckenzie",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "pittsburgh",
+    "school": "Pittsburgh",
+    "mascot": "Panthers",
+    "abbr": "PITT",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#003594",
+      "secondary": "#FFB81C"
+    },
+    "tier": 3,
+    "prestige": 68,
+    "record2026": "5-3 (2-3)",
+    "target": {
+      "off": 80,
+      "def": 77,
+      "st": 79
+    },
+    "basis": "5-3, briefly ranked No. 25; up-tempo spread with QB Heintschel (453 yards, 7 TD in one game); solid but not elite defense.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "air-raid"
+    },
+    "units": {
+      "QB": 1,
+      "WR": 1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Mason Heintschel",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "453 yards and 7 TD vs Miami (OH), 403 and 6 TD vs Bucknell."
+      },
+      {
+        "name": "Cataurus Hicks",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "114 yards vs Miami (OH); two TDs vs Virginia Tech."
+      },
+      {
+        "name": "Nick James",
+        "pos": "DT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Preseason second-team All-ACC (PFN)."
+      },
+      {
+        "name": "Antonio Chadha",
+        "pos": "K",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Hit a 58-yard field goal vs Miami (OH)."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Pittsburgh_Panthers_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "stanford",
+    "school": "Stanford",
+    "mascot": "Cardinal",
+    "abbr": "STAN",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#8C1515",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 3,
+    "prestige": 70,
+    "record2026": "4-4 (2-3)",
+    "target": {
+      "off": 74,
+      "def": 73,
+      "st": 74
+    },
+    "basis": "4-4 in Pritchard's first year after being picked last in the ACC; already beat preseason expectations; experienced grad QB Warren.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "pro"
+    },
+    "units": {
+      "QB": 1,
+      "CB": 1,
+      "DL": -1
+    },
+    "standouts": [
+      {
+        "name": "Davis Warren",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "303 yards and 4 TD vs NC State, 310 vs Hawaii."
+      },
+      {
+        "name": "Micah Ford",
+        "pos": "HB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "179 yards and 4 TD vs Elon; 150 vs NC State."
+      },
+      {
+        "name": "Caden High",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "9-103-1 vs NC State."
+      },
+      {
+        "name": "Jay Green",
+        "pos": "CB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "man",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC defensive back (PFN)."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Stanford_Cardinal_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "virginia",
+    "school": "Virginia",
+    "mascot": "Cavaliers",
+    "abbr": "UVA",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#232D4B",
+      "secondary": "#F84C1E"
+    },
+    "tier": 3,
+    "prestige": 55,
+    "record2026": "4-4 (2-3)",
+    "target": {
+      "off": 77,
+      "def": 78,
+      "st": 82
+    },
+    "basis": "2025 ACC runner-up now 4-4 after a No. 25 start; dual-threat grad QB Pribula, All-ACC OL and LB, and the preseason All-ACC punter.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "OL": 1,
+      "LB": 1,
+      "P": 2,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "Beau Pribula",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "155 pass and 110 rush yards vs NC State; 4 TD passes vs Delaware."
+      },
+      {
+        "name": "McKale Boley",
+        "pos": "OT",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "pass",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC tackle."
+      },
+      {
+        "name": "Noah Josey",
+        "pos": "OG",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason All-ACC guard."
+      },
+      {
+        "name": "Kam Robinson",
+        "pos": "OLB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason All-ACC linebacker."
+      },
+      {
+        "name": "Daniel Sparks",
+        "pos": "P",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "power",
+        "tier": "star",
+        "note": "Preseason All-ACC punter."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Virginia_Cavaliers_football_team",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "california",
+    "school": "California",
+    "mascot": "Golden Bears",
+    "abbr": "CAL",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#003262",
+      "secondary": "#FDB515"
+    },
+    "tier": 3,
+    "prestige": 62,
+    "record2026": "3-5 (2-3)",
+    "target": {
+      "off": 75,
+      "def": 72,
+      "st": 77
+    },
+    "basis": "3-5 in Tosh Lupoi's first season; talented sophomore passer Sagapolutele but inconsistent; KR Mohammed was a preseason All-ACC pick.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "pro"
+    },
+    "units": {
+      "QB": 1,
+      "RB": 1,
+      "P": 1
+    },
+    "standouts": [
+      {
+        "name": "Jaron-Keawe Sagapolutele",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "413 yards and 3 TD vs Wagner; 271 and 2 TD vs UCLA."
+      },
+      {
+        "name": "Adam Mohammed",
+        "pos": "HB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "good",
+        "note": "120 yards vs UCLA; preseason All-ACC kick returner (PFN)."
+      },
+      {
+        "name": "Ian Strong",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "94 yards vs UCLA, 97 vs Virginia Tech."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_California_Golden_Bears_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "floridastate",
+    "school": "Florida State",
+    "mascot": "Seminoles",
+    "abbr": "FSU",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#782F40",
+      "secondary": "#CEB888"
+    },
+    "tier": 1,
+    "prestige": 88,
+    "record2026": "3-4 (1-3)",
+    "target": {
+      "off": 80,
+      "def": 74,
+      "st": 81
+    },
+    "basis": "3-4 but competitive in losses (2OT at Miami, 3 pts vs SMU); explosive offense with All-American WR Robinson, porous 3-3-5 defense.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "WR": 2,
+      "RB": 1,
+      "K": 1,
+      "DL": -1
+    },
+    "standouts": [
+      {
+        "name": "Ashton Daniels",
+        "pos": "QB",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "School-record 5 rushing TD for a QB vs Virginia; 377 passing yards at Alabama."
+      },
+      {
+        "name": "Duce Robinson",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "deep",
+        "tier": "elite",
+        "note": "Preseason All-American; 135 yards at Alabama, 113 and 2 TD at Miami."
+      },
+      {
+        "name": "Ousmane Kromah",
+        "pos": "HB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "Doak Walker watch list; 116 yards vs SMU."
+      },
+      {
+        "name": "Mandrell Desir",
+        "pos": "DE",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "speed",
+        "tier": "good",
+        "note": "Preseason second-team All-ACC edge (PFN)."
+      },
+      {
+        "name": "Gabe Panikowski",
+        "pos": "K",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "accurate",
+        "tier": "good",
+        "note": "Lou Groza watch list."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Florida_State_Seminoles_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "ncstate",
+    "school": "NC State",
+    "mascot": "Wolfpack",
+    "abbr": "NCST",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#CC0000",
+      "secondary": "#000000"
+    },
+    "tier": 3,
+    "prestige": 62,
+    "record2026": "3-4 (1-3)",
+    "target": {
+      "off": 77,
+      "def": 72,
+      "st": 74
+    },
+    "basis": "3-4 despite preseason No. 7 ACC pick; QB Bailey and an All-ACC-caliber OL carry the offense, defense has struggled.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": 1,
+      "OL": 1,
+      "WR": 1
+    },
+    "standouts": [
+      {
+        "name": "CJ Bailey",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "Preseason second-team All-ACC; 275 yards and 3 TD at Vanderbilt."
+      },
+      {
+        "name": "Keenan Jackson",
+        "pos": "WR",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "9-102-3 at Vanderbilt; 123 yards vs Richmond."
+      },
+      {
+        "name": "Spike Sowells Jr.",
+        "pos": "OG",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Preseason first-team All-ACC lineman (PFN)."
+      },
+      {
+        "name": "King Mack",
+        "pos": "SS",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "hybrid",
+        "tier": "good",
+        "note": "Preseason second-team All-ACC safety (PFN)."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_NC_State_Wolfpack_football_team",
+      "https://www.profootballnetwork.com/cfb-hq/preseason-honors/acc"
+    ]
+  },
+  {
+    "id": "georgiatech",
+    "school": "Georgia Tech",
+    "mascot": "Yellow Jackets",
+    "abbr": "GT",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#B3A369",
+      "secondary": "#003057"
+    },
+    "tier": 3,
+    "prestige": 68,
+    "record2026": "2-5 (1-3)",
+    "target": {
+      "off": 73,
+      "def": 71,
+      "st": 82
+    },
+    "basis": "2-5 after a preseason No. 5 ACC pick; lost the Haynes King era and is rebuilding with Indiana transfer QB Mendoza; elite kicker Birr.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "K": 2,
+      "RB": 1,
+      "DL": -1
+    },
+    "standouts": [
+      {
+        "name": "Alberto Mendoza",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Indiana transfer; about 72% completions, 7 TD, 3 INT in five box-scored games."
+      },
+      {
+        "name": "Justice Haynes",
+        "pos": "HB",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "power",
+        "tier": "good",
+        "note": "141 yards and 2 TD vs Mercer."
+      },
+      {
+        "name": "Jordan Allen",
+        "pos": "WR",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "good",
+        "note": "120 yards vs Virginia Tech, 113 vs Colorado."
+      },
+      {
+        "name": "Aidan Birr",
+        "pos": "K",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "accurate",
+        "tier": "star",
+        "note": "Top placekicker vote-getter on preseason All-ACC."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Georgia_Tech_Yellow_Jackets_football_team",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "syracuse",
+    "school": "Syracuse",
+    "mascot": "Orange",
+    "abbr": "SYR",
+    "conference": "ACC",
+    "colors": {
+      "primary": "#F76900",
+      "secondary": "#000E54"
+    },
+    "tier": 3,
+    "prestige": 60,
+    "record2026": "2-4 (0-4)",
+    "target": {
+      "off": 73,
+      "def": 69,
+      "st": 71
+    },
+    "basis": "2-4, winless in ACC, cycling through three starting QBs; productive WR Hatcher and an All-ACC corner but a weak defense overall.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "spread"
+    },
+    "units": {
+      "QB": -1,
+      "WR": 1,
+      "CB": 1
+    },
+    "standouts": [
+      {
+        "name": "Malachi Nelson",
+        "pos": "QB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "good",
+        "note": "Latest starter; 315 yards and 2 TD vs Louisville."
+      },
+      {
+        "name": "Umari Hatcher",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": true,
+        "archetype": "deep",
+        "tier": "star",
+        "note": "13-224-1 vs Louisville; 12-152-3 at UConn."
+      },
+      {
+        "name": "Chris Peal",
+        "pos": "CB",
+        "year": "JR",
+        "redshirt": true,
+        "archetype": "man",
+        "tier": "star",
+        "note": "Preseason All-ACC cornerback."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Syracuse_Orange_football_team",
+      "https://ncfootballnews.com/acc-football-2026-preseason-media-poll-all-conference-team/"
+    ]
+  },
+  {
+    "id": "notredame",
+    "school": "Notre Dame",
+    "mascot": "Fighting Irish",
+    "abbr": "ND",
+    "conference": "Independent",
+    "colors": {
+      "primary": "#0C2340",
+      "secondary": "#C99700"
+    },
+    "tier": 1,
+    "prestige": 95,
+    "record2026": "6-1",
+    "target": {
+      "off": 88,
+      "def": 89,
+      "st": 84
+    },
+    "basis": "6-1 and AP No. 4 (only loss 28-24 at BYU); preseason SP+ top 3 with a deep RB room and a top-10 defense.",
+    "offense": {
+      "qbStyle": "pocket",
+      "scheme": "pro"
+    },
+    "units": {
+      "RB": 2,
+      "OL": 1,
+      "DL": 1,
+      "CB": 1,
+      "K": 1
+    },
+    "standouts": [
+      {
+        "name": "CJ Carr",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "pocket",
+        "tier": "star",
+        "note": "Captain; 4 TD games vs Rice and at UNC, plus several rushing TDs."
+      },
+      {
+        "name": "Jonaz Walton",
+        "pos": "HB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "good",
+        "note": "181 yards and 2 TD incl. a 97-yard run vs Stanford."
+      },
+      {
+        "name": "Jaden Greathouse",
+        "pos": "WR",
+        "year": "SR",
+        "redshirt": false,
+        "archetype": "possession",
+        "tier": "star",
+        "note": "8-125 vs BYU."
+      },
+      {
+        "name": "Boubacar Traore",
+        "pos": "DE",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "speed",
+        "tier": "star",
+        "note": "Led team with 6.5 sacks in 2025; Nagurski watch list."
+      },
+      {
+        "name": "Drayk Bowen",
+        "pos": "MLB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "star",
+        "note": "Captain; led 2025 team in tackles; fumble-return TD vs Purdue."
+      },
+      {
+        "name": "Spencer Porath",
+        "pos": "K",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "accurate",
+        "tier": "good",
+        "note": "Purdue transfer; three FGs vs BYU."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_Notre_Dame_Fighting_Irish_football_team",
+      "https://atozsports.com/college-football/notre-dame-football-good-bad-uncertain-defense-marcus-freeman-kyngstonn-viliamu-asa-leonard-moore/",
+      "https://www.elevenwarriors.com/ohio-state-football/2026/03/162042/ohio-state-ranks-no-1-in-initial-2026-sp-rankings"
+    ]
+  },
+  {
+    "id": "uconn",
+    "school": "UConn",
+    "mascot": "Huskies",
+    "abbr": "CONN",
+    "conference": "Independent",
+    "colors": {
+      "primary": "#000E2F",
+      "secondary": "#FFFFFF"
+    },
+    "tier": 4,
+    "prestige": 35,
+    "record2026": "4-3",
+    "target": {
+      "off": 71,
+      "def": 68,
+      "st": 68
+    },
+    "basis": "4-3 in Jason Candle's first season; average G5-level roster with a young dual-threat QB.",
+    "offense": {
+      "qbStyle": "dual",
+      "scheme": "spread"
+    },
+    "units": {
+      "RB": 1,
+      "LB": 1
+    },
+    "standouts": [
+      {
+        "name": "Kalieb Osborne",
+        "pos": "QB",
+        "year": "SO",
+        "redshirt": true,
+        "archetype": "dual",
+        "tier": "good",
+        "note": "About 1,420 yards and 10 TD passing through six box scores, plus rushing TDs."
+      },
+      {
+        "name": "Cyncir Bowers",
+        "pos": "HB",
+        "year": "SO",
+        "redshirt": false,
+        "archetype": "elusive",
+        "tier": "good",
+        "note": "163 yards and 2 TD vs Syracuse incl. a 71-yard run."
+      },
+      {
+        "name": "K'Von Sherman",
+        "pos": "MLB",
+        "year": "JR",
+        "redshirt": false,
+        "archetype": "run",
+        "tier": "good",
+        "note": "12 tackles, a sack and 2 forced fumbles vs Syracuse."
+      }
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/2026_UConn_Huskies_football_team",
+      "https://fbschedules.com/2026-fbs-independents-football-helmet-schedule/"
+    ]
+  }
+]

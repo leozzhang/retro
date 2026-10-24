@@ -1,0 +1,271 @@
+[
+  {
+    "id": "georgia", "school": "Georgia", "mascot": "Bulldogs", "abbr": "UGA", "conference": "SEC",
+    "colors": { "primary": "#BA0C2F", "secondary": "#000000" },
+    "tier": 1, "prestige": 93, "record2026": "6-1 (4-1)",
+    "target": { "off": 86, "def": 90, "st": 84 },
+    "basis": "AP No. 5 at 6-1 with a win at Alabama; elite recruiting talent; lost a large draft class (Freeling, Miller, Allen) but defense still top-tier.",
+    "offense": { "qbStyle": "pocket", "scheme": "pro" },
+    "units": { "OL": 1, "RB": 1, "CB": 1, "S": 1, "WR": -1 },
+    "standouts": [
+      { "name": "Gunner Stockton", "pos": "QB", "year": "SR", "redshirt": true, "archetype": "pocket", "tier": "star", "note": "Fifth-year starter; Davey O'Brien/Unitas watch lists, 5 TD vs WKU" },
+      { "name": "Earnest Greene III", "pos": "OT", "year": "SR", "redshirt": true, "archetype": "pass", "tier": "star", "note": "Preseason first-team All-SEC" },
+      { "name": "Drew Bobo", "pos": "C", "year": "SR", "redshirt": true, "archetype": "run", "tier": "star", "note": "Preseason first-team All-SEC; Outland and Lombardi watch lists" },
+      { "name": "KJ Bolden", "pos": "SS", "year": "JR", "redshirt": false, "archetype": "hybrid", "tier": "elite", "note": "Preseason first-team All-SEC; Thorpe and Nagurski watch lists" },
+      { "name": "Ellis Robinson IV", "pos": "CB", "year": "SO", "redshirt": true, "archetype": "man", "tier": "star", "note": "Preseason first-team All-SEC; Thorpe watch list" },
+      { "name": "Nate Frazier", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "Preseason second-team All-SEC" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Georgia_Bulldogs_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "olemiss", "school": "Ole Miss", "mascot": "Rebels", "abbr": "MISS", "conference": "SEC",
+    "colors": { "primary": "#CE1126", "secondary": "#14213D" },
+    "tier": 2, "prestige": 74, "record2026": "5-1 (3-1)",
+    "target": { "off": 90, "def": 84, "st": 86 },
+    "basis": "AP No. 7 at 5-1 under Pete Golding; Chambliss leads a high-tempo, top-5-caliber offense with wins over LSU and Louisville; 52-28 loss at Florida.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "QB": 2, "RB": 1, "WR": 1, "DL": 1, "K": 1 },
+    "standouts": [
+      { "name": "Trinidad Chambliss", "pos": "QB", "year": "SR", "redshirt": false, "archetype": "dual", "tier": "elite", "note": "Preseason first-team All-SEC QB; 363 pass yds vs LSU" },
+      { "name": "Kewan Lacy", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "Preseason first-team All-SEC RB" },
+      { "name": "Deuce Alexander", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "star", "note": "159 yds, 2 TD vs Louisville; 134 yds vs Florida" },
+      { "name": "Will Echoles", "pos": "DT", "year": "JR", "redshirt": false, "archetype": "quick", "tier": "elite", "note": "Preseason first-team All-SEC; Outland/Lombardi/Nagurski lists" },
+      { "name": "Suntarine Perkins", "pos": "OLB", "year": "SR", "redshirt": false, "archetype": "rusher", "tier": "good", "note": "Nagurski watch list" },
+      { "name": "Lucas Carneiro", "pos": "K", "year": "SR", "redshirt": false, "archetype": "power", "tier": "star", "note": "57-yard FG vs Charlotte; walk-off 48-yarder vs Louisville" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Ole_Miss_Rebels_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "texas", "school": "Texas", "mascot": "Longhorns", "abbr": "TEX", "conference": "SEC",
+    "colors": { "primary": "#BF5700", "secondary": "#FFFFFF" },
+    "tier": 1, "prestige": 92, "record2026": "4-2 (1-2)",
+    "target": { "off": 86, "def": 88, "st": 85 },
+    "basis": "AP No. 19 at 4-2 (beat No. 1 Ohio State, lost close games to Oklahoma and Florida); top-3 roster talent, Manning plus elite edge Colin Simmons.",
+    "offense": { "qbStyle": "dual", "scheme": "pro" },
+    "units": { "WR": 1, "OL": 1, "DL": 1, "LB": 1 },
+    "standouts": [
+      { "name": "Arch Manning", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "dual", "tier": "star", "note": "Preseason second-team All-SEC; led 4th-quarter comeback over No. 1 Ohio State" },
+      { "name": "Cam Coleman", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "elite", "note": "Auburn transfer; preseason first-team All-SEC" },
+      { "name": "Trevor Goosby", "pos": "OT", "year": "JR", "redshirt": true, "archetype": "pass", "tier": "elite", "note": "Preseason first-team All-SEC; Outland/Lombardi lists" },
+      { "name": "Colin Simmons", "pos": "DE", "year": "JR", "redshirt": false, "archetype": "speed", "tier": "elite", "note": "Preseason first-team All-SEC edge; projected high draft pick" },
+      { "name": "Rasheem Biles", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "star", "note": "Transfer; preseason first-team All-SEC, Week 1 SEC defensive POW" },
+      { "name": "Ryan Niblett", "pos": "WR", "year": "JR", "redshirt": true, "archetype": "slot", "tier": "star", "note": "Preseason first-team All-SEC return specialist" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Texas_Longhorns_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "alabama", "school": "Alabama", "mascot": "Crimson Tide", "abbr": "BAMA", "conference": "SEC",
+    "colors": { "primary": "#9E1B32", "secondary": "#828A8F" },
+    "tier": 1, "prestige": 97, "record2026": "5-2 (3-2)",
+    "target": { "off": 85, "def": 86, "st": 80 },
+    "basis": "AP No. 13 at 5-2 (losses to Georgia and at Tennessee); young QB Keelon Russell after heavy draft losses, but elite recruiting talent and a strong secondary.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "WR": 1, "CB": 1, "S": 1, "QB": -1 },
+    "standouts": [
+      { "name": "Keelon Russell", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "dual", "tier": "good", "note": "Former five-star, won the starting job in August; mobile playmaker" },
+      { "name": "Ryan Coleman-Williams", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "star", "note": "Preseason first-team All-SEC; Biletnikoff watch list" },
+      { "name": "Michael Carroll", "pos": "OG", "year": "SO", "redshirt": false, "archetype": "run", "tier": "good", "note": "Outland Trophy watch list" },
+      { "name": "Zabien Brown", "pos": "CB", "year": "JR", "redshirt": false, "archetype": "man", "tier": "star", "note": "Preseason first-team All-SEC; Thorpe watch list" },
+      { "name": "Bray Hubbard", "pos": "FS", "year": "SR", "redshirt": false, "archetype": "coverage", "tier": "elite", "note": "Preseason All-American safety" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Alabama_Crimson_Tide_football_team", "https://www.saturdaydownsouth.com/news/college-football/alabama-names-keelon-russell-starting-qb-entering-2026-season", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "lsu", "school": "LSU", "mascot": "Tigers", "abbr": "LSU", "conference": "SEC",
+    "colors": { "primary": "#461D7C", "secondary": "#FDD023" },
+    "tier": 1, "prestige": 88, "record2026": "6-2 (3-2)",
+    "target": { "off": 86, "def": 85, "st": 84 },
+    "basis": "AP No. 18 at 6-2 in Lane Kiffin's first year (beat Clemson 51-10, lost to Ole Miss and Kentucky in OT); heavy transfer haul with multiple preseason All-SEC picks.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "QB": 1, "TE": 1, "OL": 1, "LB": 1, "P": 1 },
+    "standouts": [
+      { "name": "Sam Leavitt", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "dual", "tier": "star", "note": "Arizona State transfer; 113 rush yds vs Clemson, 4 TD vs Mississippi State" },
+      { "name": "Trey'Dez Green", "pos": "TE", "year": "JR", "redshirt": false, "archetype": "receiving", "tier": "elite", "note": "Preseason first-team All-SEC TE; Lombardi watch list" },
+      { "name": "Jordan Seaton", "pos": "OT", "year": "JR", "redshirt": false, "archetype": "pass", "tier": "elite", "note": "Preseason first-team All-SEC; Outland watch list" },
+      { "name": "Princewill Umanmielen", "pos": "DE", "year": "SR", "redshirt": false, "archetype": "speed", "tier": "star", "note": "Preseason first-team All-SEC DL" },
+      { "name": "Whit Weeks", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "star", "note": "Preseason first-team All-SEC LB" },
+      { "name": "Grant Chadwick", "pos": "P", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "Preseason first-team All-SEC punter" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_LSU_Tigers_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "tennessee", "school": "Tennessee", "mascot": "Volunteers", "abbr": "TENN", "conference": "SEC",
+    "colors": { "primary": "#FF8200", "secondary": "#FFFFFF" },
+    "tier": 2, "prestige": 84, "record2026": "6-1 (3-1)",
+    "target": { "off": 84, "def": 81, "st": 83 },
+    "basis": "AP No. 11 at 6-1 (only loss 20-17 to Texas, beat Alabama 26-10); explosive run game with DeSean Bishop, QB switched to George MacIntyre in October.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "RB": 2, "OL": 1, "QB": -1, "CB": -1 },
+    "standouts": [
+      { "name": "George MacIntyre", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Took over from freshman Faizon Brandon in October; tall pocket passer" },
+      { "name": "DeSean Bishop", "pos": "HB", "year": "JR", "redshirt": true, "archetype": "elusive", "tier": "star", "note": "Doak Walker/Maxwell lists; 220 yds, 3 TD vs Auburn" },
+      { "name": "Mike Matthews", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "Biletnikoff watch list; 132 yds, 2 TD vs Furman" },
+      { "name": "Wendell Moe Jr.", "pos": "OG", "year": "SR", "redshirt": true, "archetype": "run", "tier": "star", "note": "Outland and Lombardi watch lists" },
+      { "name": "Arion Carter", "pos": "MLB", "year": "SR", "redshirt": false, "archetype": "run", "tier": "good", "note": "Butkus and Lott watch lists" },
+      { "name": "Jackson Ross", "pos": "P", "year": "SR", "redshirt": true, "archetype": "power", "tier": "good", "note": "Ray Guy watch list; SEC special teams POW Week 5" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Tennessee_Volunteers_football_team", "https://roundtable.io/sports/ncaa/tennessee/opinion/commentary-choosing-macintyre-now-as-qb1-gives-heupel-time-to-work-his-magic", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "kentucky", "school": "Kentucky", "mascot": "Wildcats", "abbr": "UK", "conference": "SEC",
+    "colors": { "primary": "#0033A0", "secondary": "#FFFFFF" },
+    "tier": 2, "prestige": 58, "record2026": "6-1 (4-1)",
+    "target": { "off": 81, "def": 80, "st": 80 },
+    "basis": "AP No. 12 at 6-1 in Will Stein's first year via close wins (two one-point OT wins) over LSU, South Carolina, Oklahoma and Texas A&M; transfer-built roster, talent rank mid-SEC.",
+    "offense": { "qbStyle": "pocket", "scheme": "pro" },
+    "units": { "OL": 1, "RB": 1, "TE": 1 },
+    "standouts": [
+      { "name": "Kenny Minchey", "pos": "QB", "year": "JR", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "Notre Dame transfer; 272 yds, 3 TD at South Carolina" },
+      { "name": "CJ Baxter", "pos": "HB", "year": "JR", "redshirt": true, "archetype": "power", "tier": "good", "note": "Texas transfer; 123 yds, 2 TD vs LSU" },
+      { "name": "Willie Rodriguez", "pos": "TE", "year": "SO", "redshirt": false, "archetype": "receiving", "tier": "good", "note": "Frequent target; TD catches vs Oklahoma" },
+      { "name": "Lance Heard", "pos": "OT", "year": "SR", "redshirt": false, "archetype": "run", "tier": "star", "note": "Tennessee transfer; Outland watch list, SEC OL POW Week 5" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Kentucky_Wildcats_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "florida", "school": "Florida", "mascot": "Gators", "abbr": "UF", "conference": "SEC",
+    "colors": { "primary": "#0021A5", "secondary": "#FA4616" },
+    "tier": 2, "prestige": 86, "record2026": "5-2 (3-2)",
+    "target": { "off": 83, "def": 79, "st": 85 },
+    "basis": "AP No. 20 at 5-2 in Jon Sumrall's first year (beat Ole Miss and Texas, lost big to Missouri and South Carolina); strong run game, top-15 recruiting talent.",
+    "offense": { "qbStyle": "pocket", "scheme": "pro" },
+    "units": { "RB": 2, "OL": 1, "K": 1, "CB": -1 },
+    "standouts": [
+      { "name": "Aaron Philo", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "pocket", "tier": "good", "note": "Georgia Tech transfer; pass-first starter" },
+      { "name": "Jadan Baugh", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "Preseason second-team All-SEC; 162 yds, 3 TD at Auburn" },
+      { "name": "Vernell Brown III", "pos": "WR", "year": "SO", "redshirt": false, "archetype": "slot", "tier": "good", "note": "Two punt-return TDs vs Campbell" },
+      { "name": "Harrison Moore", "pos": "C", "year": "JR", "redshirt": false, "archetype": "run", "tier": "good", "note": "SEC OL Player of the Week, Week 3" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Florida_Gators_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "missouri", "school": "Missouri", "mascot": "Tigers", "abbr": "MIZ", "conference": "SEC",
+    "colors": { "primary": "#F1B82D", "secondary": "#000000" },
+    "tier": 2, "prestige": 62, "record2026": "5-2 (2-2)",
+    "target": { "off": 82, "def": 80, "st": 82 },
+    "basis": "AP No. 22 at 5-2 (blew out Florida and Texas A&M, lost to Mississippi State and Ole Miss); prolific run game and passer Austin Simmons, defense lost several draft picks.",
+    "offense": { "qbStyle": "pocket", "scheme": "spread" },
+    "units": { "RB": 2, "OL": 1, "K": 1, "CB": -1 },
+    "standouts": [
+      { "name": "Austin Simmons", "pos": "QB", "year": "JR", "redshirt": false, "archetype": "pocket", "tier": "good", "note": "Ole Miss transfer; twice SEC offensive POW, 340 yds vs Florida" },
+      { "name": "Jamal Roberts", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "211 yds vs Florida, 222 yds vs Texas A&M" },
+      { "name": "Cayden Lee", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "possession", "tier": "good", "note": "156 yds, 2 TD at Mississippi State" },
+      { "name": "Cayden Green", "pos": "OT", "year": "SR", "redshirt": false, "archetype": "pass", "tier": "star", "note": "Preseason first-team All-SEC" },
+      { "name": "Blake Craig", "pos": "K", "year": "SR", "redshirt": false, "archetype": "accurate", "tier": "good", "note": "Multiple-FG games; Wuerffel watch list" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Missouri_Tigers_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "oklahoma", "school": "Oklahoma", "mascot": "Sooners", "abbr": "OU", "conference": "SEC",
+    "colors": { "primary": "#841617", "secondary": "#FDF9D8" },
+    "tier": 1, "prestige": 91, "record2026": "4-3 (2-2)",
+    "target": { "off": 76, "def": 85, "st": 88 },
+    "basis": "4-3 and unranked; offense has stalled (10 vs Michigan, 14 vs New Mexico, 13 vs Kentucky) while Venables' defense and Tate Sandell's kicking remain top-tier; beat Texas.",
+    "offense": { "qbStyle": "dual", "scheme": "air-raid" },
+    "units": { "DL": 1, "S": 1, "K": 2, "OL": -1, "RB": -1 },
+    "standouts": [
+      { "name": "John Mateer", "pos": "QB", "year": "SR", "redshirt": true, "archetype": "dual", "tier": "good", "note": "Turnover-prone this year (3 INT vs Kentucky); dual-threat" },
+      { "name": "Isaiah Sategna III", "pos": "WR", "year": "SR", "redshirt": true, "archetype": "deep", "tier": "star", "note": "Preseason second-team All-SEC; 88-yd punt return TD" },
+      { "name": "David Stone", "pos": "DT", "year": "JR", "redshirt": false, "archetype": "power", "tier": "star", "note": "Outland, Lombardi and Nagurski watch lists" },
+      { "name": "Peyton Bowen", "pos": "FS", "year": "SR", "redshirt": false, "archetype": "hybrid", "tier": "star", "note": "Pick-six vs Texas; Lott watch list" },
+      { "name": "Tate Sandell", "pos": "K", "year": "SR", "redshirt": true, "archetype": "power", "tier": "elite", "note": "Preseason first-team All-SEC; game-winning 47-yarder vs Texas" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Oklahoma_Sooners_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "mississippistate", "school": "Mississippi State", "mascot": "Bulldogs", "abbr": "MSST", "conference": "SEC",
+    "colors": { "primary": "#5D1725", "secondary": "#FFFFFF" },
+    "tier": 3, "prestige": 55, "record2026": "4-3 (2-3)",
+    "target": { "off": 79, "def": 74, "st": 78 },
+    "basis": "4-3 with wins over South Carolina and Missouri but blowout losses to Alabama and LSU; up-tempo passing offense, bottom-half SEC talent and defense.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "WR": 1, "CB": 1, "DL": -1, "OL": -1 },
+    "standouts": [
+      { "name": "Kamario Taylor", "pos": "QB", "year": "SO", "redshirt": false, "archetype": "dual", "tier": "good", "note": "354 yds, 4 TD vs Louisiana-Monroe" },
+      { "name": "Anthony Evans III", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "slot", "tier": "star", "note": "Biletnikoff watch list; 12 catches, 166 yds vs Alabama" },
+      { "name": "Fluff Bothwell", "pos": "HB", "year": "JR", "redshirt": false, "archetype": "elusive", "tier": "good", "note": "122 yds vs Missouri, 103 yds and 2 TD vs Minnesota" },
+      { "name": "Kelley Jones", "pos": "CB", "year": "JR", "redshirt": true, "archetype": "man", "tier": "star", "note": "Thorpe, Nagurski and Lott watch lists" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Mississippi_State_Bulldogs_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "auburn", "school": "Auburn", "mascot": "Tigers", "abbr": "AUB", "conference": "SEC",
+    "colors": { "primary": "#0C2340", "secondary": "#E87722" },
+    "tier": 2, "prestige": 82, "record2026": "4-3 (2-3)",
+    "target": { "off": 79, "def": 82, "st": 83 },
+    "basis": "4-3 in Alex Golesh's first year (upset No. 1 Georgia, losses to Florida, Tennessee, LSU); defense led by All-American LB Xavier Atkins, offense rebuilt around Byrum Brown.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "LB": 2, "K": 1, "WR": 1, "OL": -1 },
+    "standouts": [
+      { "name": "Byrum Brown", "pos": "QB", "year": "SR", "redshirt": false, "archetype": "dual", "tier": "good", "note": "USF transfer; 107 rush yds at Tennessee" },
+      { "name": "Keshaun Singleton", "pos": "WR", "year": "JR", "redshirt": true, "archetype": "deep", "tier": "good", "note": "Biletnikoff watch list; top target" },
+      { "name": "Xavier Atkins", "pos": "OLB", "year": "JR", "redshirt": false, "archetype": "rusher", "tier": "elite", "note": "Preseason All-American; first-team All-SEC" },
+      { "name": "Alex McPherson", "pos": "K", "year": "SR", "redshirt": true, "archetype": "accurate", "tier": "star", "note": "Walk-off 34-yard FG to beat No. 1 Georgia" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Auburn_Tigers_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "texasam", "school": "Texas A&M", "mascot": "Aggies", "abbr": "TAMU", "conference": "SEC",
+    "colors": { "primary": "#500000", "secondary": "#FFFFFF" },
+    "tier": 2, "prestige": 78, "record2026": "4-3 (1-3)",
+    "target": { "off": 78, "def": 80, "st": 83 },
+    "basis": "Preseason AP No. 8 but 4-3 and unranked after losses to Kentucky, LSU and Missouri (6 points in each of the last two); big draft losses on both lines.",
+    "offense": { "qbStyle": "dual", "scheme": "pro" },
+    "units": { "WR": 1, "S": 1, "K": 1, "OL": -1 },
+    "standouts": [
+      { "name": "Marcel Reed", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "dual", "tier": "good", "note": "Returning starter; Davey O'Brien watch list" },
+      { "name": "Mario Craver", "pos": "WR", "year": "JR", "redshirt": false, "archetype": "slot", "tier": "star", "note": "Preseason first-team All-SEC all-purpose; 119 yds vs Kentucky" },
+      { "name": "Marcus Ratcliffe", "pos": "FS", "year": "SR", "redshirt": false, "archetype": "coverage", "tier": "star", "note": "Nagurski, Lott and Wuerffel watch lists" },
+      { "name": "DJ Hicks", "pos": "DT", "year": "SR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Lombardi watch list" },
+      { "name": "David Olano", "pos": "K", "year": "SR", "redshirt": false, "archetype": "power", "tier": "star", "note": "57-yard FG vs Arkansas, 53-yarder vs Missouri" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Texas_A%26M_Aggies_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "southcarolina", "school": "South Carolina", "mascot": "Gamecocks", "abbr": "SC", "conference": "SEC",
+    "colors": { "primary": "#73000A", "secondary": "#000000" },
+    "tier": 2, "prestige": 60, "record2026": "3-3 (1-3)",
+    "target": { "off": 79, "def": 79, "st": 74 },
+    "basis": "3-3 with close losses (Mississippi State, Kentucky in OT) and a win at Florida; Sellers and Dylan Stewart are stars but secondary lost draft picks.",
+    "offense": { "qbStyle": "dual", "scheme": "air-raid" },
+    "units": { "QB": 1, "DL": 1, "OL": -1, "K": -1 },
+    "standouts": [
+      { "name": "LaNorris Sellers", "pos": "QB", "year": "JR", "redshirt": true, "archetype": "dual", "tier": "star", "note": "Big-armed runner; Walter Camp/Maxwell watch lists; SEC offensive POW Week 6" },
+      { "name": "Nyck Harbor", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "6-5 track-speed target" },
+      { "name": "Jayden Gibson", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "Oklahoma transfer" },
+      { "name": "Dylan Stewart", "pos": "DE", "year": "JR", "redshirt": false, "archetype": "speed", "tier": "elite", "note": "Preseason first-team All-SEC edge; projected first-round pick" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_South_Carolina_Gamecocks_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "arkansas", "school": "Arkansas", "mascot": "Razorbacks", "abbr": "ARK", "conference": "SEC",
+    "colors": { "primary": "#9D2235", "secondary": "#FFFFFF" },
+    "tier": 3, "prestige": 64, "record2026": "3-4 (1-3)",
+    "target": { "off": 75, "def": 72, "st": 76 },
+    "basis": "3-4 in Ryan Silverfield's first year, routed by Utah, Georgia and Texas A&M; passing offense competent, defense among the SEC's weakest.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "WR": 1, "DL": -1, "CB": -1 },
+    "standouts": [
+      { "name": "KJ Jackson", "pos": "QB", "year": "SO", "redshirt": true, "archetype": "dual", "tier": "good", "note": "309 pass yds vs Tulsa; runs some (58 yds, TD vs Vanderbilt)" },
+      { "name": "Chris Marshall", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "9 catches, 195 yds vs Tulsa; 104 yds vs Georgia" },
+      { "name": "Quincy Rhodes Jr.", "pos": "DE", "year": "SR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Lott Trophy watch list" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Arkansas_Razorbacks_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  },
+  {
+    "id": "vanderbilt", "school": "Vanderbilt", "mascot": "Commodores", "abbr": "VAN", "conference": "SEC",
+    "colors": { "primary": "#866D4B", "secondary": "#000000" },
+    "tier": 3, "prestige": 35, "record2026": "3-4 (0-4)",
+    "target": { "off": 74, "def": 73, "st": 79 },
+    "basis": "3-4 and winless in SEC after losing Diego Pavia; freshman QB Jared Curtis, lopsided losses to Georgia and Ole Miss; reliable kicker Brock Taylor.",
+    "offense": { "qbStyle": "dual", "scheme": "spread" },
+    "units": { "WR": 1, "K": 1, "QB": -1, "DL": -1 },
+    "standouts": [
+      { "name": "Jared Curtis", "pos": "QB", "year": "FR", "redshirt": false, "archetype": "dual", "tier": "good", "note": "Five-star true freshman starter; SEC freshman POW Week 3" },
+      { "name": "Junior Sherrill", "pos": "WR", "year": "SR", "redshirt": false, "archetype": "deep", "tier": "good", "note": "Leading receiver; Biletnikoff watch list" },
+      { "name": "Sedrick Alexander", "pos": "HB", "year": "SR", "redshirt": false, "archetype": "power", "tier": "good", "note": "Main ground threat" },
+      { "name": "Brock Taylor", "pos": "K", "year": "SR", "redshirt": false, "archetype": "accurate", "tier": "good", "note": "Three FGs (39, 45, 47) at Auburn" }
+    ],
+    "sources": ["https://en.wikipedia.org/wiki/2026_Vanderbilt_Commodores_football_team", "https://en.wikipedia.org/wiki/2026_Southeastern_Conference_football_season"]
+  }
+]

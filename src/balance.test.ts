@@ -3,77 +3,34 @@ import { it } from 'vitest';
 import { DEF_CALLS, type DefCall } from './data/defenses';
 import { PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
 import { kickDef, type KickDef } from './data/specialTeams';
-import { generateRoster, TEAMS } from './data/teams';
-import { Camera } from './engine/camera';
 import { FIELD_W, STEP } from './engine/constants';
-import type { Input } from './engine/input';
 import { add, clamp, dist, mulberry32, scale, type Rng } from './engine/math';
-import { KickPlay } from './game/kickPlay';
-import { Play } from './game/playState';
+import type { KickPlay } from './game/kickPlay';
+import type { Play } from './game/playState';
 import { resolvePlay } from './game/resolvePlay';
 import { applyKick, startDrive } from './game/rules';
 import { newWind } from './game/wind';
 import { CALM, type KickParams, type Wind } from './sim/kicking';
-import { isEligible, type Player } from './sim/player';
-import { DRAW_SET } from './sim/runBlocking';
-import { TACKLE_RANGE } from './sim/tackling';
+import type { Player } from './sim/player';
+import * as H from './harness';
+import { cam, fakeInput, LOS, median } from './harness';
 
-const fakeInput = {
-  mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
-  axis: () => ({ x: 0, y: 0 }),
-  isDown: () => false,
-  hit: () => false,
-  endStep: () => {},
-} as unknown as Input;
-
-const off = TEAMS[0];
-const def = TEAMS[1];
-const offR = generateRoster(off);
-const defR = generateRoster(def);
-const cam = new Camera();
-const LOS = 35;
+/** Template players, offense 90 vs defense 88 (`referenceMatchup`), so the rows only move when the sim does. */
+const M: H.Matchup = H.referenceMatchup();
 const REPS = 120;
 /** Runs are cheap and noisy, so they get more reps per row. */
 const RUN_REPS = 180;
 
-function newPlay(playDef: PlayDef, call: DefCall, rng: Rng, los = LOS): Play {
-  return new Play({
-    offTeam: off, defTeam: def, offRoster: offR, defRoster: defR, play: playDef, defCall: call,
-    press: { CB1: rng() < 0.35, CB2: rng() < 0.35 }, los, ballY: 26.6, rng,
-  });
-}
+const newPlay = (playDef: PlayDef, call: DefCall, rng: Rng, los = LOS): Play => H.newPlay(M, playDef, call, rng, los);
+const runRep = (playDef: PlayDef, call: DefCall, rng: Rng, los = LOS) => H.runRep(M, playDef, call, rng, los);
+const runKick = (kd: KickDef, los: number, params: (kp: KickPlay) => KickParams, wind: Wind, rng: Rng) =>
+  H.runKick(M, kd, los, params, wind, rng);
 
 /** Auto-QB throws to the receiver with the most separation after a fixed hold time. */
 function passLine(plays: PlayDef[], call: DefCall, holdTime: number, reps: number, rng: Rng): string {
   const stats = { n: 0, comp: 0, int: 0, sack: 0, yards: 0, sackT: 0, pbu: 0, yac: 0, td: 0 };
   for (let i = 0; i < reps; i++) {
-    const play = newPlay(plays[i % plays.length], call, rng);
-    play.snap();
-    let thrown = false;
-    let catchX = 0;
-    for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
-      if (!thrown && play.phase === 'live' && play.time - play.snapTime >= holdTime) {
-        let best = null as null | { p: (typeof play.off)[number]; sep: number };
-        for (const o of play.off) {
-          // Not a back still selling pass before his route (screens, check-releases).
-          if (!isEligible(o) || o.isBlocker || play.time - play.snapTime < o.routeDelay) continue;
-          let sep = Infinity;
-          for (const d of play.def) sep = Math.min(sep, dist(d.pos, o.pos));
-          if (!best || sep > best.sep) best = { p: o, sep };
-        }
-        if (best) {
-          const lead = dist(play.qb.pos, best.p.pos) / 22;
-          const tgt = add(best.p.pos, scale(best.p.vel, lead));
-          // Keep the lead point in bounds, or a flat runner near the sideline gets a ball out of bounds.
-          (play as any).throwBall({ x: Math.min(tgt.x, 119), y: clamp(tgt.y, 1.5, FIELD_W - 1.5) });
-          thrown = true;
-        }
-      }
-      const before = play.phase;
-      play.update(STEP, fakeInput, cam);
-      // A catch can end the play the same step (out of bounds at the sideline), so check for 'over' too.
-      if (before === 'air' && play.phase !== 'air' && play.carrier?.side === 'off') catchX = play.carrier.pos.x;
-    }
+    const { play, catchX } = H.passRep(M, plays[i % plays.length], call, holdTime, rng);
     const o = play.outcome;
     if (!o) continue;
     stats.n++;
@@ -201,48 +158,6 @@ function routeRows(rng: Rng): string[] {
   return rows;
 }
 
-/** Zone read: the auto-QB rides the back this long after the snap before reading the key. */
-const READ_AT = 0.55;
-
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  return s.length ? s[Math.floor(s.length / 2)] : 0;
-};
-
-/**
- * One auto-run rep. The auto-QB hands off (or pitches on the toss) as soon as it's on; `autoRun`
- * carries the ball. On a zone read it rides the mesh, then gives unless the key is crashing (then
- * the QB keeps). On a draw it waits out the fake pass set. On the option it pitches once the key
- * commits to the QB, and otherwise keeps. Designed QB runs carry it themselves.
- * `contact` = yards past the LOS when the first defender (blocked or not) gets a hand on him.
- */
-function runRep(playDef: PlayDef, call: DefCall, rng: Rng, los = LOS) {
-  const play = newPlay(playDef, call, rng, los);
-  play.snap();
-  let contact: number | null = null;
-  for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
-    const opt = play.handoffOption();
-    const since = play.time - play.snapTime;
-    if (playDef.read === 'option') {
-      const k = play.readKey!;
-      if (opt === 'pitch' && dist(k.pos, play.qb.pos) < 3 && !play.keyCrashing()) play.handoff(); // he's on the QB: pitch
-    } else {
-      const zr = playDef.read === 'zoneRead';
-      const ready = (!zr || (since >= READ_AT && !play.keyCrashing())) && (play.runScheme !== 'draw' || since >= DRAW_SET);
-      if ((opt === 'handoff' && ready) || (opt === 'pitch' && playDef.read === 'pitch')) play.handoff();
-    }
-    if (play.handedOff || play.kept || (playDef.qbRun && play.phase === 'run')) play.controlled = null;
-    play.update(STEP, fakeInput, cam);
-    const c = play.carrier;
-    if (contact === null && c && c.side === 'off' && play.phase === 'run') {
-      if (play.def.some((d) => !d.down && dist(d.pos, c.pos) <= TACKLE_RANGE + 0.3)) contact = c.pos.x - los;
-    }
-  }
-  const o = play.outcome;
-  const ran = !!o && (play.handedOff || play.kept || !!playDef.qbRun);
-  return { play, o, ran, yds: o ? o.spot - los : 0, contact: contact ?? (o ? o.spot - los : 0) };
-}
-
 function runRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
   const all: number[] = [];
@@ -313,27 +228,6 @@ function shortRows(plays: PlayDef[], rng: Rng): string[] {
 const KREPS = 200;
 const OWN = (yd: number) => 10 + yd;
 const fieldLbl = (x: number) => (x - 10 <= 50 ? `own ${x - 10}` : `opp ${110 - x}`);
-
-/** Auto-kicker: release `params` at the first chance (punts: as soon as the punter has the ball), then time the strike perfectly. */
-function runKick(kd: KickDef, los: number, params: (kp: KickPlay) => KickParams, wind: Wind, rng: Rng) {
-  const kp = new KickPlay({ kickTeam: off, recvTeam: def, kickRoster: offR, recvRoster: defR, def: kd, los, ballY: 26.6, wind, rng });
-  const release = (p: KickParams) => (kp as any).release(p);
-  if (kd.unit === 'punt') kp.snap();
-  else release(params(kp));
-  let released = kd.unit !== 'punt';
-  let catchX: number | null = null;
-  for (let t = 0; t < 25 && kp.phase !== 'over'; t += STEP) {
-    if (!released && kp.phase === 'set') {
-      release(params(kp));
-      released = true;
-    }
-    // Perfect timing: stop the needle on the green's center.
-    if (kp.meter()?.live && kp.time >= kp.strikeAt!) kp.pressTiming();
-    kp.update(STEP, fakeInput);
-    if (catchX === null && kp.phase === 'return') catchX = kp.carrier!.pos.x;
-  }
-  return { kp, o: kp.outcome, catchX };
-}
 
 /** Direction from the kick spot to a target point on the field. */
 function toward(from: { x: number; y: number }, x: number, y: number) {

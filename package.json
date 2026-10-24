@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "balance": "vitest run src/balance.test.ts"
+    "balance": "vitest run src/balance.test.ts",
+    "ratings": "vitest run src/ratings.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

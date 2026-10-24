@@ -6,7 +6,15 @@ import {
 } from './game/clock';
 import { DEF_CALLS, packageFor, type DefCall } from './data/defenses';
 import { ACE, EMPTY, FORMATIONS, GUN_TRIPS, I_FORM, PLAYBOOK, type Formation, type PlayDef } from './data/plays';
-import { generateRoster, TEAMS } from './data/teams';
+import { athleteName, buildSquad, freshSquad, onField, PICK_ORDER, rosterFor, starters, teamRatings } from './data/depth';
+import { templateValue } from './data/athletes';
+import { TEAM_STATE } from './data/fbs/geo';
+import { CONFERENCES } from './data/fbs/profile';
+import { overall, overallRaw, OVR_WEIGHTS, POSITIONS, SLOT_POS, type Position } from './data/positions';
+import { passBlockValue, RATING_INFO, RATING_KEYS, runBlockValue, type Ratings } from './data/ratings';
+import { COMPOSITION } from './data/rosterGen';
+import { DEF_EXTRA, DEF_SLOTS, OFF_EXTRA, OFF_SLOTS, ST_SLOTS, teamById, TEAMS } from './data/teams';
+import { accuracyAt, composure, throwErrorSd } from './sim/passing';
 import { HASH_BOT, HASH_TOP, STEP } from './engine/constants';
 import type { Input } from './engine/input';
 import { handoffKind, Play } from './game/playState';
@@ -26,6 +34,9 @@ import { catchOdds, HANDOFF_ODDS, PITCH_REACH, pitchOdds } from './sim/catching'
 import { endurance, maxSpeed, type Player } from './sim/player';
 import { playSide, runEngagement } from './sim/runBlocking';
 import { fallForward, tackleChance } from './sim/tackling';
+
+const UGA = teamById('georgia');
+const BAMA = teamById('alabama');
 
 const out = (type: PlayOutcome['type'], spot: number): PlayOutcome => ({ type, spot, spotY: 26, text: '', sub: '', color: '' });
 
@@ -68,13 +79,13 @@ describe('catching', () => {
     expect(catchOdds(null, null)).toEqual({ catch: 0, int: 0 });
   });
   it('a lone defender under the ball has a real interception chance', () => {
-    const o = catchOdds(null, { pos: 1, cth: 70, awr: 85 });
+    const o = catchOdds(null, { pos: 1, cth: 70, prc: 85 });
     expect(o.catch).toBe(0);
     expect(o.int).toBeGreaterThan(0.3);
   });
   it('contested balls are roughly coin flips, worse than open ones', () => {
     const open = catchOdds({ pos: 1, cth: 85 }, null).catch;
-    const contested = catchOdds({ pos: 1, cth: 85 }, { pos: 1, cth: 65, awr: 80 }).catch;
+    const contested = catchOdds({ pos: 1, cth: 85 }, { pos: 1, cth: 65, prc: 80 }).catch;
     expect(contested).toBeLessThan(open);
     expect(contested).toBeGreaterThan(0.35);
     expect(contested).toBeLessThan(0.7);
@@ -85,7 +96,7 @@ describe('catching', () => {
     const set = catchOdds({ pos: 0.8, cth: 80, set: 1 }, null).catch;
     expect(set).toBeGreaterThan(off);
     expect(set - off).toBeLessThan(0.06);
-    const d = { pos: 0.9, cth: 65, awr: 80 };
+    const d = { pos: 0.9, cth: 65, prc: 80 };
     const contested = catchOdds({ pos: 0.9, cth: 80 }, d).catch;
     const contestedSet = catchOdds({ pos: 0.9, cth: 80, set: 1 }, d).catch;
     expect(contestedSet).toBeGreaterThan(contested);
@@ -94,17 +105,21 @@ describe('catching', () => {
 });
 
 describe('route running', () => {
-  const offR = generateRoster(TEAMS[0]);
-  const defR = generateRoster(TEAMS[1]);
+  const offR = rosterFor(UGA);
+  const defR = rosterFor(BAMA);
   const idle = {
     mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
     axis: () => ({ x: 0, y: 0 }), isDown: () => false, hit: () => false, endStep: () => {},
   } as unknown as Input;
   const cam = new Camera();
   /** Snap `id` and follow the (non-back) receiver on `route`, recording his speed each step. */
+  // Receivers at a fixed, typical-starter profile, so the checks don't depend on who the roster generator put there.
+  const steady = Object.fromEntries(
+    Object.entries(offR).map(([s, rp]) => [s, rp.role === 'WR' || rp.role === 'TE' ? { ...rp, r: { ...rp.r, spd: 91, acc: 89, rte: 89 } } : rp]),
+  );
   const follow = (id: string, route: string, secs: number) => {
     const p = new Play({
-      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: PLAYBOOK.find((x) => x.id === id)!,
+      offTeam: UGA, defTeam: BAMA, offRoster: steady, defRoster: defR, play: PLAYBOOK.find((x) => x.id === id)!,
       defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1),
     });
     const r = p.off.find((o) => o.routeName === route && o.role !== 'RB')!;
@@ -148,13 +163,13 @@ describe('route running', () => {
   });
   it('run paths, fakes and lead paths keep their old motion', () => {
     const p = new Play({
-      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: PLAYBOOK.find((x) => x.id === 'inside-zone')!,
+      offTeam: UGA, defTeam: BAMA, offRoster: offR, defRoster: defR, play: PLAYBOOK.find((x) => x.id === 'inside-zone')!,
       defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1),
     });
     expect(p.rb.passRoute).toBe(false);
     const pa = PLAYBOOK.find((x) => x.id === 'pa-post')!;
     const q = new Play({
-      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: pa,
+      offTeam: UGA, defTeam: BAMA, offRoster: offR, defRoster: defR, play: pa,
       defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1),
     });
     expect(q.rb.passRoute).toBe(false);
@@ -368,9 +383,9 @@ describe('kick timing meter', () => {
     expect(timingGreen(95)).toBeGreaterThan(timingGreen(60));
   });
 
-  const team = TEAMS[0];
-  const roster = generateRoster(team);
-  const other = generateRoster(TEAMS[1]);
+  const team = UGA;
+  const roster = rosterFor(team);
+  const other = rosterFor(BAMA);
   const idle = {
     mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
     axis: () => ({ x: 0, y: 0 }),
@@ -382,7 +397,7 @@ describe('kick timing meter', () => {
   const kickWith = (id: string, los: number, pressAt: number | null) => {
     const kd = kickDef(id);
     const kp = new KickPlay({
-      kickTeam: team, recvTeam: TEAMS[1], kickRoster: roster, recvRoster: other, def: kd, los, ballY: POSTS_Y, wind: CALM, rng: () => 0.5,
+      kickTeam: team, recvTeam: BAMA, kickRoster: roster, recvRoster: other, def: kd, los, ballY: POSTS_Y, wind: CALM, rng: () => 0.5,
     });
     (kp as any).release({ power: 1, dir: { x: 1, y: 0 }, loft: kd.loft });
     let gapAtStrike = Infinity;
@@ -416,7 +431,7 @@ describe('kick timing meter', () => {
     const kd = kickDef('fg');
     for (let seed = 1; seed <= 40; seed++) {
       const kp = new KickPlay({
-        kickTeam: team, recvTeam: TEAMS[1], kickRoster: roster, recvRoster: other, def: kd, los: 85, ballY: POSTS_Y, wind: CALM, rng: mulberry32(seed),
+        kickTeam: team, recvTeam: BAMA, kickRoster: roster, recvRoster: other, def: kd, los: 85, ballY: POSTS_Y, wind: CALM, rng: mulberry32(seed),
       });
       (kp as any).release({ power: 1, dir: { x: 1, y: 0 }, loft: kd.loft });
       const rushers = kp.recv.filter((d) => d.job === 'rush');
@@ -440,7 +455,7 @@ describe('kick timing meter', () => {
 });
 
 describe('sprint endurance', () => {
-  const with_ = (spd: number, acc: number) => ({ r: { spd, acc } }) as unknown as Player;
+  const with_ = (spd: number, acc: number) => ({ r: { spd, acc, sta: spd * 0.6 + acc * 0.4 } }) as unknown as Player;
   it('receivers outlast pocket QBs, and a mobile QB outlasts a pocket one', () => {
     expect(endurance(with_(72, 76))).toBeLessThan(endurance(with_(91, 89)));
     expect(endurance(with_(85, 84))).toBeGreaterThan(endurance(with_(72, 76)));
@@ -507,11 +522,11 @@ describe('two-point try', () => {
 describe('playbook', () => {
   const MID = 26.65;
   const play = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
-  const offR = generateRoster(TEAMS[0]);
-  const defR = generateRoster(TEAMS[1]);
+  const offR = rosterFor(UGA);
+  const defR = rosterFor(BAMA);
   const snapPlay = (def: PlayDef, flip = false, call: DefCall = DEF_CALLS[0]) =>
     new Play({
-      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: def, defCall: call,
+      offTeam: UGA, defTeam: BAMA, offRoster: offR, defRoster: defR, play: def, defCall: call,
       press: {}, los: 35, ballY: MID, flip, rng: mulberry32(1),
     });
   const idle = {
@@ -610,7 +625,7 @@ describe('playbook', () => {
       expect(p.off.find((o) => o.slot === who)?.role).toBe(offR[who].role);
     }
     expect(offR.FB.role).toBe('RB');
-    expect(offR.FB.r.blk).toBeGreaterThan(offR.RB.r.blk);
+    expect(offR.FB.r.rbk).toBeGreaterThan(offR.RB.r.rbk);
     expect(FORMATIONS.map(personnelOf)).toEqual(['11', '11', '11', '11', '21', '12', '10']);
     // In Empty the split-out back counts as the weak side's #2 receiver.
     expect(resolvePlay({ ...play('mesh'), formation: EMPTY, weak: 'slant-drag', backs: {} }, MID, false).routes.RB).toBe('drag');
@@ -786,8 +801,8 @@ describe('playbook', () => {
 
 describe('run blocking', () => {
   const MID = 26.65;
-  const offR = generateRoster(TEAMS[0]);
-  const defR = generateRoster(TEAMS[1]);
+  const offR = rosterFor(UGA);
+  const defR = rosterFor(BAMA);
   const book = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
   const idle = {
     mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
@@ -796,7 +811,7 @@ describe('run blocking', () => {
   const cam = new Camera();
   const snapAt = (def: PlayDef, call: DefCall = DEF_CALLS[0], seed = 1) => {
     const p = new Play({
-      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: def, defCall: call,
+      offTeam: UGA, defTeam: BAMA, offRoster: offR, defRoster: defR, play: def, defCall: call,
       press: {}, los: 35, ballY: MID, rng: mulberry32(seed),
     });
     p.snap();
@@ -964,5 +979,161 @@ describe('playbook validity', () => {
       expect(seen.get(sig(p)), `${p.id} duplicates ${seen.get(sig(p))}`).toBeUndefined();
       seen.set(sig(p), p.id);
     }
+  });
+});
+
+describe('ratings', () => {
+  const flat = (v: number): Ratings => Object.fromEntries(RATING_KEYS.map((k) => [k, v])) as unknown as Ratings;
+  const onTemplate = (pos: Position, level: number): Ratings =>
+    Object.fromEntries(RATING_KEYS.map((k) => [k, templateValue(pos, k, level)])) as unknown as Ratings;
+
+  it('every position rates a player on its template at that level', () => {
+    for (const pos of POSITIONS) {
+      expect(overallRaw(onTemplate(pos, 75), pos)).toBeCloseTo(75, 6);
+      expect(overallRaw(onTemplate(pos, 88), pos)).toBeCloseTo(88, 6);
+    }
+  });
+
+  it('overall rises with each weighted rating and ignores the rest', () => {
+    for (const pos of POSITIONS) {
+      const base = flat(70);
+      for (const k of RATING_KEYS) {
+        const up = { ...base, [k]: 90 };
+        if (OVR_WEIGHTS[pos][k]) expect(overallRaw(up, pos), `${pos} ${k}`).toBeGreaterThan(overallRaw(base, pos));
+        else expect(overallRaw(up, pos), `${pos} ${k}`).toBe(overallRaw(base, pos));
+      }
+    }
+  });
+
+  it('accuracy blends short, medium and deep by distance', () => {
+    const r = { sac: 90, mac: 80, dac: 60, tup: 80, pac: 80 };
+    expect(accuracyAt(5, r)).toBe(90);
+    expect(accuracyAt(11, r)).toBeCloseTo(85);
+    expect(accuracyAt(17, r)).toBe(80);
+    expect(accuracyAt(40, r)).toBe(60);
+    expect(throwErrorSd(30, r, 0, 0)).toBeGreaterThan(throwErrorSd(30, { ...r, dac: 90 }, 0, 0));
+  });
+
+  it('poise and throwing on the run only scale their own penalty, with 80 as the old baseline', () => {
+    const r = { sac: 85, mac: 85, dac: 85, tup: 80, pac: 80 };
+    expect(composure(80)).toBe(1);
+    expect(throwErrorSd(20, { ...r, pac: 60 }, 0, 0)).toBe(throwErrorSd(20, r, 0, 0));
+    expect(throwErrorSd(20, { ...r, pac: 60 }, 1, 0)).toBeGreaterThan(throwErrorSd(20, r, 1, 0));
+    expect(throwErrorSd(20, { ...r, tup: 95 }, 0, 1)).toBeLessThan(throwErrorSd(20, r, 0, 1));
+  });
+
+  it('a blocker anchors with his strength', () => {
+    const r = flat(70);
+    expect(passBlockValue({ ...r, str: 90 })).toBeGreaterThan(passBlockValue(r));
+    expect(runBlockValue({ ...r, str: 90 })).toBeGreaterThan(runBlockValue(r));
+    expect(passBlockValue({ ...r, pbk: 90 })).toBeGreaterThan(passBlockValue({ ...r, str: 90 }));
+  });
+
+  it('every rating is documented', () => {
+    for (const k of RATING_KEYS) expect(RATING_INFO[k].effect.length).toBeGreaterThan(10);
+  });
+});
+
+describe('rosters', () => {
+  const squads = TEAMS.map((t) => buildSquad(t));
+
+  it('every FBS team has a profile, a home state, colors and a unique abbreviation', () => {
+    expect(TEAMS.length).toBeGreaterThanOrEqual(130);
+    expect(new Set(TEAMS.map((t) => t.id)).size).toBe(TEAMS.length);
+    expect(new Set(TEAMS.map((t) => t.abbr)).size).toBe(TEAMS.length);
+    for (const t of TEAMS) {
+      expect(TEAM_STATE[t.id], t.id).toBeTruthy();
+      expect(t.colors.jerseyHome).toMatch(/^#[0-9a-fA-F]{6}$/);
+      expect(CONFERENCES).toContain(t.conference);
+    }
+  });
+
+  it('an 85-man roster with the full composition, the same every time', () => {
+    for (const sq of squads) {
+      const want = COMPOSITION.reduce((s, [, n]) => s + n, 0);
+      expect(sq.athletes.length, sq.team.id).toBeGreaterThanOrEqual(want);
+      for (const [pos, n] of COMPOSITION) expect(sq.athletes.filter((a) => a.pos === pos).length).toBeGreaterThanOrEqual(n);
+    }
+    const again = freshSquad(UGA);
+    expect(again.athletes.map((a) => [a.first, a.last, a.r.spd])).toEqual(buildSquad(UGA).athletes.map((a) => [a.first, a.last, a.r.spd]));
+  });
+
+  it('every slot gets a different healthy starter', () => {
+    for (const sq of squads) {
+      const st = starters(sq);
+      for (const slot of PICK_ORDER) expect(st[slot], `${sq.team.id} ${slot}`).toBeTruthy();
+      expect(new Set(Object.values(st).map((a) => a.id)).size).toBe(PICK_ORDER.length);
+      const field = onField(sq);
+      for (const slot of [...OFF_SLOTS, ...DEF_SLOTS, ...ST_SLOTS, ...OFF_EXTRA, ...DEF_EXTRA]) expect(field[slot]).toBeTruthy();
+    }
+  });
+
+  it('ratings and bios stay in range', () => {
+    for (const sq of squads) {
+      for (const a of sq.athletes) {
+        for (const k of RATING_KEYS) {
+          expect(a.r[k]).toBeGreaterThanOrEqual(20);
+          expect(a.r[k]).toBeLessThanOrEqual(99);
+        }
+        expect(a.heightIn).toBeGreaterThan(64);
+        expect(a.heightIn).toBeLessThan(83);
+        expect(a.potential).toBeGreaterThanOrEqual(overall(a.r, a.pos) - 1);
+        expect(a.hometown.city.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('an injured starter drops out, his backup steps in, and the team rating follows', () => {
+    const sq = freshSquad(UGA);
+    const before = teamRatings(sq);
+    const qb = starters(sq).QB;
+    qb.injury = { weeks: 3 };
+    const after = starters(sq).QB;
+    expect(after.id).not.toBe(qb.id);
+    expect(onField(sq).QB.name).toBe(athleteName(after));
+    expect(teamRatings(sq).off).toBeLessThan(before.off);
+    expect(teamRatings(sq).def).toBe(before.def);
+    qb.injury = null;
+    expect(teamRatings(sq)).toEqual(before);
+  });
+
+  it('team ratings follow the research, top programs over the bottom of FBS', () => {
+    let err = 0;
+    for (const sq of squads) {
+      const r = teamRatings(sq);
+      const p = sq.team.profile;
+      err += Math.abs(r.off - p.target.off) + Math.abs(r.def - p.target.def);
+      expect(Math.abs(r.off - p.target.off), sq.team.id).toBeLessThanOrEqual(6);
+      expect(Math.abs(r.def - p.target.def), sq.team.id).toBeLessThanOrEqual(6);
+    }
+    expect(err / (2 * squads.length)).toBeLessThan(2.5);
+    const avg = (tier: number) => {
+      const s = squads.filter((q) => q.team.profile.tier === tier).map((q) => teamRatings(q).ovr);
+      return s.reduce((a, b) => a + b, 0) / s.length;
+    };
+    expect(avg(1)).toBeGreaterThan(avg(3) + 5);
+    expect(avg(3)).toBeGreaterThan(avg(5) + 5);
+  });
+
+  it('researched players are on the roster at their position, in the two-deep', () => {
+    for (const sq of squads) {
+      for (const s of sq.team.profile.standouts) {
+        const a = sq.athletes.find((x) => x.real && `${x.first} ${x.last}` === s.name);
+        expect(a, `${sq.team.id} ${s.name}`).toBeTruthy();
+        expect(a!.pos).toBe(s.pos);
+        const slots = PICK_ORDER.filter((slot) => SLOT_POS[slot] === s.pos);
+        const rank = Math.min(...slots.map((slot) => sq.depth[slot].indexOf(a!.id)));
+        const deep = s.pos === 'WR' || s.pos === 'CB' ? 4 : slots.length + 1;
+        expect(rank, `${sq.team.id} ${s.name} ${s.pos}`).toBeLessThan(deep);
+      }
+    }
+  });
+
+  it('a mobile-QB team starts a mobile QB', () => {
+    const dual = squads.filter((q) => q.team.profile.offense.qbStyle !== 'pocket' && !q.team.profile.standouts.some((s) => s.pos === 'QB'));
+    for (const q of dual) expect(starters(q).QB.archetype, q.team.id).not.toBe('pocket');
+    const elite = buildSquad(UGA).athletes.find((a) => a.real && a.pos === 'QB')!;
+    const field = onField(buildSquad(UGA));
+    expect(field.QB.name).toBe(athleteName(elite));
   });
 });

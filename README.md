@@ -15,7 +15,10 @@ npm run balance    # AI balance report -> balance.txt
 
 | Action | Input |
 | --- | --- |
-| Pick team / opponent | A/D, W/S (or click the arrows), Enter to start |
+| Pick your team | A/D team, W/S conference (or click the arrows) |
+| Pick the opponent | Left/Right team, Up/Down conference |
+| View a roster | R (yours) or T (opponent's); A/D pages, Esc back |
+| Start the game | Enter |
 | Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |
 | Playbook tab (Pass / Run / Play Action / Special) | Click a tab, or Q/E or Tab |
 | Formation filter | A/D or the mouse wheel (or click a chip) picks a formation under the tab; W/S pages when there are more than 9 plays |
@@ -36,7 +39,7 @@ npm run balance    # AI balance report -> balance.txt
 ## Layout
 
 - `src/engine/`: fixed-timestep loop helpers, camera projection (yards to pixels), input
-- `src/data/`: teams and roster generation, playbook (formations and route trees), defensive calls
+- `src/data/`: ratings and positions, the 138 FBS team profiles, roster generation and depth charts, playbook (formations and route trees), defensive calls. See [docs/RATINGS.md](docs/RATINGS.md) and [docs/ROSTERS.md](docs/ROSTERS.md)
 - `src/sim/`: player physics, ball flight, AI (routes, man and zone coverage, blocking, pursuit), catch and tackle resolution
 - `src/game/`: play state machine (`playState.ts`), down/distance rules and CPU drive sim (`rules.ts`), game and play clocks (`clock.ts`), screens (`game.ts`)
 - `src/render/`: procedural pixel-art sprites with team-color swaps, field, HUD

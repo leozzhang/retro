@@ -1,0 +1,182 @@
+[
+{"id":"byu","school":"BYU","mascot":"Cougars","abbr":"BYU","conference":"Big 12","colors":{"primary":"#002E5D","secondary":"#FFFFFF"},"tier":2,"prestige":72,"record2026":"6-0 (3-0)","target":{"off":85,"def":88,"st":80},
+"basis":"AP No. 2 and unbeaten incl. win over Notre Dame; deep returning defense with multiple All-Big 12 picks and a sophomore QB with three conference weekly awards.",
+"offense":{"qbStyle":"dual","scheme":"pro"},"units":{"QB":1,"RB":1,"LB":2,"S":1,"DL":1},
+"standouts":[
+{"name":"Bear Bachmeier","pos":"QB","year":"SO","redshirt":false,"archetype":"dual","tier":"star","note":"Three-time Big 12 Offensive POW; Maxwell/O'Brien watch"},
+{"name":"LJ Martin","pos":"HB","year":"SR","redshirt":false,"archetype":"power","tier":"star","note":"Preseason Big 12 Offensive Player of the Year"},
+{"name":"Legend Glasker","pos":"WR","year":"FR","redshirt":false,"archetype":"deep","tier":"good","note":"Freshman deep threat, two weekly awards"},
+{"name":"Cade Uluave","pos":"MLB","year":"SR","redshirt":false,"archetype":"run","tier":"elite","note":"Butkus/Nagurski/Lombardi watch lists"},
+{"name":"Isaiah Glasker","pos":"OLB","year":"SR","redshirt":false,"archetype":"rusher","tier":"star","note":"Nagurski and Bednarik watch lists"},
+{"name":"Faletau Satuala","pos":"FS","year":"JR","redshirt":false,"archetype":"hybrid","tier":"star","note":"Preseason All-Big 12 S; Thorpe watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_BYU_Cougars_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"texastech","school":"Texas Tech","mascot":"Red Raiders","abbr":"TTU","conference":"Big 12","colors":{"primary":"#CC0000","secondary":"#000000"},"tier":2,"prestige":66,"record2026":"6-1 (3-1)","target":{"off":83,"def":88,"st":86},
+"basis":"Defending Big 12 champ, AP No. 8; heavily resourced roster with preseason Big 12 DPOY and elite specialists, but QB unsettled after Sorsby's exit.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"DL":2,"LB":1,"CB":1,"K":2,"P":2,"QB":-1},
+"standouts":[
+{"name":"Will Hammond","pos":"QB","year":"SO","redshirt":true,"archetype":"dual","tier":"good","note":"Named starter after ACL recovery; Tommy Castellanos used in packages"},
+{"name":"A.J. Holmes Jr.","pos":"DT","year":"SR","redshirt":false,"archetype":"power","tier":"elite","note":"Preseason Big 12 Defensive Player of the Year"},
+{"name":"Terrance Carter Jr.","pos":"TE","year":"SR","redshirt":false,"archetype":"receiving","tier":"star","note":"Preseason All-Big 12 TE; Mackey watch"},
+{"name":"Brice Pollock","pos":"CB","year":"JR","redshirt":false,"archetype":"man","tier":"star","note":"Preseason All-Big 12 DB; Thorpe watch"},
+{"name":"Ben Roberts","pos":"MLB","year":"SR","redshirt":false,"archetype":"run","tier":"star","note":"Butkus/Bednarik watch lists"},
+{"name":"Stone Harrington","pos":"K","year":"SR","redshirt":false,"archetype":"accurate","tier":"star","note":"Preseason All-Big 12 PK; Groza watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Texas_Tech_Red_Raiders_football_team","https://www.fox34.com/2026/08/29/texas-tech-adds-quarterback-tommy-castellanos-roster/","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"utah","school":"Utah","mascot":"Utes","abbr":"UTAH","conference":"Big 12","colors":{"primary":"#CC0000","secondary":"#FFFFFF"},"tier":2,"prestige":72,"record2026":"6-0 (3-0)","target":{"off":85,"def":85,"st":83},
+"basis":"AP No. 10 and unbeaten under Morgan Scalley; veteran dual-threat QB and strong run game, typical physical Utah defense.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"QB":1,"RB":1,"OL":1,"DL":1},
+"standouts":[
+{"name":"Devon Dampier","pos":"QB","year":"SR","redshirt":false,"archetype":"dual","tier":"star","note":"About 1,400 pass yds and 15 TD through six games plus rushing; Maxwell/O'Brien watch"},
+{"name":"Wayshawn Parker","pos":"HB","year":"JR","redshirt":false,"archetype":"elusive","tier":"star","note":"Two 175-yard games incl. a 90-yd TD run"},
+{"name":"Braden Pegan","pos":"WR","year":"SR","redshirt":false,"archetype":"possession","tier":"good","note":"Leading receiver, multiple TD games"},
+{"name":"Lance Holtzclaw","pos":"DE","year":"SR","redshirt":false,"archetype":"speed","tier":"star","note":"Preseason All-Big 12 DL"},
+{"name":"Johnathan Hall","pos":"SS","year":"SR","redshirt":false,"archetype":"hybrid","tier":"good","note":"Bednarik watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Utah_Utes_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"houston","school":"Houston","mascot":"Cougars","abbr":"HOU","conference":"Big 12","colors":{"primary":"#C8102E","secondary":"#FFFFFF"},"tier":3,"prestige":58,"record2026":"6-1 (3-1)","target":{"off":82,"def":81,"st":81},
+"basis":"AP No. 14, only loss by 2 at Texas Tech; Weigman-led offense with All-Big 12 WR and OL, solid defense under Fritz.",
+"offense":{"qbStyle":"pocket","scheme":"pro"},"units":{"WR":1,"TE":1,"OL":1,"K":1},
+"standouts":[
+{"name":"Conner Weigman","pos":"QB","year":"SR","redshirt":false,"archetype":"pocket","tier":"good","note":"Starter; Maxwell/O'Brien/Manning watch lists"},
+{"name":"Amare Thomas","pos":"WR","year":"SR","redshirt":false,"archetype":"possession","tier":"star","note":"Preseason All-Big 12 WR; Biletnikoff watch"},
+{"name":"Patrick Overmyer","pos":"TE","year":"SR","redshirt":false,"archetype":"receiving","tier":"good","note":"Mackey watch; Big 12 weekly award"},
+{"name":"Shadre Hurst","pos":"OG","year":"SR","redshirt":false,"archetype":"run","tier":"star","note":"Preseason All-Big 12 OL"},
+{"name":"Will James","pos":"FS","year":"SR","redshirt":false,"archetype":"coverage","tier":"star","note":"Preseason All-Big 12 DB"},
+{"name":"Makhi Hughes","pos":"HB","year":"JR","redshirt":true,"archetype":"power","tier":"good","note":"Leading rusher in several games; Doak Walker watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Houston_Cougars_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"arizona","school":"Arizona","mascot":"Wildcats","abbr":"ARIZ","conference":"Big 12","colors":{"primary":"#CC0033","secondary":"#003366"},"tier":3,"prestige":58,"record2026":"5-1 (2-1)","target":{"off":83,"def":80,"st":80},
+"basis":"AP No. 25, only loss at BYU; veteran QB Fifita and big-play passing game, experienced defense.",
+"offense":{"qbStyle":"pocket","scheme":"spread"},"units":{"QB":2,"WR":1,"OL":1,"K":1},
+"standouts":[
+{"name":"Noah Fifita","pos":"QB","year":"SR","redshirt":true,"archetype":"pocket","tier":"star","note":"Preseason All-Big 12 QB; 341 yds/3 TD at WVU"},
+{"name":"Isaiah Mizell","pos":"WR","year":"SR","redshirt":false,"archetype":"deep","tier":"good","note":"183 yds, 2 TD at West Virginia"},
+{"name":"Tristan Bounds","pos":"OT","year":"SR","redshirt":false,"archetype":"pass","tier":"good","note":"Outland watch"},
+{"name":"Tre Smith","pos":"DE","year":"SR","redshirt":false,"archetype":"power","tier":"good","note":"Lott Trophy watch"},
+{"name":"Taye Brown","pos":"MLB","year":"SR","redshirt":false,"archetype":"run","tier":"star","note":"Butkus and Nagurski watch lists"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Arizona_Wildcats_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"oklahomastate","school":"Oklahoma State","mascot":"Cowboys","abbr":"OKST","conference":"Big 12","colors":{"primary":"#FF7300","secondary":"#000000"},"tier":3,"prestige":66,"record2026":"4-2 (2-1)","target":{"off":83,"def":73,"st":83},
+"basis":"Rebuilt under Eric Morris with transfer QB Mestemaker; beat Oregon, explosive air attack but leaky defense; excellent K Keltner.",
+"offense":{"qbStyle":"pocket","scheme":"air-raid"},"units":{"QB":1,"WR":2,"RB":1,"K":1,"DL":-1,"CB":-1},
+"standouts":[
+{"name":"Drew Mestemaker","pos":"QB","year":"SO","redshirt":true,"archetype":"pocket","tier":"star","note":"North Texas transfer; preseason Big 12 Newcomer of the Year, two weekly awards"},
+{"name":"Caleb Hawkins","pos":"HB","year":"SO","redshirt":false,"archetype":"power","tier":"star","note":"Preseason All-American; 110 yds vs Oregon"},
+{"name":"Wyatt Young","pos":"WR","year":"JR","redshirt":false,"archetype":"slot","tier":"star","note":"Preseason All-Big 12 WR"},
+{"name":"Ethan Wesloski","pos":"MLB","year":"SR","redshirt":false,"archetype":"run","tier":"star","note":"Three Big 12 Defensive POW awards"},
+{"name":"Sam Keltner","pos":"K","year":"SO","redshirt":false,"archetype":"accurate","tier":"star","note":"Three Big 12 ST POW awards"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Oklahoma_State_Cowboys_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"baylor","school":"Baylor","mascot":"Bears","abbr":"BAY","conference":"Big 12","colors":{"primary":"#154734","secondary":"#FFB81C"},"tier":3,"prestige":63,"record2026":"4-3 (2-2)","target":{"off":80,"def":73,"st":84},
+"basis":"Middling Big 12 record with Florida transfer DJ Lagway; productive passing, inconsistent defense; top punter and perfect FG kicker.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"QB":1,"WR":1,"P":2,"K":1,"DL":-1},
+"standouts":[
+{"name":"DJ Lagway","pos":"QB","year":"JR","redshirt":false,"archetype":"pocket","tier":"good","note":"Florida transfer; Golden Arm watch; 4 TD vs ASU"},
+{"name":"Gavin Freeman","pos":"WR","year":"SR","redshirt":false,"archetype":"slot","tier":"good","note":"154 yds at Auburn, 115 at ASU"},
+{"name":"Palmer Williams","pos":"P","year":"SR","redshirt":false,"archetype":"power","tier":"star","note":"Preseason All-Big 12 P; Ray Guy watch"},
+{"name":"Rhett Armstrong","pos":"K","year":"SO","redshirt":false,"archetype":"accurate","tier":"good","note":"12/12 on FGs incl. a 54-yarder"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Baylor_Bears_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"cincinnati","school":"Cincinnati","mascot":"Bearcats","abbr":"CIN","conference":"Big 12","colors":{"primary":"#E00122","secondary":"#000000"},"tier":3,"prestige":55,"record2026":"5-2 (2-2)","target":{"off":79,"def":75,"st":78},
+"basis":"5-2 with a win over No. 8 Texas Tech; veteran OL with an All-American guard, new QB JC French after Sorsby left.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"OL":2,"RB":1,"LB":1},
+"standouts":[
+{"name":"JC French IV","pos":"QB","year":"SR","redshirt":false,"archetype":"dual","tier":"good","note":"Starter; Manning watch"},
+{"name":"Evan Tengesdahl","pos":"OG","year":"SR","redshirt":false,"archetype":"pass","tier":"elite","note":"Preseason All-American and All-Big 12"},
+{"name":"Joe Cotton","pos":"OT","year":"SR","redshirt":false,"archetype":"pass","tier":"star","note":"Preseason All-Big 12 OL"},
+{"name":"Jonathan Thompson","pos":"MLB","year":"SR","redshirt":false,"archetype":"run","tier":"good","note":"Butkus/Bednarik watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Cincinnati_Bearcats_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"westvirginia","school":"West Virginia","mascot":"Mountaineers","abbr":"WVU","conference":"Big 12","colors":{"primary":"#002855","secondary":"#EAAA00"},"tier":3,"prestige":64,"record2026":"5-3 (2-3)","target":{"off":79,"def":70,"st":72},
+"basis":"Rich Rod year two: strong run game behind Cam Cook and a running QB, but gives up big totals (45 to ISU, 52 to Arizona).",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"RB":2,"QB":1,"CB":-1,"S":-1},
+"standouts":[
+{"name":"Michael Hawkins Jr.","pos":"QB","year":"JR","redshirt":true,"archetype":"dual","tier":"good","note":"Starter; 149 rush yds vs Iowa State"},
+{"name":"Cam Cook","pos":"HB","year":"SR","redshirt":false,"archetype":"power","tier":"star","note":"Preseason All-Big 12 RB; 193 yds vs OSU"},
+{"name":"DJ Epps","pos":"WR","year":"JR","redshirt":false,"archetype":"possession","tier":"good","note":"Leading receiver"},
+{"name":"Landen Livingston","pos":"C","year":"SR","redshirt":true,"archetype":"run","tier":"good","note":"Rimington watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_West_Virginia_Mountaineers_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"kansasstate","school":"Kansas State","mascot":"Wildcats","abbr":"KSU","conference":"Big 12","colors":{"primary":"#512888","secondary":"#D1D1D1"},"tier":3,"prestige":64,"record2026":"4-2 (1-2)","target":{"off":79,"def":74,"st":74},
+"basis":"First year under Collin Klein; senior dual-threat Avery Johnson and a deep run game, average defense.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"QB":1,"RB":1,"OL":1,"K":-1},
+"standouts":[
+{"name":"Avery Johnson","pos":"QB","year":"SR","redshirt":false,"archetype":"dual","tier":"star","note":"Starter; 152 rush yds vs Tulane"},
+{"name":"Joe Jackson","pos":"HB","year":"SR","redshirt":false,"archetype":"power","tier":"good","note":"Preseason all-conference RB; 159 yds vs Kansas"},
+{"name":"John Pastore","pos":"OT","year":"SR","redshirt":false,"archetype":"run","tier":"star","note":"Preseason All-Big 12 OL"},
+{"name":"Wendell Gregory","pos":"DE","year":"SO","redshirt":false,"archetype":"speed","tier":"star","note":"Preseason All-Big 12 DL"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Kansas_State_Wildcats_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"arizonastate","school":"Arizona State","mascot":"Sun Devils","abbr":"ASU","conference":"Big 12","colors":{"primary":"#8C1D40","secondary":"#FFC627"},"tier":3,"prestige":62,"record2026":"3-3 (1-2)","target":{"off":75,"def":77,"st":77},
+"basis":"3-3 after losing Sam Leavitt and Jordyn Tyson; blown out by Baylor and Texas Tech, but a solid front seven with All-Big 12 DL Fite.",
+"offense":{"qbStyle":"pocket","scheme":"spread"},"units":{"DL":1,"LB":1,"WR":1,"QB":-1},
+"standouts":[
+{"name":"Cutter Boley","pos":"QB","year":"SO","redshirt":true,"archetype":"pocket","tier":"good","note":"Kentucky transfer, started most games; Mikey Keene started at Texas Tech"},
+{"name":"C.J. Fite","pos":"DT","year":"SR","redshirt":false,"archetype":"power","tier":"star","note":"Preseason All-Big 12 DL"},
+{"name":"Omarion Miller","pos":"WR","year":"SR","redshirt":false,"archetype":"deep","tier":"star","note":"Preseason All-Big 12 WR"},
+{"name":"Owen Long","pos":"MLB","year":"JR","redshirt":false,"archetype":"run","tier":"good","note":"Two Big 12 Defensive POW awards; Butkus watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Arizona_State_Sun_Devils_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"iowastate","school":"Iowa State","mascot":"Cyclones","abbr":"ISU","conference":"Big 12","colors":{"primary":"#C8102E","secondary":"#F1BE48"},"tier":3,"prestige":52,"record2026":"3-3 (1-2)","target":{"off":74,"def":76,"st":76},
+"basis":"First year under Jimmy Rogers after heavy roster turnover; competitive losses to Iowa, Utah and BYU, low-output passing game.",
+"offense":{"qbStyle":"dual","scheme":"pro"},"units":{"RB":1,"DL":1,"WR":-1},
+"standouts":[
+{"name":"Jaylen Raynor","pos":"QB","year":"SR","redshirt":false,"archetype":"dual","tier":"good","note":"Arkansas State transfer; Manning watch"},
+{"name":"Aiden Flora","pos":"HB","year":"SO","redshirt":false,"archetype":"elusive","tier":"good","note":"194 yds and 2 TD vs Bowling Green"},
+{"name":"Isaac Terrell","pos":"DE","year":"SR","redshirt":false,"archetype":"power","tier":"good","note":"Bednarik watch; Week 1 weekly award"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Iowa_State_Cyclones_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"ucf","school":"UCF","mascot":"Knights","abbr":"UCF","conference":"Big 12","colors":{"primary":"#000000","secondary":"#BA9B37"},"tier":3,"prestige":56,"record2026":"3-3 (1-2)","target":{"off":74,"def":76,"st":74},
+"basis":"3-3 in Scott Frost's second stint; QB injury shuffle (Barnett hurt, Jenkins starting), decent secondary.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"RB":1,"CB":1,"QB":-1},
+"standouts":[
+{"name":"Keyone Jenkins","pos":"QB","year":"SR","redshirt":false,"archetype":"dual","tier":"good","note":"Starting since the Georgia State game after Alonza Barnett III's hamstring injury"},
+{"name":"Duke Watson","pos":"HB","year":"JR","redshirt":false,"archetype":"elusive","tier":"good","note":"177 yds, 2 TD vs Georgia State; Doak Walker watch"},
+{"name":"Demari Henderson","pos":"CB","year":"SR","redshirt":false,"archetype":"man","tier":"good","note":"Big 12 Defensive POW"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_UCF_Knights_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]},
+
+{"id":"tcu","school":"TCU","mascot":"Horned Frogs","abbr":"TCU","conference":"Big 12","colors":{"primary":"#4D1979","secondary":"#A3A9AC"},"tier":3,"prestige":66,"record2026":"3-4 (1-3)","target":{"off":72,"def":79,"st":74},
+"basis":"3-4 with a stingy defense (24 or fewer allowed in every loss) but a sputtering new offense led by Harvard transfer Jaden Craig.",
+"offense":{"qbStyle":"pocket","scheme":"spread"},"units":{"S":1,"DL":1,"OL":-1,"RB":-1},
+"standouts":[
+{"name":"Jaden Craig","pos":"QB","year":"SR","redshirt":false,"archetype":"pocket","tier":"good","note":"Harvard transfer; 391 yds/4 TD vs Grambling"},
+{"name":"Jamel Johnson","pos":"SS","year":"SR","redshirt":false,"archetype":"hybrid","tier":"star","note":"Thorpe and Nagurski watch lists"},
+{"name":"Ansel Din-Mbuh","pos":"DT","year":"SR","redshirt":false,"archetype":"power","tier":"good","note":"Nagurski watch"},
+{"name":"Jordan Dwyer","pos":"WR","year":"SR","redshirt":false,"archetype":"possession","tier":"good","note":"Biletnikoff watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_TCU_Horned_Frogs_football_team","https://www.stakingtheplains.com/2026/08/27/2026-big-12-football-teams-previews-tcu-horned-frogs/"]},
+
+{"id":"kansas","school":"Kansas","mascot":"Jayhawks","abbr":"KU","conference":"Big 12","colors":{"primary":"#0051BA","secondary":"#E8000D"},"tier":3,"prestige":50,"record2026":"3-4 (1-3)","target":{"off":74,"def":69,"st":75},
+"basis":"Post-Jalon Daniels rebuild with an inexperienced running QB; losses to Missouri, ASU, Utah and K-State, defense below Big 12 average.",
+"offense":{"qbStyle":"dual","scheme":"spread"},"units":{"RB":1,"WR":1,"QB":-1,"DL":-1},
+"standouts":[
+{"name":"Isaiah Marshall","pos":"QB","year":"JR","redshirt":true,"archetype":"scrambler","tier":"good","note":"Won camp battle; 333 pass yds at Utah"},
+{"name":"Dylan Edwards","pos":"HB","year":"SR","redshirt":false,"archetype":"elusive","tier":"good","note":"K-State transfer, leading rusher"},
+{"name":"Nik McMillan","pos":"WR","year":"SR","redshirt":true,"archetype":"possession","tier":"good","note":"Biletnikoff watch"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Kansas_Jayhawks_football_team","https://www2.ljworld.com/sports/2026/aug/27/kansas-names-isaiah-marshall-starting-quarterback-for-2026-season/"]},
+
+{"id":"colorado","school":"Colorado","mascot":"Buffaloes","abbr":"COLO","conference":"Big 12","colors":{"primary":"#CFB87C","secondary":"#000000"},"tier":3,"prestige":68,"record2026":"2-4 (0-3)","target":{"off":70,"def":74,"st":75},
+"basis":"2-4, winless in Big 12 with a struggling offense (7 points vs Northwestern and Texas Tech); QB shuffle between Julian Lewis and Isaac Wilson.",
+"offense":{"qbStyle":"pocket","scheme":"spread"},"units":{"WR":1,"OL":-2,"QB":-1},
+"standouts":[
+{"name":"Julian Lewis","pos":"QB","year":"FR","redshirt":true,"archetype":"pocket","tier":"good","note":"Opened as starter; Isaac Wilson started recent Big 12 games"},
+{"name":"Joseph Williams","pos":"WR","year":"JR","redshirt":false,"archetype":"deep","tier":"good","note":"127 yds vs Baylor, 123 vs Weber State"},
+{"name":"Boo Carter","pos":"CB","year":"JR","redshirt":false,"archetype":"man","tier":"good","note":"Big 12 weekly award Week 1"}
+],
+"sources":["https://en.wikipedia.org/wiki/2026_Colorado_Buffaloes_football_team","https://en.wikipedia.org/wiki/2026_Big_12_Conference_football_season"]}
+]

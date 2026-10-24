@@ -94,14 +94,14 @@ const TURN_TIME = 0.35;
 /** A set receiver moving faster than this (yd/s) has to be coming back to the QB to stay set. */
 const SET_MAX_SPEED = 3;
 
-/** Share of top speed a receiver carries through a turn of `turnDeg`; sharper route runners (`acc`) keep more. */
-export function cutKeep(turnDeg: number, acc: number): number {
+/** Share of top speed a receiver carries through a turn of `turnDeg`; sharper route runners (`rte`) keep more. */
+export function cutKeep(turnDeg: number, rte: number): number {
   if (turnDeg < 20) return 1;
-  return clamp(1 - (0.7 * (turnDeg - 20)) / 160 + (acc - 75) * 0.004, 0.25, 1);
+  return clamp(1 - (0.7 * (turnDeg - 20)) / 160 + (rte - 75) * 0.004, 0.25, 1);
 }
 
 function turnTime(p: Player): number {
-  return TURN_TIME - (0.15 * p.r.acc) / 100;
+  return TURN_TIME - (0.15 * p.r.rte) / 100;
 }
 
 /**
@@ -126,7 +126,7 @@ function runRoute(play: Play, p: Player): void {
   if (p.passRoute) {
     // Burst: strong from a standstill (the release, out of a plant), gentle near top speed.
     const v = len(p.vel);
-    const burst = BURST * (0.8 + (0.4 * p.r.acc) / 100) * (1 - (BURST_TAPER * v) / sp);
+    const burst = BURST * (0.8 + (0.4 * p.r.rte) / 100) * (1 - (BURST_TAPER * v) / sp);
     sp = Math.min(sp, v + burst * STEP);
     // Plant: brake into a sharp break so it's cut tight rather than rounded off at full speed.
     if (p.routeIdx < p.route.length) {
@@ -369,8 +369,8 @@ function cover(play: Play, d: Player): void {
     d.want = ZERO;
     return;
   }
-  // Defenders react to what the receiver did a moment ago; better awareness = shorter lag.
-  const lagFrames = Math.round((0.6 - (d.r.awr / 100) * 0.35) * 60);
+  // Defenders react to what the receiver did a moment ago; better man coverage = shorter lag.
+  const lagFrames = Math.round((0.6 - (d.r.mcv / 100) * 0.35) * 60);
   const hist = play.history.get(r.id);
   const lp = hist && hist.length ? hist[Math.max(0, hist.length - 1 - lagFrames)] : r.pos;
   const since = play.time - play.snapTime;

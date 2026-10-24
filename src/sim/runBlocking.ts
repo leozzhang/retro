@@ -1,6 +1,7 @@
 import { add, clamp, dist, lerp, norm, scale, sub, type Vec } from '../engine/math';
 import type { Play } from '../game/playState';
 import { maxSpeed, seek, type Player } from './player';
+import { runBlockValue } from '../data/ratings';
 
 /**
  * Run blocking: who blocks whom at the snap (by scheme), how a run block moves
@@ -337,9 +338,9 @@ export function runEngagement(play: Play, d: Player): number {
   const n = d.engagedBy.length;
   const goal = d.goal ?? play.qb.pos;
   const toGoal = norm(sub(goal, d.pos));
-  const blk = d.engagedBy.reduce((s, b) => s + b.r.blk, 0) / n;
+  const blk = d.engagedBy.reduce((s, b) => s + runBlockValue(b.r), 0) / n;
   const edge = RUN_BLOCK_EDGE - (play.runScheme === 'stretch' ? REACH_PENALTY : 0);
-  const power = d.r.str * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll;
+  const power = d.r.bsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll;
   d.blockDir ??= norm(sub(d.engagedBy[0].pos, d.pos));
   let move: Vec;
   if (power > 0) {

@@ -1,7 +1,9 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
 import { FORMATIONS, PLAY_TABS, playsOfKind, ROUTES, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
-import { generateRoster, TEAMS, type RosterPlayer, type Team } from '../data/teams';
+import { buildSquad, rosterFor, teamRatings } from '../data/depth';
+import { CONFERENCES } from '../data/fbs/profile';
+import { TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
@@ -10,6 +12,7 @@ import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawHint, drawPlayClock, drawScorebug } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
+import { drawRoster, rosterPages } from '../render/rosterScreen';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { getSprite, teamUniform } from '../render/sprites';
 import { text, textWidth } from '../render/text';
@@ -26,7 +29,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -92,8 +95,11 @@ function inRect(x: number, y: number, r: { x: number; y: number; w: number; h: n
 
 export class Game {
   private screen: Screen = 'title';
-  private userIdx = 0;
-  private cpuIdx = 1;
+  private userIdx = Math.max(0, TEAMS.findIndex((t) => t.id === 'georgia'));
+  private cpuIdx = Math.max(0, TEAMS.findIndex((t) => t.id === 'alabama'));
+  /** Roster screen: whose roster and which page. */
+  private rosterIdx = 0;
+  private rosterPage = 0;
   private qIdx = QUARTER_OPTIONS.indexOf(8);
   private user!: Team;
   private cpu!: Team;
@@ -142,6 +148,9 @@ export class Game {
       case 'title':
         this.updateTitle(dt, input);
         break;
+      case 'roster':
+        this.updateRoster(input);
+        break;
       case 'call':
         this.updateCall(dt, input);
         break;
@@ -172,24 +181,34 @@ export class Game {
 
   private updateTitle(dt: number, input: Input): void {
     this.titleTime += dt;
-    const n = TEAMS.length;
-    const step = (i: number, d: number, other: number) => {
-      let j = (i + d + n) % n;
-      if (j === other) j = (j + d + n) % n;
-      return j;
-    };
     const nq = QUARTER_OPTIONS.length;
-    if (input.hit('KeyA', 'ArrowLeft')) this.userIdx = step(this.userIdx, -1, this.cpuIdx);
-    if (input.hit('KeyD', 'ArrowRight')) this.userIdx = step(this.userIdx, 1, this.cpuIdx);
-    if (input.hit('KeyW', 'ArrowUp')) this.cpuIdx = step(this.cpuIdx, -1, this.userIdx);
-    if (input.hit('KeyS', 'ArrowDown')) this.cpuIdx = step(this.cpuIdx, 1, this.userIdx);
+    if (input.hit('KeyA')) this.userIdx = this.stepTeam(this.userIdx, -1, this.cpuIdx);
+    if (input.hit('KeyD')) this.userIdx = this.stepTeam(this.userIdx, 1, this.cpuIdx);
+    if (input.hit('KeyW')) this.userIdx = this.stepConference(this.userIdx, -1, this.cpuIdx);
+    if (input.hit('KeyS')) this.userIdx = this.stepConference(this.userIdx, 1, this.cpuIdx);
+    if (input.hit('ArrowLeft')) this.cpuIdx = this.stepTeam(this.cpuIdx, -1, this.userIdx);
+    if (input.hit('ArrowRight')) this.cpuIdx = this.stepTeam(this.cpuIdx, 1, this.userIdx);
+    if (input.hit('ArrowUp')) this.cpuIdx = this.stepConference(this.cpuIdx, -1, this.userIdx);
+    if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
+    const userRoster = input.hit('KeyR');
+    if (userRoster || input.hit('KeyT')) {
+      this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
+      this.rosterPage = 0;
+      this.screen = 'roster';
+      return;
+    }
     if (input.mouse.pressed) {
       const { x, y } = input.mouse;
-      if (y > 150 && y < 268) {
-        if (x < VIEW_W / 2) this.userIdx = step(this.userIdx, x < 160 ? -1 : 1, this.cpuIdx);
-        else this.cpuIdx = step(this.cpuIdx, x < 480 ? -1 : 1, this.userIdx);
+      const user = x < VIEW_W / 2;
+      const d = x < (user ? 160 : 480) ? -1 : 1;
+      if (y > 150 && y < 222) {
+        if (user) this.userIdx = this.stepTeam(this.userIdx, d, this.cpuIdx);
+        else this.cpuIdx = this.stepTeam(this.cpuIdx, d, this.userIdx);
+      } else if (y >= 222 && y < 238) {
+        if (user) this.userIdx = this.stepConference(this.userIdx, d, this.cpuIdx);
+        else this.cpuIdx = this.stepConference(this.cpuIdx, d, this.userIdx);
       } else if (y >= 268 && y < 290) {
         this.qIdx = (this.qIdx + (x < VIEW_W / 2 ? nq - 1 : 1)) % nq;
       } else if (y >= 290) {
@@ -201,11 +220,41 @@ export class Game {
     this.cam.follow(32, 0.5);
   }
 
+  /** Next or previous team in the same conference, skipping `other` (the team on the other side). */
+  private stepTeam(i: number, d: number, other: number): number {
+    const conf = TEAMS[i].conference;
+    const list = TEAMS.map((_, j) => j).filter((j) => TEAMS[j].conference === conf && (j === i || j !== other));
+    const at = list.indexOf(i);
+    return list[(at + d + list.length) % list.length];
+  }
+
+  /** First team of the next or previous conference, skipping `other`. */
+  private stepConference(i: number, d: number, other: number): number {
+    const n = CONFERENCES.length;
+    let c = CONFERENCES.indexOf(TEAMS[i].conference);
+    for (let k = 0; k < n; k++) {
+      c = (c + d + n) % n;
+      const j = TEAMS.findIndex((t, jj) => t.conference === CONFERENCES[c] && jj !== other);
+      if (j >= 0) return j;
+    }
+    return i;
+  }
+
+  private updateRoster(input: Input): void {
+    const n = rosterPages(buildSquad(TEAMS[this.rosterIdx]));
+    if (input.hit('KeyA', 'ArrowLeft')) this.rosterPage = (this.rosterPage + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight') || input.mouse.pressed) this.rosterPage = (this.rosterPage + 1) % n;
+    if (input.hit('Escape', 'Enter', 'Backspace')) {
+      this.screen = 'title';
+      this.titleTime = 0;
+    }
+  }
+
   private startGame(): void {
     this.user = TEAMS[this.userIdx];
     this.cpu = TEAMS[this.cpuIdx];
-    this.userRoster = generateRoster(this.user);
-    this.cpuRoster = generateRoster(this.cpu);
+    this.userRoster = rosterFor(this.user);
+    this.cpuRoster = rosterFor(this.cpu);
     this.crowd = makeCrowd(this.user, this.cpu);
     this.score = { user: 0, cpu: 0 };
     this.clock = newClock(QUARTER_OPTIONS[this.qIdx]);
@@ -609,7 +658,7 @@ export class Game {
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
     const late = (c.quarter === 4 && left < 300) || (c.quarter === 2 && left < 120);
-    const sim = simulateDrive(this.cpu.off, this.user.def, start, this.rng, {
+    const sim = simulateDrive(teamRatings(buildSquad(this.cpu)).off, teamRatings(buildSquad(this.user)).def, start, this.rng, {
       timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
     });
     const { halfOver } = advanceSim(c, sim.secs);
@@ -661,6 +710,10 @@ export class Game {
     g.imageSmoothingEnabled = false;
     if (this.screen === 'title') {
       this.renderTitle(g);
+      return;
+    }
+    if (this.screen === 'roster') {
+      drawRoster(g, buildSquad(TEAMS[this.rosterIdx]), this.rosterPage);
       return;
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
@@ -1021,15 +1074,16 @@ export class Game {
     text(g, 'SATURDAY GRIDIRON', VIEW_W / 2, 40, { size: 24, align: 'center', color: '#ffd23f', shadow: '#7a3e14' });
     text(g, 'COLLEGE FOOTBALL  -  GAMEPLAY MVP', VIEW_W / 2, 76, { size: 8, align: 'center', color: '#cfd6df' });
 
-    this.drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A / D', true);
-    this.drawTeamPanel(g, cpu, 480, 'OPPONENT', 'W / S', false);
+    this.drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A/D TEAM  W/S CONF', true);
+    this.drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
     text(g, 'VS', VIEW_W / 2, 196, { size: 16, align: 'center', color: '#ffffff' });
     text(g, `<  QUARTERS: ${QUARTER_OPTIONS[this.qIdx]} MIN  >   (Q / E)`, VIEW_W / 2, 276, { align: 'center', color: '#9ad7ff' });
 
     if (Math.floor(this.titleTime * 2) % 2 === 0) {
       text(g, 'PRESS ENTER TO KICK OFF', VIEW_W / 2, 300, { size: 8, align: 'center', color: '#ffffff' });
     }
-    text(g, 'DRAG + RELEASE TO PASS.  R-CLICK HAND OFF.  WASD MOVE.  SHIFT SPRINT.', VIEW_W / 2, 330, {
+    text(g, 'R / T: YOUR / OPPONENT ROSTER', VIEW_W / 2, 316, { size: 8, align: 'center', color: '#9ad7ff' });
+    text(g, 'DRAG + RELEASE TO PASS.  R-CLICK HAND OFF.  WASD MOVE.  SHIFT SPRINT.', VIEW_W / 2, 334, {
       size: 8, align: 'center', color: '#8fa0b8',
     });
   }
@@ -1040,8 +1094,10 @@ export class Game {
     g.drawImage(spr, cx - 40, 124, 80, 88);
     text(g, '<', cx - 70, 164, { size: 16, align: 'center', color: '#ffd23f' });
     text(g, '>', cx + 70, 164, { size: 16, align: 'center', color: '#ffd23f' });
-    text(g, t.school.toUpperCase(), cx, 222, { size: 12, align: 'center', color: '#ffffff' });
-    text(g, `${t.conference.toUpperCase()}  OFF ${t.off}  DEF ${t.def}`, cx, 242, { align: 'center', color: '#cfd6df' });
-    text(g, keys, cx, 258, { align: 'center', color: '#5d6b80', shadow: false });
+    text(g, t.school.toUpperCase(), cx, 210, { size: t.school.length > 13 ? 8 : 12, align: 'center', color: '#ffffff' });
+    text(g, `< ${t.conference.toUpperCase()} >`, cx, 226, { align: 'center', color: '#9ad7ff' });
+    const r = teamRatings(buildSquad(t));
+    text(g, `OVR ${r.ovr}  OFF ${r.off}  DEF ${r.def}`, cx, 240, { align: 'center', color: '#cfd6df' });
+    text(g, keys, cx, 256, { align: 'center', color: '#5d6b80', shadow: false });
   }
 }

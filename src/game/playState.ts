@@ -1,5 +1,6 @@
 import type { DefCall, DefPackage } from '../data/defenses';
 import { ROUTES, type PlayDef, type RunScheme } from '../data/plays';
+import { passBlockValue } from '../data/ratings';
 import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type RosterPlayer, type Team } from '../data/teams';
 import type { Camera } from '../engine/camera';
 import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
@@ -248,7 +249,7 @@ export class Play {
       const into = norm(sub(pt, i ? p.route[i - 1] : p.pos));
       const out = norm(sub(next, pt));
       const turn = (Math.acos(clamp(into.x * out.x + into.y * out.y, -1, 1)) * 180) / Math.PI;
-      return cutKeep(turn, p.r.acc);
+      return cutKeep(turn, p.r.rte);
     });
   }
 
@@ -339,7 +340,7 @@ export class Play {
     else this.assignProtection();
     for (const d of this.def) {
       const r = d.manTarget;
-      if (d.press && r && this.rng() < 0.5 + (d.r.str - r.r.str) / 100) r.jam = 0.45;
+      if (d.press && r && this.rng() < 0.5 + (d.r.prs - r.r.rls) / 100) r.jam = 0.45;
     }
     // Run blocking is a run key: the second level reads it and comes downhill.
     if (this.playDef.block === 'run') {
@@ -348,7 +349,7 @@ export class Play {
         const t = d.manTarget;
         if (t && !t.isBlocker) continue; // still has a receiver (or the back) to mirror
         const read =
-          0.35 + (1 - d.r.awr / 100) * 0.5 + (d.assign?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0);
+          0.35 + (1 - d.r.prc / 100) * 0.5 + (d.assign?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0);
         d.fitAt = this.snapTime + read;
         d.fitUntil = Infinity;
       }
@@ -477,7 +478,7 @@ export class Play {
     if (!this.scramble && qb.pos.x > this.los + 0.3) {
       this.scramble = true;
       this.aim = null;
-      for (const d of this.def) d.reactAt = this.time + 0.2 + (1 - d.r.awr / 100) * 0.4;
+      for (const d of this.def) d.reactAt = this.time + 0.2 + (1 - d.r.prc / 100) * 0.4;
       this.popup('SCRAMBLE', qb.pos, '#9ad7ff');
     }
     if ((input.mouse.rpressed || input.hit('KeyF')) && this.handoffOption()) {
@@ -636,7 +637,7 @@ export class Play {
   /** Defenders key the handoff: front seven fast, defenders turned on receivers slower. A fooled read key is slower still. */
   private reactToRun(fooled: Player | null = null): void {
     for (const d of this.def) {
-      const slow = 1 - d.r.awr / 100;
+      const slow = 1 - d.r.prc / 100;
       const t = d.manTarget;
       let react: number;
       if (this.time >= d.fitAt) react = 0.05;
@@ -654,10 +655,10 @@ export class Play {
     for (const d of this.def) {
       if (d.role !== 'LB' && d.role !== 'S') continue;
       const a = d.assign?.kind;
-      const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.awr - 70) * 0.01;
+      const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.prc - 70) * 0.01;
       if (this.rng() >= chance) continue;
       d.fitAt = this.time;
-      d.fitUntil = this.time + 0.35 + (1 - d.r.awr / 100) * 0.6;
+      d.fitUntil = this.time + 0.35 + (1 - d.r.prc / 100) * 0.6;
     }
   }
 
@@ -687,7 +688,7 @@ export class Play {
     }
     const pressure = clamp((4 - nearest) / 4, 0, 1);
     const moving = clamp(len(qb.vel) / 6, 0, 1);
-    const sd = throwErrorSd(dist(qb.pos, target), qb.r.thr, pressure, moving);
+    const sd = throwErrorSd(dist(qb.pos, target), qb.r, pressure, moving);
     const to = { x: target.x + gauss(rng) * sd, y: target.y + gauss(rng) * sd * 0.8, z: 1.2 };
     const from = { x: qb.pos.x + qb.facing * 0.3, y: qb.pos.y, z: 2.0 };
     const { dur, peak } = passParams(dist(from, to), qb.r.arm);
@@ -719,7 +720,8 @@ export class Play {
       if (d.down) continue;
       const isMan = !!best && d.manTarget === best;
       if (dist(d.pos, this.ballTarget) < 14 || isMan) {
-        const react = 0.5 - (d.r.awr / 100) * 0.35 + rng() * 0.1;
+        const cov = d.assign?.kind === 'man' ? d.r.mcv : d.r.zcv;
+        const react = 0.5 - (cov / 100) * 0.35 + rng() * 0.1;
         d.reactAt = this.time + (seesThrow(d) ? react + 0.1 : Math.max(react, dur * 0.6));
       }
     }
@@ -760,8 +762,8 @@ export class Play {
     const res = oob
       ? 'miss'
       : resolveCatch(
-          bestO ? { pos: so, cth: bestO.r.cth, set: this.catchSet } : null,
-          bestD ? { pos: sd, cth: bestD.r.cth, awr: bestD.r.awr } : null,
+          bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet } : null,
+          bestD ? { pos: sd, cth: bestD.r.cth, prc: bestD.r.prc } : null,
           this.rng,
         );
 
@@ -770,7 +772,7 @@ export class Play {
       this.controlled = bestO;
       this.phase = 'run';
       setPose(bestO, 'catch', 0.25);
-      for (const d of this.def) d.reactAt = this.time + 0.12 + (1 - d.r.awr / 100) * 0.35;
+      for (const d of this.def) d.reactAt = this.time + 0.12 + (1 - d.r.prc / 100) * 0.35;
       this.popup('CATCH!', bestO.pos, '#ffffff');
       return;
     }
@@ -873,8 +875,8 @@ export class Play {
       }
       const n = d.engagedBy.length;
       const dir = norm(sub(d.goal ?? this.qb.pos, d.pos));
-      const blk = d.engagedBy.reduce((s, b) => s + b.r.blk, 0) / n;
-      const power = d.r.str * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15;
+      const blk = d.engagedBy.reduce((s, b) => s + passBlockValue(b.r), 0) / n;
+      const power = d.r.rsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15;
       const push = clamp(0.8 + power * 0.06, -0.8, 2.2);
       d.want = scale(dir, push);
       for (const b of d.engagedBy) b.want = scale(dir, push);
