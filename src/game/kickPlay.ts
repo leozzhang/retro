@@ -12,10 +12,11 @@ import { pursue, returnerAI } from '../sim/ai';
 import { launch, makeBall, updateFlight, type Ball } from '../sim/ball';
 import { anchorBlockers, formEngagements, release, updateEngagements } from '../sim/blocking';
 import {
-  applyKickError, fgCheck, fgDistance, kickErrorSd, launchKick, predictKick, stepKick,
+  applyKickError, applyMistime, fgCheck, fgDistance, kickErrorSd, launchKick, METER_HALF, mistimeAngle, predictKick, stepKick,
+  timingGreen,
   type FgResult, type KickFlight, type KickParams, type KickPrediction, type Wind,
 } from '../sim/kicking';
-import { knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, type Player } from '../sim/player';
+import { knockDown, makePlayer, maxSpeed, seek, seekTimed, setPose, stepPlayer, tickTimers, type Player } from '../sim/player';
 import { MIN_DRAG_PX, type Aim } from '../sim/passing';
 import { TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import type { Popup } from './playState';
@@ -42,8 +43,10 @@ export const KICK_DRAG_PX = 110;
 const LOFT_RATE = 24;
 const WHEEL_STEP = 2;
 const SNAP_SPEED = 19;
-/** Seconds from the punter's release to foot on ball. */
-const PUNT_GETOFF = 0.3;
+/** Seconds from the punter's drop to foot on ball, when the timing is perfect (the needle starts moving at the drop). */
+export const PUNT_GETOFF = METER_HALF;
+/** Seconds from the FG/XP release to the ideal strike: the snap (about 0.37 s) plus the kicker's steps into the hold. */
+export const FG_STRIKE = 0.9;
 /** A rusher this close to the punter (or holder) with the ball still on him blocks the kick. */
 const BLOCK_REACH = 1.0;
 /** Base chance a field goal gets blocked even when the protection holds (a low kick, a penetrating tackle). */
@@ -92,11 +95,14 @@ export class KickPlay {
   phase: KickPhase = 'presnap';
   time = 0;
   snapTime = 0;
-  setTime = 0;
   releaseTime = 0;
   kickTime = 0;
   overTime = 0;
   aim: Aim | null = null;
+  /** Timing meter: when the foot should meet the ball (the green's center), or null before the swing starts. */
+  strikeAt: number | null = null;
+  /** Where the user stopped the needle (-1 early .. +1 late), or null until then. */
+  timing: number | null = null;
   loft: number;
   /** Kick the user released, waiting for the snap / approach to finish. */
   private queued: KickParams | null = null;
@@ -183,6 +189,28 @@ export class KickPlay {
     const from = { x: c.pos.x + 0.3, y: c.pos.y, z: 0.4 };
     const to = { x: tgt.pos.x + 0.3, y: tgt.pos.y, z: this.unit === 'punt' ? 1.2 : 0.6 };
     launch(this.ball, from, to, dist(from, to) / SNAP_SPEED, 0.3, 'snap');
+    if (this.unit === 'fg' || this.unit === 'xp') this.assignFgProtection();
+  }
+
+  /**
+   * FG/XP protection is gap-sound: each rusher gets his own blocker, matched by
+   * how close they line up across the line, so no rusher walks through an
+   * unblocked gap while two blockers double his neighbor. The spare blocker
+   * picks up whoever comes free.
+   */
+  private assignFgProtection(): void {
+    const blockers = this.kick.filter((o) => o.job === 'protect');
+    const rushers = this.recv.filter((d) => d.job === 'rush');
+    const pairs: [Player, Player, number][] = [];
+    for (const b of blockers) for (const d of rushers) pairs.push([b, d, Math.abs(b.pos.y - d.pos.y)]);
+    pairs.sort((x, y) => x[2] - y[2]);
+    for (const b of blockers) b.mark = null;
+    const taken = new Set<Player>();
+    for (const [b, d] of pairs) {
+      if (b.mark || taken.has(d)) continue;
+      b.mark = d;
+      taken.add(d);
+    }
   }
 
   private updateAim(input: Input, dt: number): void {
@@ -233,8 +261,11 @@ export class KickPlay {
     this.releaseTime = this.time;
     if (this.unit === 'fg' || this.unit === 'xp') {
       this.snap();
+      this.strikeAt = this.time + FG_STRIKE;
     } else if (this.unit === 'kickoff') {
       this.phase = 'approach';
+      const runUp = dist(this.kicker.pos, this.kickoffSpot()) / (maxSpeed(this.kicker) * 0.85);
+      this.strikeAt = this.time + Math.max(0.6, runUp);
     } else if (this.phase === 'set') {
       this.startPuntSwing();
     }
@@ -243,7 +274,28 @@ export class KickPlay {
   private startPuntSwing(): void {
     this.phase = 'approach';
     this.releaseTime = this.time;
-    setPose(this.kicker, 'puntDrop', PUNT_GETOFF + 0.05);
+    this.strikeAt = this.time + PUNT_GETOFF;
+    setPose(this.kicker, 'puntDrop', Infinity);
+  }
+
+  /** The timing meter for the HUD: needle position `e` (-1..1), green half-width, and whether it's still waiting for Space. */
+  meter(): { e: number; green: number; live: boolean; moving: boolean } | null {
+    if (this.strikeAt === null || this.flight || this.blockedKick) return null;
+    const e = this.timing ?? clamp((this.time - this.strikeAt) / METER_HALF, -1, 1);
+    return { e, green: timingGreen(this.kicker.r.kac), live: this.timing === null, moving: this.time >= this.strikeAt - METER_HALF };
+  }
+
+  /** Space: stop the needle. Ignored before it starts moving and after the first press. */
+  pressTiming(): void {
+    if (this.strikeAt === null || this.timing !== null || !this.queued) return;
+    if (this.time < this.strikeAt - METER_HALF) return;
+    this.timing = clamp((this.time - this.strikeAt) / METER_HALF, -1, 1);
+  }
+
+  /** Foot on ball: the needle is stopped (or ran out) and the kicker is at the ball. */
+  private readyToStrike(arrived: boolean): boolean {
+    if (this.strikeAt === null || this.timing === null) return false;
+    return arrived || this.time >= this.strikeAt + METER_HALF;
   }
 
   /** 0..1: how close the nearest free rusher is to the punter. */
@@ -261,6 +313,11 @@ export class KickPlay {
     this.time += dt;
     for (const p of this.players) tickTimers(p, dt);
     if (this.canAim()) this.updateAim(input, dt);
+    if (this.strikeAt !== null && this.timing === null && this.queued) {
+      if (input.hit('Space')) this.pressTiming();
+      // Never pressed: the needle runs off the end, a full late push.
+      if (this.timing === null && this.time >= this.strikeAt + METER_HALF) this.timing = 1;
+    }
 
     switch (this.phase) {
       case 'snap':
@@ -271,7 +328,7 @@ export class KickPlay {
         break;
       case 'approach':
         if (this.unit === 'kickoff') this.kickoffApproach();
-        else if (this.time - this.releaseTime >= PUNT_GETOFF) this.kickNow();
+        else if (this.readyToStrike(this.time >= this.strikeAt!)) this.kickNow();
         break;
       case 'flight':
       case 'loose':
@@ -309,7 +366,6 @@ export class KickPlay {
 
   private snapArrived(): void {
     this.phase = 'set';
-    this.setTime = this.time;
     if (this.unit === 'punt') {
       this.ball.state = 'held';
       this.ball.carrier = this.kicker;
@@ -321,19 +377,24 @@ export class KickPlay {
     }
   }
 
-  /** Kicker's steps into the hold; he strikes it on arrival. */
+  /** Kicker's steps into the hold, paced to reach it as the needle crosses the green; he strikes once Space is hit. */
   private fgApproach(): void {
     const k = this.kicker;
     const spot = { x: this.kickSpot.x - 0.45, y: this.kickSpot.y - 0.3 };
-    k.want = seek(k, spot, 5.2, 0.2);
-    if (dist(k.pos, spot) < 0.3 || this.time - this.setTime > 1.2) this.kickNow();
+    k.want = seekTimed(k, spot, this.strikeAt! - this.time);
+    if (this.readyToStrike(dist(k.pos, spot) < 0.3)) this.kickNow();
+  }
+
+  /** Where the kicker plants beside the tee. */
+  private kickoffSpot(): Vec {
+    return { x: this.kickSpot.x - 0.4, y: this.kickSpot.y - 0.25 };
   }
 
   private kickoffApproach(): void {
     const k = this.kicker;
-    const spot = { x: this.kickSpot.x - 0.4, y: this.kickSpot.y - 0.25 };
-    k.want = seek(k, spot, maxSpeed(k) * 0.85, 0.2);
-    if (dist(k.pos, spot) < 0.3 || this.time - this.releaseTime > 2.5) this.kickNow();
+    const spot = this.kickoffSpot();
+    k.want = seekTimed(k, spot, this.strikeAt! - this.time);
+    if (this.readyToStrike(dist(k.pos, spot) < 0.3)) this.kickNow();
   }
 
   private kickNow(): void {
@@ -343,7 +404,9 @@ export class KickPlay {
     const from = this.kickFrom();
     this.kickSpot = from;
     const pressure = this.unit === 'punt' ? this.pressure() : 0;
-    const actual = applyKickError(p, k.r.kac, pressure, this.rng);
+    const e = this.timing ?? 0;
+    this.timingPopup(e);
+    const actual = applyKickError(applyMistime(p, e, k.r.kac), k.r.kac, pressure, this.rng);
     setPose(k, 'kick', 0.45);
     if (this.holder) setPose(this.holder, 'hold', 0.6);
     this.kickTime = this.time;
@@ -379,6 +442,13 @@ export class KickPlay {
     this.letItGo = this.unit === 'punt' && land.x >= OPP_GOAL - 10 && land.x < OPP_GOAL + 12;
   }
 
+  private timingPopup(e: number): void {
+    const miss = Math.abs(mistimeAngle(e, this.kicker.r.kac));
+    const at = { x: this.kicker.pos.x, y: this.kicker.pos.y - 1 };
+    if (!miss) this.popup('PERFECT!', at, '#5cff7a');
+    else this.popup(e < 0 ? 'EARLY' : 'LATE', at, miss > 0.06 ? '#ff5a5a' : '#ffd23f');
+  }
+
   private fgBlockChance(): number {
     const yds = fgDistance(this.los, OPP_GOAL);
     return FG_BLOCK_BASE + (yds > 45 ? 0.008 : 0) + (this.unit === 'xp' ? -0.003 : 0);
@@ -399,6 +469,7 @@ export class KickPlay {
       if (d.down || d.engagedBy.length) continue;
       if (dist(d.pos, this.kicker.pos) < BLOCK_REACH) {
         setPose(d, 'catch', 0.4);
+        this.kicker.pose = null; // drops out of the held punt drop
         this.ball.carrier = null;
         this.ball.state = 'kick';
         this.queued = null;
@@ -603,7 +674,7 @@ export class KickPlay {
       const closing = (c.vel.x - t.vel.x) * (c.pos.x - t.pos.x) + (c.vel.y - t.vel.y) * (c.pos.y - t.pos.y) < -0.5 * d;
       if (!arm && !closing && d > TACKLE_RANGE && d < DIVE_RANGE) {
         t.tackleCd = 1.2;
-        if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, false) * DIVE_ODDS) {
+        if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * DIVE_ODDS) {
           knockDown(c);
           knockDown(t);
           this.endReturn(c, `Diving stop by #${t.num} ${t.name}`);
@@ -613,7 +684,7 @@ export class KickPlay {
         continue;
       }
       if (d > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, false) * (arm ? ARM_TACKLE : 1)) {
+      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * (arm ? ARM_TACKLE : 1)) {
         knockDown(c);
         knockDown(t);
         this.endReturn(c, `Tackled by #${t.num} ${t.name}`);
@@ -684,7 +755,7 @@ export class KickPlay {
     }
     if (p.job === 'cover') {
       // Kickoff: time the run so nobody crosses the kick line before the ball is kicked.
-      const left = Math.max(0.15, dist(this.kicker.pos, this.kickSpot) / (maxSpeed(this.kicker) * 0.85));
+      const left = Math.max(0.15, (this.strikeAt ?? this.time) - this.time);
       const tgt = { x: this.los - 0.4, y: p.start.y };
       p.want = seek(p, tgt, Math.min(maxSpeed(p), dist(p.pos, tgt) / left), 0.3);
       return;

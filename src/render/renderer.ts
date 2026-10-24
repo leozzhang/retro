@@ -5,7 +5,7 @@ import type { Play } from '../game/playState';
 import { facingQB } from '../sim/ai';
 import { flightPos, passParams } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
-import { isEligible, poseOf, type Player } from '../sim/player';
+import { endurance, isEligible, poseOf, type Player } from '../sim/player';
 import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite } from './sprites';
 import { text } from './text';
 
@@ -218,10 +218,13 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
     g.fillRect(x - 1, y + 2, 3, 1);
     g.fillRect(x, y + 3, 1, 1);
     if (ctl.stamina < 0.999) {
+      // The bar's length shows how much sprint he has in him: shorter for a pocket QB than a receiver.
+      const w = Math.round(10 + 8 * endurance(ctl));
+      const bx = x - Math.round(w / 2) - 1;
       g.fillStyle = 'rgba(0,0,0,0.6)';
-      g.fillRect(x - 8, Math.round(s.y) + 4, 16, 3);
+      g.fillRect(bx, Math.round(s.y) + 4, w + 2, 3);
       g.fillStyle = ctl.stamina > 0.3 ? '#5cff7a' : '#ff5a5a';
-      g.fillRect(x - 7, Math.round(s.y) + 5, Math.round(14 * ctl.stamina), 1);
+      g.fillRect(bx + 1, Math.round(s.y) + 5, Math.round(w * ctl.stamina), 1);
     }
   }
 

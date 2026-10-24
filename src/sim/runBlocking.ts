@@ -44,6 +44,10 @@ const HINGE_HOLD = 1;
 const PULL_TURN = 1;
 /** Draw: the line shows pass for this long, then turns its men away from the back. */
 export const DRAW_SET = 0.7;
+/** A blocked defender this far from the carrier on the backside of the play (or behind him) peels off to pursue. */
+const PEEL_DIST = 8;
+/** He counts as backside once he's this far behind the carrier, across the field or downfield. */
+const PEEL_BACKSIDE = 2;
 /** Auto-runner lane scan: how far either side of the designed hole a zone run reads (cutbacks). */
 export const ZONE_READ_W = 6;
 /** Gap runs stay this close to the designed hole. */
@@ -352,7 +356,10 @@ export function runEngagement(play: Play, d: Player): number {
   const c = play.carrier;
   if (c && c.side === 'off' && play.phase === 'run') {
     const dc = dist(d.pos, c.pos);
-    if (dc > 8) shed = 2.5; // the far side of the play peels off to pursue
+    // The far side of the play peels off to pursue. Playside perimeter blocks (WRs on DBs) are far from
+    // the back too while he gets to the edge, but they hold or break on the matchup.
+    const backside = (d.pos.y - c.pos.y) * playSide(play) < -PEEL_BACKSIDE || d.pos.x < c.pos.x - PEEL_BACKSIDE;
+    if (dc > PEEL_DIST && backside) shed = 2.5;
     else if (dc < 2.5) shed = levered(d, c.pos) ? (SHED_LEVERED * (power > 0 ? 2 : 1)) / n : clamp(2.2 + power * 0.05, 0.8, 5);
   }
   return shed;

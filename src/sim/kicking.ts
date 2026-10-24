@@ -207,7 +207,41 @@ export function applyKickError(p: KickParams, kac: number, pressure: number, rng
   };
 }
 
-export type FgResult = 'good' | 'wideLeft' | 'wideRight' | 'short' | 'upright';
+/**
+ * Timing meter: after the release a needle sweeps the bar and the user hits
+ * Space as the foot meets the ball. `e` runs -1 (bar's left end, early) to +1
+ * (right end, late); 0 is the green's center.
+ */
+/** Seconds from the green's center to either end of the bar. */
+export const METER_HALF = 0.45;
+/** Pull (early) or push (late) at the very end of the bar, radians (about 10°). */
+export const MISTIME_DIR = 0.18;
+/** Exponent on how far past the green the needle was: under 1 makes a near miss already cost real direction. */
+export const MISTIME_CURVE = 0.85;
+/** Green half-width in meter units: a base plus a share for kick accuracy. */
+export const GREEN_BASE = 0.12;
+export const GREEN_KAC = 0.12;
+
+export function timingGreen(kac: number): number {
+  return GREEN_BASE + (GREEN_KAC * kac) / 100;
+}
+
+/** Direction error from mistiming (radians): 0 on the green; early pulls left (-y), late pushes right (+y). */
+export function mistimeAngle(e: number, kac: number): number {
+  const g = timingGreen(kac);
+  const a = Math.abs(clamp(e, -1, 1));
+  if (a <= g) return 0;
+  return Math.sign(e) * MISTIME_DIR * ((a - g) / (1 - g)) ** MISTIME_CURVE;
+}
+
+export function applyMistime(p: KickParams, e: number, kac: number): KickParams {
+  const da = mistimeAngle(e, kac);
+  if (!da) return p;
+  const a = Math.atan2(p.dir.y, p.dir.x) + da;
+  return { ...p, dir: { x: Math.cos(a), y: Math.sin(a) } };
+}
+
+export type FgResult ='good' | 'wideLeft' | 'wideRight' | 'short' | 'upright';
 
 /**
  * Judge a field goal as the ball crosses the plane of the goal posts (between

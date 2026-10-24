@@ -51,11 +51,17 @@ export function reachScore(distance: number): number {
   return Math.max(0, 1 - distance / CATCH_REACH);
 }
 
-/** Chance a handoff is cleanly exchanged; the rest are fumbles. */
-export const HANDOFF_ODDS = 0.99;
+/** Chance a handoff is cleanly exchanged; the rest are fumbles (about one a season). */
+export const HANDOFF_ODDS = 0.997;
 
-/** Chance the back hauls in a pitch, given how well he got under it (`pos` as in `Contender`). */
+/** A back can reach back or check up for a pitch farther than a receiver can for a pass. */
+export const PITCH_REACH = 2.5;
+
+/**
+ * Chance the back hauls in a pitch, given how well he got under it (`pos` as in `Contender`, against
+ * `PITCH_REACH`): about 0.5% on the ground when he's right under it, 2-3% at the edge of his reach.
+ */
 export function pitchOdds(pos: number, cth: number): number {
   if (pos <= 0) return 0;
-  return clamp(0.93 + 0.06 * Math.sqrt(pos) + (cth - 70) * 0.001, 0, 0.99);
+  return clamp(0.975 + 0.02 * Math.sqrt(pos) + (cth - 70) * 0.0005, 0, 0.995);
 }

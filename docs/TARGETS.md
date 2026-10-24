@@ -18,7 +18,7 @@ The current measured values live in the baseline in [PROGRESS.md](PROGRESS.md). 
   - **power success:** 3rd or 4th and 2 or less converted
 - The league-wide levels below are from general knowledge; I couldn't confirm them in one current table. Re-check them against CFBD or SP+ data when possible.
 
-These targets are for the harness auto-runner, which has no jukes, so a human should do a bit better:
+These targets are for the harness auto-runner, which doesn't steer, so a human should do a bit better:
 
 | Situation | YPC | Median | Stuffs (≤0) | 4+ | 10+ |
 | --- | --- | --- | --- | --- | --- |

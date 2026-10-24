@@ -46,10 +46,11 @@ Controls are listed in [README.md](README.md).
   - run blocks: `RUN_BLOCK_EDGE`, `REACH_PENALTY`, `BLOCK_ROLL_SD`, `WASH_RATE`, `COMBO_CLIMB`, `SHED_WIN`, `SHED_LEVERED`, `ARM_LEVERED`, `RUN_ENGAGE`, `DRAW_SET` (`sim/runBlocking.ts`)
   - defense vs. the run: `LB_FIT_DEPTH`, `MAN_DEPTH`, `TRASH_SPEED`, `PURSUIT_LEAD` (`sim/ai.ts`)
   - zone read and option: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH`, `KEEP_INSIDE`, `OPTION_CUT`; screens `SCREEN_SET` (`game/playState.ts`)
-  - `pitchOdds`, `HANDOFF_ODDS` (`sim/catching.ts`)
+  - `pitchOdds`, `PITCH_REACH`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
-  - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd` (`sim/kicking.ts`)
-  - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `DIVE_RANGE` (`game/kickPlay.ts`)
+  - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd`; the kick timing meter `METER_HALF`, `MISTIME_DIR`, `MISTIME_CURVE`, `GREEN_BASE`, `GREEN_KAC` (`sim/kicking.ts`)
+  - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)
+  - sprint: `SPRINT_TIME`, `SPRINT_RECOVER` (`game/playState.ts`), scaled by `endurance` (`sim/player.ts`)
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.
 

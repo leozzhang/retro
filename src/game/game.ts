@@ -700,10 +700,14 @@ export class Game {
       return;
     }
     const fg = kp.unit === 'fg' || kp.unit === 'xp';
+    if (kp.meter()?.live) {
+      drawHint(g, 'SPACE: KICK IT ON THE GREEN');
+      return;
+    }
     switch (kp.phase) {
       case 'presnap':
-        if (kp.unit === 'punt') drawHint(g, 'SPACE/CLICK: SNAP   THEN DRAG + RELEASE TO PUNT   ESC: BACK');
-        else drawHint(g, 'DRAG BACK + RELEASE TO KICK   W/S OR WHEEL: LOFT   ESC: BACK');
+        if (kp.unit === 'punt') drawHint(g, 'SPACE/CLICK: SNAP   DRAG + RELEASE, THEN SPACE ON THE GREEN');
+        else drawHint(g, 'DRAG + RELEASE, THEN SPACE ON THE GREEN   W/S: LOFT   ESC: BACK');
         if (fg && !kp.aim) {
           const yds = fgDistance(this.drive.los, OPP_GOAL);
           text(g, kp.unit === 'xp' ? 'EXTRA POINT' : `${yds}-YARD ATTEMPT`, VIEW_W / 2, 40, { size: 8, align: 'center', color: '#ffd23f' });
@@ -754,14 +758,14 @@ export class Game {
       case 'live': {
         const ho = play.handoffOption();
         const give = ho === 'pitch' ? 'R-CLICK PITCH  ' : ho ? 'R-CLICK HAND OFF  ' : '';
-        drawHint(g, play.scramble ? 'WASD RUN  SHIFT SPRINT  SPACE JUKE' : play.aim ? 'RELEASE TO THROW  SPACE: CANCEL' : `${give}DRAG + RELEASE TO THROW  WASD MOVE QB`);
+        drawHint(g, play.scramble ? 'WASD RUN  SHIFT SPRINT' : play.aim ? 'RELEASE TO THROW  SPACE: CANCEL' : `${give}DRAG + RELEASE TO THROW  WASD MOVE QB`);
         break;
       }
       case 'air':
         drawHint(g, play.pitch ? 'PITCH...' : 'BALL IN THE AIR...');
         break;
       case 'run':
-        drawHint(g, play.carrier?.side === 'off' ? 'W/S STEER  A SLOW  SHIFT SPRINT  SPACE JUKE' : 'TACKLE HIM! (AI PURSUIT)');
+        drawHint(g, play.carrier?.side === 'off' ? 'W/S STEER  A SLOW  SHIFT SPRINT' : 'TACKLE HIM! (AI PURSUIT)');
         break;
     }
   }

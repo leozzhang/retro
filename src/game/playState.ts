@@ -8,9 +8,9 @@ import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Ve
 import { teamUniform } from '../render/sprites';
 import { cutKeep, facingQB, isRusher, returnerAI, seesThrow, thinkDefense, thinkOffense } from '../sim/ai';
 import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
-import { HANDOFF_ODDS, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
+import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
-  isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, type Player,
+  accelOf, endurance, isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, type Player,
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import {
@@ -54,6 +54,13 @@ export const PITCH_RANGE = 8;
 const PITCH_SPEED = 13;
 /** Tackle odds multiplier for a defender still engaged with a blocker (an arm tackle). */
 const ARM_TACKLE = 0.5;
+/**
+ * Seconds of full sprint from a full bar, from the least to the most enduring player, eased by
+ * `endurance` squared: a pocket QB about 1.5 s, a mobile QB about 2.3, a WR about 2.9.
+ */
+const SPRINT_TIME = { min: 1.15, max: 3.46 };
+/** Stamina regained per second off the sprint, least to most enduring. */
+const SPRINT_RECOVER = { min: 0.12, max: 0.18 };
 /** RB this close to the QB early on a play-action call sells the fake. */
 const FAKE_RANGE = 2;
 /** Chance the zone-read key crashes on the back; otherwise he stays home on the QB. */
@@ -125,8 +132,6 @@ export class Play {
   /** The player the user is steering (QB pre-throw, ball carrier after a catch). */
   controlled: Player | null = null;
   aim: Aim | null = null;
-  /** Play time when Space last cancelled an aim, so that same press doesn't also juke. */
-  private aimCancelAt = -1;
   ballTarget: Vec | null = null;
   intended: Player | null = null;
   scramble = false;
@@ -136,8 +141,6 @@ export class Play {
   outcome: PlayOutcome | null = null;
   popups: Popup[] = [];
   history = new Map<number, Vec[]>();
-  jukeTimer = 0;
-  private jukeCd = 0;
   /** Ball has been handed or pitched to the RB. */
   handedOff = false;
   /** The ball in the air is a pitch, not a forward pass. */
@@ -389,8 +392,6 @@ export class Play {
 
   update(dt: number, input: Input, cam: Camera): void {
     this.time += dt;
-    this.jukeTimer -= dt;
-    this.jukeCd -= dt;
     for (const p of this.players) tickTimers(p, dt);
     if (this.phase !== 'presnap') this.recordHistory();
 
@@ -501,7 +502,6 @@ export class Play {
     } else if (input.hit('Space')) {
       // Pull the ball down: drop the aim without throwing. Releasing the button later does nothing.
       this.aim = null;
-      this.aimCancelAt = this.time;
     } else if (m.released || !m.down) {
       const drag = len(sub(this.aim.start, this.aim.cur));
       const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm);
@@ -532,11 +532,18 @@ export class Play {
     this.handedOff = true;
     this.reactToRun(this.readKey && !this.keyCrash && this.playDef.read === 'zoneRead' ? this.readKey : null);
     if (kind === 'pitch') {
-      const t = dist(qb.pos, rb.pos) / PITCH_SPEED;
-      // Lead the back along his path even if he's only just starting to move.
+      // Lead the back to where he'll be at full tilt when it gets there: along his heading if he's
+      // moving, along his path if he's just starting off, accelerating from his current speed.
       const next = rb.route[rb.routeIdx];
-      const vel = len(rb.vel) < 3 && next ? scale(norm(sub(next, rb.pos)), maxSpeed(rb) * 0.75) : rb.vel;
-      const lead = add(rb.pos, scale(vel, t + 0.15));
+      const dir = len(rb.vel) >= 3 ? norm(rb.vel) : next ? norm(sub(next, rb.pos)) : { x: 0, y: 0 };
+      const v0 = Math.max(0, rb.vel.x * dir.x + rb.vel.y * dir.y);
+      const top = maxSpeed(rb);
+      const acc = accelOf(rb);
+      const tUp = Math.max(0, (top - v0) / acc);
+      const reach = (t: number) =>
+        t <= tUp ? v0 * t + 0.5 * acc * t * t : v0 * tUp + 0.5 * acc * tUp * tUp + top * (t - tUp);
+      let lead = rb.pos;
+      for (let i = 0; i < 3; i++) lead = add(rb.pos, scale(dir, reach(dist(qb.pos, lead) / PITCH_SPEED + 0.05)));
       const from = { x: qb.pos.x, y: qb.pos.y, z: 1.1 };
       const to = { x: lead.x, y: lead.y, z: 1.0 };
       launch(this.ball, from, to, dist(from, to) / PITCH_SPEED + 0.05, 0.35);
@@ -722,7 +729,7 @@ export class Play {
     const land = this.ballTarget!;
     if (this.pitch) {
       const rb = this.rb;
-      if (!rb.down && this.rng() < pitchOdds(reachScore(dist(rb.pos, land)), rb.r.cth)) {
+      if (!rb.down && this.rng() < pitchOdds(Math.max(0, 1 - dist(rb.pos, land) / PITCH_REACH), rb.r.cth)) {
         this.giveBall(rb);
         this.controlled = rb;
         this.phase = 'run';
@@ -807,21 +814,12 @@ export class Play {
 
     const moving = ax.x !== 0 || ax.y !== 0;
     const sprint = moving && input.isDown('ShiftLeft', 'ShiftRight') && c.stamina > 0.02;
-    c.stamina = sprint ? Math.max(0, c.stamina - dt * 0.35) : Math.min(1, c.stamina + dt * 0.15);
+    const e = endurance(c);
+    const drain = 1 / lerp(SPRINT_TIME.min, SPRINT_TIME.max, e * e);
+    const recover = lerp(SPRINT_RECOVER.min, SPRINT_RECOVER.max, e);
+    c.stamina = sprint ? Math.max(0, c.stamina - dt * drain) : Math.min(1, c.stamina + dt * recover);
     const sp = maxSpeed(c) * (sprint ? 1 : 0.86) * (this.aim ? 0.6 : 1);
     c.want = scale(norm(ax), sp);
-
-    if (input.hit('Space') && this.jukeCd <= 0 && !this.aim && this.aimCancelAt !== this.time) {
-      let dy = ax.y;
-      if (!dy) {
-        let nearest: Player | null = null;
-        for (const d of this.def) if (!d.down && (!nearest || dist(d.pos, c.pos) < dist(nearest.pos, c.pos))) nearest = d;
-        dy = nearest && nearest.pos.y < c.pos.y ? 1 : -1;
-      }
-      c.vel = add(c.vel, { x: 0, y: dy * 5.5 });
-      this.jukeTimer = 0.35;
-      this.jukeCd = 1.1;
-    }
   }
 
   // ------------------------------------------------------------ blocking
@@ -834,7 +832,8 @@ export class Play {
       if (!b.isBlocker && !downfield) continue;
       for (const d of this.def) {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
-        if (downfield && dist(d.pos, this.carrier!.pos) > 10) continue;
+        // Away from the ball only a blocker's own run-block assignment is worth locking onto (a WR on his DB).
+        if (downfield && dist(d.pos, this.carrier!.pos) > 10 && !(b.mark === d && this.runBlocking())) continue;
         if (!downfield && d === this.readKey) continue; // left unblocked on purpose
         if (d.engagedBy.length === 1 && b.mark !== d) continue;
         // Blockers with an assignment work to their man rather than grabbing whoever they bump into.
@@ -928,9 +927,8 @@ export class Play {
       if (t.down || t.tackleCd > 0 || t.engaged || t.role === 'QB') continue;
       const arm = t.engagedBy.length > 0;
       if (dist(t.pos, c.pos) > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
-      const juking = this.jukeTimer > 0 && c === this.controlled;
       const armOdds = arm ? ARM_TACKLE * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, juking) * armOdds) {
+      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * armOdds) {
         this.tackled(c, t);
         return;
       }
@@ -941,7 +939,7 @@ export class Play {
       knockDown(t, 0.9);
       t.tackleCd = 1.6;
       c.vel = scale(c.vel, 0.55);
-      this.popup(juking ? 'JUKED HIM!' : 'BROKEN TACKLE!', c.pos, '#ffd23f');
+      this.popup('BROKEN TACKLE!', c.pos, '#ffd23f');
     }
   }
 

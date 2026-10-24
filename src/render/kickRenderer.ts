@@ -4,7 +4,7 @@ import { dist, type Vec3 } from '../engine/math';
 import type { KickPlay } from '../game/kickPlay';
 import { fieldLabel } from '../game/rules';
 import type { Wind } from '../sim/kicking';
-import { CROSSBAR_Z, POSTS_X, POSTS_Y, UPRIGHT_HALF } from '../sim/kicking';
+import { CROSSBAR_Z, MISTIME_DIR, mistimeAngle, POSTS_X, POSTS_Y, UPRIGHT_HALF } from '../sim/kicking';
 import { drawPlayer, drawShadow } from './renderer';
 import { getBallSprite, getTeeSprite } from './sprites';
 import { text } from './text';
@@ -77,7 +77,56 @@ export function drawKickPlay(g: CanvasRenderingContext2D, cam: Camera, kp: KickP
     g.globalAlpha = 1;
   }
 
+  drawTimingMeter(g, kp);
   if (kp.unit === 'fg' || kp.unit === 'xp') drawGoalCam(g, kp);
+}
+
+/**
+ * Timing bar, bottom center: red / yellow / green / yellow / red, with the
+ * needle sweeping left to right. Dimmed until the needle starts moving; after
+ * Space it freezes where it was stopped.
+ */
+const METER_STOPS: [number, [number, number, number]][] = [
+  [0, [63, 210, 94]], [0.35, [224, 181, 44]], [1, [200, 58, 58]],
+];
+
+/** Green, through yellow, to red as the mistime severity goes 0 to 1. */
+function meterColor(sev: number): string {
+  for (let k = 1; k < METER_STOPS.length; k++) {
+    const [s1, c1] = METER_STOPS[k];
+    if (sev > s1 && k < METER_STOPS.length - 1) continue;
+    const [s0, c0] = METER_STOPS[k - 1];
+    const t = Math.min(1, Math.max(0, (sev - s0) / (s1 - s0)));
+    const c = c0.map((v, j) => Math.round(v + (c1[j] - v) * t));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+  return 'rgb(200,58,58)';
+}
+
+function drawTimingMeter(g: CanvasRenderingContext2D, kp: KickPlay): void {
+  const m = kp.meter();
+  if (!m) return;
+  const W = 160;
+  const H = 8;
+  const X = Math.round(VIEW_W / 2 - W / 2);
+  const Y = 324;
+  const at = (e: number) => X + Math.round(((e + 1) / 2) * W);
+  g.fillStyle = 'rgba(8,10,14,0.75)';
+  g.fillRect(X - 2, Y - 2, W + 4, H + 4);
+  g.globalAlpha = m.moving || !m.live ? 1 : 0.45;
+  // One column per pixel, colored by how much that spot would cost: green on the sweet spot,
+  // shading through yellow to red at the ends.
+  const kac = kp.kicker.r.kac;
+  for (let i = 0; i < W; i++) {
+    const sev = Math.abs(mistimeAngle(((i + 0.5) / W) * 2 - 1, kac)) / MISTIME_DIR;
+    g.fillStyle = meterColor(sev);
+    g.fillRect(X + i, Y, 1, H);
+  }
+  g.globalAlpha = 1;
+  g.fillStyle = '#ffffff';
+  g.fillRect(at(m.e) - 1, Y - 3, 2, H + 6);
+  text(g, 'EARLY', X, Y - 12, { size: 8, color: '#cfd6df' });
+  text(g, 'LATE', X + W, Y - 12, { size: 8, align: 'right', color: '#cfd6df' });
 }
 
 function drawGetOff(g: CanvasRenderingContext2D, cam: Camera, kp: KickPlay): void {

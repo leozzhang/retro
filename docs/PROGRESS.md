@@ -19,7 +19,7 @@ _Last updated: 2026-10-24_
   - pursuit uses intercept angles
   - teammates block downfield after the catch
 - **Catch resolution:** catch, drop, pass breakup or interception. Receivers and defenders time their run to arrive with the ball.
-- **Running:** user-controlled carrier, sprint with stamina, juke, broken tackles, sacks, scrambles, out of bounds, interception returns and pick sixes.
+- **Running:** user-controlled carrier, sprint with stamina, broken tackles, sacks, scrambles, out of bounds, interception returns and pick sixes.
 - **Rules:** down and distance, first downs, touchdown (+7), safety, turnover on downs. The CPU's possessions are simulated by `simulateDrive`.
 - **Tooling:** 28 unit tests, a balance harness (`npm run balance`), an F1 debug overlay, and a `window.game` dev hook.
 
@@ -32,7 +32,7 @@ _Last updated: 2026-10-24_
   - CPU drives burn game clock: about 32 s per play, about 7 s on clock-stopping plays, faster when trailing late and slower when milking a Q4 lead. A drive ends at the half.
   - Notices queue up with a scorebug snapshot.
 - **Run game.**
-  - **Right-click (or F)** hands off to the RB whenever he's behind the line and not blocking, on any play. Within 1.8 yd it's a handoff (99% clean); up to 8 yd it's a pitch or shovel (`pitchOdds`). Misses are a `fumble` outcome, recovered by the offense.
+  - **Right-click (or F)** hands off to the RB whenever he's behind the line and not blocking, on any play. Within 1.8 yd it's a handoff (99.7% clean); up to 8 yd it's a pitch or shovel (`pitchOdds`). Misses are a `fumble` outcome, recovered by the offense.
   - Run plays use run blocking: DL go to the nearest OL, uncovered OL climb to LBs, TE and WRs stalk DBs. `RUN_BLOCK_EDGE`.
   - The second level reads run blocking and fits its gap (`runFit`). Defenders near the ball shed blocks and make arm tackles (`ARM_TACKLE`).
 - **Play action.** The RB's fake path meets the QB's drop point. LBs and safeties bite for a beat (`sellFake`), then the RB stays in to block his own man, whose defender then sits underneath instead of hug-rushing (`lateBlock`).
@@ -50,6 +50,7 @@ _Last updated: 2026-10-24_
   - The card sets the kick type: default loft, loft range, and bounce profile.
   - Drag back like a pass. Drag length sets power and drag angle sets direction.
   - W/S or the mouse wheel tilts the loft within the type's range.
+  - Then Space on the timing meter's green (see the timing meter section).
   - The preview arc shows the landing spot, an accuracy ellipse from the kicker's `kac`, hang time and roll. **Wind is not in the preview.**
 - **FG / XP:**
   - Aim before the snap. The release snaps it, the holder places it, and the kicker steps in and kicks.
@@ -393,12 +394,73 @@ Routes used to run at one speed: top speed about 0.45 s after the snap, every cu
 **Tests:** 7 new ones covering the set catch bonus (open and contested, under 6 points), `cutKeep`, the go route's ramp and no set, the slant keeping speed vs the hitch stopping, the curl plant-settle-turn, and run, fake and lead paths left alone.
 
 ## Done: cancel a pass aim (2026-10-24)
-- **Space while aiming** drops the aim without throwing (`Play.updateLive`). The release that follows does nothing, and the same press doesn't trigger a juke. The hint bar shows `RELEASE TO THROW  SPACE: CANCEL` while aiming.
+- **Space while aiming** drops the aim without throwing (`Play.updateLive`). The release that follows does nothing. The hint bar shows `RELEASE TO THROW  SPACE: CANCEL` while aiming.
+
+## Done: perimeter blocks on outside runs (2026-10-24)
+Bug: on outside runs, the playside WRs' stalk blocks on the corners almost never held. Both causes were rules meant for the backside that only checked distance to the carrier. Right after the handoff or pitch, a playside corner is 15–19 yd from the back, so those rules caught him too.
+- **Peel-off:** `runEngagement` shed every blocked defender more than 8 yd from the carrier at 2.5/s, which is about 0.4 s per block. Now a defender only peels off if he is also backside of the carrier or behind him (`PEEL_DIST`, `PEEL_BACKSIDE`).
+- **Engage gate:** after the handoff, `formEngagements` wouldn't start any block more than 10 yd from the carrier. A WR who hadn't reached his man by the pitch couldn't lock on. A blocker's own run-block assignment is now exempt.
+- Test: a far playside block keeps its matchup shed rate, and the backside still peels off.
+- Balance (before → after, YPC by call: 2 Man / Cover 1 / Cover 0):
+  - Lead Toss: 3.2/3.5/0.7 → 6.0/4.3/8.1. Stuffs 38% → 21% against 2 Man.
+  - Toss: 7.5/3.1/1.3 → 8.0/4.9/0.8. Stuffs 31% → 20% against 2 Man.
+  - Speed Option: 2.5/1.9/10.2 → 4.2/3.7/12.4.
+  - Draw: 1.1/0.3 → 2.4/1.8. Its peel-off also stopped hitting the playside.
+  - All runs: 3.9 → 4.1. Interior runs moved within noise.
+  - Pin-Pull Sweep, Power Read and zone-read keeps are unchanged. Their flagged problems are elsewhere.
+- **Flag:** Lead Toss against Cover 0 is now 8.1 YPC with a 0.1 median and 17% 10+ runs, so it's boom or bust. Speed Option against Cover 0 is 12.4. Watch both; they weren't tuned.
+
+## Done: fumbled pitches and handoffs (2026-10-24)
+Bug: pitches were fumbled far too often, most visibly on I-form play action, where the back starts 5–7 yd deep, so an early right-click is a pitch. The aim in `Play.handoff()` led a slow back (under 3 yd/s) as if he were already at 75% of top speed, plus 0.15 s extra. A back starting from rest can't get there in a 0.4 s pitch, and any miss beyond `CATCH_REACH` (1.7 yd) was an automatic fumble. Fast backs overshot the same way. Across the playbook the old aim missed by up to 1.9 yd; the new one by at most 0.6.
+- **Pitch aim:** leads the back to where he gets at full tilt during the flight, accelerating from his current speed (`accelOf`, capped at top speed), along his heading if he's moving or his path if he's just starting.
+- **The back runs through the pitch** at full speed (`thinkOffense`) instead of `seekTimed`, which paced him to arrive exactly on time and catch it at a jog.
+- **Rates:** `HANDOFF_ODDS` 0.99 → 0.997. `pitchOdds` is now about 0.5% on the ground when he's under it and 2–3% at the edge of the new `PITCH_REACH` (2.5 yd; was 1.7 with 1–7% drops).
+- Tests: `pitchOdds` bounds, and a regression test pitching on Toss, Lead Toss, I-Form Boot, I-Form Deep Cross and PA Seams at every 0.05 s from the snap to 1.2 s; the back must be within half of `PITCH_REACH` when the ball arrives.
+- Balance: fumbles across all run rows 145 → 47 (of about 14,600 reps, 1.0% → 0.3%). Toss and Lead Toss over 1,000 reps per call: 0.3–0.6%, all from the base rate.
+- **Flag: pitch plays got better.** Catching in stride gets the back to the edge faster. YPC by call (2 Man / Cover 1 / Cover 0), before → after:
+  - Toss: 8.0/4.9/0.8 → 11.9/5.1/4.3.
+  - Lead Toss: 6.0/4.3/8.1 → 9.3/4.9/12.7 (13 TDs against Cover 0).
+  - Speed Option: 4.2/3.7/12.4 → 6.9/4.2/13.5.
+  - All runs: 4.1 → 4.6.
+  - Pitching into the zero blitz no longer loses yards. Not tuned. The levers are the perimeter blocks and the defense's force player, not the pitch.
+
+## Done: kick timing meter, no juke, stat-based sprint (2026-10-24)
+- **Kick timing meter (FG, XP, punt, kickoff).** The drag still sets power, direction and loft. After the release a bar appears at the bottom center: red, yellow, green, yellow, red, with a needle sweeping left to right. Press **Space** as it crosses the green.
+  - Math in `sim/kicking.ts`: `METER_HALF` (0.45 s from the green's center to either end), `timingGreen(kac)` (green half-width `GREEN_BASE + GREEN_KAC·kac/100`, about ±0.1 s for a kac-84 kicker), and `mistimeAngle` (0 on the green, then `MISTIME_DIR·m^MISTIME_CURVE` for `m` the share of the way from the green's edge to the bar's end: 0.18 rad, about 10°, at the end, with the 0.85 curve making near misses cost more. Halfway out is about 4.3°, enough to miss a 40-yarder).
+  - The bar is drawn one pixel column at a time, colored by what that spot would cost: green, shading through yellow to red. **Early hooks left (−y), late pushes right (+y).** The existing `kac` gaussian error is applied on top.
+  - The run-up is paced (`seekTimed`) so the kicker reaches the ball as the needle hits the green's center: `FG_STRIKE` 0.9 s after an FG/XP release, the natural run-up time on kickoffs, and `PUNT_GETOFF` after the punter's drop.
+  - The foot meets the ball when the needle is stopped **and** the kicker is at the ball. An early press strikes on arrival (with the hook); a late press makes him wait planted. If you never press, the needle runs off the end and it's a full late push.
+  - Kickoff cover lanes are timed to the strike, so a late press doesn't put anyone offside. They wait at the line.
+  - Popups: PERFECT! / EARLY / LATE (red when far off).
+  - **`PUNT_GETOFF` went from 0.3 to 0.45 s** so the needle starts moving at the drop. A late press costs more get-off time against the rush.
+- **FG/XP protection is gap-sound** (`assignFgProtection`, at the snap). The protectors used to take the nearest rusher, so two would double a DT and the WLB stacked behind him ran through the A gap untouched on every snap. He was 2.6 yd from the hold at the strike every time. Now each rusher gets his own blocker, matched by alignment, and the spare protector picks up whoever comes free.
+  - Probe, 200 FGs: the nearest rusher at the strike was a median 2.6 yd from the hold, inside 3 yd 100% of the time. Now it's a median 6.5 yd, inside 3 yd 2% of the time, which is about the real FBS FG block rate (about 1.5–2%). Interior rushers get about a yard of push; the ends get the most.
+  - The block itself is still the `FG_BLOCK_BASE` roll, not the rush. FG rows only moved within noise.
+  - Test: one blocker per rusher, and no rusher within 2 yd of the hold before the strike (40 seeds).
+- **Juke removed.** Space does nothing while running. `tackleChance` lost its `juking` argument; the "JUKED HIM!" popup is gone.
+- **Sprint endurance** (`endurance` in `sim/player.ts`): `clamp((0.6·spd + 0.4·acc − 60)/35, 0, 1)`, so it's continuous. Template values: QB about 0.39, TE 0.52, RB 0.83, WR 0.86, and a mobile QB (85/84) about 0.70.
+  - Full sprint lasts `SPRINT_TIME` 1.15–3.46 s, eased by endurance squared (it was 2.86 s for everyone): about 1.5 s for a pocket QB, 1.8 for a TE, 2.3 for a mobile QB, 2.7 for an RB, 2.9 for a WR. Receivers keep the old feel; QBs tire much sooner. Recovery is `SPRINT_RECOVER` 0.12–0.18/s (was 0.15).
+  - The stamina bar's length scales with endurance (10–18 px), so a QB's bar is visibly shorter.
+- **Harness:** the auto-kicker presses at the green's center (|e| ≤ 0.04), so aim is unchanged. Every scrimmage row came out byte-identical. Kick rows moved because pre-kick timing changed (the shared RNG is drawn per step) and because of the longer punt get-off:
+
+  | Row | Before | After |
+  | --- | --- | --- |
+  | Punt from own 30 | net 39.3, fc 56%, ret 44% (5.8) | net 40.0, fc 71%, ret 29% (6.9) |
+  | Pooch | in20 79% | in20 83% |
+  | Coffin corner | oob 51%, tb 28% | oob 61%, tb 26% |
+  | Line drive | ret TDs 5 | ret TDs 3 |
+  | Deep kickoff | CPU start 22.5, tb 64%, ret 13.2 | 23.0, tb 60%, ret 15.9 |
+  | FG calm, by decade | 92 / 77 / 66 / 35% | 93 / 80 / 69 / 32% |
+  | FG wind, by decade | 90 / 73 / 55 / 25% | 91 / 83 / 57 / 26% |
+
+- **Flag:** the punt fair-catch rate jumped from 56% to 71%. The extra 0.15 s of get-off lets coverage get closer by the time the ball comes down. Punt blocks are still 0. The FG and kickoff changes look like RNG noise at 200 reps. Not tuned.
+- **Tests:** 6 new ones: mistime direction and growth, a wider green for better kickers, a live FG (on the green is good, early lands left of the posts, no press auto-pushes right, the kicker is at the ball at the strike), kickoff coverage staying onside on a late press, and endurance ordering. The tackling test lost its juke assertion. 86 tests in total.
+- **Not checked by hand yet:** the meter's look and feel in the browser.
 
 ## Balance baseline
 From `npm run balance` (Georgia offense vs Alabama defense), after the route-running work. The single-seed 120-rep rows below move a few points from run to run; use the paired table above for before/after.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
-- **Run rows:** the auto-QB hands off as soon as it can (it reads the zone-read key, waits out the draw, and pitches the option on the key), and `autoRun` reads the line for a lane. There are no jukes, so expect real players to do better.
+- **Run rows:** the auto-QB hands off as soon as it can (it reads the zone-read key, waits out the draw, and pitches the option on the key), and `autoRun` reads the line for a lane. It doesn't steer around tacklers, so expect real players to do better.
 
 | All pass plays, defense | Hold | Comp | INT | Sacks | YPP |
 | --- | --- | --- | --- | --- | --- |
@@ -417,8 +479,8 @@ From `npm run balance` (Georgia offense vs Alabama defense), after the route-run
 **Runs:**
 - All 26 run rows (with RPO gives and QB runs): 3.9 YPC, median 2.1, 18% stuffs, 22% gaining 4+, 10% gaining 10+. Run code didn't change; this moved by 0.1 only because the pass rows ahead of it use the shared RNG differently.
 - The original five runs: 5.1 YPC, median 2.9, 16% stuffs. See the table above.
-- Against Cover 0, interior runs give 2–4 YPC; Toss and Lead Toss lose yards.
-- **Kicks are unchanged:** the punt, kickoff and FG rows still match the table below exactly. Kick coverage keeps the old pursuit lead; only scrimmage pursuers use `PURSUIT_LEAD`.
+- Against Cover 0, interior runs give 2–4 YPC. Toss and Lead Toss used to lose yards; since the pitch fix they don't (see the flag there).
+- **Kicks:** the table below is from after the timing meter (see that section). Kick coverage keeps the old pursuit lead; only scrimmage pursuers use `PURSUIT_LEAD`.
 
 **Short yardage (3rd and 1):** Power 84%, Iso 90%, QB Sneak 77%, QB Power 58% (1% against Cover 0).
 
@@ -428,20 +490,20 @@ The per-play `RUN` and `PLAY` rows in `balance.txt` have the details. Reading th
 The NFL completion %, yards per target and man/zone splits by route are in [TARGETS.md](TARGETS.md). They're not tuned toward yet; they belong with the defense work.
 These need a harness that targets by route (or by read), not "most open". The current one over-throws flats and checkdowns. The new `ROUTE` rows are a first step: they target one route per row, against man calls only.
 
-**Special teams:** an auto-kicker with fixed aim per kick type, 200 reps each, in random wind. Kicks use their own seed, so the scrimmage rows don't move.
+**Special teams:** an auto-kicker with fixed aim per kick type and perfect meter timing, 200 reps each, in random wind. Kicks use their own seed, so the scrimmage rows don't move.
 
 | Kick | Result |
 | --- | --- |
-| Punt from own 30 (full power) | Gross 42.1, net 39.3. 56% fair caught, 5.8-yard average return, 0 blocks |
-| Pooch from opp 40 (74% power) | 79% downed or caught inside the 20, 94% fair caught |
-| Coffin corner from opp 38 | 100% inside the 20: 51% out of bounds, 28% touchbacks |
-| Line drive from own 30 | Gross 43.7, net 34.3. 97% returned (10.5 average), 2.5% returned for TDs |
-| Deep kickoff | 64% touchbacks. CPU starts at its 22.5; 13.2-yard average return |
+| Punt from own 30 (full power) | Gross 42.2, net 40.0. 71% fair caught, 6.9-yard average return, 0 blocks |
+| Pooch from opp 40 (74% power) | 83% downed or caught inside the 20, 93% fair caught |
+| Coffin corner from opp 38 | 99% inside the 20: 61% out of bounds, 26% touchbacks |
+| Line drive from own 30 | Gross 45.0, net 34.4. 99% returned (11.3 average), 1.5% returned for TDs |
+| Deep kickoff | 60% touchbacks. CPU starts at its 23.0; 15.9-yard average return |
 | Sky kickoff | CPU starts at its 31. 14% fair caught |
-| Squib | CPU starts at its 36. 1% returned for TDs |
-| Corner kickoff | CPU starts at its 22. 8% out of bounds |
-| FG, straight aim, calm | 20-29: 92%, 30-39: 77%, 40-49: 66%, 50-59: 35%. Blocks about 1.5% |
-| FG, straight aim, wind | 20-29: 90%, 30-39: 73%, 40-49: 55%, 50-59: 25%. The auto-kicker doesn't allow for wind |
+| Squib | CPU starts at its 36. 0 returned for TDs |
+| Corner kickoff | CPU starts at its 22. 7% out of bounds |
+| FG, straight aim, calm | 20-29: 93%, 30-39: 80%, 40-49: 69%, 50-59: 32%. Blocks about 1% |
+| FG, straight aim, wind | 20-29: 91%, 30-39: 83%, 40-49: 57%, 50-59: 26%. The auto-kicker doesn't allow for wind |
 
 ## In progress
 - Nothing right now.
@@ -468,11 +530,11 @@ These need a harness that targets by route (or by read), not "most open". The cu
 - **Play diagrams are small:** cards are now 62 px tall to fit 9 per page. Each card zooms to its own play, but drags and crossers on wide pass plays still look short.
 - **No timeouts, spike, kneel or overtime yet.** Ties stand.
 - **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The defense has no run-defense calls yet.
-- **Toss pitch timing:** if you pitch the instant the ball is snapped, the RB catches it nearly standing still.
+- **WR stalk blocks lose the matchup quickly:** in `runEngagement` the defender's side is `str*0.7 + spd*0.3`, and the WR adds only his `blk` (about 45). A fast corner wins by about 30 points and sheds at about 2.3/s. On stretch plays the WR also takes the lineman's `REACH_PENALTY`. Perimeter blocks now form and last longer than before, but they still don't hold long. Not tuned: consider a stalk-block rule (the WR only has to stay between, not drive) or no reach penalty for non-linemen.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
 - **No zone underneath coverage:** defenses are man or deep zones only.
 - **RPOs are still a run plus a tagged route.** There's no read on a defender yet, and the harness measures only the give.
-- **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB shed at once. A human steering the QB should do better; check by playing before tuning.
+- **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB on his backside shed at once. Keeps were unchanged by the perimeter-block fix. A human steering the QB should do better; check by playing before tuning.
 - **The read key's crash is a coin flip.** It doesn't depend on the call, the down, or the key's awareness yet.
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 

@@ -59,7 +59,10 @@ export function thinkOffense(play: Play, p: Player): void {
     return;
   }
   if (play.phase === 'air' && p === play.intended && play.ballTarget) {
-    p.want = seekTimed(p, play.ballTarget, play.ballTimeLeft());
+    // A pitch is led to where the back gets at full tilt, so he runs through the spot rather than timing it.
+    const d = sub(play.ballTarget, p.pos);
+    if (play.pitch) p.want = len(d) > 0.3 ? scale(norm(d), maxSpeed(p)) : p.vel;
+    else p.want = seekTimed(p, play.ballTarget, play.ballTimeLeft());
     return;
   }
   if (p.routeDelay && play.time - play.snapTime < p.routeDelay) {

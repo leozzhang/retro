@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Camera, project, unproject } from './engine/camera';
-import { mulberry32 } from './engine/math';
+import { dist, mulberry32 } from './engine/math';
 import {
   advanceSim, afterPlay, clockText, newClock, penaltySpot, playClockText, readyForPlay, tickBetween, tickLive, type Clock,
 } from './game/clock';
@@ -15,12 +15,16 @@ import { alignY, personnelOf, resolvePlay } from './game/resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, type KickOutcome, type PlayOutcome,
 } from './game/rules';
-import { CALM, fgCheck, fgDistance, POSTS_X, POSTS_Y, predictKick, UPRIGHT_HALF, type BounceProfile } from './sim/kicking';
+import {
+  CALM, fgCheck, fgDistance, METER_HALF, mistimeAngle, POSTS_X, POSTS_Y, predictKick, timingGreen, UPRIGHT_HALF, type BounceProfile,
+} from './sim/kicking';
+import { kickDef } from './data/specialTeams';
+import { KickPlay } from './game/kickPlay';
 import { flightPos, passParams } from './sim/ball';
 import { cutKeep, facingQB } from './sim/ai';
-import { catchOdds } from './sim/catching';
-import { maxSpeed } from './sim/player';
-import { runEngagement } from './sim/runBlocking';
+import { catchOdds, HANDOFF_ODDS, PITCH_REACH, pitchOdds } from './sim/catching';
+import { endurance, maxSpeed, type Player } from './sim/player';
+import { playSide, runEngagement } from './sim/runBlocking';
 import { fallForward, tackleChance } from './sim/tackling';
 
 const out = (type: PlayOutcome['type'], spot: number): PlayOutcome => ({ type, spot, spotY: 26, text: '', sub: '', color: '' });
@@ -159,9 +163,8 @@ describe('route running', () => {
 });
 
 describe('tackling', () => {
-  it('jukes and elusive backs cause misses', () => {
-    expect(tackleChance(80, 80, 70, true)).toBeLessThan(tackleChance(80, 80, 70, false));
-    expect(tackleChance(80, 95, 70, false)).toBeLessThan(tackleChance(80, 60, 70, false));
+  it('elusive backs cause misses', () => {
+    expect(tackleChance(80, 95, 70)).toBeLessThan(tackleChance(80, 60, 70));
   });
 });
 
@@ -290,6 +293,13 @@ describe('handoffs', () => {
     expect(handoffKind(qb, { x: 34.9, y: 26 }, 35)).toBeNull();
     expect(handoffKind(qb, { x: 20, y: 26 }, 35)).toBeNull();
   });
+  it('exchanges are almost never fumbled; a pitch only hits the ground when the back is out of reach', () => {
+    expect(HANDOFF_ODDS).toBeGreaterThanOrEqual(0.995);
+    expect(pitchOdds(1, 70)).toBeGreaterThanOrEqual(0.99);
+    expect(pitchOdds(0.05, 70)).toBeGreaterThanOrEqual(0.975);
+    expect(pitchOdds(1, 50)).toBeLessThan(pitchOdds(1, 90));
+    expect(pitchOdds(0, 99)).toBe(0);
+  });
   it('a fumble recovered by the offense is spotted like a tackle', () => {
     const a = applyOutcome(startDrive(25), out('fumble', 33));
     expect(a.drive.los).toBe(33);
@@ -342,6 +352,99 @@ describe('field goals', () => {
   it('distance counts the end zone and the hold', () => {
     expect(fgDistance(85, 110)).toBe(42);
     expect(fgDistance(107, 110)).toBe(20);
+  });
+});
+
+describe('kick timing meter', () => {
+  it('the green is clean; early pulls left, late pushes right, more so the farther off', () => {
+    expect(mistimeAngle(0, 80)).toBe(0);
+    expect(mistimeAngle(timingGreen(80) * 0.9, 80)).toBe(0);
+    expect(mistimeAngle(-0.5, 80)).toBeLessThan(0);
+    expect(mistimeAngle(0.5, 80)).toBeGreaterThan(0);
+    expect(mistimeAngle(1, 80)).toBeGreaterThan(mistimeAngle(0.5, 80));
+    expect(mistimeAngle(-1, 80)).toBeCloseTo(-mistimeAngle(1, 80));
+  });
+  it('an accurate kicker gets a wider green', () => {
+    expect(timingGreen(95)).toBeGreaterThan(timingGreen(60));
+  });
+
+  const team = TEAMS[0];
+  const roster = generateRoster(team);
+  const other = generateRoster(TEAMS[1]);
+  const idle = {
+    mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
+    axis: () => ({ x: 0, y: 0 }),
+    isDown: () => false,
+    hit: () => false,
+    endStep: () => {},
+  } as unknown as Input;
+  /** Kick straight ahead with no random error (rng 0.5 makes every gaussian 0) and press at `pressAt` from the ideal strike (null: never). */
+  const kickWith = (id: string, los: number, pressAt: number | null) => {
+    const kd = kickDef(id);
+    const kp = new KickPlay({
+      kickTeam: team, recvTeam: TEAMS[1], kickRoster: roster, recvRoster: other, def: kd, los, ballY: POSTS_Y, wind: CALM, rng: () => 0.5,
+    });
+    (kp as any).release({ power: 1, dir: { x: 1, y: 0 }, loft: kd.loft });
+    let gapAtStrike = Infinity;
+    let coverMaxX = -Infinity;
+    for (let t = 0; t < 8 && kp.phase !== 'over'; t += STEP) {
+      if (pressAt !== null && kp.meter()?.live && kp.time >= kp.strikeAt! + pressAt) kp.pressTiming();
+      const before = kp.flight;
+      kp.update(STEP, idle);
+      if (!kp.flight) {
+        for (const o of kp.kick) if (o.job === 'cover') coverMaxX = Math.max(coverMaxX, o.pos.x);
+      } else if (!before) {
+        gapAtStrike = dist(kp.kicker.pos, kp.kickSpot);
+      }
+    }
+    return { kp, gapAtStrike, coverMaxX };
+  };
+
+  it('a field goal on the green goes straight; early hooks left, late pushes right', () => {
+    const good = kickWith('fg', 97, 0);
+    expect(good.kp.fg).toBe('good');
+    expect(good.kp.timing!).toBeLessThan(timingGreen(good.kp.kicker.r.kac));
+    expect(good.gapAtStrike).toBeLessThan(1.0);
+    const early = kickWith('fg', 97, -METER_HALF);
+    const late = kickWith('fg', 97, null);
+    expect(late.kp.timing).toBe(1);
+    expect(early.kp.flight!.pos.y).toBeLessThan(POSTS_Y - 2);
+    expect(late.kp.flight!.pos.y).toBeGreaterThan(POSTS_Y + 2);
+    expect(early.gapAtStrike).toBeLessThan(1.0);
+  });
+  it('field goal protection holds: no rusher gets a free run at the hold', () => {
+    const kd = kickDef('fg');
+    for (let seed = 1; seed <= 40; seed++) {
+      const kp = new KickPlay({
+        kickTeam: team, recvTeam: TEAMS[1], kickRoster: roster, recvRoster: other, def: kd, los: 85, ballY: POSTS_Y, wind: CALM, rng: mulberry32(seed),
+      });
+      (kp as any).release({ power: 1, dir: { x: 1, y: 0 }, loft: kd.loft });
+      const rushers = kp.recv.filter((d) => d.job === 'rush');
+      // One blocker per rusher, and every rusher has one.
+      const marks = kp.kick.filter((o) => o.job === 'protect' && o.mark).map((o) => o.mark);
+      expect(new Set(marks).size).toBe(rushers.length);
+      let nearest = Infinity;
+      for (let t = 0; t < 3 && !kp.flight; t += STEP) {
+        if (kp.meter()?.live && kp.time >= kp.strikeAt!) kp.pressTiming();
+        kp.update(STEP, idle);
+        for (const d of rushers) nearest = Math.min(nearest, dist(d.pos, kp.kickSpot));
+      }
+      expect(nearest).toBeGreaterThan(2);
+    }
+  });
+  it('kickoff coverage stays behind the line while the kicker waits on a late press', () => {
+    const r = kickWith('ko-deep', 45, null);
+    expect(r.kp.timing).toBe(1);
+    expect(r.coverMaxX).toBeLessThan(45);
+  });
+});
+
+describe('sprint endurance', () => {
+  const with_ = (spd: number, acc: number) => ({ r: { spd, acc } }) as unknown as Player;
+  it('receivers outlast pocket QBs, and a mobile QB outlasts a pocket one', () => {
+    expect(endurance(with_(72, 76))).toBeLessThan(endurance(with_(91, 89)));
+    expect(endurance(with_(85, 84))).toBeGreaterThan(endurance(with_(72, 76)));
+    expect(endurance(with_(85, 84))).toBeLessThan(1);
   });
 });
 
@@ -657,6 +760,28 @@ describe('playbook', () => {
       expect(handoffKind({ x: 0, y: 0 }, { x: -1, y: 2.5 }, 5, 3.2)).toBe('handoff');
     });
   });
+
+  it('a pitch is led to where the back can actually get, standing or on the move', () => {
+    for (const id of ['toss', 'lead-toss', 'i-boot', 'i-deep-cross', 'pa-seams']) {
+      let pitches = 0;
+      // Pitch at the snap (back standing) and at points along his path (accelerating, faking, releasing).
+      for (let wait = 0; wait < 1.2; wait += 0.05) {
+        const p = snapPlay(play(id));
+        p.snap();
+        run(p, wait);
+        if (p.handoffOption() !== 'pitch') continue;
+        p.handoff();
+        pitches++;
+        let miss = 0;
+        for (let i = 0; i < 120 && p.phase === 'air'; i++) {
+          miss = dist(p.rb.pos, p.ballTarget!);
+          run(p, STEP);
+        }
+        expect(miss, `${id} at ${wait.toFixed(2)}s`).toBeLessThan(PITCH_REACH * 0.5);
+      }
+      expect(pitches, id).toBeGreaterThan(0);
+    }
+  });
 });
 
 describe('run blocking', () => {
@@ -775,6 +900,27 @@ describe('run blocking', () => {
     rb.pos = { x: p.los + 1, y: MID - 1.5 }; // ...or past his free shoulder
     const free = runEngagement(p, d);
     expect(free).toBeGreaterThan(levered * 2);
+  });
+
+  it('a playside perimeter block holds while the back gets to the edge; the backside peels off', () => {
+    const p = snapAt(book('outside-zone'));
+    run(p, 0.7); // handed off and running
+    const side = playSide(p);
+    const rb = p.rb;
+    const d = at(p, 'CB1');
+    const b = at(p, 'X');
+    for (const o of [...p.off, ...p.def]) o.engagedBy = [];
+    d.engagedBy = [b];
+    b.engaged = d;
+    d.blockRoll = -60; // the WR is winning his block, so only the peel-off rule can make it shed fast
+    d.blockDir = { x: -1, y: 0 };
+    rb.pos = { x: p.los - 3, y: MID + side * 3 };
+    d.pos = { x: p.los + 5, y: MID + side * 16 }; // the corner out wide, 13+ yd from the back
+    const playside = runEngagement(p, d);
+    d.pos = { x: p.los + 5, y: MID - side * 16 }; // same distance, backside
+    const backside = runEngagement(p, d);
+    expect(playside).toBeLessThan(1);
+    expect(backside).toBe(2.5);
   });
 
   it('a tackled ball carrier going forward falls forward', () => {

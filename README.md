@@ -27,10 +27,9 @@ npm run balance    # AI balance report -> balance.txt
 | Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, and the game goes into slight slow motion while you aim. Space cancels the aim without throwing |
 | Hand off / pitch to the RB | Right-click (or F) while he's in the backfield and not blocking. Works on any play, so you can call a draw |
 | Move QB / steer runner | WASD or arrow keys. After a catch the runner keeps going downfield automatically |
-| Sprint | Shift (drains stamina) |
-| Juke | Space while running |
-| Kick (FG, PAT, kickoff) | Drag back from anywhere and release. Drag length sets power and drag angle sets direction. W/S or the mouse wheel raises or lowers the loft. The preview ignores wind |
-| Punt | Space or click to snap, then drag and release before the rush gets home |
+| Sprint | Shift (drains stamina). How long it lasts depends on the player's speed and acceleration, so a pocket QB's bar is shorter than a receiver's |
+| Kick (FG, PAT, kickoff) | Drag back from anywhere and release. Drag length sets power and drag angle sets direction. W/S or the mouse wheel raises or lowers the loft. The preview ignores wind. Then press Space as the needle crosses the green: early hooks the kick left, late pushes it right |
+| Punt | Space or click to snap, then drag and release before the rush gets home, then Space on the green |
 | After a touchdown | Pick EXTRA POINT, or 2-PT TRY to run any play from the 3 (Esc goes back) |
 | Debug overlay | F1 (coverage assignments, blocks, catch radius, defensive call) |
 

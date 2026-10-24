@@ -2,7 +2,7 @@ import type { Assign } from '../data/defenses';
 import type { RouteName } from '../data/plays';
 import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
-import { add, len, limit, scale, sub, type Vec } from '../engine/math';
+import { add, clamp, len, limit, scale, sub, type Vec } from '../engine/math';
 import type { Pose, Uniform } from '../render/sprites';
 
 export type Side = 'off' | 'def';
@@ -163,6 +163,14 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
 /** Top speed in yards/second. A 90-speed player tops out around 8.6 yd/s. */
 export function maxSpeed(p: Player): number {
   return 4.8 + (p.r.spd / 100) * 4.2;
+}
+
+/**
+ * Sprint endurance, 0..1, from speed and burst: a pocket QB is about 0.4, a TE
+ * about 0.5, backs and receivers about 0.85. It sets how long the sprint bar lasts.
+ */
+export function endurance(p: Player): number {
+  return clamp((p.r.spd * 0.6 + p.r.acc * 0.4 - 60) / 35, 0, 1);
 }
 
 export function accelOf(p: Player): number {

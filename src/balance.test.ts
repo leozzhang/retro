@@ -314,7 +314,7 @@ const KREPS = 200;
 const OWN = (yd: number) => 10 + yd;
 const fieldLbl = (x: number) => (x - 10 <= 50 ? `own ${x - 10}` : `opp ${110 - x}`);
 
-/** Auto-kicker: release `params` at the first chance (punts: as soon as the punter has the ball). */
+/** Auto-kicker: release `params` at the first chance (punts: as soon as the punter has the ball), then time the strike perfectly. */
 function runKick(kd: KickDef, los: number, params: (kp: KickPlay) => KickParams, wind: Wind, rng: Rng) {
   const kp = new KickPlay({ kickTeam: off, recvTeam: def, kickRoster: offR, recvRoster: defR, def: kd, los, ballY: 26.6, wind, rng });
   const release = (p: KickParams) => (kp as any).release(p);
@@ -327,6 +327,8 @@ function runKick(kd: KickDef, los: number, params: (kp: KickPlay) => KickParams,
       release(params(kp));
       released = true;
     }
+    // Perfect timing: stop the needle on the green's center.
+    if (kp.meter()?.live && kp.time >= kp.strikeAt!) kp.pressTiming();
     kp.update(STEP, fakeInput);
     if (catchX === null && kp.phase === 'return') catchX = kp.carrier!.pos.x;
   }
