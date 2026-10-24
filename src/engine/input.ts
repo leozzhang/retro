@@ -7,7 +7,8 @@ export class Input {
   private pressed = new Set<string>();
   /** `downX/downY` = where the current/last press started, captured at event time. */
   /** `rpressed` = right button went down this step (hand off / pitch). */
-  mouse = { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false };
+  /** `wheel` = scroll notches this step (negative = wheel up). */
+  mouse = { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 };
 
   constructor(private canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (e) => {
@@ -37,6 +38,14 @@ export class Input {
       this.mouse.down = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        this.mouse.wheel += Math.sign(e.deltaY);
+        e.preventDefault();
+      },
+      { passive: false },
+    );
   }
 
   private updatePos(e: MouseEvent): void {
@@ -66,5 +75,6 @@ export class Input {
     this.mouse.pressed = false;
     this.mouse.released = false;
     this.mouse.rpressed = false;
+    this.mouse.wheel = 0;
   }
 }

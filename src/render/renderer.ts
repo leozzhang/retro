@@ -96,7 +96,7 @@ function drawDebug(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
   text(g, `DEF: ${play.defCall.name}`, 6, 330, { size: 8, color: '#ffb3b3' });
 }
 
-function drawShadow(g: CanvasRenderingContext2D, x: number, y: number, w: number): void {
+export function drawShadow(g: CanvasRenderingContext2D, x: number, y: number, w: number): void {
   g.fillStyle = 'rgba(0,0,0,0.28)';
   g.beginPath();
   g.ellipse(Math.round(x), Math.round(y), w, w * 0.35, 0, 0, Math.PI * 2);
@@ -138,7 +138,7 @@ function drawAim(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
   g.fillRect(Math.round(c.x) - 1, Math.round(c.y) - 1, 2, 2);
 }
 
-function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean): void {
+export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean): void {
   const s = cam.toScreen(p.pos.x, p.pos.y);
   const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), p.facing);
   g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
@@ -188,16 +188,16 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
     drawPlayer(g, cam, p, presnap);
     if (ball.state === 'held' && ball.carrier === p) {
       const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
-      g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 2));
+      g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
     }
   }
   if (ball.state === 'dead' && !ball.carrier) {
     const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
-    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 2));
+    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
   }
   if (airborne) {
     const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
-    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 2));
+    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
   }
 
   if (ctl) {

@@ -14,6 +14,7 @@ import {
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import { TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import { alignY, resolvePlay, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
 
 export type Phase = 'presnap' | 'snap' | 'live' | 'air' | 'run' | 'over';
@@ -37,6 +38,8 @@ export interface PlaySetup {
   press: Partial<Record<DefSlot, boolean>>;
   los: number;
   ballY: number;
+  /** The user mirrored the play at the call. */
+  flip?: boolean;
   rng: Rng;
 }
 
@@ -80,6 +83,8 @@ export class Play {
   readonly los: number;
   readonly ballY: number;
   readonly playDef: PlayDef;
+  /** The play as laid out for this snap (mirroring, personnel, concept routes). */
+  readonly resolved: ResolvedPlay;
   readonly defCall: DefCall;
   readonly qbDrop: Vec;
   private readonly rng: Rng;
@@ -111,6 +116,7 @@ export class Play {
     this.los = s.los;
     this.ballY = s.ballY;
     this.playDef = s.play;
+    const rp = (this.resolved = resolvePlay(s.play, s.ballY, s.flip ?? false));
     this.defCall = s.defCall;
     this.rng = s.rng;
 
@@ -119,12 +125,13 @@ export class Play {
     const bySlot = new Map<string, Player>();
 
     for (const slot of OFF_SLOTS) {
-      const a = s.play.formation.align[slot];
-      const y = clamp(a.mode === 'abs' ? a.y : s.ballY + a.y, 1, FIELD_W - 1);
-      const p = makePlayer('off', s.offRoster[slot], offU, { x: s.los + a.dx, y });
-      const rn = s.play.routes[slot];
+      const a = rp.align[slot];
+      const y = clamp(alignY(a, s.ballY), 1, FIELD_W - 1);
+      const p = makePlayer('off', s.offRoster[rp.cast[slot]], offU, { x: s.los + a.dx, y });
+      const rn = rp.routes[slot];
       p.isBlocker = p.role === 'OL' || rn === 'block';
       p.thenBlock = !!(rn && ROUTES[rn].thenBlock);
+      p.pull = s.play.scheme?.pulls?.find((pl) => pl.who === slot)?.job ?? null;
       if (rn && rn !== 'block') this.buildRoute(p, rn);
       this.off.push(p);
       bySlot.set(slot, p);
@@ -132,8 +139,8 @@ export class Play {
     this.qb = bySlot.get('QB')!;
     this.center = bySlot.get('C')!;
     this.rb = bySlot.get('RB')!;
-    this.qbDrop = { x: this.qb.pos.x - s.play.drop, y: clamp(this.qb.pos.y + (s.play.dropY ?? 0), 2, FIELD_W - 2) };
-    const rbRoute = s.play.routes.RB;
+    this.qbDrop = { x: this.qb.pos.x - s.play.drop, y: clamp(this.qb.pos.y + rp.dropY, 2, FIELD_W - 2) };
+    const rbRoute = rp.routes.RB;
     if (rbRoute === 'paFake') this.buildFake();
     this.hole =
       rbRoute && ROUTES[rbRoute].run && this.rb.route.length
@@ -155,7 +162,7 @@ export class Play {
 
   private buildRoute(p: Player, rn: keyof typeof ROUTES): void {
     const r = ROUTES[rn];
-    const side = Math.sign(this.ballY - p.pos.y) || 1; // +1 means "inside" is +y
+    const side = Math.sign(this.ballY - p.pos.y) || this.resolved.strongSign; // +1 means "inside" is +y
     let prev = p.pos;
     let last = p.pos;
     for (const [dn, ins] of r.pts) {
@@ -185,11 +192,12 @@ export class Play {
   private defAlignment(slot: DefSlot, d: Player, off: Map<string, Player>, press: boolean): Vec {
     const los = this.los;
     const by = this.ballY;
+    // DL techniques sit on the OL splits (G 1.5, T 3): DTs shade the guards, DEs outside the tackles.
     const base: Record<DefSlot, Vec> = {
-      DE1: { x: los + 1.2, y: by - 3.9 },
-      DT1: { x: los + 1.0, y: by - 1.0 },
-      DT2: { x: los + 1.0, y: by + 1.2 },
-      DE2: { x: los + 1.2, y: by + 3.9 },
+      DE1: { x: los + 1.2, y: by - 4.5 },
+      DT1: { x: los + 1.0, y: by - 1.25 },
+      DT2: { x: los + 1.0, y: by + 1.5 },
+      DE2: { x: los + 1.2, y: by + 4.5 },
       WLB: { x: los + 4.5, y: by - 2.6 },
       MLB: { x: los + 4.5, y: by + 2.6 },
       CB1: { x: los + 6, y: 8 },
@@ -254,7 +262,7 @@ export class Play {
 
   /** Down linemen get the nearest lineman, uncovered linemen climb to a backer, the rest stalk. */
   private assignRunBlocks(): void {
-    const ol = this.off.filter((o) => o.role === 'OL');
+    const ol = this.off.filter((o) => o.role === 'OL' && !o.pull);
     const dl = this.def.filter((d) => d.role === 'DL');
     for (const r of dl) {
       let best: Player | null = null;
@@ -263,7 +271,7 @@ export class Play {
     }
     const marked = () => new Set(this.off.map((o) => o.mark));
     for (const b of this.off) {
-      if (b.mark || !b.isBlocker) continue;
+      if (b.mark || !b.isBlocker || b.pull) continue;
       const taken = marked();
       let best: Player | null = null;
       for (const d of this.def) {
@@ -292,7 +300,19 @@ export class Play {
       if (best) best.mark = r;
       return !!best;
     };
-    for (const r of dl) take(ol, r, (b) => Math.abs(b.pos.y - r.pos.y));
+    const slide = this.playDef.scheme?.slide;
+    if (slide) {
+      // Slide: each lineman takes the gap toward the slide; a back checks the edge rusher left behind.
+      const sign = slide === 'strong' ? this.resolved.strongSign : -this.resolved.strongSign;
+      const edge = sign > 0 ? dl[0] : dl[dl.length - 1];
+      const backHasEdge = !!edge && take(backs, edge, (b) => dist(b.pos, edge.pos));
+      for (const r of dl) {
+        if (r === edge && backHasEdge) continue;
+        take(ol, r, (b) => Math.abs(b.pos.y + sign * 1.2 - r.pos.y));
+      }
+    } else {
+      for (const r of dl) take(ol, r, (b) => Math.abs(b.pos.y - r.pos.y));
+    }
     for (const r of blitzers) {
       if (!take(backs, r, (b) => dist(b.pos, r.pos))) take(ol, r, (b) => dist(b.pos, r.pos));
     }
@@ -410,7 +430,7 @@ export class Play {
     const qb = this.qb;
     const rb = this.rb;
     if (this.phase !== 'live' || this.carrier !== qb || this.scramble || this.thrown || qb.down) return null;
-    if (rb.isBlocker || rb.down || rb.engaged || rb.stun > 0) return null;
+    if (this.playDef.qbRun || rb.isBlocker || rb.down || rb.engaged || rb.stun > 0) return null;
     return handoffKind(qb.pos, rb.pos, this.los);
   }
 

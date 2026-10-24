@@ -1,7 +1,7 @@
 import { lerp, type Vec3 } from '../engine/math';
 import type { Player } from './player';
 
-export type BallState = 'held' | 'snap' | 'air' | 'bounce' | 'dead';
+export type BallState = 'held' | 'snap' | 'air' | 'bounce' | 'kick' | 'dead';
 
 export interface Ball {
   state: BallState;

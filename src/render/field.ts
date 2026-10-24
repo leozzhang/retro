@@ -4,6 +4,7 @@ import {
   FIELD_LEN, FIELD_TOP_PX, FIELD_W, HASH_BOT, HASH_TOP, OPP_GOAL, OWN_GOAL, PPY_X, PPY_Y, VIEW_H, VIEW_W,
 } from '../engine/constants';
 import { mulberry32, pick } from '../engine/math';
+import { CROSSBAR_Z, POSTS_Y, UPRIGHT_HALF } from '../sim/kicking';
 import { text } from './text';
 
 const GRASS_A = '#3d8b37';
@@ -117,6 +118,53 @@ export function drawField(g: CanvasRenderingContext2D, cam: Camera, home: Team, 
       text(g, n[1], px + 3, sy(yy), { size: 8, align: 'left', color: LINE, shadow: false });
     }
   }
+
+  drawGoalPosts(g, cam, FIELD_LEN, 1);
+  drawGoalPosts(g, cam, 0, -1);
+}
+
+const POST = '#ffd23f';
+const POST_DARK = '#9c7a12';
+/**
+ * Screen-x skew per yard across the field. The top-down projection would stack
+ * both uprights on one vertical line, so they're drawn slightly oblique.
+ */
+const POST_SKEW = 1.4;
+const UPRIGHT_TOP = 10;
+
+/** Goal posts on the end line at world x `x`; the gooseneck sits behind it (`back` = +1 at the far end). */
+function drawGoalPosts(g: CanvasRenderingContext2D, cam: Camera, x: number, back: 1 | -1): void {
+  const at = (y: number, z: number, dx = 0) => {
+    const s = cam.toScreen(x + dx, y, z);
+    return { x: Math.round(s.x + (y - POSTS_Y) * POST_SKEW), y: Math.round(s.y) };
+  };
+  const base = at(POSTS_Y, 0, back * 0.8);
+  if (base.x < -40 || base.x > VIEW_W + 40) return;
+  const neck = at(POSTS_Y, CROSSBAR_Z, back * 0.8);
+  const bar = at(POSTS_Y, CROSSBAR_Z);
+  const l0 = at(POSTS_Y - UPRIGHT_HALF, CROSSBAR_Z);
+  const l1 = at(POSTS_Y - UPRIGHT_HALF, UPRIGHT_TOP);
+  const r0 = at(POSTS_Y + UPRIGHT_HALF, CROSSBAR_Z);
+  const r1 = at(POSTS_Y + UPRIGHT_HALF, UPRIGHT_TOP);
+  const line = (a: { x: number; y: number }, b: { x: number; y: number }, col: string, w: number) => {
+    g.strokeStyle = col;
+    g.lineWidth = w;
+    g.beginPath();
+    g.moveTo(a.x + 0.5, a.y + 0.5);
+    g.lineTo(b.x + 0.5, b.y + 0.5);
+    g.stroke();
+  };
+  // Shadow on the turf, then the post itself.
+  g.fillStyle = 'rgba(0,0,0,0.25)';
+  g.fillRect(base.x - 2, base.y - 1, 5, 2);
+  for (const [col, w] of [[POST_DARK, 3], [POST, 1]] as const) {
+    line(base, neck, col, w);
+    line(neck, bar, col, w);
+    line(l0, r0, col, w);
+    line(l0, l1, col, w);
+    line(r0, r1, col, w);
+  }
+  g.lineWidth = 1;
 }
 
 function drawEndZone(

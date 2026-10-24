@@ -2,7 +2,9 @@ import type { Team } from '../data/teams';
 
 export type Pose =
   | 'stand' | 'stance' | 'run0' | 'run1' | 'run2' | 'run3'
-  | 'throw' | 'throwEnd' | 'catch' | 'down';
+  | 'throw' | 'throwEnd' | 'catch' | 'down'
+  // special teams
+  | 'kick' | 'hold' | 'puntDrop' | 'fairCatch';
 
 export interface Uniform {
   key: string;
@@ -67,6 +69,15 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose): void {
       P(8, 14, 2, 1, u.pants); P(8, 15, 2, 3, u.socks); P(8, 18, 3, 1, u.shoe);
       P(5, 14, 2, 1, u.pants); P(4, 15, 2, 1, u.socks); P(3, 15, 1, 1, u.socks); P(2, 14, 2, 1, u.shoe);
       break;
+    case 'kick':
+      // Plant leg down, kicking leg swung up through the ball.
+      P(5, 14, 2, 1, u.pants); P(5, 15, 2, 3, u.socks); P(5, 18, 3, 1, u.shoe);
+      P(9, 12, 2, 1, u.pants); P(11, 11, 2, 1, u.socks); P(13, 10, 2, 1, u.socks); P(15, 8, 2, 2, u.shoe);
+      break;
+    case 'puntDrop':
+      P(5, 14, 2, 1, u.pants); P(5, 15, 2, 3, u.socks); P(5, 18, 3, 1, u.shoe);
+      P(8, 14, 2, 1, u.pants); P(9, 15, 2, 2, u.socks); P(10, 17, 2, 1, u.socks); P(11, 18, 3, 1, u.shoe);
+      break;
     default:
       P(5, 14, 2, 1, u.pants); P(5, 15, 2, 3, u.socks); P(5, 18, 3, 1, u.shoe);
       P(8, 14, 2, 1, u.pants); P(8, 15, 2, 3, u.socks); P(8, 18, 3, 1, u.shoe);
@@ -106,6 +117,19 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose): void {
     case 'catch':
       P(10, 4, 2, 3, u.jersey); P(11, 2, 2, 2, skin);
       break;
+    case 'kick':
+      // Arms out for balance.
+      P(2, 7, 2, 1, u.jersey); P(0, 6, 2, 2, skin);
+      P(11, 8, 2, 1, u.jersey); P(13, 8, 1, 2, skin);
+      break;
+    case 'puntDrop':
+      // Ball held out in front, about to drop it on the foot.
+      P(10, 8, 3, 1, u.jersey); P(13, 8, 2, 2, skin);
+      break;
+    case 'fairCatch':
+      // Arm straight up and waving.
+      P(9, 1, 2, 5, u.jersey); P(9, -1, 2, 2, skin);
+      break;
     default:
       P(9 + ux, 8 + uy, 2, 2, u.jersey); P(10 + ux, 10 + uy, 2, 2, skin);
   }
@@ -126,6 +150,23 @@ function drawStance(P: Px, u: Uniform, skin: string): void {
   P(15, 8, 1, 3, u.mask);
   P(10, 10, 4, 1, u.helmet);
   P(11, 8, 2, 2, u.logo);
+}
+
+function drawHold(P: Px, u: Uniform, skin: string): void {
+  // Holder on one knee, facing the kicker's spot, hand on the ball.
+  P(3, 17, 6, 2, u.pants); P(2, 18, 2, 1, u.socks); P(0, 18, 2, 1, u.shoe);
+  P(8, 15, 2, 4, u.socks); P(8, 18, 3, 1, u.shoe);
+  P(4, 13, 7, 2, u.pants);
+  P(4, 9, 7, 4, u.jersey);
+  P(5, 10, 3, 2, u.trim);
+  P(11, 11, 2, 1, u.jersey); P(13, 12, 2, 2, skin);
+  P(6, 4, 4, 1, u.stripe);
+  P(5, 5, 6, 1, u.helmet);
+  P(5, 6, 4, 2, u.helmet);
+  P(9, 6, 2, 2, skin);
+  P(11, 6, 1, 3, u.mask);
+  P(5, 8, 4, 1, u.helmet);
+  P(6, 6, 2, 2, u.logo);
 }
 
 function drawDown(P: Px, u: Uniform, skin: string): void {
@@ -169,6 +210,7 @@ function paint(u: Uniform, skin: string, pose: Pose): HTMLCanvasElement {
   };
   if (pose === 'down') drawDown(P, u, skin);
   else if (pose === 'stance') drawStance(P, u, skin);
+  else if (pose === 'hold') drawHold(P, u, skin);
   else drawUpright(P, u, skin, pose);
   outline(g, SPR_W, SPR_H);
   return c;
@@ -196,22 +238,54 @@ export function getSprite(u: Uniform, skin: string, pose: Pose, facing: 1 | -1):
   return s;
 }
 
-let ballSprite: HTMLCanvasElement | null = null;
+const ballSprites: HTMLCanvasElement[] = [];
 
-export function getBallSprite(): HTMLCanvasElement {
-  if (ballSprite) return ballSprite;
+/**
+ * Ball sprite. Frame 0 is the ball on its side (carried, passes); frames 1-3
+ * tilt it end over end for kicks. All are 8x8 with the ball centered at (4, 4).
+ */
+export function getBallSprite(frame = 0): HTMLCanvasElement {
+  const f = frame % 4;
+  if (ballSprites[f]) return ballSprites[f];
   const c = document.createElement('canvas');
   c.width = 8;
-  c.height = 5;
+  c.height = 8;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#7a3e14';
-  g.fillRect(2, 1, 4, 3);
-  g.fillRect(1, 2, 6, 1);
-  g.fillStyle = '#a65a24';
-  g.fillRect(2, 1, 3, 1);
-  g.fillStyle = '#ffffff';
-  g.fillRect(3, 2, 2, 1);
-  outline(g, 8, 5);
-  ballSprite = c;
+  const px = (x: number, y: number, w: number, h: number, col: string) => {
+    g.fillStyle = col;
+    g.fillRect(x, y, w, h);
+  };
+  const BR = '#7a3e14';
+  const HI = '#a65a24';
+  if (f === 0) {
+    px(2, 3, 4, 3, BR); px(1, 4, 6, 1, BR); px(2, 3, 3, 1, HI); px(3, 4, 2, 1, '#ffffff');
+  } else if (f === 1 || f === 3) {
+    // Tilted 45 degrees (mirrored for frame 3).
+    const m = (x: number) => (f === 1 ? x : 7 - x);
+    for (const [x, y] of [[2, 5], [3, 4], [4, 3], [5, 2], [3, 5], [4, 4], [5, 3], [2, 4], [4, 2]] as const) px(m(x), y, 1, 1, BR);
+    px(m(4), 3, 1, 1, HI);
+    px(m(3), 4, 1, 1, '#ffffff');
+  } else {
+    // Nose up.
+    px(3, 2, 3, 4, BR); px(4, 1, 1, 6, BR); px(3, 2, 1, 2, HI); px(4, 3, 1, 2, '#ffffff');
+  }
+  outline(g, 8, 8);
+  ballSprites[f] = c;
+  return c;
+}
+
+let teeSprite: HTMLCanvasElement | null = null;
+
+export function getTeeSprite(): HTMLCanvasElement {
+  if (teeSprite) return teeSprite;
+  const c = document.createElement('canvas');
+  c.width = 6;
+  c.height = 3;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ff7a1a';
+  g.fillRect(2, 0, 2, 1);
+  g.fillRect(1, 1, 4, 1);
+  g.fillRect(0, 2, 6, 1);
+  teeSprite = c;
   return c;
 }

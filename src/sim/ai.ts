@@ -140,9 +140,35 @@ function pickRunTarget(play: Play, p: Player): Player | null {
   return best;
 }
 
+/**
+ * Puller: run flat behind the line to the playside, then pick up the kick-out
+ * (first man outside the hole) or the lead block (first backer in it).
+ * Returns false once he has someone, so the normal run block takes over.
+ */
+function pullBlock(play: Play, p: Player): boolean {
+  const hole = play.hole;
+  const playSign = Math.sign(hole.y - play.ballY) || play.resolved.strongSign;
+  const spotY = hole.y + (p.pull === 'kick' ? playSign * 2.5 : 0);
+  if (Math.abs(p.pos.y - spotY) > 1.2) {
+    p.want = seek(p, { x: Math.min(p.start.x - 0.8, play.los - 1), y: spotY }, maxSpeed(p) * 0.95, 0.3);
+    return true;
+  }
+  const taken = new Set(play.off.map((o) => o.mark));
+  let best: Player | null = null;
+  for (const d of play.def) {
+    if (d.down || taken.has(d) || dist(d.pos, p.pos) > 7) continue;
+    if (p.pull === 'kick' ? (d.pos.y - hole.y) * playSign < -1 : d.role !== 'LB' && d.role !== 'S') continue;
+    if (!best || dist(d.pos, p.pos) < dist(best.pos, p.pos)) best = d;
+  }
+  p.pull = null;
+  p.mark = best;
+  return false;
+}
+
 /** Fire off the ball and wall the defender off from the hole. */
 function runBlock(play: Play, p: Player): void {
   const hole = play.hole;
+  if (p.pull && !p.mark && pullBlock(play, p)) return;
   if (!p.mark || p.mark.down || p.mark === play.carrier) p.mark = pickRunTarget(play, p);
   if (p.mark) {
     const r = p.mark;
@@ -352,8 +378,8 @@ export function autoRun(play: Play, c: Player): void {
   c.want = scale(norm(dir), maxSpeed(c) * 0.95);
 }
 
-/** Interception returner: run for the user's end zone, slipping away from nearby tacklers. */
-export function returnerAI(play: Play, c: Player): void {
+/** Returner (interceptions and kick returns): run for the user's end zone, slipping away from nearby tacklers. */
+export function returnerAI(play: { off: Player[]; phase: string }, c: Player): void {
   if (c.down || play.phase === 'over') {
     c.want = ZERO;
     return;

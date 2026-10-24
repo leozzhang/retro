@@ -1,4 +1,5 @@
 import type { Assign } from '../data/defenses';
+import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
 import { add, len, limit, scale, sub, type Vec } from '../engine/math';
 import type { Pose, Uniform } from '../render/sprites';
@@ -40,6 +41,8 @@ export interface Player {
   thenBlock: boolean;
   /** Became a blocker mid-play (after a fake), so his man defender doesn't hug rush. */
   lateBlock: boolean;
+  /** Pulling on a run: still working behind the line toward his kick-out or lead block. */
+  pull: 'kick' | 'lead' | null;
   engaged: Player | null;
   /** Rusher this blocker is responsible for. */
   mark: Player | null;
@@ -59,6 +62,9 @@ export interface Player {
   /** Run fit window: from `fitAt` until `fitUntil` the defender attacks the run (run read or PA bite). */
   fitAt: number;
   fitUntil: number;
+
+  /** Special-teams job on kicking plays. */
+  job: StJob | null;
 }
 
 let nextId = 1;
@@ -93,6 +99,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     isBlocker: false,
     thenBlock: false,
     lateBlock: false,
+    pull: null,
     engaged: null,
     mark: null,
     stun: 0,
@@ -108,6 +115,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     goal: null,
     fitAt: Infinity,
     fitUntil: 0,
+    job: null,
   };
 }
 

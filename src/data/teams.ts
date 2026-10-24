@@ -1,6 +1,6 @@
 import { clamp, gauss, hashString, mulberry32, pick, type Rng } from '../engine/math';
 
-export type Role = 'QB' | 'RB' | 'WR' | 'TE' | 'OL' | 'DL' | 'LB' | 'CB' | 'S';
+export type Role = 'QB' | 'RB' | 'WR' | 'TE' | 'OL' | 'DL' | 'LB' | 'CB' | 'S' | 'K' | 'P';
 
 export interface Ratings {
   spd: number; // top speed
@@ -13,6 +13,8 @@ export interface Ratings {
   awr: number; // awareness (reaction time in coverage / pursuit)
   arm: number; // throw power
   thr: number; // throw accuracy
+  kpw: number; // kick power (leg)
+  kac: number; // kick accuracy
 }
 
 export interface RosterPlayer {
@@ -122,16 +124,29 @@ export const TEAMS: Team[] = [
 
 export const OFF_SLOTS = ['QB', 'RB', 'X', 'Z', 'SL', 'TE', 'LT', 'LG', 'C', 'RG', 'RT'] as const;
 export const DEF_SLOTS = ['DE1', 'DT1', 'DT2', 'DE2', 'WLB', 'MLB', 'CB1', 'CB2', 'NB', 'FS', 'SS'] as const;
+/** Specialists, generated after everyone else so the other players' ratings don't depend on them. */
+export const ST_SLOTS = ['K', 'P'] as const;
+/** Depth players a formation can sub into an on-field slot. Generated last so existing ratings don't change. */
+export const OFF_EXTRA = ['FB', 'TE2', 'WR4'] as const;
 export type OffSlot = (typeof OFF_SLOTS)[number];
 export type DefSlot = (typeof DEF_SLOTS)[number];
+export type ExtraSlot = (typeof OFF_EXTRA)[number];
+export type RosterOffSlot = OffSlot | ExtraSlot;
 
 const SLOT_ROLE: Record<string, Role> = {
   QB: 'QB', RB: 'RB', X: 'WR', Z: 'WR', SL: 'WR', TE: 'TE', LT: 'OL', LG: 'OL', C: 'OL', RG: 'OL', RT: 'OL',
-  DE1: 'DL', DT1: 'DL', DT2: 'DL', DE2: 'DL', WLB: 'LB', MLB: 'LB', CB1: 'CB', CB2: 'CB', NB: 'CB', FS: 'S', SS: 'S',
+  DE1: 'DL', DT1: 'DL', DT2: 'DL', DE2: 'DL', WLB: 'LB', MLB: 'LB', CB1: 'CB', CB2: 'CB', NB: 'CB', FS: 'S', SS: 'S', K: 'K', P: 'P',
+  FB: 'RB', TE2: 'TE', WR4: 'WR',
+};
+
+/** Per-slot tweaks on top of the role template: a fullback is a blocking back. */
+const SLOT_ADJ: Partial<Record<string, Partial<Ratings>>> = {
+  FB: { spd: -8, elu: -18, cth: -6, blk: 15, str: 6 },
 };
 
 // Archetype ratings for a roughly 80-overall player at each position.
-const TEMPLATE: Record<Role, Ratings> = {
+// Only specialists get kick ratings rolled; everyone else has a flat 30.
+const TEMPLATE: Record<Role, Omit<Ratings, 'kpw' | 'kac'>> = {
   QB: { spd: 72, acc: 76, cth: 50, tkl: 30, blk: 30, str: 60, elu: 66, awr: 82, arm: 86, thr: 84 },
   RB: { spd: 89, acc: 89, cth: 70, tkl: 35, blk: 55, str: 76, elu: 86, awr: 72, arm: 40, thr: 30 },
   WR: { spd: 91, acc: 89, cth: 85, tkl: 30, blk: 45, str: 55, elu: 82, awr: 76, arm: 40, thr: 30 },
@@ -141,6 +156,12 @@ const TEMPLATE: Record<Role, Ratings> = {
   LB: { spd: 80, acc: 81, cth: 60, tkl: 85, blk: 45, str: 76, elu: 50, awr: 78, arm: 30, thr: 30 },
   CB: { spd: 92, acc: 91, cth: 66, tkl: 66, blk: 35, str: 55, elu: 70, awr: 80, arm: 30, thr: 30 },
   S: { spd: 88, acc: 87, cth: 66, tkl: 79, blk: 40, str: 65, elu: 60, awr: 82, arm: 30, thr: 30 },
+  K: { spd: 62, acc: 64, cth: 50, tkl: 35, blk: 25, str: 50, elu: 45, awr: 70, arm: 35, thr: 35 },
+  P: { spd: 64, acc: 64, cth: 72, tkl: 35, blk: 25, str: 52, elu: 45, awr: 70, arm: 45, thr: 40 },
+};
+const KICK_TEMPLATE: Partial<Record<Role, Pick<Ratings, 'kpw' | 'kac'>>> = {
+  K: { kpw: 85, kac: 84 },
+  P: { kpw: 84, kac: 80 },
 };
 
 const FIRST = [
@@ -161,6 +182,7 @@ const SKINS = ['#f1c9a5', '#e0ac85', '#c68a5e', '#9c6440', '#7a4a2a', '#5a3620']
 const NUM_RANGES: Record<Role, [number, number][]> = {
   QB: [[1, 19]], RB: [[0, 9], [20, 39]], WR: [[0, 19], [80, 88]], TE: [[80, 89]], OL: [[50, 79]],
   DL: [[90, 99], [40, 49]], LB: [[0, 9], [40, 59]], CB: [[0, 39]], S: [[0, 39]],
+  K: [[1, 49], [90, 99]], P: [[1, 49], [90, 99]],
 };
 
 function pickNumber(rng: Rng, role: Role, used: Set<number>): number {
@@ -184,14 +206,18 @@ export function generateRoster(team: Team): Record<string, RosterPlayer> {
   const rng = mulberry32(hashString(team.id));
   const roster: Record<string, RosterPlayer> = {};
   const used = new Set<number>();
-  for (const slot of [...OFF_SLOTS, ...DEF_SLOTS]) {
+  for (const slot of [...OFF_SLOTS, ...DEF_SLOTS, ...ST_SLOTS, ...OFF_EXTRA]) {
     const role = SLOT_ROLE[slot];
-    const ovr = (OFF_SLOTS as readonly string[]).includes(slot) ? team.off : team.def;
+    const st = (ST_SLOTS as readonly string[]).includes(slot);
+    const offense = (OFF_SLOTS as readonly string[]).includes(slot) || (OFF_EXTRA as readonly string[]).includes(slot);
+    const ovr = st ? (team.off + team.def) / 2 : offense ? team.off : team.def;
     const shift = (ovr - 80) * 0.8 + gauss(rng) * 3;
-    const base = TEMPLATE[role];
-    const r = {} as Ratings;
+    const base: Partial<Ratings> = { ...TEMPLATE[role], ...KICK_TEMPLATE[role] };
+    for (const [k, v] of Object.entries(SLOT_ADJ[slot] ?? {}) as [keyof Ratings, number][]) base[k] = base[k]! + v;
+    const r = { kpw: 30, kac: 30 } as Ratings;
     for (const k of Object.keys(base) as (keyof Ratings)[]) {
-      r[k] = Math.round(clamp(base[k] + shift + gauss(rng) * 3, 25, 99));
+      // Specialists' strength matters less than for position players.
+      r[k] = Math.round(clamp(base[k]! + shift * (st ? 0.5 : 1) + gauss(rng) * 3, 25, 99));
     }
     roster[slot] = {
       slot,

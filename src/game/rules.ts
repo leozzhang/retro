@@ -19,15 +19,20 @@ export interface Drive {
   ballY: number;
   down: number;
   firstDownX: number;
+  /** A try after a touchdown (untimed, one play). */
+  try?: boolean;
 }
 
 export type Change =
   | { kind: 'none' }
-  | { kind: 'score' } // user scored, CPU receives kickoff
+  | { kind: 'pat' } // user scored a touchdown: kick the extra point or go for two
+  | { kind: 'kickoff' } // user kicks off next (after a field goal or a try)
   | { kind: 'downs'; cpuStart: number }
   | { kind: 'int'; cpuStart: number }
+  | { kind: 'cpuBall'; cpuStart: number } // after a punt, a kickoff or a missed field goal
   | { kind: 'safety' }
-  | { kind: 'pick6' };
+  | { kind: 'pick6' }
+  | { kind: 'returnTd'; sub: string };
 
 export interface Applied {
   drive: Drive;
@@ -47,7 +52,7 @@ export function applyOutcome(drive: Drive, out: PlayOutcome): Applied {
   const base = { drive, userPoints: 0, cpuPoints: 0 };
   switch (out.type) {
     case 'td':
-      return { ...base, userPoints: 7, headline: 'TOUCHDOWN', change: { kind: 'score' } };
+      return { ...base, userPoints: 6, headline: 'TOUCHDOWN', change: { kind: 'pat' } };
     case 'pick6':
       return { ...base, cpuPoints: 7, headline: 'PICK SIX', change: { kind: 'pick6' } };
     case 'safety':
@@ -78,9 +83,80 @@ export function applyOutcome(drive: Drive, out: PlayOutcome): Applied {
   return { ...base, drive: next, headline, change: { kind: 'none' } };
 }
 
+/** A two-point try: a touchdown is worth 2, anything else nothing. A defensive return scores 2 for the CPU (NCAA). */
+export function applyTry(drive: Drive, out: PlayOutcome): Applied {
+  const base = { drive, userPoints: 0, cpuPoints: 0, change: { kind: 'kickoff' } as Change };
+  if (out.type === 'td') return { ...base, userPoints: 2, headline: 'TWO-POINT TRY GOOD' };
+  if (out.type === 'pick6') return { ...base, cpuPoints: 2, headline: 'DEFENSIVE TWO POINTS' };
+  return { ...base, headline: 'TRY FAILED' };
+}
+
+// ---------------------------------------------------------------- kicks
+
+export type KickResult =
+  | 'fgGood' | 'fgMiss' | 'xpGood' | 'xpMiss' | 'blocked'
+  | 'touchback' | 'fairCatch' | 'downed' | 'oob' | 'returned' | 'returnTd' | 'recovered';
+
+export interface KickOutcome {
+  result: KickResult;
+  unit: 'fg' | 'xp' | 'punt' | 'kickoff';
+  /** World x where the ball ends up (where the receiving team takes over, before touchback rules). */
+  spot: number;
+  spotY: number;
+  text: string;
+  sub: string;
+  color: string;
+}
+
+/** NCAA spots, in yards from the CPU's own goal line. */
+export const KICKOFF_TOUCHBACK = 25;
+export const PUNT_TOUCHBACK = 20;
+export const KICKOFF_OOB = 35;
+
+/** Where the CPU takes over after a kick that ended at world x `spot`. */
+function cpuYard(spot: number): number {
+  return clamp(Math.round(OPP_GOAL - spot), 1, 99);
+}
+
+export function applyKick(drive: Drive, out: KickOutcome): Applied {
+  const base = { drive, userPoints: 0, cpuPoints: 0 };
+  const cpuBall = (cpuStart: number, headline = ''): Applied => ({ ...base, headline, change: { kind: 'cpuBall', cpuStart } });
+  switch (out.result) {
+    case 'fgGood':
+      return { ...base, userPoints: 3, headline: 'FIELD GOAL', change: { kind: 'kickoff' } };
+    case 'xpGood':
+      return { ...base, userPoints: 1, headline: '', change: { kind: 'kickoff' } };
+    case 'xpMiss':
+      return { ...base, headline: '', change: { kind: 'kickoff' } };
+    case 'fgMiss':
+      // NCAA: the defense takes over at the previous line of scrimmage, or its 20 if that's closer to its goal.
+      return cpuBall(Math.max(20, cpuYard(drive.los)), 'NO GOOD');
+    case 'returnTd':
+      return { ...base, cpuPoints: 7, headline: 'RETURN TOUCHDOWN', change: { kind: 'returnTd', sub: out.sub } };
+    case 'recovered': {
+      const los = clamp(out.spot, OWN_GOAL + 0.5, OPP_GOAL - 0.5);
+      const next = { los, ballY: clamp(out.spotY, HASH_TOP, HASH_BOT), down: 1, firstDownX: Math.min(OPP_GOAL, los + 10) };
+      return { ...base, drive: next, headline: 'YOUR BALL', change: { kind: 'none' } };
+    }
+    case 'blocked':
+      if (out.unit === 'xp') return { ...base, headline: '', change: { kind: 'kickoff' } };
+      return cpuBall(cpuYard(out.spot), 'BLOCKED');
+    case 'touchback':
+      return cpuBall(out.unit === 'kickoff' ? KICKOFF_TOUCHBACK : PUNT_TOUCHBACK, 'TOUCHBACK');
+    case 'oob':
+      return cpuBall(out.unit === 'kickoff' ? KICKOFF_OOB : cpuYard(out.spot));
+    case 'fairCatch':
+      // A fair catch of a kickoff inside the 25 comes out to the 25.
+      return cpuBall(out.unit === 'kickoff' ? Math.max(KICKOFF_TOUCHBACK, cpuYard(out.spot)) : cpuYard(out.spot));
+    default:
+      return cpuBall(cpuYard(out.spot));
+  }
+}
+
 const ORD = ['1ST', '2ND', '3RD', '4TH'];
 
 export function downDistance(d: Drive): string {
+  if (d.try) return 'TRY';
   const ord = ORD[Math.min(3, d.down - 1)];
   if (d.firstDownX >= OPP_GOAL) return `${ord} & GOAL`;
   const toGo = d.firstDownX - d.los;

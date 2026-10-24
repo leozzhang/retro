@@ -18,10 +18,18 @@ Controls are listed in [README.md](README.md).
 
 ## Code layout (src/)
 - `engine/`: constants, camera projection, input, math and seeded RNG
-- `data/`: teams and roster generation (`teams.ts`), formations, route trees and playbook (`plays.ts`), defensive calls (`defenses.ts`)
-- `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, blocking, pursuit), catch, tackle and pass-aim math
-- `game/`: `playState.ts` (the `Play` class: the state machine for one snap, including handoffs), `rules.ts` (down and distance, scoring, CPU drive sim), `clock.ts` (game and play clock rules), `game.ts` (screens: title, play call, play, notices, final)
-- `render/`: procedural pixel sprites with team-color swaps, field, HUD, and the play renderer
+- `data/`: teams and roster generation (`teams.ts`), formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), defensive calls (`defenses.ts`), kick types and special-teams units (`specialTeams.ts`)
+- `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, blocking, pursuit), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
+- `game/`:
+  - `resolvePlay.ts`: lays a play out for the snap (mirroring, personnel, concepts to slot routes). See [docs/PLAYBOOK.md](docs/PLAYBOOK.md)
+  - `playState.ts`: the `Play` class, the state machine for one snap, including handoffs
+  - `kickPlay.ts`: the `KickPlay` class (FG/XP, punts, kickoffs) and the special-teams AI
+  - `rules.ts`: down and distance, scoring, kick spots, CPU drive sim
+  - `clock.ts`: game and play clock rules
+  - `wind.ts`: per-game wind and its quarterly drift
+  - `game.ts`: screens (title, play call with PAT and kickoff modes, play, kick, notices, final)
+- `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
+- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, and the kick renderer (aim preview, goal cam)
 
 ## Conventions
 - **World units are yards.** x runs 0–120 along the field: 0–10 is the user's end zone and 110–120 is the opponent's. The user always attacks toward +x. y runs 0–53.3 across the field, with 0 at the far (top) sideline.
@@ -35,6 +43,8 @@ Controls are listed in [README.md](README.md).
   - shed and push rates (`Play.updateEngagements`), `RUN_BLOCK_EDGE`, `ARM_TACKLE` (`game/playState.ts`)
   - `pitchOdds`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
+  - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd` (`sim/kicking.ts`)
+  - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `DIVE_RANGE` (`game/kickPlay.ts`)
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.
 

@@ -17,8 +17,9 @@ npm run balance    # AI balance report -> balance.txt
 | --- | --- |
 | Pick team / opponent | A/D, W/S (or click the arrows), Enter to start |
 | Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |
-| Playbook tab (Pass / Run / Play Action) | Click a tab, or Q/E or Tab |
+| Playbook tab (Pass / Run / Play Action / Special) | Click a tab, or Q/E or Tab |
 | Call a play | Click a card or press 1–6. Watch the play clock: if it runs out, it's delay of game |
+| Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
 | Audible (pre-snap) | Esc |
 | Snap | Space or click |
 | Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, and the game goes into slight slow motion while you aim |
@@ -26,6 +27,9 @@ npm run balance    # AI balance report -> balance.txt
 | Move QB / steer runner | WASD or arrow keys. After a catch the runner keeps going downfield automatically |
 | Sprint | Shift (drains stamina) |
 | Juke | Space while running |
+| Kick (FG, PAT, kickoff) | Drag back from anywhere and release. Drag length sets power and drag angle sets direction. W/S or the mouse wheel raises or lowers the loft. The preview ignores wind |
+| Punt | Space or click to snap, then drag and release before the rush gets home |
+| After a touchdown | Pick EXTRA POINT, or 2-PT TRY to run any play from the 3 (Esc goes back) |
 | Debug overlay | F1 (coverage assignments, blocks, catch radius, defensive call) |
 
 ## Layout
@@ -36,4 +40,4 @@ npm run balance    # AI balance report -> balance.txt
 - `src/game/`: play state machine (`playState.ts`), down/distance rules and CPU drive sim (`rules.ts`), game and play clocks (`clock.ts`), screens (`game.ts`)
 - `src/render/`: procedural pixel-art sprites with team-color swaps, field, HUD
 
-Tuning constants live next to the logic they affect: `throwErrorSd` in `sim/passing.ts`, `catchOdds` in `sim/catching.ts`, `tackleChance` in `sim/tackling.ts`, shed and push rates in `Play.updateEngagements`, `RUN_BLOCK_EDGE` and `ARM_TACKLE` in `game/playState.ts`, `pitchOdds` in `sim/catching.ts`, and `AIM_TIME_SCALE` in `game/game.ts`.
+Tuning constants live next to the logic they affect: kick physics and accuracy (`LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd`) in `sim/kicking.ts`, special-teams odds (`MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `DIVE_RANGE`) in `game/kickPlay.ts`, `throwErrorSd` in `sim/passing.ts`, `catchOdds` in `sim/catching.ts`, `tackleChance` in `sim/tackling.ts`, shed and push rates in `Play.updateEngagements`, `RUN_BLOCK_EDGE` and `ARM_TACKLE` in `game/playState.ts`, `pitchOdds` in `sim/catching.ts`, and `AIM_TIME_SCALE` in `game/game.ts`.

@@ -1,25 +1,45 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
 import { PLAY_TABS, playsOfKind, ROUTES, type PlayDef } from '../data/plays';
+import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { generateRoster, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
-import { FIELD_W, OWN_GOAL, VIEW_W } from '../engine/constants';
+import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
-import { clamp } from '../engine/math';
+import { clamp, type Vec3 } from '../engine/math';
 import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawHint, drawPlayClock, drawScorebug } from '../render/hud';
+import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
+import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { getSprite, teamUniform } from '../render/sprites';
 import { text, textWidth } from '../render/text';
 import {
   adminStop, advanceSim, afterPlay, clockText, mmss, newClock, nextQuarter, penaltySpot, playClockText,
   QUARTER_OPTIONS, quarterName, readyForPlay, snapClock, tickBetween, tickLive, timeLeftInHalf, type Clock,
 } from './clock';
+import { KickPlay } from './kickPlay';
 import { Play } from './playState';
+import { alignY, personnelOf, resolvePlay } from './resolvePlay';
 import {
-  applyOutcome, downDistance, fieldLabel, simulateDrive, startDrive, userStartAfter, type Applied, type Drive,
+  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, userStartAfter,
+  type Applied, type Drive,
 } from './rules';
+import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'call' | 'play' | 'notice' | 'final';
+type Screen = 'title' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+
+/**
+ * What the call screen offers: the full playbook, the choice after a touchdown,
+ * the playbook for a two-point try, or kickoff calls.
+ */
+type CallMode = 'normal' | 'pat' | 'try' | 'kickoff';
+
+type Card = { kind: 'play'; def: PlayDef } | { kind: 'kick'; def: KickDef } | { kind: 'twoPt' };
+
+/** NCAA kickoffs are from the kicking team's 35. */
+const KICKOFF_LINE = OWN_GOAL + 35;
+/** Field goal attempts longer than this get flagged on the card. */
+const FG_RANGE_HINT = 55;
 
 interface Notice {
   title: string;
@@ -42,14 +62,14 @@ const CARD_Y0 = 166;
 const TAB_W = 120;
 const TAB_H = 14;
 const TAB_Y = 148;
-const TAB_X0 = (VIEW_W - (PLAY_TABS.length * TAB_W + (PLAY_TABS.length - 1) * 4)) / 2;
 
 function cardRect(i: number) {
   return { x: CARD_X0 + (i % 3) * (CARD_W + CARD_GAP), y: CARD_Y0 + Math.floor(i / 3) * (CARD_H + CARD_GAP), w: CARD_W, h: CARD_H };
 }
 
-function tabRect(i: number) {
-  return { x: TAB_X0 + i * (TAB_W + 4), y: TAB_Y, w: TAB_W, h: TAB_H };
+function tabRect(i: number, n: number) {
+  const x0 = (VIEW_W - (n * TAB_W + (n - 1) * 4)) / 2;
+  return { x: x0 + i * (TAB_W + 4), y: TAB_Y, w: TAB_W, h: TAB_H };
 }
 
 function inRect(x: number, y: number, r: { x: number; y: number; w: number; h: number }): boolean {
@@ -72,20 +92,30 @@ export class Game {
   private clock: Clock = newClock(8);
   private drive: Drive = startDrive(25);
   private play: Play | null = null;
+  private kick: KickPlay | null = null;
+  private callMode: CallMode = 'normal';
+  private wind: Wind = CALM;
+  private windQuarter = 1;
+  /** Side-profile flight sketches for the kick cards, by kick id. */
+  private kickSketch = new Map<string, Vec3[]>();
   private defCall: DefCall | null = null;
   private press: Record<string, boolean> = {};
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
-  private afterNotices: 'call' | 'final' = 'call';
+  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' = 'call';
   private tab = 0;
   private hover = -1;
+  /** The user mirrored the next play (F on the play-call screen). */
+  private flipCall = false;
   private debug = false;
   private titleTime = 0;
   private t = 0;
 
   timeScale(): number {
-    return this.screen === 'play' && this.play?.aim ? AIM_TIME_SCALE : 1;
+    if (this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
+    if (this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
+    return 1;
   }
 
   update(dt: number, input: Input): void {
@@ -101,6 +131,9 @@ export class Game {
       case 'play':
         this.updatePlay(dt, input);
         break;
+      case 'kick':
+        this.updateKick(dt, input);
+        break;
       case 'notice':
         if (input.hit('Space', 'Enter') || input.mouse.pressed) this.nextNotice();
         break;
@@ -110,6 +143,10 @@ export class Game {
           this.titleTime = 0;
         }
         break;
+    }
+    if (this.screen !== 'title' && this.clock.quarter !== this.windQuarter) {
+      this.windQuarter = this.clock.quarter;
+      this.wind = nextQuarterWind(this.wind, this.rng);
     }
     this.cam.update(dt);
   }
@@ -156,43 +193,88 @@ export class Game {
     this.score = { user: 0, cpu: 0 };
     this.clock = newClock(QUARTER_OPTIONS[this.qIdx]);
     this.drive = startDrive(25);
+    this.wind = newWind(this.rng);
+    this.windQuarter = 1;
+    this.kickSketch.clear();
     this.tab = 0;
     this.toCall();
   }
 
   // ------------------------------------------------------------ play call
 
-  private toCall(): void {
+  private toCall(mode: CallMode = 'normal'): void {
     this.screen = 'call';
+    this.callMode = mode;
     this.play = null;
+    this.kick = null;
     this.applied = null;
     this.defCall = pickDefCall(this.rng);
     this.press = { CB1: this.rng() < 0.35, CB2: this.rng() < 0.35, NB: this.rng() < 0.2 };
+    if (mode === 'pat' || mode === 'try') this.tab = Math.min(this.tab, 2);
     readyForPlay(this.clock);
-    this.cam.follow(this.drive.los, 0.4);
+    this.cam.follow(this.spotX(), 0.4);
   }
 
-  private tabPlays(): PlayDef[] {
-    return playsOfKind(PLAY_TABS[this.tab].kind);
+  /** Where the ball sits between plays: the line of scrimmage, or the tee before a kickoff. */
+  private spotX(): number {
+    return this.callMode === 'kickoff' ? KICKOFF_LINE : this.drive.los;
+  }
+
+  /** Tabs on the call screen in this mode (none for the PAT choice and kickoffs). */
+  private tabs(): typeof PLAY_TABS {
+    if (this.callMode === 'normal') return PLAY_TABS;
+    if (this.callMode === 'try') return PLAY_TABS.filter((t) => t.kind !== 'st');
+    return [];
+  }
+
+  private cards(): Card[] {
+    switch (this.callMode) {
+      case 'pat':
+        return [{ kind: 'kick', def: kickDef('xp') }, { kind: 'twoPt' }];
+      case 'kickoff':
+        return KICKOFF_CALLS.map((def) => ({ kind: 'kick', def }));
+      default: {
+        const tab = this.tabs()[this.tab];
+        if (tab.kind === 'st') return ST_TAB.map((def) => ({ kind: 'kick', def }));
+        return playsOfKind(tab.kind).map((def) => ({ kind: 'play', def }));
+      }
+    }
   }
 
   private updateCall(dt: number, input: Input): void {
     if (this.tickBetweenPlays(dt)) return;
-    const n = PLAY_TABS.length;
-    if (input.hit('KeyQ')) this.tab = (this.tab + n - 1) % n;
-    if (input.hit('KeyE', 'Tab')) this.tab = (this.tab + 1) % n;
+    const tabs = this.tabs();
+    const n = tabs.length;
+    if (n) {
+      if (input.hit('KeyQ')) this.tab = (this.tab + n - 1) % n;
+      if (input.hit('KeyE', 'Tab')) this.tab = (this.tab + 1) % n;
+      if (input.hit('KeyF')) this.flipCall = !this.flipCall;
+    }
+    if (this.callMode === 'try' && input.hit('Escape', 'Backspace')) {
+      this.callMode = 'pat';
+      return;
+    }
     const { x, y } = input.mouse;
     if (input.mouse.pressed) {
-      for (let i = 0; i < n; i++) if (inRect(x, y, tabRect(i))) this.tab = i;
+      for (let i = 0; i < n; i++) if (inRect(x, y, tabRect(i, n))) this.tab = i;
     }
-    const plays = this.tabPlays();
+    const cards = this.cards();
     this.hover = -1;
-    for (let i = 0; i < plays.length; i++) if (inRect(x, y, cardRect(i))) this.hover = i;
+    for (let i = 0; i < cards.length; i++) if (inRect(x, y, cardRect(i))) this.hover = i;
     let chosen = -1;
-    for (let i = 0; i < plays.length; i++) if (input.hit(`Digit${i + 1}`, `Numpad${i + 1}`)) chosen = i;
+    for (let i = 0; i < cards.length; i++) if (input.hit(`Digit${i + 1}`, `Numpad${i + 1}`)) chosen = i;
     if (input.mouse.pressed && this.hover >= 0) chosen = this.hover;
-    if (chosen >= 0) this.startPlay(plays[chosen]);
-    this.cam.follow(this.drive.los, 0.4);
+    if (chosen >= 0) {
+      input.mouse.pressed = false; // the click that picks a kick must not start its aim
+      const c = cards[chosen];
+      if (c.kind === 'play') this.startPlay(c.def);
+      else if (c.kind === 'kick') this.startKick(c.def);
+      else {
+        this.callMode = 'try';
+        this.tab = 0;
+      }
+    }
+    this.cam.follow(this.spotX(), 0.4);
   }
 
   private startPlay(def: PlayDef): void {
@@ -206,9 +288,28 @@ export class Game {
       press: this.press,
       los: this.drive.los,
       ballY: this.drive.ballY,
+      flip: this.flipCall,
       rng: this.rng,
     });
+    this.flipCall = false;
     this.screen = 'play';
+  }
+
+  private startKick(def: KickDef): void {
+    const kickoff = def.unit === 'kickoff';
+    this.kick = new KickPlay({
+      kickTeam: this.user,
+      recvTeam: this.cpu,
+      kickRoster: this.userRoster,
+      recvRoster: this.cpuRoster,
+      def,
+      los: kickoff ? KICKOFF_LINE : this.drive.los,
+      ballY: kickoff ? FIELD_W / 2 : this.drive.ballY,
+      wind: this.wind,
+      rng: this.rng,
+    });
+    this.applied = null;
+    this.screen = 'kick';
   }
 
   /**
@@ -216,8 +317,9 @@ export class Game {
    * Returns true if time ran out and the game moved on (end of quarter or delay of game).
    */
   private tickBetweenPlays(dt: number): boolean {
+    if (this.callMode === 'kickoff') return false; // the kicking team sets up on the referee's signal
     tickBetween(this.clock, dt);
-    if (this.clock.time <= 0) {
+    if (this.callMode === 'normal' && this.clock.time <= 0) {
       this.play = null;
       this.periodOver();
       return true;
@@ -232,7 +334,8 @@ export class Game {
         title: 'DELAY OF GAME', sub: `${yds === 5 ? '5-yard' : 'Half the distance'} penalty. Replay the down`,
         extra: downDistance(this.drive), color: '#ffd23f',
       });
-      this.showNotices('call');
+      this.kick = null;
+      this.showNotices(this.callMode === 'normal' ? 'call' : 'pat');
       return true;
     }
     return false;
@@ -251,47 +354,106 @@ export class Game {
       }
       if (input.hit('Space') || input.mouse.pressed) {
         play.snap();
-        snapClock(this.clock);
+        if (!this.drive.try) snapClock(this.clock); // tries are untimed
         input.mouse.pressed = false; // the snap click must not start an aim
       }
     }
     play.update(dt, input, this.cam);
-    if (play.phase !== 'presnap' && play.phase !== 'over') tickLive(this.clock, dt);
+    if (play.phase !== 'presnap' && play.phase !== 'over' && !this.drive.try) tickLive(this.clock, dt);
 
     const lead = play.aim ? 0.22 : play.phase === 'run' ? 0.4 : play.phase === 'air' ? 0.45 : 0.35;
     this.cam.follow(play.focusX(), lead);
 
     if (play.phase === 'over' && play.outcome) {
       if (!this.applied) {
-        this.applied = applyOutcome(this.drive, play.outcome);
+        if (this.drive.try) {
+          this.applied = applyTry(this.drive, play.outcome);
+        } else {
+          this.applied = applyOutcome(this.drive, play.outcome);
+          afterPlay(this.clock, play.outcome.type, this.applied.headline === 'FIRST DOWN');
+          if (play.outcome.type === 'td') adminStop(this.clock); // a score stops the clock
+        }
         this.score.user += this.applied.userPoints;
         this.score.cpu += this.applied.cpuPoints;
-        afterPlay(this.clock, play.outcome.type, this.applied.headline === 'FIRST DOWN');
-      } else {
+      } else if (!this.drive.try) {
         tickBetween(this.clock, dt);
       }
       const skip = play.overTime > 0.6 && (input.hit('Space', 'Enter') || input.mouse.pressed);
-      if (play.overTime > 2.6 || skip) this.finishPlay(this.applied);
+      if (play.overTime > 2.6 || skip) this.handleChange(this.applied);
     }
   }
 
-  private finishPlay(a: Applied): void {
+  // ------------------------------------------------------------ kicks
+
+  private updateKick(dt: number, input: Input): void {
+    const kp = this.kick!;
+    if (kp.phase === 'presnap') {
+      if (this.tickBetweenPlays(dt)) return;
+      if (input.hit('Escape', 'Backspace')) {
+        this.screen = 'call'; // back to the call screen; the play clock keeps running
+        this.kick = null;
+        return;
+      }
+      if (kp.unit === 'punt' && (input.hit('Space') || input.mouse.pressed)) {
+        kp.snap();
+        snapClock(this.clock);
+        input.mouse.pressed = false; // the snap click must not start the punt aim
+      }
+    }
+    const was = kp.phase;
+    kp.update(dt, input);
+    if (was === 'presnap' && kp.phase !== 'presnap' && kp.unit === 'fg') snapClock(this.clock);
+    if (kp.clockRunning()) tickLive(this.clock, dt);
+    const f = kp.focus();
+    this.cam.follow(f.x, f.lead);
+
+    if (kp.phase === 'over' && kp.outcome) {
+      if (!this.applied) {
+        this.applied = applyKick(this.drive, kp.outcome);
+        this.score.user += this.applied.userPoints;
+        this.score.cpu += this.applied.cpuPoints;
+        // Every kick ends in a score or a change of possession: the clock stops until the next snap.
+        adminStop(this.clock);
+      } else if (kp.unit !== 'xp') {
+        tickBetween(this.clock, dt);
+      }
+      const skip = kp.overTime > 0.6 && (input.hit('Space', 'Enter') || input.mouse.pressed);
+      if (kp.overTime > 2.8 || skip) this.handleChange(this.applied);
+    }
+  }
+
+  /** Move the game on after a play or kick: next down, try, kickoff, or a change of possession. */
+  private handleChange(a: Applied): void {
     const c = a.change;
-    if (c.kind === 'none') {
-      this.drive = a.drive;
-      if (this.clock.time <= 0) this.periodOver();
-      else this.toCall();
-      return;
+    switch (c.kind) {
+      case 'none':
+        this.drive = a.drive;
+        if (this.clock.time <= 0) this.periodOver();
+        else this.toCall();
+        return;
+      case 'pat':
+        // The try happens even with no time left.
+        this.drive = { los: OPP_GOAL - 3, ballY: FIELD_W / 2, down: 1, firstDownX: OPP_GOAL, try: true };
+        this.toCall('pat');
+        return;
+      case 'kickoff':
+        this.drive = startDrive(25);
+        this.kickOffNext();
+        return;
+      case 'pick6':
+      case 'returnTd': {
+        this.drive = startDrive(25);
+        adminStop(this.clock);
+        const sub = c.kind === 'pick6' ? 'Pick six' : c.sub;
+        this.notify({ title: `${this.cpu.abbr} SCORES`, sub: `${sub}. Kickoff to you.`, extra: '' });
+        if (this.clock.time <= 0) this.periodOver();
+        else this.showNotices('call');
+        return;
+      }
+      default:
+        break;
     }
-    if (c.kind === 'pick6') {
-      this.drive = startDrive(25);
-      adminStop(this.clock);
-      this.notify({ title: `${this.cpu.abbr} SCORES`, sub: 'Pick six. Kickoff to you.', extra: '' });
-      if (this.clock.time <= 0) this.periodOver();
-      else this.showNotices('call');
-      return;
-    }
-    const cpuStart = c.kind === 'score' ? 25 : c.kind === 'safety' ? 40 : c.cpuStart;
+    const cpuStart = c.kind === 'safety' ? 40 : c.cpuStart;
     if (this.clock.time > 0) {
       this.cpuDrive(cpuStart);
       return;
@@ -303,6 +465,24 @@ export class Game {
       this.cpuDrive(cpuStart);
     } else {
       this.periodOver();
+    }
+  }
+
+  /** The user scored: kick off, unless the scoring play ended the half or the game. */
+  private kickOffNext(): void {
+    if (this.clock.time > 0) {
+      this.toCall('kickoff');
+      return;
+    }
+    const q = this.clock.quarter;
+    if (q === 1 || q === 3) {
+      this.endQuarterNotice();
+      nextQuarter(this.clock);
+      this.showNotices('kickoff');
+    } else if (q === 2) {
+      this.halftime();
+    } else {
+      this.showNotices('final');
     }
   }
 
@@ -332,11 +512,11 @@ export class Game {
     }
   }
 
-  /** The user took the opening kickoff, so the CPU receives to start the second half. */
+  /** The user took the opening kickoff, so the user kicks off to start the second half. */
   private halftime(): void {
-    this.notify({ title: 'HALFTIME', sub: this.scoreLine(), extra: `${this.cpu.abbr} receives the kickoff`, color: '#9ad7ff' });
+    this.notify({ title: 'HALFTIME', sub: this.scoreLine(), extra: `You kick off to ${this.cpu.abbr}`, color: '#9ad7ff' });
     nextQuarter(this.clock);
-    this.cpuDrive(25);
+    this.showNotices('kickoff');
   }
 
   /** Simulate a CPU possession from `start` (yards from its own goal), burning game clock. */
@@ -376,7 +556,7 @@ export class Game {
     return n;
   }
 
-  private showNotices(then: 'call' | 'final'): void {
+  private showNotices(then: Game['afterNotices']): void {
     this.afterNotices = then;
     this.screen = 'notice';
     if (!this.notices.length) this.nextNotice();
@@ -386,6 +566,8 @@ export class Game {
     if (this.notices.length) this.notices.shift();
     if (this.notices.length) return;
     if (this.afterNotices === 'final') this.screen = 'final';
+    else if (this.afterNotices === 'kickoff') this.toCall('kickoff');
+    else if (this.afterNotices === 'pat') this.toCall('pat');
     else this.toCall();
   }
 
@@ -398,16 +580,22 @@ export class Game {
       return;
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
-    drawLines(g, this.cam, this.drive.los, this.drive.firstDownX);
-    if (this.play) drawPlay(g, this.cam, this.play, this.debug);
+    const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
+    drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
+    if (this.kick) drawKickPlay(g, this.cam, this.kick, this.debug);
+    else if (this.play) drawPlay(g, this.cam, this.play, this.debug);
     else this.drawBallSpot(g);
 
-    const center = `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
-    const right = this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
+    const center = kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
+    const right = this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
     const shown = this.screen === 'notice' ? this.notices[0] : undefined;
     drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockText(this.clock), center, right);
-    const huddle = this.screen === 'call' || (this.screen === 'play' && this.play?.phase === 'presnap');
-    if (huddle) drawPlayClock(g, playClockText(this.clock), this.clock.play, this.t);
+    const huddle =
+      this.screen === 'call' || (this.screen === 'play' && this.play?.phase === 'presnap') ||
+      (this.screen === 'kick' && this.kick?.phase === 'presnap');
+    if (huddle && this.callMode !== 'kickoff') drawPlayClock(g, playClockText(this.clock), this.clock.play, this.t);
+    const kicking = this.screen === 'kick' || (this.screen === 'call' && this.cards()[0]?.kind === 'kick');
+    if (kicking) drawWind(g, this.wind, windLabel(this.wind));
 
     if (this.screen === 'call') this.renderCall(g);
     else if (this.screen === 'notice' && this.notices.length) {
@@ -415,7 +603,41 @@ export class Game {
       drawBanner(g, n.title, n.sub, n.color ?? '#ffffff', n.extra);
       drawHint(g, 'CLICK OR SPACE TO CONTINUE');
     } else if (this.screen === 'final') this.renderFinal(g);
+    else if (this.kick) this.renderKickHud(g, this.kick);
     else if (this.play) this.renderPlayHud(g, this.play);
+  }
+
+  private renderKickHud(g: CanvasRenderingContext2D, kp: KickPlay): void {
+    if (kp.phase === 'over' && kp.outcome && this.applied) {
+      const o = kp.outcome;
+      const h = this.applied.headline;
+      drawBanner(g, o.text, o.sub, o.color, h && h !== o.text && h !== 'BLOCKED' ? h : '');
+      drawHint(g, 'CLICK OR SPACE TO CONTINUE');
+      return;
+    }
+    const fg = kp.unit === 'fg' || kp.unit === 'xp';
+    switch (kp.phase) {
+      case 'presnap':
+        if (kp.unit === 'punt') drawHint(g, 'SPACE/CLICK: SNAP   THEN DRAG + RELEASE TO PUNT   ESC: BACK');
+        else drawHint(g, 'DRAG BACK + RELEASE TO KICK   W/S OR WHEEL: LOFT   ESC: BACK');
+        if (fg && !kp.aim) {
+          const yds = fgDistance(this.drive.los, OPP_GOAL);
+          text(g, kp.unit === 'xp' ? 'EXTRA POINT' : `${yds}-YARD ATTEMPT`, VIEW_W / 2, 40, { size: 8, align: 'center', color: '#ffd23f' });
+        }
+        break;
+      case 'snap':
+      case 'set':
+        drawHint(g, kp.unit === 'punt' ? 'DRAG + RELEASE TO PUNT   W/S LOFT   GET IT OFF!' : 'KICK IS AWAY...');
+        break;
+      case 'approach':
+      case 'flight':
+      case 'loose':
+        drawHint(g, fg ? 'KICK IS UP...' : 'COVER IT! (AI COVERAGE)');
+        break;
+      case 'return':
+        drawHint(g, 'COVERAGE: TACKLE HIM! (AI PURSUIT)');
+        break;
+    }
   }
 
   private renderFinal(g: CanvasRenderingContext2D): void {
@@ -426,7 +648,7 @@ export class Game {
   }
 
   private drawBallSpot(g: CanvasRenderingContext2D): void {
-    const s = this.cam.toScreen(this.drive.los, this.drive.ballY);
+    const s = this.callMode === 'kickoff' ? this.cam.toScreen(KICKOFF_LINE, FIELD_W / 2) : this.cam.toScreen(this.drive.los, this.drive.ballY);
     g.fillStyle = '#7a3e14';
     g.fillRect(Math.round(s.x) - 3, Math.round(s.y) - 2, 6, 3);
   }
@@ -479,13 +701,24 @@ export class Game {
   }
 
   private renderCall(g: CanvasRenderingContext2D): void {
-    const plays = this.tabPlays();
+    const cards = this.cards();
+    const tabs = this.tabs();
     g.fillStyle = 'rgba(8,10,14,0.55)';
     g.fillRect(0, 128, VIEW_W, 218);
-    const tip = this.hover >= 0 && plays[this.hover] ? plays[this.hover].tip.toUpperCase() : 'CHOOSE A PLAY';
+    const hc = this.hover >= 0 ? cards[this.hover] : undefined;
+    const fallback =
+      this.callMode === 'pat' ? 'TOUCHDOWN! KICK THE PAT OR GO FOR TWO'
+      : this.callMode === 'kickoff' ? 'KICKOFF: CHOOSE A KICK'
+      : this.callMode === 'try' ? 'TWO-POINT TRY FROM THE 3   ESC: BACK'
+      : 'CHOOSE A PLAY';
+    const tip = hc ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.def.tip).toUpperCase() : fallback;
     text(g, tip, VIEW_W / 2, 134, { size: 8, align: 'center', color: '#ffd23f' });
-    PLAY_TABS.forEach((t, i) => {
-      const r = tabRect(i);
+    if (!tabs.length) {
+      const head = this.callMode === 'pat' ? 'POINT AFTER' : 'KICKOFF';
+      text(g, head, VIEW_W / 2, TAB_Y + 3, { align: 'center', color: '#ffffff' });
+    }
+    tabs.forEach((t, i) => {
+      const r = tabRect(i, tabs.length);
       const on = i === this.tab;
       g.fillStyle = on ? this.user.colors.primary : '#141b26';
       g.fillRect(r.x, r.y, r.w, r.h);
@@ -495,8 +728,66 @@ export class Game {
       }
       text(g, t.label, r.x + r.w / 2, r.y + 3, { align: 'center', color: on ? '#ffffff' : '#8fa0b8', shadow: on ? undefined : false });
     });
-    plays.forEach((p, i) => this.drawCard(g, p, i));
-    drawHint(g, 'CLICK A PLAY OR 1-6   Q/E OR TAB: SWITCH TABS');
+    cards.forEach((c, i) => {
+      if (c.kind === 'play') this.drawCard(g, c.def, i);
+      else this.drawKickCard(g, c, i);
+    });
+    drawHint(g, tabs.length ? `CLICK A PLAY OR 1-${cards.length}   Q/E OR TAB: SWITCH TABS   F: FLIP${this.flipCall ? ' (ON)' : ''}` : `CLICK A CARD OR 1-${cards.length}`);
+  }
+
+  private cardFrame(g: CanvasRenderingContext2D, i: number, title: string, sub: string, subColor = '#8fa0b8') {
+    const r = cardRect(i);
+    const hot = this.hover === i;
+    g.fillStyle = hot ? '#24324a' : '#141b26';
+    g.fillRect(r.x, r.y, r.w, r.h);
+    g.fillStyle = hot ? '#ffd23f' : this.user.colors.primary;
+    g.fillRect(r.x, r.y, r.w, 2);
+    text(g, `${i + 1} ${title.toUpperCase()}`, r.x + 6, r.y + 6, { color: hot ? '#ffd23f' : '#ffffff' });
+    text(g, sub, r.x + 6, r.y + 17, { color: subColor, shadow: false });
+    return r;
+  }
+
+  /** Kick card: unit and distance, plus a side-on sketch of the kick's flight shape. */
+  private drawKickCard(g: CanvasRenderingContext2D, c: Exclude<Card, { kind: 'play' }>, i: number): void {
+    if (c.kind === 'twoPt') {
+      const r = this.cardFrame(g, i, '2-Pt Try', 'ANY PLAY FROM THE 3');
+      g.fillStyle = 'rgba(255,255,255,0.12)';
+      g.fillRect(r.x + 40, r.y + 34, r.w - 80, 40);
+      g.fillStyle = this.cpu.colors.primary;
+      g.fillRect(r.x + r.w - 70, r.y + 34, 30, 40);
+      text(g, '+2', r.x + r.w / 2 - 14, r.y + 46, { size: 16, align: 'center', color: '#ffd23f' });
+      return;
+    }
+    const d = c.def;
+    let sub = d.unit === 'punt' ? 'PUNT' : d.unit === 'kickoff' ? 'KICKOFF' : 'FROM THE 3, 20 YARDS';
+    let subColor = '#8fa0b8';
+    if (d.unit === 'fg') {
+      const yds = fgDistance(this.drive.los, OPP_GOAL);
+      sub = `${yds}-YARD ATTEMPT${yds > FG_RANGE_HINT ? '  LONG!' : ''}`;
+      if (yds > FG_RANGE_HINT) subColor = '#ff9a5a';
+    }
+    const r = this.cardFrame(g, i, d.name, sub, subColor);
+    // Flight sketch: distance across, height up, same scale for every card.
+    let pts = this.kickSketch.get(d.id);
+    if (!pts) {
+      const kicker = this.userRoster[d.unit === 'punt' ? 'P' : 'K'];
+      const from = { x: 0, y: 26, z: d.unit === 'punt' ? 1 : 0.1 };
+      const power = d.unit === 'kickoff' && d.id !== 'ko-squib' ? 1 : d.id === 'pooch' || d.id === 'ko-sky' ? 0.6 : 0.85;
+      pts = predictKick(from, { power, dir: { x: 1, y: 0 }, loft: d.loft }, kicker.r.kpw, CALM, d.bounce, d.unit === 'kickoff').pts;
+      this.kickSketch.set(d.id, pts);
+    }
+    const x0 = r.x + 12;
+    const y0 = r.y + r.h - 8;
+    g.fillStyle = 'rgba(255,255,255,0.15)';
+    g.fillRect(x0, y0, r.w - 24, 1);
+    g.fillStyle = d.directional ? '#ff9f43' : '#5ce1ff';
+    for (let k = 0; k < pts.length; k += 2) {
+      const p = pts[k];
+      const sx = x0 + p.x * 2.3;
+      if (sx > r.x + r.w - 8) break;
+      g.fillRect(Math.round(sx), Math.round(y0 - p.z * 2), 1, 1);
+    }
+    text(g, `LOFT ${d.loft}`, r.x + r.w - 6, r.y + 6, { align: 'right', color: '#5d6b80', shadow: false });
   }
 
   private drawCard(g: CanvasRenderingContext2D, p: PlayDef, i: number): void {
@@ -507,7 +798,7 @@ export class Game {
     g.fillStyle = hot ? '#ffd23f' : this.user.colors.primary;
     g.fillRect(r.x, r.y, r.w, 2);
     text(g, `${i + 1} ${p.name.toUpperCase()}`, r.x + 6, r.y + 6, { color: hot ? '#ffd23f' : '#ffffff' });
-    text(g, p.formation.name.toUpperCase(), r.x + 6, r.y + 17, { color: '#8fa0b8', shadow: false });
+    text(g, `${p.formation.name.toUpperCase()}  ${personnelOf(p.formation)}`, r.x + 6, r.y + 17, { color: '#8fa0b8', shadow: false });
 
     // Mini play diagram (offense moving right, field width squashed like the game view)
     const dx0 = r.x + 34;
@@ -519,10 +810,11 @@ export class Game {
     g.fillRect(Math.round(sx(0)), dy0, 1, 48);
     const colors = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
     let ci = 0;
-    for (const [slot, a] of Object.entries(p.formation.align)) {
+    const rp = resolvePlay(p, by, this.flipCall);
+    for (const [slot, a] of Object.entries(rp.align)) {
       const x0 = a.dx;
-      const y0 = clamp(a.mode === 'abs' ? a.y : by + a.y, 1, FIELD_W - 1);
-      const route = p.routes[slot as keyof typeof p.routes];
+      const y0 = clamp(alignY(a, by), 1, FIELD_W - 1);
+      const route = rp.routes[slot as keyof typeof rp.routes];
       if (!route || slot === 'QB') {
         g.fillStyle = slot === 'QB' ? '#ffffff' : '#7d8796';
         g.fillRect(Math.round(sx(x0)) - 1, Math.round(sy(y0)) - 1, 2, 2);
@@ -541,7 +833,7 @@ export class Game {
         }
         continue;
       }
-      const side = Math.sign(by - y0) || 1;
+      const side = Math.sign(by - y0) || rp.strongSign;
       g.strokeStyle = col;
       g.lineWidth = def.run ? 2 : 1;
       g.beginPath();
