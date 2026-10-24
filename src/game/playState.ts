@@ -1,19 +1,22 @@
 import type { DefCall, DefPackage } from '../data/defenses';
-import { ROUTES, type PlayDef } from '../data/plays';
+import { ROUTES, type PlayDef, type RunScheme } from '../data/plays';
 import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type RosterPlayer, type Team } from '../data/teams';
 import type { Camera } from '../engine/camera';
 import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { isRusher, returnerAI, seesThrow, thinkDefense, thinkOffense } from '../sim/ai';
+import { cutKeep, facingQB, isRusher, returnerAI, seesThrow, thinkDefense, thinkOffense } from '../sim/ai';
 import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
 import { HANDOFF_ODDS, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
   isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, type Player,
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
-import { TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import {
+  ARM_LEVERED, assignRunBlocks, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
+} from '../sim/runBlocking';
+import { fallForward, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { matchDefense } from './matchups';
 import { alignY, resolvePlay, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
@@ -49,8 +52,6 @@ const HISTORY_LEN = 60;
 export const HANDOFF_RANGE = 1.8;
 export const PITCH_RANGE = 8;
 const PITCH_SPEED = 13;
-/** Drive-block advantage for the OL on designed runs (subtracted from the defender's power). */
-const RUN_BLOCK_EDGE = 3;
 /** Tackle odds multiplier for a defender still engaged with a blocker (an arm tackle). */
 const ARM_TACKLE = 0.5;
 /** RB this close to the QB early on a play-action call sells the fake. */
@@ -65,6 +66,18 @@ const MESH_REACH = 3.2;
 const KEEP_WIDTH = 3.5;
 /** Zone read: the QB pulls it if the back never reaches the mesh this long after the snap. */
 const MESH_TIME = 1.2;
+/** Power read: on a keep the QB cuts this far inside the read key, behind the pulling guard. */
+const KEEP_INSIDE = 3;
+/** Speed option: on a keep (the key took the pitch man) the QB turns up this far inside him. */
+const OPTION_CUT = 2.5;
+/** Designed QB runs wait this long after the snap for the blocking to form, by scheme (QB power lets the guard get there). */
+const QB_RUN_WAIT: Partial<Record<RunScheme, number>> = { gap: 0.35, draw: DRAW_SET };
+/** A blocker split out wider than this from the ball is a stalk blocker, not a pass protector. */
+export const STALK_SPLIT = 6.5;
+/** Screens: the line pass-sets this long, then lets its rushers go and releases to block. */
+export const SCREEN_SET = 0.8;
+/** Routes that make a receiver the target of a screen (the others stalk-block for him). */
+const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble'];
 
 export type HandoffKind = 'handoff' | 'pitch';
 
@@ -116,6 +129,8 @@ export class Play {
   intended: Player | null = null;
   scramble = false;
   thrown = false;
+  /** How set (facing the QB, 0..1) the receiver was on the last catch attempt. */
+  catchSet = 0;
   outcome: PlayOutcome | null = null;
   popups: Popup[] = [];
   history = new Map<number, Vec[]>();
@@ -132,6 +147,12 @@ export class Play {
   private meshed = false;
   /** Zone read: the QB pulled it. */
   kept = false;
+  /** Auto-runner: the lane he's committed to (world y). */
+  laneY = NaN;
+  /** Screens and bubbles: the receiver the others block for. */
+  readonly screenTarget: Player | null = null;
+  /** Screen: the line has let its rushers go and is releasing. */
+  screenReleased = false;
 
   constructor(s: PlaySetup) {
     this.los = s.los;
@@ -150,8 +171,13 @@ export class Play {
       const y = clamp(alignY(a, s.ballY), 1, FIELD_W - 1);
       const p = makePlayer('off', s.offRoster[rp.cast[slot]], offU, { x: s.los + a.dx, y });
       const rn = rp.routes[slot];
-      p.isBlocker = p.role === 'OL' || rn === 'block';
+      p.routeName = rn ?? null;
+      p.isBlocker = p.role === 'OL' || rn === 'block' || !!(rn && ROUTES[rn].lead);
       p.thenBlock = !!(rn && ROUTES[rn].thenBlock);
+      p.stalk = p.isBlocker && p.role !== 'OL' && Math.abs(y - s.ballY) > STALK_SPLIT;
+      p.routeDelay = (rn && ROUTES[rn].delay) || 0;
+      p.delayBlock = !!(rn && ROUTES[rn].delayBlock);
+      if (rn && SCREEN_ROUTES.includes(rn) && !this.screenTarget) this.screenTarget = p;
       p.pull = rp.pulls.find((pl) => pl.who === slot)?.job ?? null;
       if (rn && rn !== 'block') this.buildRoute(p, rn);
       this.off.push(p);
@@ -163,10 +189,13 @@ export class Play {
     this.qbDrop = { x: this.qb.pos.x - s.play.drop, y: clamp(this.qb.pos.y + rp.dropY, 2, FIELD_W - 2) };
     const rbRoute = rp.routes.RB;
     if (rbRoute === 'paFake') this.buildFake();
+    const qbPath = s.play.qbPath;
     this.hole =
       rbRoute && ROUTES[rbRoute].run && this.rb.route.length
         ? { ...this.rb.route[this.rb.route.length - 1] }
-        : { x: this.los + 1.5, y: this.ballY };
+        : qbPath
+          ? { x: this.los + qbPath[0], y: clamp(this.ballY + qbPath[1] * rp.strongSign, 2, FIELD_W - 2) }
+          : { x: this.los + 1.5, y: this.ballY };
 
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
@@ -179,11 +208,13 @@ export class Play {
       this.def.push(d);
     }
 
-    if (s.play.read === 'zoneRead') {
-      // The read key is the outermost lineman on the backside, away from the hole.
-      const back = -(Math.sign(this.hole.y - this.ballY) || rp.strongSign);
+    if (s.play.read === 'zoneRead' || s.play.read === 'option') {
+      // The read key is the outermost lineman on the backside, away from the hole; on power read
+      // and the option it's the playside end.
+      const toHole = Math.sign(this.hole.y - this.ballY) || rp.strongSign;
+      const side = s.play.read === 'option' || s.play.key === 'play' ? toHole : -toHole;
       const dl = this.def.filter((d) => d.role === 'DL');
-      this.readKey = dl.reduce((a, b) => ((b.pos.y - a.pos.y) * back > 0 ? b : a));
+      this.readKey = dl.reduce((a, b) => ((b.pos.y - a.pos.y) * side > 0 ? b : a));
     }
 
     this.players = [...this.off, ...this.def];
@@ -202,6 +233,18 @@ export class Play {
       last = pt;
     }
     if (r.cont && p.route.length) p.routeDir = norm(sub(last, prev));
+
+    // Speed carried through each waypoint, from how sharply the route turns there.
+    p.passRoute = !r.run && !r.thenBlock && !r.lead;
+    p.settle = p.passRoute && !r.cont && p.route.length > 0;
+    p.cutKeep = p.route.map((pt, i) => {
+      const next = p.route[i + 1];
+      if (!next) return r.cont ? 1 : 0;
+      const into = norm(sub(pt, i ? p.route[i - 1] : p.pos));
+      const out = norm(sub(next, pt));
+      const turn = (Math.acos(clamp(into.x * out.x + into.y * out.y, -1, 1)) * 180) / Math.PI;
+      return cutKeep(turn, p.r.acc);
+    });
   }
 
   /**
@@ -264,6 +307,21 @@ export class Play {
     return { x: Math.min(pos.x, FIELD_LEN - 0.5), y: clamp(pos.y, 1, FIELD_W - 1) };
   }
 
+  /** The line's run-blocking rules for this play. */
+  get runScheme(): RunScheme {
+    return this.playDef.scheme?.run ?? 'zone';
+  }
+
+  /** Draw: the line is still showing pass. */
+  passSet(): boolean {
+    return this.runScheme === 'draw' && this.time - this.snapTime < DRAW_SET;
+  }
+
+  /** Run blocking rules are in effect for engagements (designed run, ball not thrown, draw set done). */
+  runBlocking(): boolean {
+    return this.playDef.block === 'run' && !this.thrown && !this.passSet();
+  }
+
   snap(): void {
     if (this.phase !== 'presnap') return;
     this.phase = 'snap';
@@ -272,7 +330,7 @@ export class Play {
     const to = { x: this.qb.pos.x, y: this.qb.pos.y, z: 1.2 };
     launch(this.ball, from, to, dist(from, to) / 16, 0.15, 'snap');
     if (this.readKey) this.keyCrash = this.rng() < KEY_CRASH;
-    if (this.playDef.block === 'run') this.assignRunBlocks();
+    if (this.playDef.block === 'run' && this.runScheme !== 'draw') assignRunBlocks(this);
     else this.assignProtection();
     for (const d of this.def) {
       const r = d.manTarget;
@@ -284,33 +342,11 @@ export class Play {
         if (d.role === 'DL') continue;
         const t = d.manTarget;
         if (t && !t.isBlocker) continue; // still has a receiver (or the back) to mirror
-        const read = 0.35 + (1 - d.r.awr / 100) * 0.5 + (d.assign?.kind === 'deep' ? 0.3 : 0);
+        const read =
+          0.35 + (1 - d.r.awr / 100) * 0.5 + (d.assign?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0);
         d.fitAt = this.snapTime + read;
         d.fitUntil = Infinity;
       }
-    }
-  }
-
-  /** Down linemen get the nearest lineman, uncovered linemen climb to a backer, the rest stalk. The zone-read key is left alone. */
-  private assignRunBlocks(): void {
-    const ol = this.off.filter((o) => o.role === 'OL' && !o.pull);
-    const dl = this.def.filter((d) => d.role === 'DL' && d !== this.readKey);
-    for (const r of dl) {
-      let best: Player | null = null;
-      for (const b of ol) if (!b.mark && (!best || Math.abs(b.pos.y - r.pos.y) < Math.abs(best.pos.y - r.pos.y))) best = b;
-      if (best) best.mark = r;
-    }
-    const marked = () => new Set(this.off.map((o) => o.mark));
-    for (const b of this.off) {
-      if (b.mark || !b.isBlocker || b.pull) continue;
-      const taken = marked();
-      let best: Player | null = null;
-      for (const d of this.def) {
-        if (taken.has(d) || d === this.readKey || d.pos.x < b.pos.x - 1) continue;
-        if (b.role === 'OL' && d.role !== 'LB') continue;
-        if (!best || dist(d.pos, b.pos) < dist(best.pos, b.pos)) best = d;
-      }
-      b.mark = best;
     }
   }
 
@@ -324,7 +360,7 @@ export class Play {
     const dl = rushers.filter((d) => d.role === 'DL').sort(byY);
     const blitzers = rushers.filter((d) => d.role !== 'DL');
     const ol = this.off.filter((o) => o.role === 'OL');
-    const backs = this.off.filter((o) => o.isBlocker && o.role !== 'OL');
+    const backs = this.off.filter((o) => o.isBlocker && o.role !== 'OL' && !o.stalk);
     const take = (pool: Player[], r: Player, metric: (b: Player) => number) => {
       let best: Player | null = null;
       for (const b of pool) if (!b.mark && (!best || metric(b) < metric(best))) best = b;
@@ -385,6 +421,13 @@ export class Play {
     }
     if (this.controlled) this.userControl(input, dt);
 
+    if (this.runBlocking()) releaseClimbers(this);
+    if (this.playDef.screen && !this.screenReleased && this.phase !== 'presnap' && this.time - this.snapTime >= SCREEN_SET) {
+      // Let the rush go: every lineman comes off his man and releases to block for the screen.
+      this.screenReleased = true;
+      for (const d of this.def) if (d.engagedBy.some((b) => b.role === 'OL')) this.release(d);
+      for (const o of this.off) if (o.role === 'OL') o.mark = null;
+    }
     this.updateEngagements(dt);
     for (const p of this.players) stepPlayer(p, dt);
     this.anchorBlockers();
@@ -424,6 +467,10 @@ export class Play {
   private updateLive(input: Input, cam: Camera): void {
     const qb = this.qb;
     if (this.carrier !== qb) return;
+    if (this.playDef.read === 'option' && qb.pos.x > this.los - 0.3) {
+      this.optionKeep();
+      return;
+    }
     if (!this.scramble && qb.pos.x > this.los + 0.3) {
       this.scramble = true;
       this.aim = null;
@@ -434,7 +481,11 @@ export class Play {
       this.handoff();
       return;
     }
-    if (this.readKey && this.updateMesh()) return;
+    if (this.playDef.qbRun) {
+      this.startQbRun();
+      return;
+    }
+    if (this.playDef.read === 'zoneRead' && this.updateMesh()) return;
     if (this.playDef.kind === 'pa' && !this.faked && this.time - this.snapTime < 1.3 && dist(this.rb.pos, qb.pos) < FAKE_RANGE) {
       this.sellFake();
     }
@@ -473,7 +524,7 @@ export class Play {
     const rb = this.rb;
     this.aim = null;
     this.handedOff = true;
-    this.reactToRun(this.readKey && !this.keyCrash ? this.readKey : null);
+    this.reactToRun(this.readKey && !this.keyCrash && this.playDef.read === 'zoneRead' ? this.readKey : null);
     if (kind === 'pitch') {
       const t = dist(qb.pos, rb.pos) / PITCH_SPEED;
       // Lead the back along his path even if he's only just starting to move.
@@ -501,6 +552,15 @@ export class Play {
     this.phase = 'run';
   }
 
+  /** Designed QB carry: once he has the snap it's a run, and the defense reads it as one. */
+  startQbRun(): void {
+    if (!this.playDef.qbRun || this.phase !== 'live' || this.carrier !== this.qb) return;
+    if (this.time - this.snapTime < (QB_RUN_WAIT[this.runScheme] ?? 0)) return;
+    this.aim = null;
+    this.reactToRun();
+    this.phase = 'run';
+  }
+
   /**
    * Zone read: ride the back through the mesh. Once he's carried past the QB
    * without a give (or never got there), the QB pulls it. Returns true on a keep.
@@ -515,24 +575,47 @@ export class Play {
     return false;
   }
 
-  /** The read key is coming down the line at the back (moving inside, not just upfield): the cue to pull it. */
+  /**
+   * The read key is going after the back rather than the QB: the cue to pull it. A backside key
+   * crashes down the line; a playside key (power read) runs with the sweep.
+   */
   keyCrashing(): boolean {
     const k = this.readKey;
-    if (!k) return false;
-    const inside = Math.sign(this.ballY - k.start.y);
-    return (k.pos.y - k.start.y) * inside > 1.5 || k.vel.y * inside > 4.5;
+    if (!k || len(k.vel) < 1.5) return false;
+    const v = norm(k.vel);
+    const at = (p: Player) => {
+      const d = norm(sub(p.pos, k.pos));
+      return v.x * d.x + v.y * d.y;
+    };
+    return at(this.rb) > at(this.qb) + 0.15;
   }
 
-  /** Zone read keep: the QB runs for the alley outside wherever the read key is, and the back carries out his fake. */
+  /**
+   * Zone read keep: the QB runs for the alley outside wherever the read key is, and the back carries
+   * out his fake. On power read he keeps it inside the key instead, behind the pulling guard.
+   */
   private keep(): void {
     const key = this.readKey!;
     const out = Math.sign(key.start.y - this.ballY) || -this.resolved.strongSign;
     this.kept = true;
     this.aim = null;
-    this.hole = { x: this.los + 1, y: clamp(key.pos.y + out * KEEP_WIDTH, 2, FIELD_W - 2) };
+    const y = this.playDef.keep === 'inside' ? key.start.y - out * KEEP_INSIDE : key.pos.y + out * KEEP_WIDTH;
+    this.hole = { x: this.los + 1, y: clamp(y, 2, FIELD_W - 2) };
     // He's been riding the mesh, so he pulls it already moving.
     this.qb.vel = scale(norm(sub(this.hole, this.qb.pos)), maxSpeed(this.qb) * 0.5);
     this.reactToRun(this.keyCrash ? key : null);
+    this.phase = 'run';
+    this.popup('KEEP', this.qb.pos, '#9ad7ff');
+  }
+
+  /** Speed option: the QB got to the line without pitching it, so he keeps it and turns up inside the key. */
+  private optionKeep(): void {
+    const key = this.readKey!;
+    const out = Math.sign(key.start.y - this.ballY) || this.resolved.strongSign;
+    this.kept = true;
+    this.aim = null;
+    this.hole = { x: this.los + 1.5, y: clamp(key.pos.y - out * OPTION_CUT, 2, FIELD_W - 2) };
+    this.reactToRun(this.keyCrash ? null : key); // a key who took the pitch man is late to the QB
     this.phase = 'run';
     this.popup('KEEP', this.qb.pos, '#9ad7ff');
   }
@@ -660,10 +743,11 @@ export class Play {
         bestD = p;
       }
     }
+    this.catchSet = bestO ? facingQB(bestO, this.qb, this.time) : 0;
     const res = oob
       ? 'miss'
       : resolveCatch(
-          bestO ? { pos: so, cth: bestO.r.cth } : null,
+          bestO ? { pos: so, cth: bestO.r.cth, set: this.catchSet } : null,
           bestD ? { pos: sd, cth: bestD.r.cth, awr: bestD.r.awr } : null,
           this.rng,
         );
@@ -738,18 +822,24 @@ export class Play {
 
   private formEngagements(): void {
     if (this.phase === 'presnap' || this.phase === 'over') return;
-    const runBlocking = this.phase === 'run' && this.carrier?.side === 'off';
+    const downfield = this.phase === 'run' && this.carrier?.side === 'off';
     for (const b of this.off) {
-      if (b.down || b.engaged || b.stun > 0 || b === this.carrier || b.role === 'QB') continue;
-      if (!b.isBlocker && !runBlocking) continue;
+      if (b.down || b.engaged || b.stun > 0 || b === this.carrier || b.role === 'QB' || b.pull) continue; // pullers don't stop to block on the way
+      if (!b.isBlocker && !downfield) continue;
       for (const d of this.def) {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
-        if (runBlocking && dist(d.pos, this.carrier!.pos) > 10) continue;
-        if (!runBlocking && d === this.readKey) continue; // left unblocked on purpose
+        if (downfield && dist(d.pos, this.carrier!.pos) > 10) continue;
+        if (!downfield && d === this.readKey) continue; // left unblocked on purpose
         if (d.engagedBy.length === 1 && b.mark !== d) continue;
         // Blockers with an assignment work to their man rather than grabbing whoever they bump into.
-        if (!runBlocking && b.isBlocker && b.mark && !b.mark.down && b.mark !== d) continue;
-        if (dist(b.pos, d.pos) < 1.0) {
+        // On runs too, as long as their man is still close enough to matter.
+        if (b.isBlocker && b.mark && !b.mark.down && b.mark !== d && (!downfield || dist(b.pos, b.mark.pos) < 4)) continue;
+        if (dist(b.pos, d.pos) < (b.mark === d && this.runBlocking() ? RUN_ENGAGE : 1.0)) {
+          if (!d.engagedBy.length && this.runBlocking()) {
+            // A new run block: note which side the blocker has him from, and roll how it goes.
+            d.blockDir = norm(sub(b.pos, d.pos));
+            d.blockRoll = gauss(this.rng) * BLOCK_ROLL_SD;
+          }
           b.engaged = d;
           d.engagedBy.push(b);
           break;
@@ -761,6 +851,7 @@ export class Play {
   private release(d: Player): void {
     for (const b of d.engagedBy) b.engaged = null;
     d.engagedBy = [];
+    d.blockDir = null;
   }
 
   private updateEngagements(dt: number): void {
@@ -771,11 +862,14 @@ export class Play {
         this.release(d);
         continue;
       }
+      if (this.runBlocking()) {
+        if (this.rng() < runEngagement(this, d) * dt) this.shed(d);
+        continue;
+      }
       const n = d.engagedBy.length;
       const dir = norm(sub(d.goal ?? this.qb.pos, d.pos));
       const blk = d.engagedBy.reduce((s, b) => s + b.r.blk, 0) / n;
-      const runBlocking = this.playDef.block === 'run' && !this.thrown;
-      const power = d.r.str * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15 - (runBlocking ? RUN_BLOCK_EDGE : 0);
+      const power = d.r.str * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15;
       const push = clamp(0.8 + power * 0.06, -0.8, 2.2);
       d.want = scale(dir, push);
       for (const b of d.engagedBy) b.want = scale(dir, push);
@@ -791,12 +885,14 @@ export class Play {
         if (dc > 8) shedRate = 2.5;
         else if (dc < 2.2) shedRate = Math.max(shedRate, clamp(2.2 + power * 0.05, 0.8, 5));
       }
-      if (this.rng() < shedRate * dt) {
-        for (const b of d.engagedBy) b.stun = 0.35;
-        this.release(d);
-        d.noEngage = 1.3;
-      }
+      if (this.rng() < shedRate * dt) this.shed(d);
     }
+  }
+
+  private shed(d: Player): void {
+    for (const b of d.engagedBy) b.stun = 0.35;
+    this.release(d);
+    d.noEngage = 1.3;
   }
 
   /** Keep each blocker locked between its defender and the defender's goal. */
@@ -804,7 +900,7 @@ export class Play {
     for (const d of this.def) {
       const n = d.engagedBy.length;
       if (!n) continue;
-      const dir = norm(sub(d.goal ?? this.qb.pos, d.pos));
+      const dir = this.runBlocking() && d.blockDir ? d.blockDir : norm(sub(d.goal ?? this.qb.pos, d.pos));
       d.engagedBy.forEach((b, i) => {
         const off = n === 1 ? 0 : i === 0 ? -0.45 : 0.45;
         const ax = d.pos.x + dir.x * 0.85 - dir.y * off;
@@ -827,7 +923,8 @@ export class Play {
       const arm = t.engagedBy.length > 0;
       if (dist(t.pos, c.pos) > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
       const juking = this.jukeTimer > 0 && c === this.controlled;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, juking) * (arm ? ARM_TACKLE : 1)) {
+      const armOdds = arm ? ARM_TACKLE * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
+      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str, juking) * armOdds) {
         this.tackled(c, t);
         return;
       }
@@ -843,6 +940,8 @@ export class Play {
   }
 
   private tackled(c: Player, t: Player): void {
+    // Carriers going forward fall forward (yards after contact); returners and sacks don't.
+    if (c.side === 'off') c.pos = { x: Math.min(c.pos.x + fallForward(c.vel.x, c.r.str, t.r.str), OPP_GOAL - 0.01), y: c.pos.y };
     knockDown(c);
     knockDown(t);
     const spot = c.pos.x;

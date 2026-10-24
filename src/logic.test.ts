@@ -17,8 +17,11 @@ import {
 } from './game/rules';
 import { CALM, fgCheck, fgDistance, POSTS_X, POSTS_Y, predictKick, UPRIGHT_HALF, type BounceProfile } from './sim/kicking';
 import { flightPos, passParams } from './sim/ball';
+import { cutKeep, facingQB } from './sim/ai';
 import { catchOdds } from './sim/catching';
-import { tackleChance } from './sim/tackling';
+import { maxSpeed } from './sim/player';
+import { runEngagement } from './sim/runBlocking';
+import { fallForward, tackleChance } from './sim/tackling';
 
 const out = (type: PlayOutcome['type'], spot: number): PlayOutcome => ({ type, spot, spotY: 26, text: '', sub: '', color: '' });
 
@@ -71,6 +74,87 @@ describe('catching', () => {
     expect(contested).toBeLessThan(open);
     expect(contested).toBeGreaterThan(0.35);
     expect(contested).toBeLessThan(0.7);
+  });
+  it('a set receiver facing the QB catches a little more often', () => {
+    const off = catchOdds({ pos: 0.8, cth: 80 }, null).catch;
+    expect(catchOdds({ pos: 0.8, cth: 80, set: 0 }, null).catch).toBe(off);
+    const set = catchOdds({ pos: 0.8, cth: 80, set: 1 }, null).catch;
+    expect(set).toBeGreaterThan(off);
+    expect(set - off).toBeLessThan(0.06);
+    const d = { pos: 0.9, cth: 65, awr: 80 };
+    const contested = catchOdds({ pos: 0.9, cth: 80 }, d).catch;
+    const contestedSet = catchOdds({ pos: 0.9, cth: 80, set: 1 }, d).catch;
+    expect(contestedSet).toBeGreaterThan(contested);
+    expect(contestedSet - contested).toBeLessThan(0.06);
+  });
+});
+
+describe('route running', () => {
+  const offR = generateRoster(TEAMS[0]);
+  const defR = generateRoster(TEAMS[1]);
+  const idle = {
+    mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
+    axis: () => ({ x: 0, y: 0 }), isDown: () => false, hit: () => false, endStep: () => {},
+  } as unknown as Input;
+  const cam = new Camera();
+  /** Snap `id` and follow the (non-back) receiver on `route`, recording his speed each step. */
+  const follow = (id: string, route: string, secs: number) => {
+    const p = new Play({
+      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: PLAYBOOK.find((x) => x.id === id)!,
+      defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1),
+    });
+    const r = p.off.find((o) => o.routeName === route && o.role !== 'RB')!;
+    p.snap();
+    const speeds: number[] = [];
+    let setAt = Infinity;
+    for (let t = 0; t < secs; t += STEP) {
+      p.update(STEP, idle, cam);
+      speeds.push(Math.hypot(r.vel.x, r.vel.y));
+      if (setAt === Infinity && facingQB(r, p.qb, p.time) >= 1) setAt = p.time - p.snapTime;
+    }
+    return { p, r, speeds, setAt, top: maxSpeed(r) * 0.95 };
+  };
+
+  it('cutKeep: full speed through a slight bend, a plant on a come-back, sharper with acc', () => {
+    expect(cutKeep(10, 75)).toBe(1);
+    expect(cutKeep(150, 75)).toBeLessThan(0.5);
+    expect(cutKeep(90, 95)).toBeGreaterThan(cutKeep(90, 60));
+  });
+  it('a go route builds to top speed out of the snap and is never set', () => {
+    const { speeds, top, setAt } = follow('four-verts', 'go', 2);
+    const reach = speeds.findIndex((v) => v >= top * 0.95) * STEP;
+    expect(reach).toBeGreaterThan(0.5);
+    expect(reach).toBeLessThan(1.0);
+    expect(setAt).toBe(Infinity);
+  });
+  it('a slant keeps most of its speed through the break; a hitch nearly stops at his', () => {
+    const slant = follow('slant-flat', 'slant', 1.2);
+    expect(Math.min(...slant.speeds.slice(30))).toBeGreaterThan(slant.top * 0.6);
+    const hitch = follow('double-hitch', 'hitch', 1.1);
+    expect(Math.min(...hitch.speeds.slice(45))).toBeLessThan(hitch.top * 0.5);
+  });
+  it('a curl plants, settles short of an overrun and squares up to the QB', () => {
+    const { p, r, speeds, setAt, top } = follow('curl-flat', 'curl', 3);
+    const stem = speeds[Math.round(1.0 / STEP)];
+    expect(stem).toBeGreaterThan(top * 0.95);
+    expect(Math.min(...speeds.slice(Math.round(1.0 / STEP), Math.round(2.2 / STEP)))).toBeLessThan(top * 0.3);
+    expect(r.pos.x - 35).toBeLessThan(12.5); // breaks at 12 and comes back, no long overrun
+    expect(setAt).toBeLessThan(2.3);
+    expect(setAt + p.snapTime - r.turnAt).toBeLessThan(0.4); // turned within 0.4 s of starting the turn
+  });
+  it('run paths, fakes and lead paths keep their old motion', () => {
+    const p = new Play({
+      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: PLAYBOOK.find((x) => x.id === 'inside-zone')!,
+      defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1),
+    });
+    expect(p.rb.passRoute).toBe(false);
+    const pa = PLAYBOOK.find((x) => x.id === 'pa-post')!;
+    const q = new Play({
+      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: pa,
+      defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1),
+    });
+    expect(q.rb.passRoute).toBe(false);
+    expect(q.off.some((o) => o.passRoute && o.role === 'WR')).toBe(true);
   });
 });
 
@@ -360,8 +444,9 @@ describe('playbook', () => {
   };
 
   it('the migrated playbook resolves to the old route maps, alignments and cast', () => {
-    expect(PLAYBOOK.map((p) => p.id).sort()).toEqual(Object.keys(OLD).sort());
-    for (const p of PLAYBOOK) {
+    const ids = PLAYBOOK.map((p) => p.id);
+    for (const id of Object.keys(OLD)) expect(ids).toContain(id);
+    for (const p of PLAYBOOK.filter((x) => x.id in OLD)) {
       const r = resolvePlay(p, MID, false);
       expect(r.routes, p.id).toEqual(OLD[p.id]);
       expect(r.align, p.id).toEqual(p.formation.align);
@@ -476,7 +561,7 @@ describe('playbook', () => {
   });
 
   it('11-personnel plays keep every call exactly as written', () => {
-    for (const p of PLAYBOOK) {
+    for (const p of PLAYBOOK.filter((x) => personnelOf(x.formation) === '11')) {
       for (const call of DEF_CALLS) {
         for (const flip of [false, true]) {
           const plan = matchDefense(call, p, resolvePlay(p, MID, flip));
@@ -571,5 +656,167 @@ describe('playbook', () => {
       expect(handoffKind({ x: 0, y: 0 }, { x: -1, y: 2.5 }, 5)).toBe('pitch');
       expect(handoffKind({ x: 0, y: 0 }, { x: -1, y: 2.5 }, 5, 3.2)).toBe('handoff');
     });
+  });
+});
+
+describe('run blocking', () => {
+  const MID = 26.65;
+  const offR = generateRoster(TEAMS[0]);
+  const defR = generateRoster(TEAMS[1]);
+  const book = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
+  const idle = {
+    mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
+    axis: () => ({ x: 0, y: 0 }), isDown: () => false, hit: () => false, endStep: () => {},
+  } as unknown as Input;
+  const cam = new Camera();
+  const snapAt = (def: PlayDef, call: DefCall = DEF_CALLS[0], seed = 1) => {
+    const p = new Play({
+      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: def, defCall: call,
+      press: {}, los: 35, ballY: MID, rng: mulberry32(seed),
+    });
+    p.snap();
+    return p;
+  };
+  /** Run the play, handing off as soon as the back can take it. */
+  const run = (p: Play, secs: number) => {
+    for (let t = 0; t < secs && p.phase !== 'over'; t += STEP) {
+      if (p.handoffOption() === 'handoff') p.handoff();
+      if (p.handedOff) p.controlled = null;
+      p.update(STEP, idle, cam);
+    }
+  };
+  const at = (p: Play, slot: string) => [...p.off, ...p.def].find((o) => o.slot === slot)!;
+
+  it('zone: uncovered linemen double a down lineman, then climb to a backer', () => {
+    const p = snapAt(book('inside-zone'));
+    const climbers = p.off.filter((o) => o.climb);
+    expect(climbers.length).toBeGreaterThan(0);
+    for (const c of climbers) {
+      expect(c.mark?.role).toBe('DL');
+      expect(p.off.filter((o) => o.mark === c.mark).length).toBe(2); // the double team
+      expect(['LB', 'S', 'CB']).toContain(c.climb!.role);
+    }
+    // Every down lineman is somebody's man (the backside end gets cut off).
+    for (const d of p.def.filter((x) => x.role === 'DL')) expect(p.off.some((o) => o.mark === d)).toBe(true);
+    const lb = climbers[0].climb!;
+    run(p, 1.0);
+    expect(climbers[0].climb).toBeNull();
+    expect(climbers[0].mark === lb || climbers[0].engaged === lb || lb.down).toBe(true);
+  });
+
+  it('gap: the line blocks down and the backside tackle hinges for the pulled guard', () => {
+    const p = snapAt(book('power'), DEF_CALLS[2]);
+    const lt = at(p, 'LT');
+    expect(lt.mark).toBeNull();
+    expect(lt.hinge).not.toBeNull();
+    expect(lt.hinge!.y).toBeGreaterThan(lt.pos.y); // toward the guard's spot
+    const y0 = lt.pos.y;
+    const end = at(p, 'DE1');
+    expect(p.off.some((o) => o.mark === end)).toBe(false); // the backside end is left alone
+    run(p, 0.6);
+    expect(lt.pos.y).toBeGreaterThan(y0 + 0.4); // stepped inside
+    run(p, 0.9);
+    expect(lt.hinge).toBeNull(); // took whoever came, or worked up to the next man
+    expect(lt.mark).not.toBeNull();
+  });
+
+  it('a winning run block washes the defender away from the hole', () => {
+    // Over many reps the playside 3-technique ends up inside his start (Power hits outside him, to +y).
+    let moved = 0;
+    for (let seed = 1; seed <= 24; seed++) {
+      const p = snapAt(book('power'), DEF_CALLS[0], seed);
+      const dt = at(p, 'DT2');
+      const y0 = dt.pos.y;
+      run(p, 0.9);
+      moved += dt.pos.y - y0;
+    }
+    expect(moved / 24).toBeLessThan(-0.15);
+  });
+
+  it('trap: the first lineman playside of the center is left for the pulling guard', () => {
+    const trap: PlayDef = {
+      ...book('power'), id: 'trap-t', scheme: { run: 'trap', pulls: [{ who: 'LG', job: 'kick' }] },
+    };
+    const p = snapAt(trap);
+    const dt = at(p, 'DT2'); // lined up over the right guard
+    const lg = at(p, 'LG');
+    expect(p.off.some((o) => o.mark === dt)).toBe(false);
+    expect(lg.pullTarget).toBe(dt);
+    run(p, 1.0);
+    expect(lg.mark).toBe(dt);
+  });
+
+  it('draw: the line shows pass, then run blocks', () => {
+    const draw: PlayDef = { ...book('inside-zone'), id: 'draw-t', scheme: { run: 'draw' } };
+    const p = snapAt(draw);
+    expect(p.passSet()).toBe(true);
+    expect(p.runBlocking()).toBe(false);
+    run(p, 0.4);
+    const c = at(p, 'C');
+    expect(c.pos.x).toBeLessThan(p.los); // setting, not firing out
+    run(p, 0.6);
+    expect(p.passSet()).toBe(false);
+  });
+
+  it('a levered defender sheds far less often than one the carrier runs past on his free side', () => {
+    const p = snapAt(book('inside-zone'));
+    run(p, 0.7); // handed off and running
+    const rb = p.rb;
+    const d = at(p, 'DT2');
+    const b = at(p, 'RG');
+    for (const o of [...p.off, ...p.def]) o.engagedBy = [];
+    d.engagedBy = [b];
+    b.engaged = d;
+    d.pos = { x: p.los + 1, y: MID };
+    d.blockRoll = 0;
+    d.blockDir = { x: 0, y: 1 }; // the guard has him from the +y side
+    rb.pos = { x: p.los + 1, y: MID + 1.5 }; // the back runs past on the blocker's side
+    const levered = runEngagement(p, d);
+    rb.pos = { x: p.los + 1, y: MID - 1.5 }; // ...or past his free shoulder
+    const free = runEngagement(p, d);
+    expect(free).toBeGreaterThan(levered * 2);
+  });
+
+  it('a tackled ball carrier going forward falls forward', () => {
+    expect(fallForward(8, 76, 76)).toBeGreaterThan(1);
+    expect(fallForward(-2, 90, 60)).toBe(0);
+    expect(fallForward(30, 99, 40)).toBeLessThanOrEqual(2.2);
+  });
+});
+
+describe('playbook validity', () => {
+  const MIDY = 26.65;
+  it('every play has a unique id, a tip that fits the banner, and resolves on every hash, flipped or not', () => {
+    const ids = PLAYBOOK.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const p of PLAYBOOK) {
+      expect(p.tip.length, p.id).toBeGreaterThan(10);
+      expect(p.tip.length, p.id).toBeLessThanOrEqual(76); // one line of the call-screen banner
+      expect(p.name.length, p.id).toBeLessThanOrEqual(20); // fits the card
+      for (const y of [HASH_TOP, MIDY, HASH_BOT]) for (const f of [false, true]) expect(() => resolvePlay(p, y, f), p.id).not.toThrow();
+    }
+  });
+
+  it('has 60-80 scrimmage plays across every formation, with each tab filled', () => {
+    expect(PLAYBOOK.length).toBeGreaterThanOrEqual(60);
+    expect(PLAYBOOK.length).toBeLessThanOrEqual(80);
+    for (const f of FORMATIONS) expect(PLAYBOOK.some((p) => p.formation === f), f.name).toBe(true);
+    for (const k of ['pass', 'run', 'pa'] as const) expect(PLAYBOOK.filter((p) => p.kind === k).length, k).toBeGreaterThanOrEqual(15);
+  });
+
+  it('flip rules: trips and empty plays go to the field; balanced 2x2 shells are drawn as-is', () => {
+    for (const p of PLAYBOOK) {
+      if (p.id in { 'mesh': 1, 'dagger': 1, 'curl-flat': 1, 'rpo-bubble': 1 }) continue; // legacy plays stay fixed
+      if (p.formation === GUN_TRIPS || p.formation === EMPTY) expect(p.flip, p.id).toBe('field');
+    }
+  });
+
+  it('no two plays share a formation, both concepts, the backfield jobs and the scheme', () => {
+    const sig = (p: PlayDef) => JSON.stringify([p.formation.name, p.kind, p.strong, p.weak, p.backs, p.scheme, p.read, p.qbRun, p.screen]);
+    const seen = new Map<string, string>();
+    for (const p of PLAYBOOK) {
+      expect(seen.get(sig(p)), `${p.id} duplicates ${seen.get(sig(p))}`).toBeUndefined();
+      seen.set(sig(p), p.id);
+    }
   });
 });

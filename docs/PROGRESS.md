@@ -178,32 +178,252 @@ Design notes are in [PLAYBOOK.md](PLAYBOOK.md).
   - **Zone Read:** the auto-QB reads the key perfectly. Gives net about 6.1 / 3.0 / 3.5 YPC. Keeps net only 0.3 / -0.3 / -0.7: the auto-runner QB starts 5 yd deep and the alley defender (the NB or CB1 in man, the robber in Cover 1) gets him near the line. A keep against a home key loses about 2.3. The old 11.3 against Cover 1 was a handful of long IZ runs in 60 reps.
   - **Toss** moved (2 Man 5.7 → 11.0, Cover 0 0.7 → -1.3) only because Power now uses the shared RNG differently. Nothing about Toss changed; the rows are just noisy at 60 reps.
 
+## Done: run blocking and a 62-play playbook (2026-10-24)
+Design notes are in [PLAYBOOK.md](PLAYBOOK.md).
+
+### Run blocking (`sim/runBlocking.ts`)
+Runs into the middle used to die in the DL. Four things caused it:
+- An engaged block moved toward the ball carrier.
+- Every blocked defender shed as soon as the back got within 2.2 yd.
+- Linemen took the nearest DL with no scheme.
+- After the handoff, every blocker dropped his assignment for the nearest defender.
+
+The new model:
+- **Schemes (`scheme.run`):**
+  - `zone`: covered and playside-gap rules. Uncovered linemen double, then climb to the backer when he declares (`COMBO_CLIMB`), with a cut-off on the backside end.
+  - `stretch`: the same rules, but reach blocks give up `REACH_PENALTY` of their edge.
+  - `gap`: down blocks. The backside tackle hinges for the pulled guard and then works up after `HINGE_HOLD`. Down linemen far backside are left to chase.
+  - `trap`: the first lineman playside of the center is left for the pulling guard.
+  - `draw`: the line pass-sets for `DRAW_SET`, then run-blocks.
+- **Engagements:**
+  - Each run block rolls its outcome at contact (`BLOCK_ROLL_SD`).
+  - A winning blocker drives his man back and washes him off the hole (`WASH_RATE`).
+  - A losing blocker gets worked around, and the defender penetrates.
+  - The blocker keeps the side he got (`blockDir`), so **leverage** matters. A defender his blocker has leverage on rarely sheds (`SHED_LEVERED`) and only gets a weak arm tackle (`ARM_LEVERED`). One the back runs past on his free shoulder sheds fast.
+- **Blockers:**
+  - Assigned blockers get their hands on their man from `RUN_ENGAGE` (1.4 yd).
+  - They take the angle to where their man is going.
+  - After the handoff they wall him off from the carrier.
+  - They keep their assignments for the whole run.
+  - Pullers run tight to the line, don't stop to block on the way, and pick their man by the hole. A latent bug where kick-outs ran as leads is fixed.
+- **Defense:**
+  - Backers fit at `LB_FIT_DEPTH` (2.8 yd), not at the line.
+  - A backer or DB in the box loses 15% speed working through traffic (`TRASH_*`).
+  - Man defenders on a back still behind the line hold at `MAN_DEPTH` instead of charging into the backfield.
+  - Deep safeties read run faster.
+  - Pursuers lead the carrier up to `PURSUIT_LEAD` (2 s), so deep defenders take angles.
+- **Tackling:** a carrier going forward falls forward (`fallForward`, about 1.4 yd at full speed), which gives yards after contact.
+- **Auto-runner (harness only):** reads the line for the lane with the most time to spare. Zone runs can cut back (`ZONE_READ_W`); gap runs stay near the hole.
+- **QB runs:** a designed QB carry is now a run phase. The defense reads it and `autoRun` can carry it.
+
+**FBS targets** for the harness auto-runner (all targets are kept in [TARGETS.md](TARGETS.md)):
+- FBS teams average about 4.4 yards per rush (AP, 2018–21, sacks included). Starting backs gain about 3.1 yards after contact (PFF).
+- Stuff rate, opportunity rate (4+) and power success are as defined by Football Study Hall.
+- The league-wide levels used are from general knowledge, not one current table: about 18% stuffs, about 45% gaining 4+, about 12% gaining 10+, median about 3, power success about 70%.
+
+The original five runs (IZ, OZ, Power, Toss, Zone Read), averaged over the three calls:
+
+| | YPC | Median | Stuffs | 4+ | 10+ |
+| --- | --- | --- | --- | --- | --- |
+| Before (old harness) | 3.8 | 1.1 | 33% | — | 10% |
+| After | 5.1 | 2.9 | 16% | 30% | 13% |
+| FBS target | 4.5–5.5 | ~3 | ~18% | ~45% | ~12% |
+
+- **Inside Zone:** 6.7 / 5.6 / 2.0 YPC against 2 Man / Cover 1 / Cover 0. Against light boxes the medians are 3.2 and 4.0.
+- **Cover 0:** runs went from mostly stuffs to 2–6 YPC.
+- **Short yardage (3rd and 1):** Power 84–85%, Iso 89–92%, QB Sneak 74–79%.
+- **Still short of the target:** the 4+ rate (about 30% against about 45%). Too many runs end in 1–3 yards.
+
+### Harness (`npm run balance`)
+- **The auto-QB's aim is clamped in bounds.** This fixes the known flats-out-of-bounds bug, so every pass row moved once (see the baseline).
+- **YAC bug fixed:** a catch that ended the play the same step (out of bounds at the sideline) never recorded a catch spot. That was the source of the 40–60 yd YAC readings.
+- **Auto-QB changes:**
+  - It skips a back who is still selling pass before his route.
+  - It waits out the draw's fake set.
+  - On the option, it pitches once the key commits to the QB.
+- **Run rows:**
+  - New columns: `median`, `4+`, and `contact` (yards past the LOS at first contact).
+  - 180 reps per row.
+  - QB runs are included, and RPOs are included as give-only rows.
+- **New `SHORT` rows:** 3rd-and-1 conversion for plays tagged `short`.
+- **`BAL_ONLY=a,b`:** limits the per-play rows to those ids or kinds. A full report takes about 60 s.
+
+### Playbook: 18 → 62 plays
+26 pass, 20 run and 16 PA/RPO, using all seven formations.
+
+**New concepts** (`data/concepts.ts`):
+- the common NFL pairs: `double-hitch`, `double-slant`, `go-post`, `go-hitch`, `in-cross`
+- `stick`, `flood`, `drive`, `mills`, `cross-go` (Y-Cross), `double-out`, `corner-out` (which finally use `quickOut`), `spacing`, `snag`
+- screens (`smoke`, `tunnel`)
+- the under-center PA combos (`post-cross`, `cross-corner`, `cross-drag`, `go-corner`, `corner-flat`)
+- `pop` and `slice`
+
+**New routes:**
+- receivers: `cross`, `glance`, `smoke`, `tunnel`
+- backs: `checkFlat`, `screen`, `angle`
+- run paths: `izDeep`, `stretch`, `counter`, `trap`, `draw`, `iso`, `sweep`, `pitchPath`
+- lead blockers: `lead`, `kickOut`, `leadWide`, `slice`, `qbLead`
+
+**New mechanics:**
+- `RouteDef.delay`/`delayBlock`: screens, check-releases and the draw. The back sells pass within `DELAY_SET_RANGE` of his spot.
+- Lead blockers (`RouteDef.lead`): the FB, H or TE runs the path, then run-blocks.
+- `PlayDef.screen`: the line pass-sets for `SCREEN_SET`, then releases.
+- Detached receivers who block **stalk** a DB. Their man doesn't hug-rush, and they're out of the protection pool. This fixed screens being sacked almost every time.
+- `PlayDef.qbPath` and `QB_RUN_WAIT` for QB runs.
+- The zone read gains `key: 'play'` and `keep: 'inside'` (Power Read).
+- The new `read: 'option'` (Speed Option). The key either takes the QB or widens with the pitch man.
+- `keyCrashing()` now asks whether the key is running at the back or at the QB, so it works for either key.
+
+**Flip rules:**
+- `field`: trips, empty, screens and perimeter runs
+- `boundary`: Power O, Counter, Duo, Iso and the boots (boot back to the field)
+- `fixed`: balanced 2x2 shells and the 18 legacy plays
+
+### Call screen
+- Formation chips under the PASS / RUN / PLAY ACTION tabs: A/D or the wheel switches them, and a click works too. The chip is remembered per tab.
+- A 3×3 card grid, with W/S to page.
+- Cards zoom to their own play, so runs are readable, and pull paths are drawn as dotted lines.
+
+### Tests
+75 total (71 run by `npm test`).
+- **New `run blocking` tests:**
+  - zone combos and the climb
+  - gap down blocks and the hinge
+  - wash
+  - trap
+  - draw
+  - leverage shed
+  - fall-forward
+- **New `playbook validity` tests:**
+  - unique ids, tip and name lengths, and resolving on every hash, flipped or not
+  - 60–80 plays covering all formations
+  - trips and empty plays flip to the field
+  - no duplicate signatures
+- **Legacy tests:** the route-map test now checks the 18 legacy plays as a subset, and the "keeps every call" test covers 11-personnel plays only.
+
+### Flags: plays that are clearly overpowered or useless (not tuned)
+Criteria:
+- **Overpowered:** a pass play at 12+ YPP at both holds against two or more calls, or a run at 8+ YPC against two or more calls.
+- **Useless:** a pass play at 2 or fewer YPP everywhere, or a run at 1.5 or fewer YPC everywhere.
+
+Rows are from the final report.
+
+**Overpowered:**
+- **Go Post:** 13–21 YPP at both holds against Cover 1 and Cover 0 (9–18 against 2 Man).
+- **PA Boot Flood:** 12–21 YPP at both holds against Cover 1 and Cover 0.
+- **Close to the bar against Cover 1 only:** PA Post (21–24 YPP), Ace Max Shot (17–23), PA Seams.
+
+**Useless or broken (a mechanic gap rather than a tuning problem):**
+- **Power Read** (about 1.0 YPC): with the line blocking down, the gun sweep has to cover about 12 yd sideways before it turns up. A squeezing key or the WILL gets him in the backfield. It needs a perimeter blocker or a faster sweep path.
+- **Draw** (0.3 YPC; −1.3 against Cover 0): a four-man rush reaches the mesh while the line is still selling pass. Draws need the DL to rush past the back, or a deeper mesh.
+- **QB Power** (0.4 YPC; 3rd and 1 converts 58% / 59% / 1%): after the guard pulls, the center blocks back on the 1-technique alone and loses often enough to stuff the waiting QB.
+- **Pin-Pull Sweep** (0.8 YPC): the playside guard and tackle pull from a gun sweep and get there behind the back.
+- **Counter GT** (1.7 YPC; contact −2.2): with both backside linemen pulling, the center can't hold the backside 1-technique.
+
+**Weak:**
+- **Lead Toss** (2.5 YPC, 44% stuffs; 0.2 against Cover 0).
+- **Empty QB Draw:** fine against 2 Man (3.5), but −1.1 against Cover 0, where six rush against five.
+
+**Strong run rows** (no run-defense calls exist yet, so every light box stays light):
+- Outside Zone against 2 Man: 10.2 YPC.
+- Speed Option against Cover 0: 10.4 YPC.
+- RPO Stick and Power Bubble give rows against 2 Man (8+ YPC, about 50% 10+): the routes take the man defenders out of the box. That's the point of an RPO, but the defense has no answer yet.
+
+**Harness artifacts, not play problems.** The auto-QB throws to the most open receiver at a fixed hold time:
+- At 1.2 s it throws to a flat still crossing the formation (Stick, Flood and Dagger: 5–20% completions, 12–26% INTs). At 2.2 s the same plays are fine.
+- At 2.2 s it dumps to a check-release back (Double Hitch, Double Slant, Drive, Corner Out: 90%+ completions at 0–2 YPP).
+- On Four Verts, Smash, Mesh, Post Wheel and the I-Form boots it takes the RB or FB flat (3–6 YPP, about 90% completions).
+- Smoke at 1.2 s (1–5 YPP): it's a one-step throw, and 1.2 s is late.
+
+**Near-duplicates:** none by the signature test. Four Verts, Smash and Mesh have near-identical rows only because the auto-QB throws the same RB flat on all three.
+
+## Done: route running, speed and settle catches (2026-10-24)
+Routes used to run at one speed: top speed about 0.45 s after the snap, every cut rounded off at full speed, and hitch, curl and comeback receivers overrunning their spot (the old curl ran to 12.7 yd and drifted back to 8.7).
+
+**Speed through a route** (`runRoute` in `sim/ai.ts`, pass routes only):
+- **Burst:** off the line and out of a cut at `BURST` (scaled by `acc`), tapering by `BURST_TAPER` near top speed. `accelOf` still caps it. A WR now reaches top speed at about 0.7 s instead of 0.5 s, and a go route is about 0.5 yd shorter at 1 s.
+- **Plant:** he brakes at `PLANT_DECEL` into each waypoint, down to `cutKeep` of top speed there.
+  - `cutKeep` depends on the turn angle and `acc`: about 0.96 on a slant for a sharp route runner, about 0.5 on a hitch or curl, and 1 on bends under 20°.
+  - Cuts are now tight, and settle routes stop on their spot (curl at 10.2, hitch at 5.5).
+- **Only pass routes are affected.** `Player.passRoute` is false for run paths, PA fakes and lead paths, so handoff timing and run blocking are untouched. The SHORT, punt, kickoff and FG rows came out byte-identical.
+- **Defense is unchanged.** Man coverage already follows a lagged position, so it stays tight on the release, and the gap opens where the receiver plants and bursts away.
+
+**Settle and face the QB:**
+- On a `settle` route (one that ends with `cont: false`: hitch, curl, comeback, smoke, RB screen), the receiver starts turning to the QB as he comes back down the final leg, or when he stops.
+  - The turn takes `TURN_TIME - 0.15·acc/100` (about 0.2–0.3 s), and the sprite turns when it's done.
+- `facingQB()` gives a 0..1 "set" value. It drops to 0 if he's moving faster than `SET_MAX_SPEED` and not back toward the QB, and it's always 0 on routes caught in stride.
+- `catchOdds` takes `set`:
+  - `SET_HANDS` (+0.04 to the hands factor)
+  - `SET_CONTEST` (+5% to his share of a contested ball)
+  - That's about +3–4 points on a contested hitch and less than 1 on an open one.
+- F1 debug shows each route runner's speed, or a green SET.
+
+**Harness:** new `ROUTE` rows (`BAL_ONLY=route`). They throw to the receiver on one route 0.3 s after his sharpest break (go, post and corner use the NFL time to break), with NFL comp % vs man and separation alongside for reference.
+
+**Before → after.** These are paired runs: the same seeds with the new profile on and off, at 1,200 reps per aggregate row and 600 per route row.
+
+| All pass plays | 1.2s comp / YPP | 2.2s comp / YPP |
+| --- | --- | --- |
+| 2 Man Under | 68.0 / 5.39 → 67.3 / 5.39 | 66.0 / 6.32 → 66.7 / 6.60 |
+| Cover 1 Robber | 69.6 / 7.68 → 71.0 / 6.99 | 67.2 / 7.98 → 64.2 / 7.79 |
+| Cover 0 Blitz | 70.7 / 8.78 → 69.0 / 8.23 | (sacks) -2.25 → -2.12 |
+| **PA:** 2 Man Under | 67.9 / 8.54 → 68.6 / 8.30 | 76.0 / 8.39 → 78.1 / 8.56 |
+| **PA:** Cover 1 Robber | 75.2 / 13.28 → 75.3 / 13.20 | 77.2 / 13.08 → 76.7 / **10.93** |
+| **PA:** Cover 0 Blitz | 76.9 / 15.31 → 75.0 / 14.55 | (sacks) 1.70 → 1.39 |
+
+| Route (thrown out of the break) | 2 Man comp | Cover 1 comp | Of the gain, from the set bonus |
+| --- | --- | --- | --- |
+| Hitch | 58 → 66% | 55 → 62% | about +3 / +1 |
+| Curl | 51 → 56% | 54 → 61% | about +5 / +10 (noisy) |
+| Comeback | 56 → 58% | 54 → 58% | 0 / +6 |
+| Slant | 61 → 61% (YPT 8.4 → 5.4) | 60 → 53% | none |
+| Deep out | 60 → 52% | 57 → 56% | none |
+| Dig | 51 → 48% | 53 → 53% | none |
+| Drag | 67 → 62% | 65 → 63% | none |
+
+**Flags (not tuned):**
+- The overpowered and useless lists are unchanged: Go Post and PA Boot Flood overpowered, Double Hitch "useless" (the check-release artifact).
+- **PA against Cover 1 at 2.2 s lost about 2 YPP.** It's spread over the boots: PA Boot Flood 15.7 → 13.8 and Ace Boot 7.0 → 5.6 (400-rep per-play check). Boot Flood was already flagged as overpowered.
+- **Deep out against 2 Man:** 60 → 52%. The plant on an 88° break costs speed the man defender doesn't lose.
+- **Quick-throw YAC is lower.** A slant caught 0.3 s after its break is still re-accelerating, so YPT fell from 8.4 to 5.4 (NFL 6.9). That eases the "high YAC on quick throws" bug below.
+- **Ace Y-Stick halved** (for example 9.2 → 4.6 against 2 Man at 1.2 s). It's a harness artifact: per target, the go and slant results barely moved, but the WRs are a little tighter at 1.2 s, so the "most open" QB throws the TE2 flat 478 times instead of 317.
+- **RB Screen rose** from about 2 to 6–8 YPP against 2 Man and Cover 1. The back now stops on his spot and is set. The NFL screen is 5.1 per target.
+- **Separation at arrival is still far below the NFL:** 0.0–0.9 yd against NFL 1.5–3.7, because man defenders run to the ball's landing spot. Real separation lives at the throw.
+
+**Tests:** 7 new ones covering the set catch bonus (open and contested, under 6 points), `cutKeep`, the go route's ramp and no set, the slant keeping speed vs the hitch stopping, the curl plant-settle-turn, and run, fake and lead paths left alone.
+
 ## Balance baseline
-From `npm run balance` (Georgia offense vs Alabama defense).
-- **Pass and PA rows:** an auto-QB throws to the most open receiver after a fixed hold time.
-- **Run rows:** an auto-QB hands off as soon as it can, and `autoRun` carries the ball (no jukes, so expect real players to do better).
+From `npm run balance` (Georgia offense vs Alabama defense), after the route-running work. The single-seed 120-rep rows below move a few points from run to run; use the paired table above for before/after.
+- **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
+- **Run rows:** the auto-QB hands off as soon as it can (it reads the zone-read key, waits out the draw, and pitches the option on the key), and `autoRun` reads the line for a lane. There are no jukes, so expect real players to do better.
 
-| Pass plays, defense | Hold | Comp | INT | Sacks | YAC |
+| All pass plays, defense | Hold | Comp | INT | Sacks | YPP |
 | --- | --- | --- | --- | --- | --- |
-| 2 Man Under | 2.2s | 72% | 0.0% | 7/120 | 10.6 |
-| Cover 1 Robber | 2.2s | 58% | 0.0% | 2/120 | 3.2 |
-| Cover 0 Blitz | 1.2s | 76% | 0.0% | 0/120 | 12.4 |
-| Cover 0 Blitz | 2.2s | n/a | n/a | 97/120 | n/a |
+| 2 Man Under | 1.2s | 70% | 4.2% | 0/120 | 4.9 |
+| 2 Man Under | 2.2s | 65% | 5.4% | 8/120 | 6.3 |
+| Cover 1 Robber | 2.2s | 72% | 0.0% | 8/120 | 8.4 |
+| Cover 0 Blitz | 1.2s | 67% | 2.5% | 0/120 | 7.3 |
+| Cover 0 Blitz | 2.2s | 64% | 4.0% | 95/120 | -2.1 |
 
-| PA plays, defense | Hold | Comp | INT | Sacks | YPP |
+| PA plays (dropback), defense | Hold | Comp | INT | Sacks | YPP |
 | --- | --- | --- | --- | --- | --- |
-| 2 Man Under | 2.2s | 62% | 3.6% | 9/120 | 7.9 |
-| Cover 1 Robber | 2.2s | 71% | 1.8% | 8/120 | 17.1 (vs 3.1 for straight dropbacks) |
+| 2 Man Under | 2.2s | 78% | 2.6% | 4/120 | 8.7 |
+| Cover 1 Robber | 2.2s | 80% | 1.8% | 7/120 | 15.8 |
+| Cover 0 Blitz | 1.2s | 72% | 3.3% | 0/120 | 14.1 |
 
-Runs, all plays and defenses: **3.8 YPC, median 1.1**, 33% for 0 or fewer yards, 10% gain 10 or more. By defense:
-- Against 2 Man and Cover 1: about 1–11 YPC. Outside Zone and Toss against 2 Man are best; Zone Read against Cover 1 and Power against Cover 1 are worst.
-- Against Cover 0: IZ 0.3 YPC (73% stuffs), Toss -1.3 (98%), Power 1.0 (37%), Zone Read 1.2 (30%), Outside Zone 2.1 (18%).
-- Zone Read: the harness reads the key (give about 3–6 YPC, keep about -0.7 to 0.3).
-- Toss: only works against 2 Man.
+**Runs:**
+- All 26 run rows (with RPO gives and QB runs): 3.9 YPC, median 2.1, 18% stuffs, 22% gaining 4+, 10% gaining 10+. Run code didn't change; this moved by 0.1 only because the pass rows ahead of it use the shared RNG differently.
+- The original five runs: 5.1 YPC, median 2.9, 16% stuffs. See the table above.
+- Against Cover 0, interior runs give 2–4 YPC; Toss and Lead Toss lose yards.
+- **Kicks are unchanged:** the punt, kickoff and FG rows still match the table below exactly. Kick coverage keeps the old pursuit lead; only scrimmage pursuers use `PURSUIT_LEAD`.
 
-The `PLAY` rows at the end of `balance.txt` give the same numbers per play.
+**Short yardage (3rd and 1):** Power 84%, Iso 90%, QB Sneak 77%, QB Power 58% (1% against Cover 0).
 
-Reading the defense matters: don't run inside, or pitch, into the zero blitz. Holding the ball against Cover 0 still gets the QB sacked almost every time.
+The per-play `RUN` and `PLAY` rows in `balance.txt` have the details. Reading the defense still matters: don't pitch into the zero blitz, and don't hold the ball against it.
+
+### Future tuning targets: NFL results by route
+The NFL completion %, yards per target and man/zone splits by route are in [TARGETS.md](TARGETS.md). They're not tuned toward yet; they belong with the defense work.
+These need a harness that targets by route (or by read), not "most open". The current one over-throws flats and checkdowns. The new `ROUTE` rows are a first step: they target one route per row, against man calls only.
 
 **Special teams:** an auto-kicker with fixed aim per kick type, 200 reps each, in random wind. Kicks use their own seed, so the scrimmage rows don't move.
 
@@ -224,7 +444,9 @@ Reading the defense matters: don't run inside, or pitch, into the zero blitz. Ho
 - Nothing right now.
 
 ## Known bugs and rough edges
-- **The auto-QB in the harness leads flat routes out of bounds.** It throws to the most open receiver plus his velocity, so a flat runner at the sideline gets a ball out of bounds. Dagger and Curl Flat rows are mostly this. Clamping the harness's aim point inside the field would fix it, but that changes every pass row.
+- **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
+- **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
+- **The run game's 4+ rate is low** (about 30% for the core runs, against FBS about 45%). Too many runs end at 1–3 yards. Second-level fits still beat climbing linemen too often.
 - **Routes still outside the NFL middle 50%:**
   - `deepOut` breaks flat (-88° vs NFL -61°). It was kept as it was.
   - The seam runs straight; NFL seams drift outside by about 13°.
@@ -236,37 +458,30 @@ Reading the defense matters: don't run inside, or pitch, into the zero blitz. Ho
 - **Main-view goal posts are drawn skewed,** because the projection would otherwise stack both uprights on one line. A ball that clips an upright can look slightly off. Trust the goal cam.
 - **CPU kicks to the user are still simulated:** the drive starts at the 25 or a computed punt spot. There are no playable returns.
 - **The free kick after a safety is still simulated:** CPU ball at its 40.
-- **High YAC on quick throws:** about 13–20 yards when throwing to a wide-open receiver at 1.2s. Defenders trailing in man can't close on a straight-line runner. Realism is unclear; revisit tackling and pursuit tuning.
+- **Separation at the catch is tiny** (0.0–0.9 yd in the `ROUTE` rows, against NFL medians of 1.5–3.7). Man defenders run to the ball's landing spot as soon as they react to the throw.
+- **The deep out lost about 8 points against 2 Man** with the plant (see the route-running flags).
+- **High YAC on quick throws:** about 13–20 yards when throwing to a wide-open receiver at 1.2s. The route burst trimmed this (a slant thrown out of its break now gives 5.4 per target). Defenders trailing in man can't close on a straight-line runner. Realism is unclear; revisit tackling and pursuit tuning.
 - **Sack rate when holding long:** about 35% of plays at 3.2s against a 4-man rush, which may be harsh.
-- **Squashed play diagrams:** the play-card diagrams are compressed vertically, so drags and crossers look short.
+- **Play diagrams are small:** cards are now 62 px tall to fit 9 per page. Each card zooms to its own play, but drags and crossers on wide pass plays still look short.
 - **No timeouts, spike, kneel or overtime yet.** Ties stand.
-- **Run results are lumpy:** the harness shows clusters (for example, many 9–10 yard runs), because the sim is fairly deterministic once blocks set. Small randomness in blocker paths or fits would help.
-- **Cover 0 vs runs is harsh** (about 70% stuffs for the auto-runner). It's intended as a read, but it may need softening once players try it.
+- **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The defense has no run-defense calls yet.
 - **Toss pitch timing:** if you pitch the instant the ball is snapped, the RB catches it nearly standing still.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
 - **No zone underneath coverage:** defenses are man or deep zones only.
-- **RPOs are still Inside Zone plus a tagged route.** There's no read on a defender yet.
+- **RPOs are still a run plus a tagged route.** There's no read on a defender yet, and the harness measures only the give.
 - **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB shed at once. A human steering the QB should do better; check by playing before tuning.
-- **Power vs. Cover 0 got worse** with the pull (3.1 → 1.0 YPC): when the guard leaves, nobody picks up the backside blitzer. A down-block or hinge rule for the backside would fix it, but that's beyond the existing pull scheme.
 - **The read key's crash is a coin flip.** It doesn't depend on the call, the down, or the key's awareness yet.
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 
 ## Next up (rough priority)
-1. **Finish the NFL findings:**
-   - Use `quickOut` in a concept.
-   - Add double hitch, double slant, GO/POST and IN/CROSS concepts.
-   - Use per-route completion % as balance targets, after fixing the harness's out-of-bounds aim.
-   - Check the run-game dip from the wider line.
-1. **Playbook, Phase 2:**
-   - Trips plays set to `flip: 'field'`.
-   - New plays from I-Form, Ace and Empty (the defense now adjusts to them).
-   - Backside blocking rules for gap runs (down blocks, hinge), then revisit Power against Cover 0.
-   - An RPO read on a defender.
-   - Then re-baseline the balance numbers.
+1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
+1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
+1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
+1. **An RPO read on a defender,** and give the harness a pull decision.
 1. Full FBS database: all conferences and teams, realistic strength tiers, then real rosters.
 2. Clock tools: timeouts (3 per half), spike, kneel, college overtime.
-3. Run-defense calls (8-man box, run blitzes) and zone coverages (Cover 2, 3, 4, and underneath zones) and smarter defensive play-calling by down and distance.
-4. A bigger playbook UI: formation sets, filtering by situation.
+3. Run-defense calls (8-man box, run blitzes; light boxes are currently too easy to run on) and zone coverages (Cover 2, 3, 4, and underneath zones) and smarter defensive play-calling by down and distance.
+4. Playbook UI, part 2: filter by situation (short yardage, red zone, 2-minute).
 5. Special teams, part 2: playable kick and punt returns, onside kicks, fakes, a real free kick after a safety, and CPU 4th-down decisions shown as actual kicks.
 6. Pre-snap reads and audibles beyond Esc (hot routes, protection slides).
 7. Sound, and packaging as an .exe with Electron or Tauri.

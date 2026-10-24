@@ -12,14 +12,14 @@ A PC football game inspired by Retro Bowl, set in FBS college football, with mor
 npm run dev         # http://localhost:5173
 npm run typecheck   # tsc --noEmit
 npm test            # unit tests (src/logic.test.ts)
-npm run balance     # headless AI balance report -> balance.txt
+npm run balance     # headless AI balance report -> balance.txt (BAL_ONLY=id,kind limits the per-play rows)
 ```
 Controls are listed in [README.md](README.md).
 
 ## Code layout (src/)
 - `engine/`: constants, camera projection, input, math and seeded RNG
 - `data/`: teams and roster generation (`teams.ts`), formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), defensive calls (`defenses.ts`), kick types and special-teams units (`specialTeams.ts`)
-- `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, blocking, pursuit), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
+- `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, pass pro, pursuit), run blocking by scheme (`runBlocking.ts`: zone/stretch/gap/trap/draw, combos, pulls, leverage, the auto-runner's lane read), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
 - `game/`:
   - `resolvePlay.ts`: lays a play out for the snap (mirroring, personnel, concepts to slot routes). See [docs/PLAYBOOK.md](docs/PLAYBOOK.md)
   - `matchups.ts`: the defense's package and man matchups for the offense on the field
@@ -39,15 +39,18 @@ Controls are listed in [README.md](README.md).
 - **Art is original pixel art drawn in code** (`render/sprites.ts`). Don't copy Retro Bowl assets.
 - **Tuning constants sit next to their logic:**
   - `throwErrorSd` (`sim/passing.ts`)
-  - `catchOdds` (`sim/catching.ts`)
-  - `tackleChance` (`sim/tackling.ts`)
-  - shed and push rates (`Play.updateEngagements`), `RUN_BLOCK_EDGE`, `ARM_TACKLE` (`game/playState.ts`)
-  - zone read: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH` (`game/playState.ts`)
+  - `catchOdds`, and the set-receiver bonus `SET_HANDS`, `SET_CONTEST` (`sim/catching.ts`)
+  - route running: `BURST`, `BURST_TAPER`, `PLANT_DECEL`, `cutKeep`, `TURN_TIME`, `SET_MAX_SPEED` (`sim/ai.ts`)
+  - `tackleChance`, `FALL_FORWARD` (`sim/tackling.ts`)
+  - pass-pro shed and push rates (`Play.updateEngagements`), `ARM_TACKLE` (`game/playState.ts`)
+  - run blocks: `RUN_BLOCK_EDGE`, `REACH_PENALTY`, `BLOCK_ROLL_SD`, `WASH_RATE`, `COMBO_CLIMB`, `SHED_WIN`, `SHED_LEVERED`, `ARM_LEVERED`, `RUN_ENGAGE`, `DRAW_SET` (`sim/runBlocking.ts`)
+  - defense vs. the run: `LB_FIT_DEPTH`, `MAN_DEPTH`, `TRASH_SPEED`, `PURSUIT_LEAD` (`sim/ai.ts`)
+  - zone read and option: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH`, `KEEP_INSIDE`, `OPTION_CUT`; screens `SCREEN_SET` (`game/playState.ts`)
   - `pitchOdds`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
   - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd` (`sim/kicking.ts`)
   - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `DIVE_RANGE` (`game/kickPlay.ts`)
-- **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md.
+- **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.
 
 ## Working agreement

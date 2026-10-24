@@ -18,7 +18,9 @@ npm run balance    # AI balance report -> balance.txt
 | Pick team / opponent | A/D, W/S (or click the arrows), Enter to start |
 | Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |
 | Playbook tab (Pass / Run / Play Action / Special) | Click a tab, or Q/E or Tab |
-| Call a play | Click a card or press 1–6. Watch the play clock: if it runs out, it's delay of game |
+| Formation filter | A/D or the mouse wheel (or click a chip) picks a formation under the tab; W/S pages when there are more than 9 plays |
+| Call a play | Click a card or press 1–9. Watch the play clock: if it runs out, it's delay of game |
+| Speed option | Right-click to pitch while you attack the end; run past the line to keep it |
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
 | Audible (pre-snap) | Esc |
 | Snap | Space or click |

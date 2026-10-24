@@ -28,8 +28,14 @@ export interface Formation {
 export type RouteName =
   | 'go' | 'seam' | 'slant' | 'quickOut' | 'deepOut' | 'in' | 'post' | 'corner' | 'curl' | 'hitch'
   | 'comeback' | 'flat' | 'drag' | 'wheel' | 'swing' | 'bubble' | 'block'
+  | 'cross' | 'glance' | 'smoke' | 'tunnel'
+  // Back routes
+  | 'checkFlat' | 'screen' | 'angle'
   // RB run paths and play-action fakes
-  | 'iz' | 'oz' | 'power' | 'toss' | 'paFake';
+  | 'iz' | 'oz' | 'power' | 'toss' | 'paFake'
+  | 'izDeep' | 'stretch' | 'counter' | 'trap' | 'draw' | 'iso' | 'sweep' | 'pitchPath'
+  // Lead blockers (FB, H, TE): run the path, then run-block
+  | 'lead' | 'kickOut' | 'leadWide' | 'slice' | 'qbLead';
 
 export interface RouteDef {
   pts: [number, number][];
@@ -38,6 +44,12 @@ export interface RouteDef {
   thenBlock?: boolean;
   /** RB run path: drawn bold on play cards, and its last point marks the hole. */
   run?: boolean;
+  /** Seconds after the snap before the route starts (screens, the draw, check-releases). */
+  delay?: number;
+  /** Pass-block during the delay (screens, check-releases, the draw's fake set). */
+  delayBlock?: boolean;
+  /** Lead blocker on a run: he's a blocker from the snap, runs the path, then run-blocks the first man he finds. */
+  lead?: boolean;
 }
 
 /**
@@ -79,6 +91,44 @@ export const ROUTES: Record<RouteName, RouteDef> = {
   // Singleback: sprint wide right away; the QB pitches it.
   toss: { pts: [[1, 6], [4, 11], [8, 12.5]], cont: true, run: true },
   paFake: { pts: [[0.7, 1.6], [2.5, 3.2]], cont: false, thenBlock: true },
+
+  // Deep over: climbs to about 11 yd while crossing the field (Y-cross, PA crossers from under center).
+  cross: { pts: [[3, 1], [8, 5], [11, 13], [12, 30]], cont: true },
+  // Glance: a skinny post off a 5-yd stem (the RPO post).
+  glance: { pts: [[5, 0], [14, 4.5]], cont: true },
+  // Smoke: one step up, then back toward the QB for a quick screen.
+  smoke: { pts: [[1, 0], [0, 0.4]], cont: false },
+  // Tunnel: come inside behind the line, then turn up behind the linemen.
+  tunnel: { pts: [[0.3, 2], [-0.8, 6], [1, 8.5]], cont: true },
+  // Backs
+  // Check-release: block, then leak to the flat and get just past the line.
+  checkFlat: { pts: [[1.5, -3], [5.5, -9]], cont: true, delay: 0.7, delayBlock: true },
+  screen: { pts: [[1.5, -3.5], [1.8, -6]], cont: false, delay: 0.9, delayBlock: true },
+  angle: { pts: [[1, -3], [4, -2], [6.5, 5]], cont: true },
+  // Run paths. Under center / pistol inside zone: downhill at the playside B gap, free to cut back.
+  izDeep: { pts: [[2.5, 0.8], [5.6, 2.6], [9, 3]], cont: true, run: true },
+  // Under-center stretch: aim at the tight end's outside hip, then bend it up.
+  stretch: { pts: [[3, 1.8], [5.5, 6], [8.5, 8.5]], cont: true, run: true },
+  // Gun counter: jab away, then come back across behind the pullers to the off-tackle hole.
+  counter: { pts: [[0.3, -1], [0.8, 2], [4, 5], [8, 5.8]], cont: true, run: true },
+  // Trap: a quick hitter just inside the trapped lineman.
+  trap: { pts: [[3, 0.8], [6.5, 1], [9, 1.2]], cont: true, run: true },
+  // Draw: sell pass, then step up beside the QB and hit the A gap.
+  draw: { pts: [[-0.6, 1.4], [3, 2.4], [7, 2.8]], cont: true, run: true, delay: 0.6, delayBlock: true },
+  // Iso: downhill behind the fullback into the playside B gap.
+  iso: { pts: [[3, 0.8], [7, 2.2], [10, 2.4]], cont: true, run: true },
+  // Gun sweep: get to the edge fast (power read, pin-pull).
+  sweep: { pts: [[0.5, 3], [2.5, 9], [6, 12.5]], cont: true, run: true },
+  // Speed option: stay in a pitch relationship, about 4 yd outside and 1.5 behind the QB.
+  pitchPath: { pts: [[1, 4.5], [3, 10], [7, 13.5]], cont: true, run: true },
+  // Lead blockers
+  lead: { pts: [[3.6, 2.4]], cont: false, lead: true },
+  kickOut: { pts: [[3.2, 4.5], [4, 6]], cont: false, lead: true },
+  leadWide: { pts: [[2, 6], [4, 11]], cont: false, lead: true },
+  // Slice: the tight end comes back across behind the line to kick out the backside end.
+  slice: { pts: [[-0.7, 3], [-0.4, 9.8]], cont: false, lead: true },
+  // QB power: the back leads through the hole for the QB.
+  qbLead: { pts: [[1.5, 2.5], [5, 4.8]], cont: false, lead: true },
 };
 
 // Line splits near the NFL medians (G 1.55, T 3.1, inline TE 4.9; analysis/out/splits.md).
@@ -219,7 +269,8 @@ export type ReadType =
   | 'none' // dropback or play-action pass
   | 'handoff' // called give
   | 'pitch' // toss: pitch it right away
-  | 'zoneRead' // give, or keep off the backside end
+  | 'zoneRead' // give, or keep off the read key (the backside end, or the playside end on power read)
+  | 'option' // speed option: attack the playside end, pitch it or keep it
   | 'rpo'; // give, or pull and throw the tagged route
 
 /** Auto-mirror at the snap: keep as drawn, or put the strong side to the wide (field) or short (boundary) side. */
@@ -231,7 +282,19 @@ export interface Pull {
   job: 'kick' | 'lead';
 }
 
+/**
+ * Run-blocking scheme (`sim/runBlocking.ts`):
+ * - zone: take the man over you or in your playside gap; uncovered linemen double, then climb.
+ * - stretch: zone, reaching for the playside shoulder (outside zone, toss).
+ * - gap: block down; pullers lead or kick out; the backside tackle hinges (power, counter).
+ * - trap: gap, but the first lineman playside of the center is left for the pulling guard.
+ * - draw: show pass for `DRAW_SET`, then run block.
+ */
+export type RunScheme = 'zone' | 'stretch' | 'gap' | 'trap' | 'draw';
+
 export interface BlockScheme {
+  /** Runs: the line's rules (default zone). */
+  run?: RunScheme;
   /** Pass pro: the line slides its gaps toward this side and the back checks the other edge. */
   slide?: Side;
   /** Runs: players who pull behind the line instead of blocking down. */
@@ -253,8 +316,17 @@ export interface PlayDef {
   /** Optional pulls and slides on top of the base scheme. */
   scheme?: BlockScheme;
   read: ReadType;
+  /** Zone read: which end is the key ('back' = the backside end, the default; 'play' = power read), and where the QB keeps it. */
+  key?: 'back' | 'play';
+  keep?: 'outside' | 'inside';
+  /** Designed QB runs: the hole, as [downfield, toward the strong side] yards from the ball. Mirrors with the play. */
+  qbPath?: [number, number];
+  /** Pass plays: the line pass-sets, then releases to block for a screen. */
+  screen?: boolean;
   /** Designed QB carry: no handoff option, and it's left out of RB run stats. */
   qbRun?: boolean;
+  /** Short-yardage call: gets a 3rd-and-1 row in `npm run balance`. */
+  short?: boolean;
   flip: FlipRule;
   /** QB drop (yards back from his alignment); on runs this is the mesh point. */
   drop: number;
@@ -302,6 +374,128 @@ export const PLAYBOOK: PlayDef[] = [
     tip: 'Safe completions vs off coverage.',
   },
 
+  // Quick game and screens (batch 1)
+  {
+    id: 'double-slant', name: 'Double Slant', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'double-slant', weak: 'hitch', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'field', drop: 1,
+    tip: 'Two slants to the field vs press man. Throw it on the break.',
+  },
+  {
+    id: 'double-hitch', name: 'Double Hitch', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'double-hitch', weak: 'double-hitch', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 1,
+    tip: 'Corners off? Four hitches at 6. Take the free yards.',
+  },
+  {
+    id: 'stick', name: 'Stick', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'stick', weak: 'slant', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 1,
+    tip: 'Read the flat defender: he takes the flat, throw the stick.',
+  },
+  {
+    id: 'trips-outs', name: 'Trips Outs', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'double-out', weak: 'go', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 1,
+    tip: 'Quick outs to the field, seam holds the safety. Throw early.',
+  },
+  {
+    id: 'empty-spacing', name: 'Empty Spacing', kind: 'pass', formation: EMPTY,
+    strong: 'spacing', weak: 'go-hitch', block: 'pass', read: 'none', flip: 'field', drop: 1,
+    tip: 'Five out, ball out fast. Beats the blitz if you read it.',
+  },
+  {
+    id: 'smoke', name: 'Smoke', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'go', weak: 'smoke', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 0.5,
+    tip: 'Boundary corner off? Throw it now, slot blocks him.',
+  },
+  {
+    id: 'tunnel-screen', name: 'Tunnel Screen', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'tunnel', weak: 'go', backs: { RB: 'block' },
+    block: 'pass', screen: true, read: 'none', flip: 'field', drop: 1.5,
+    tip: 'Let them rush. Z comes inside behind the linemen.',
+  },
+  {
+    id: 'rb-screen', name: 'RB Screen', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'verts', weak: 'verts', backs: { RB: 'screen' },
+    block: 'pass', screen: true, read: 'none', flip: 'fixed', drop: 3,
+    tip: 'Vs the blitz. Drift back, let them come, dump it to the RB.',
+  },
+
+  // Intermediate and shots (batch 2)
+  {
+    id: 'drive', name: 'Drive', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'drive', weak: 'go-hitch', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2,
+    tip: 'Shallow drag under the backers, dig behind them. Man or zone.',
+  },
+  {
+    id: 'y-cross', name: 'Y-Cross', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'cross-go', weak: 'curl-flat', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tip: 'Air Raid staple: Y crosses at 12 while Z clears. Read it high to low.',
+  },
+  {
+    id: 'mills', name: 'Mills', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'mills', weak: 'double-slant', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tip: 'Post over the dig. Safety jumps the dig? The post is behind him.',
+  },
+  {
+    id: 'go-post', name: 'Go Post', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'go-post', weak: 'go-post', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 3,
+    tip: 'Shot play. Posts split two-high; the go beats a lone safety.',
+  },
+  {
+    id: 'flood', name: 'Flood', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'flood', weak: 'curl', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 2.5,
+    tip: 'Three levels to the field: go, out, flat. Read the corner.',
+  },
+  {
+    id: 'empty-dig-cross', name: 'Empty Dig Cross', kind: 'pass', formation: EMPTY,
+    strong: 'in-cross', weak: 'double-slant', block: 'pass', read: 'none', flip: 'field', drop: 2,
+    tip: 'Dig over the crosser, hitch underneath. Five out, no help for the D.',
+  },
+  {
+    id: 'corner-out', name: 'Corner Out', kind: 'pass', formation: PISTOL,
+    strong: 'corner-out', weak: 'double-slant', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2,
+    tip: 'Corner over the quick out: high-low the flat defender.',
+  },
+  {
+    id: 'post-wheel', name: 'Post Wheel', kind: 'pass', formation: PISTOL,
+    strong: 'post', weak: 'go-hitch', backs: { RB: 'wheel' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tip: 'RB wheel up the sideline under the post. A backer on the RB loses.',
+  },
+  {
+    id: 'ace-stick', name: 'Ace Y-Stick', kind: 'pass', formation: ACE,
+    strong: 'stick', weak: 'slant-flat', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 1.5,
+    tip: 'Two tight ends vs base D: Y sits at 6, the flat holds the backer.',
+  },
+  {
+    id: 'snag', name: 'Snag', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'snag', weak: 'slant', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 2,
+    tip: 'Triangle on the flat defender: snag at 5, corner over it. Go clears.',
+  },
+  {
+    id: 'go-out', name: 'Go Out', kind: 'pass', formation: GUN_TRIPS,
+    strong: 'go-out', weak: 'slant', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'field', drop: 2.5,
+    tip: "The NFL's most common pair: go clears, the deep out sits under it.",
+  },
+  {
+    id: 'texas', name: 'Texas', kind: 'pass', formation: GUN_DOUBLES,
+    strong: 'post-curl', weak: 'double-slant', backs: { RB: 'angle' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2,
+    tip: 'RB angle route: out, then back inside. A backer on the RB loses.',
+  },
+
   // ---------------------------------------------------------------- run
   {
     id: 'inside-zone', name: 'Inside Zone', kind: 'run', formation: GUN_DOUBLES,
@@ -310,18 +504,18 @@ export const PLAYBOOK: PlayDef[] = [
   },
   {
     id: 'outside-zone', name: 'Outside Zone', kind: 'run', formation: PISTOL,
-    backs: { RB: 'oz' }, block: 'run', read: 'handoff', flip: 'fixed', drop: 0.6,
+    backs: { RB: 'oz' }, block: 'run', scheme: { run: 'stretch' }, read: 'handoff', flip: 'fixed', drop: 0.6,
     tip: 'Stretch the edge, cut up behind blocks.',
   },
   {
     id: 'power', name: 'Power', kind: 'run', formation: SINGLEBACK,
-    backs: { RB: 'power' }, block: 'run', scheme: { pulls: [{ who: 'LG', job: 'lead' }] },
-    read: 'handoff', flip: 'fixed', drop: 2.4,
+    backs: { RB: 'power' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'handoff', short: true, flip: 'fixed', drop: 2.4,
     tip: 'Downhill off tackle. Good in short yardage.',
   },
   {
     id: 'toss', name: 'Toss', kind: 'run', formation: SINGLEBACK,
-    backs: { RB: 'toss' }, block: 'run', read: 'pitch', flip: 'fixed', drop: 1,
+    backs: { RB: 'toss' }, block: 'run', scheme: { run: 'stretch' }, read: 'pitch', flip: 'fixed', drop: 1,
     tip: 'R-click right away to pitch. Beat them wide.',
   },
   {
@@ -329,9 +523,94 @@ export const PLAYBOOK: PlayDef[] = [
     backs: { RB: 'iz' }, block: 'run', read: 'zoneRead', flip: 'fixed', drop: 0.5,
     tip: 'R-click to give, or keep it and run the QB.',
   },
+  // Zone and gap runs (batch 3)
+  {
+    id: 'split-zone', name: 'Split Zone', kind: 'run', formation: PISTOL,
+    strong: 'slice', backs: { RB: 'izDeep' }, block: 'run', read: 'handoff', flip: 'fixed', drop: 0.8,
+    tip: 'Zone to the TE side; the TE slices back on the end. Cutback lane.',
+  },
+  {
+    id: 'i-stretch', name: 'I-Form Stretch', kind: 'run', formation: I_FORM,
+    backs: { SL: 'leadWide', RB: 'stretch' }, block: 'run', scheme: { run: 'stretch' },
+    read: 'handoff', flip: 'field', drop: 2.5, dropY: 1.5,
+    tip: 'Stretch to the field behind the FB. Press the edge, then cut up.',
+  },
+  {
+    id: 'power-o', name: 'Power O', kind: 'run', formation: I_FORM,
+    backs: { SL: 'kickOut', RB: 'power' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'handoff', flip: 'boundary', drop: 2.2,
+    tip: 'FB kicks out the end, guard leads through. Downhill, 21 personnel.',
+  },
+  {
+    id: 'counter', name: 'Counter GT', kind: 'run', formation: GUN_DOUBLES,
+    backs: { RB: 'counter' }, block: 'run',
+    scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'kick' }, { who: 'LT', job: 'lead' }] },
+    read: 'handoff', flip: 'boundary', drop: 0.5,
+    tip: 'Jab away, then follow the guard and tackle off tackle. Beats flow.',
+  },
+  {
+    id: 'duo', name: 'Duo', kind: 'run', formation: ACE,
+    backs: { RB: 'izDeep' }, block: 'run', scheme: { run: 'gap' }, read: 'handoff', flip: 'boundary', drop: 1.2,
+    tip: 'Two double teams, no pullers. Downhill; read the MIKE.',
+  },
+  {
+    id: 'iso', name: 'Iso', kind: 'run', formation: I_FORM,
+    backs: { SL: 'lead', RB: 'iso' }, block: 'run', scheme: { run: 'gap' }, read: 'handoff', short: true,
+    flip: 'boundary', drop: 1.2,
+    tip: 'FB isolates the MIKE. Short yardage: hit it hard behind him.',
+  },
+  {
+    id: 'trap', name: 'Trap', kind: 'run', formation: SINGLEBACK,
+    backs: { RB: 'trap' }, block: 'run', scheme: { run: 'trap', pulls: [{ who: 'LG', job: 'kick' }] },
+    read: 'handoff', flip: 'fixed', drop: 1,
+    tip: 'Let the 3-tech in, the guard traps him. Quick hitter vs penetration.',
+  },
+  // Perimeter, draw, option and QB runs (batch 4)
+  {
+    id: 'lead-toss', name: 'Lead Toss', kind: 'run', formation: I_FORM,
+    backs: { SL: 'leadWide', RB: 'toss' }, block: 'run', scheme: { run: 'stretch' }, read: 'pitch',
+    flip: 'field', drop: 1,
+    tip: 'R-click right away to pitch. FB leads the edge; follow him.',
+  },
+  {
+    id: 'pin-pull', name: 'Pin-Pull Sweep', kind: 'run', formation: GUN_TRIPS,
+    backs: { RB: 'sweep' }, block: 'run',
+    scheme: { run: 'stretch', pulls: [{ who: 'RG', job: 'lead' }, { who: 'RT', job: 'kick' }] },
+    read: 'handoff', flip: 'field', drop: 0.5,
+    tip: 'Guard and tackle pull out front of the sweep. Outrun the pursuit.',
+  },
+  {
+    id: 'draw', name: 'Draw', kind: 'run', formation: GUN_DOUBLES,
+    backs: { RB: 'draw' }, block: 'run', scheme: { run: 'draw' }, read: 'handoff', flip: 'fixed', drop: 1.2,
+    tip: 'Show pass, then hand it off. Beats a hard rush and two-high.',
+  },
+  {
+    id: 'qb-draw', name: 'Empty QB Draw', kind: 'run', formation: EMPTY,
+    block: 'run', scheme: { run: 'draw' }, read: 'none', qbRun: true, qbPath: [1.5, 0.8],
+    flip: 'field', drop: 1,
+    tip: 'Five wide empties the box. Sell pass, then the QB runs it.',
+  },
+  {
+    id: 'power-read', name: 'Power Read', kind: 'run', formation: GUN_DOUBLES,
+    backs: { RB: 'sweep' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'zoneRead', key: 'play', keep: 'inside', flip: 'field', drop: 0.5,
+    tip: 'Read the playside end. He widens with the sweep? Keep it inside.',
+  },
+  {
+    id: 'speed-option', name: 'Speed Option', kind: 'run', formation: PISTOL,
+    backs: { RB: 'pitchPath' }, block: 'run', scheme: { run: 'stretch' }, read: 'option',
+    flip: 'field', drop: -5, dropY: 8,
+    tip: 'Attack the end. He takes you? R-click to pitch. He takes the pitch? Keep.',
+  },
+  {
+    id: 'qb-power', name: 'QB Power', kind: 'run', formation: GUN_TRIPS,
+    backs: { RB: 'qbLead' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'none', qbRun: true, qbPath: [1, 3.2], short: true, flip: 'field', drop: 0.3,
+    tip: 'QB keeps it behind the back and the pulling guard. Goal-line hammer.',
+  },
   {
     id: 'qb-sneak', name: 'QB Sneak', kind: 'run', formation: SINGLEBACK,
-    backs: { RB: 'block' }, block: 'run', read: 'none', qbRun: true, flip: 'fixed', drop: 0,
+    backs: { RB: 'block' }, block: 'run', read: 'none', qbRun: true, short: true, flip: 'fixed', drop: 0,
     tip: 'Short yardage. Hold D and push the pile.',
   },
 
@@ -360,6 +639,37 @@ export const PLAYBOOK: PlayDef[] = [
     block: 'pass', read: 'none', flip: 'fixed', drop: 3,
     tip: 'Hold the safeties with the fake.',
   },
+  // Play action from under center (batch 5): boots and floods with crossers and corners
+  {
+    id: 'i-boot', name: 'I-Form Boot', kind: 'pa', formation: I_FORM,
+    strong: 'post-cross', weak: 'corner', backs: { SL: 'flat', RB: 'paFake' },
+    block: 'pass', read: 'none', flip: 'boundary', drop: 1.5, dropY: -7,
+    tip: 'Fake it, boot back to the field: corner, TE crosser, FB in the flat.',
+  },
+  {
+    id: 'i-deep-cross', name: 'I-Form Deep Cross', kind: 'pa', formation: I_FORM,
+    strong: 'cross-corner', weak: 'go', backs: { SL: 'flat', RB: 'paFake' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 3,
+    tip: 'Sell the run; Z crosses deep under a TE corner. Hit it on the move.',
+  },
+  {
+    id: 'ace-boot', name: 'Ace Boot', kind: 'pa', formation: ACE,
+    strong: 'post-drag', weak: 'go-corner', backs: { RB: 'flat' },
+    block: 'pass', read: 'none', flip: 'boundary', drop: 1.5, dropY: -7,
+    tip: 'Two TEs: one drags across, one runs the corner. RB leaks to the flat.',
+  },
+  {
+    id: 'ace-max', name: 'Ace Max Shot', kind: 'pa', formation: ACE,
+    strong: 'go', weak: 'post', backs: { RB: 'paFake' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 3,
+    tip: 'Seven-man protection, two shots: Z go, X post. Take the one-on-one.',
+  },
+  {
+    id: 'counter-boot', name: 'Counter Boot', kind: 'pa', formation: SINGLEBACK,
+    strong: 'cross-drag', weak: 'corner-flat', backs: { RB: 'paFake' },
+    block: 'pass', read: 'none', flip: 'boundary', drop: 1.5, dropY: -7,
+    tip: 'Boot away from the fake: deep cross, drag, corner and slot flat.',
+  },
   {
     id: 'rpo-slant', name: 'RPO Slant', kind: 'pa', formation: GUN_DOUBLES,
     weak: 'slant', backs: { RB: 'iz' },
@@ -371,6 +681,33 @@ export const PLAYBOOK: PlayDef[] = [
     strong: 'bubble', backs: { RB: 'iz' },
     block: 'run', read: 'rpo', flip: 'fixed', drop: 0.5,
     tip: 'Numbers outside? Throw the bubble.',
+  },
+  // RPO tags (batch 5): still give-or-pull, no read on a defender yet
+  {
+    id: 'rpo-glance', name: 'RPO Glance', kind: 'pa', formation: GUN_DOUBLES,
+    weak: 'glance', backs: { RB: 'iz' }, block: 'run', read: 'rpo', flip: 'fixed', drop: 0.5,
+    tip: 'R-click to give, or pull it and throw the glance behind the backers.',
+  },
+  {
+    id: 'rpo-stick', name: 'RPO Stick', kind: 'pa', formation: GUN_TRIPS,
+    strong: 'stick', backs: { RB: 'iz' }, block: 'run', read: 'rpo', flip: 'field', drop: 0.5,
+    tip: 'Give it, or pull and hit the stick if the flat defender bites on the run.',
+  },
+  {
+    id: 'rpo-pop', name: 'RPO Pop', kind: 'pa', formation: ACE,
+    strong: 'pop', backs: { RB: 'izDeep' }, block: 'run', read: 'rpo', flip: 'fixed', drop: 1.5,
+    tip: 'Inside zone look; the TE pops up the seam behind the backers.',
+  },
+  {
+    id: 'rpo-smoke', name: 'RPO Smoke', kind: 'pa', formation: GUN_DOUBLES,
+    weak: 'smoke', backs: { RB: 'iz' }, block: 'run', read: 'rpo', flip: 'field', drop: 0.5,
+    tip: 'Boundary corner off? Pull it and throw the smoke. Else give it.',
+  },
+  {
+    id: 'power-bubble', name: 'Power Bubble', kind: 'pa', formation: GUN_TRIPS,
+    strong: 'bubble', backs: { RB: 'iz' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'rpo', flip: 'field', drop: 0.5,
+    tip: 'Power with a pulling guard; the bubble punishes a box that fills fast.',
   },
 ];
 

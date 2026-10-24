@@ -1,4 +1,5 @@
 import type { Assign } from '../data/defenses';
+import type { RouteName } from '../data/plays';
 import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
 import { add, len, limit, scale, sub, type Vec } from '../engine/math';
@@ -33,19 +34,41 @@ export interface Player {
 
   // Offense
   start: Vec;
+  /** The route he was given this snap (null for linemen and the QB). */
+  routeName: RouteName | null;
   route: Vec[];
   routeIdx: number;
   routeDir: Vec | null;
+  /** A pass route (not a run path, fake or lead path): it gets the burst-and-plant speed profile. */
+  passRoute: boolean;
+  /** Per waypoint: the share of top speed he carries through it (0 = stop there). */
+  cutKeep: number[];
+  /** The route ends with him settling (hitch, curl, comeback, smoke, screen): he turns to face the QB. */
+  settle: boolean;
+  /** When his turn toward the QB started (Infinity until then). */
+  turnAt: number;
   isBlocker: boolean;
   /** Turns into a pass blocker once the route (a play-action fake) is done. */
   thenBlock: boolean;
   /** Became a blocker mid-play (after a fake), so his man defender doesn't hug rush. */
   lateBlock: boolean;
+  /** A detached receiver who blocks (stalks a DB): his man defender plays him rather than rushing. */
+  stalk: boolean;
+  /** Seconds after the snap before the route starts, and whether he pass-blocks until then. */
+  routeDelay: number;
+  delayBlock: boolean;
   /** Pulling on a run: still working behind the line toward his kick-out or lead block. */
   pull: 'kick' | 'lead' | null;
   engaged: Player | null;
   /** Rusher this blocker is responsible for. */
   mark: Player | null;
+  /** Zone combo: the backer this blocker leaves the double team for at `comboUntil`. */
+  climb: Player | null;
+  comboUntil: number;
+  /** Gap-scheme backside tackle: the spot he hinges to, taking whoever comes through it. */
+  hinge: Vec | null;
+  /** Trap: the lineman this puller is coming to kick out. */
+  pullTarget: Player | null;
   stun: number;
   jam: number;
   manual: boolean;
@@ -58,6 +81,10 @@ export interface Player {
   turned: boolean;
   engagedBy: Player[];
   noEngage: number;
+  /** Run blocks: unit vector from this defender to the side his blocker has him (set at contact). */
+  blockDir: Vec | null;
+  /** Run blocks: this block's luck, in rating points, rolled at contact. */
+  blockRoll: number;
   goal: Vec | null;
   /** Run fit window: from `fitAt` until `fitUntil` the defender attacks the run (run read or PA bite). */
   fitAt: number;
@@ -93,15 +120,27 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     stamina: 1,
     reactAt: Infinity,
     start: { ...pos },
+    routeName: null,
     route: [],
     routeIdx: 0,
     routeDir: null,
+    passRoute: false,
+    cutKeep: [],
+    settle: false,
+    turnAt: Infinity,
     isBlocker: false,
     thenBlock: false,
     lateBlock: false,
+    stalk: false,
+    routeDelay: 0,
+    delayBlock: false,
     pull: null,
     engaged: null,
     mark: null,
+    climb: null,
+    comboUntil: 0,
+    hinge: null,
+    pullTarget: null,
     stun: 0,
     jam: 0,
     manual: false,
@@ -112,6 +151,8 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     turned: true,
     engagedBy: [],
     noEngage: 0,
+    blockDir: null,
+    blockRoll: 0,
     goal: null,
     fitAt: Infinity,
     fitUntil: 0,

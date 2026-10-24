@@ -1,5 +1,5 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
-import { PLAY_TABS, playsOfKind, ROUTES, type PlayDef } from '../data/plays';
+import { FORMATIONS, PLAY_TABS, playsOfKind, ROUTES, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { generateRoster, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
@@ -54,18 +54,32 @@ interface Notice {
 /** Slow-motion while the QB is aiming. 1 = off. */
 const AIM_TIME_SCALE = 0.65;
 
+// Call screen layout: tip, playbook tabs, formation chips, then a 3x3 grid of cards.
+const CALL_Y = 92;
 const CARD_W = 196;
-const CARD_H = 84;
+const CARD_H = 62;
 const CARD_GAP = 8;
+const CARD_ROW_GAP = 5;
 const CARD_X0 = (VIEW_W - (3 * CARD_W + 2 * CARD_GAP)) / 2;
-const CARD_Y0 = 166;
+const CARD_Y0 = 144;
+/** Cards on one page of the call screen. */
+const PAGE = 9;
 const TAB_W = 120;
 const TAB_H = 14;
-const TAB_Y = 148;
+const TAB_Y = 110;
+const CHIP_Y = 128;
+const CHIP_H = 11;
 
 function cardRect(i: number) {
-  return { x: CARD_X0 + (i % 3) * (CARD_W + CARD_GAP), y: CARD_Y0 + Math.floor(i / 3) * (CARD_H + CARD_GAP), w: CARD_W, h: CARD_H };
+  return { x: CARD_X0 + (i % 3) * (CARD_W + CARD_GAP), y: CARD_Y0 + Math.floor(i / 3) * (CARD_H + CARD_ROW_GAP), w: CARD_W, h: CARD_H };
 }
+
+/** Formation filter chips for one playbook tab: ALL, then each formation the tab uses (in `FORMATIONS` order). */
+function chipsFor(plays: PlayDef[]): (Formation | null)[] {
+  return [null, ...FORMATIONS.filter((f) => plays.some((p) => p.formation === f))];
+}
+
+const chipLabel = (f: Formation | null) => (f ? f.name.toUpperCase() : 'ALL');
 
 function tabRect(i: number, n: number) {
   const x0 = (VIEW_W - (n * TAB_W + (n - 1) * 4)) / 2;
@@ -105,6 +119,9 @@ export class Game {
   /** Where the game goes once the notice queue is empty. */
   private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' = 'call';
   private tab = 0;
+  /** Formation chip picked on each playbook tab (index into `chipsFor`), and the page within it. */
+  private chip: Record<number, number> = {};
+  private page = 0;
   private hover = -1;
   /** The user mirrored the next play (F on the play-call screen). */
   private flipCall = false;
@@ -236,9 +253,50 @@ export class Game {
       default: {
         const tab = this.tabs()[this.tab];
         if (tab.kind === 'st') return ST_TAB.map((def) => ({ kind: 'kick', def }));
-        return playsOfKind(tab.kind).map((def) => ({ kind: 'play', def }));
+        const list = this.chipPlays();
+        const page = Math.min(this.page, this.pageCount() - 1);
+        return list.slice(page * PAGE, page * PAGE + PAGE).map((def) => ({ kind: 'play', def }));
       }
     }
+  }
+
+  /** The current playbook tab's plays, or null on a tab without plays (special teams, PAT, kickoff). */
+  private tabPlays(): PlayDef[] | null {
+    if (this.callMode === 'pat' || this.callMode === 'kickoff') return null;
+    const tab = this.tabs()[this.tab];
+    return tab && tab.kind !== 'st' ? playsOfKind(tab.kind) : null;
+  }
+
+  /** The formation chip in use on this tab: the first formation until the user picks one. */
+  private chipIndex(): number {
+    const plays = this.tabPlays();
+    if (!plays) return 0;
+    const n = chipsFor(plays).length;
+    return Math.min(this.chip[this.tab] ?? (n > 1 ? 1 : 0), n - 1);
+  }
+
+  /** Plays under the current formation chip, before paging. */
+  private chipPlays(): PlayDef[] {
+    const plays = this.tabPlays() ?? [];
+    const f = chipsFor(plays)[this.chipIndex()];
+    return f ? plays.filter((p) => p.formation === f) : plays;
+  }
+
+  private pageCount(): number {
+    return Math.max(1, Math.ceil(this.chipPlays().length / PAGE));
+  }
+
+  private chipRects(): { x: number; y: number; w: number; h: number }[] {
+    const plays = this.tabPlays();
+    if (!plays) return [];
+    const widths = chipsFor(plays).map((f) => chipLabel(f).length * 8 + 8);
+    const gap = 4;
+    let x = (VIEW_W - (widths.reduce((a, b) => a + b, 0) + gap * (widths.length - 1))) / 2;
+    return widths.map((w) => {
+      const r = { x, y: CHIP_Y, w, h: CHIP_H };
+      x += w + gap;
+      return r;
+    });
   }
 
   private updateCall(dt: number, input: Input): void {
@@ -246,9 +304,24 @@ export class Game {
     const tabs = this.tabs();
     const n = tabs.length;
     if (n) {
+      const tabWas = this.tab;
       if (input.hit('KeyQ')) this.tab = (this.tab + n - 1) % n;
       if (input.hit('KeyE', 'Tab')) this.tab = (this.tab + 1) % n;
       if (input.hit('KeyF')) this.flipCall = !this.flipCall;
+      if (this.tab !== tabWas) this.page = 0;
+    }
+    const chips = this.chipRects();
+    if (chips.length) {
+      // A/D or the wheel: formation chip. W/S: page within it.
+      const step = (input.hit('KeyD') ? 1 : 0) - (input.hit('KeyA') ? 1 : 0) + Math.sign(input.mouse.wheel);
+      if (step) {
+        this.chip[this.tab] = (this.chipIndex() + step + chips.length) % chips.length;
+        this.page = 0;
+      }
+      const pages = this.pageCount();
+      const pg = Math.min(this.page, pages - 1);
+      if (input.hit('KeyS')) this.page = (pg + 1) % pages;
+      if (input.hit('KeyW')) this.page = (pg + pages - 1) % pages;
     }
     if (this.callMode === 'try' && input.hit('Escape', 'Backspace')) {
       this.callMode = 'pat';
@@ -256,7 +329,18 @@ export class Game {
     }
     const { x, y } = input.mouse;
     if (input.mouse.pressed) {
-      for (let i = 0; i < n; i++) if (inRect(x, y, tabRect(i, n))) this.tab = i;
+      for (let i = 0; i < n; i++) {
+        if (inRect(x, y, tabRect(i, n)) && this.tab !== i) {
+          this.tab = i;
+          this.page = 0;
+        }
+      }
+      chips.forEach((r, i) => {
+        if (inRect(x, y, r)) {
+          this.chip[this.tab] = i;
+          this.page = 0;
+        }
+      });
     }
     const cards = this.cards();
     this.hover = -1;
@@ -704,7 +788,7 @@ export class Game {
     const cards = this.cards();
     const tabs = this.tabs();
     g.fillStyle = 'rgba(8,10,14,0.55)';
-    g.fillRect(0, 128, VIEW_W, 218);
+    g.fillRect(0, CALL_Y, VIEW_W, 346 - CALL_Y);
     const hc = this.hover >= 0 ? cards[this.hover] : undefined;
     const fallback =
       this.callMode === 'pat' ? 'TOUCHDOWN! KICK THE PAT OR GO FOR TWO'
@@ -712,7 +796,7 @@ export class Game {
       : this.callMode === 'try' ? 'TWO-POINT TRY FROM THE 3   ESC: BACK'
       : 'CHOOSE A PLAY';
     const tip = hc ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.def.tip).toUpperCase() : fallback;
-    text(g, tip, VIEW_W / 2, 134, { size: 8, align: 'center', color: '#ffd23f' });
+    text(g, tip, VIEW_W / 2, CALL_Y + 6, { size: 8, align: 'center', color: '#ffd23f' });
     if (!tabs.length) {
       const head = this.callMode === 'pat' ? 'POINT AFTER' : 'KICKOFF';
       text(g, head, VIEW_W / 2, TAB_Y + 3, { align: 'center', color: '#ffffff' });
@@ -728,11 +812,34 @@ export class Game {
       }
       text(g, t.label, r.x + r.w / 2, r.y + 3, { align: 'center', color: on ? '#ffffff' : '#8fa0b8', shadow: on ? undefined : false });
     });
+    const plays = this.tabPlays();
+    if (plays) {
+      const ci = this.chipIndex();
+      const rects = this.chipRects();
+      chipsFor(plays).forEach((f, i) => {
+        const r = rects[i];
+        const on = i === ci;
+        g.fillStyle = on ? '#24324a' : '#101620';
+        g.fillRect(r.x, r.y, r.w, r.h);
+        if (on) {
+          g.fillStyle = '#ffd23f';
+          g.fillRect(r.x, r.y + r.h - 1, r.w, 1);
+        }
+        text(g, chipLabel(f), r.x + r.w / 2, r.y + 2, { align: 'center', color: on ? '#ffd23f' : '#8fa0b8', shadow: false });
+      });
+    }
     cards.forEach((c, i) => {
       if (c.kind === 'play') this.drawCard(g, c.def, i);
       else this.drawKickCard(g, c, i);
     });
-    drawHint(g, tabs.length ? `CLICK A PLAY OR 1-${cards.length}   Q/E OR TAB: SWITCH TABS   F: FLIP${this.flipCall ? ' (ON)' : ''}` : `CLICK A CARD OR 1-${cards.length}`);
+    const pages = plays ? this.pageCount() : 1;
+    const paging = pages > 1 ? `  W/S PAGE ${Math.min(this.page, pages - 1) + 1}/${pages}` : '';
+    drawHint(
+      g,
+      plays
+        ? `1-${cards.length} PLAY  Q/E TAB  A/D FORMATION${paging}  F FLIP${this.flipCall ? ' (ON)' : ''}`
+        : tabs.length ? `CLICK A CARD OR 1-${cards.length}   Q/E: SWITCH TABS` : `CLICK A CARD OR 1-${cards.length}`,
+    );
   }
 
   private cardFrame(g: CanvasRenderingContext2D, i: number, title: string, sub: string, subColor = '#8fa0b8') {
@@ -742,8 +849,8 @@ export class Game {
     g.fillRect(r.x, r.y, r.w, r.h);
     g.fillStyle = hot ? '#ffd23f' : this.user.colors.primary;
     g.fillRect(r.x, r.y, r.w, 2);
-    text(g, `${i + 1} ${title.toUpperCase()}`, r.x + 6, r.y + 6, { color: hot ? '#ffd23f' : '#ffffff' });
-    text(g, sub, r.x + 6, r.y + 17, { color: subColor, shadow: false });
+    text(g, `${i + 1} ${title.toUpperCase()}`, r.x + 6, r.y + 5, { color: hot ? '#ffd23f' : '#ffffff' });
+    text(g, sub, r.x + 6, r.y + 15, { color: subColor, shadow: false });
     return r;
   }
 
@@ -785,7 +892,7 @@ export class Game {
       const p = pts[k];
       const sx = x0 + p.x * 2.3;
       if (sx > r.x + r.w - 8) break;
-      g.fillRect(Math.round(sx), Math.round(y0 - p.z * 2), 1, 1);
+      g.fillRect(Math.round(sx), Math.round(y0 - p.z * 1.4), 1, 1);
     }
     text(g, `LOFT ${d.loft}`, r.x + r.w - 6, r.y + 6, { align: 'right', color: '#5d6b80', shadow: false });
   }
@@ -797,20 +904,38 @@ export class Game {
     g.fillRect(r.x, r.y, r.w, r.h);
     g.fillStyle = hot ? '#ffd23f' : this.user.colors.primary;
     g.fillRect(r.x, r.y, r.w, 2);
-    text(g, `${i + 1} ${p.name.toUpperCase()}`, r.x + 6, r.y + 6, { color: hot ? '#ffd23f' : '#ffffff' });
-    text(g, `${p.formation.name.toUpperCase()}  ${personnelOf(p.formation)}`, r.x + 6, r.y + 17, { color: '#8fa0b8', shadow: false });
+    text(g, `${i + 1} ${p.name.toUpperCase()}`, r.x + 6, r.y + 5, { color: hot ? '#ffd23f' : '#ffffff' });
+    text(g, `${p.formation.name.toUpperCase()}  ${personnelOf(p.formation)}`, r.x + 6, r.y + 15, { color: '#8fa0b8', shadow: false });
 
-    // Mini play diagram (offense moving right, field width squashed like the game view)
-    const dx0 = r.x + 34;
-    const dy0 = r.y + 30;
-    const sx = (x: number) => dx0 + x * 3.6;
-    const sy = (y: number) => dy0 + (y / FIELD_W) * 48;
+    // Mini play diagram (offense moving right). Width is squashed like the game view, but each card
+    // zooms to its own play's spread, so a tight I-Form run reads as well as a four-wide pass.
+    const dh = r.h - 28;
+    const dy0 = r.y + 25;
     const by = FIELD_W / 2;
+    const rp = resolvePlay(p, by, this.flipCall);
+    const ys: number[] = [];
+    const xs: number[] = [];
+    for (const [slot, a] of Object.entries(rp.align)) {
+      const y0 = alignY(a, by);
+      const rn = rp.routes[slot as keyof typeof rp.routes];
+      xs.push(a.dx);
+      if (rn === 'block' && a.mode === 'split') continue; // a split-out blocker is pinned to the edge instead
+      ys.push(y0);
+      const side = Math.sign(by - y0) || rp.strongSign;
+      if (rn) for (const [dn, ins] of ROUTES[rn].pts) {
+        ys.push(y0 + ins * side);
+        xs.push(Math.min(a.dx + dn, 40));
+      }
+    }
+    const half = clamp(Math.max(...ys.map((y) => Math.abs(y - by))) + 2, 8, FIELD_W / 2);
+    const minX = Math.min(...xs) - 1;
+    const xScale = Math.min(8, (r.w - 18) / (Math.max(...xs) + 2 - minX));
+    const sx = (x: number) => r.x + 8 + (x - minX) * xScale;
+    const sy = (y: number) => clamp(dy0 + dh / 2 + ((y - by) / (2 * half)) * dh, dy0, dy0 + dh);
     g.fillStyle = 'rgba(255,255,255,0.15)';
-    g.fillRect(Math.round(sx(0)), dy0, 1, 48);
+    g.fillRect(Math.round(sx(0)), dy0, 1, dh);
     const colors = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
     let ci = 0;
-    const rp = resolvePlay(p, by, this.flipCall);
     for (const [slot, a] of Object.entries(rp.align)) {
       const x0 = a.dx;
       const y0 = clamp(alignY(a, by), 1, FIELD_W - 1);
@@ -857,6 +982,27 @@ export class Game {
         const l = Math.hypot(vx, vy) || 1;
         const s = def.run ? 4 : 3;
         g.fillRect(Math.round(sx(px + (vx / l) * 0.8)) - 1, Math.round(sy(py + (vy / l) * 0.8)) - 1, s, s);
+      }
+    }
+
+    // Pullers: a dotted path flat behind the line to the hole (a kick-out aims just outside it).
+    const rbRoute = rp.routes.RB;
+    if (rp.pulls.length && rbRoute && ROUTES[rbRoute].run) {
+      const ry = clamp(alignY(rp.align.RB, by), 1, FIELD_W - 1);
+      const last = ROUTES[rbRoute].pts[ROUTES[rbRoute].pts.length - 1];
+      const holeY = ry + last[1] * (Math.sign(by - ry) || rp.strongSign);
+      const playSign = Math.sign(holeY - by) || rp.strongSign;
+      g.fillStyle = '#ffffff';
+      for (const pl of rp.pulls) {
+        const a = rp.align[pl.who];
+        const oy = alignY(a, by);
+        const ty = holeY + (pl.job === 'kick' ? playSign * 2.5 : 0);
+        const steps = Math.ceil(Math.abs(ty - oy) / 0.9);
+        for (let k = 1; k <= steps; k++) {
+          g.fillRect(Math.round(sx(a.dx - 0.8)), Math.round(sy(oy + ((ty - oy) * k) / steps)), 1, 1);
+        }
+        g.fillRect(Math.round(sx(a.dx - 0.8)) + 1, Math.round(sy(ty)) - 1, 2, 1);
+        g.fillRect(Math.round(sx(a.dx - 0.8)) + 3, Math.round(sy(ty)) - 1, 1, 1);
       }
     }
   }

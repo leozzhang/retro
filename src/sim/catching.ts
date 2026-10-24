@@ -5,7 +5,13 @@ export interface Contender {
   pos: number;
   cth: number;
   awr?: number;
+  /** Receiver only: 0..1, how set he is (settled and facing the QB on a hitch, curl, comeback or screen). */
+  set?: number;
 }
+
+/** A set receiver sees the ball all the way in: a little surer hands, and he can shield the defender. */
+export const SET_HANDS = 0.04;
+export const SET_CONTEST = 0.05;
 
 export type CatchResult = 'catch' | 'int' | 'drop' | 'pbu' | 'miss';
 
@@ -15,14 +21,16 @@ export const CATCH_REACH = 1.7;
 export function catchOdds(o: Contender | null, d: Contender | null): { catch: number; int: number } {
   const oPos = o ? Math.pow(clamp(o.pos, 0, 1), 0.6) : 0;
   const dPos = d ? Math.pow(clamp(d.pos, 0, 1), 0.6) : 0;
-  const open = o ? clamp(0.2 + 0.8 * oPos * (0.75 + (0.25 * o.cth) / 100), 0, 0.98) : 0;
+  const set = o?.set ?? 0;
+  const hands = o ? 0.75 + (0.25 * o.cth) / 100 + SET_HANDS * set : 0;
+  const open = o ? clamp(0.2 + 0.8 * oPos * hands, 0, 0.98) : 0;
   if (!d) return { catch: open, int: 0 };
 
   const dHands = d.cth * 0.6 + (d.awr ?? d.cth) * 0.4;
   const intBase = clamp(0.08 + 0.5 * dPos * (dHands / 100), 0, 0.7);
   if (!o) return { catch: 0, int: intBase };
 
-  const oSkill = oPos * (0.75 + (0.25 * o.cth) / 100);
+  const oSkill = oPos * hands * (1 + SET_CONTEST * set);
   const dSkill = dPos * (0.6 + (0.4 * dHands) / 100);
   const share = oSkill / (oSkill + dSkill * 0.9 + 1e-6);
   const pc = open * share;

@@ -1,7 +1,8 @@
 import type { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL } from '../engine/constants';
-import { add, scale, type Vec } from '../engine/math';
+import { add, len, scale, type Vec } from '../engine/math';
 import type { Play } from '../game/playState';
+import { facingQB } from '../sim/ai';
 import { flightPos, passParams } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
 import { isEligible, poseOf, type Player } from '../sim/player';
@@ -85,6 +86,13 @@ function drawDebug(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
       g.lineTo(s.x, s.y);
       g.stroke();
     }
+  }
+  // Route runners: current speed (yd/s), and SET once squared up to the QB on a settle route.
+  for (const o of play.off) {
+    if (!o.passRoute || o.isBlocker || play.carrier === o) continue;
+    const a = cam.toScreen(o.pos.x, o.pos.y);
+    const set = facingQB(o, play.qb, play.time);
+    text(g, set >= 1 ? 'SET' : len(o.vel).toFixed(1), a.x, a.y + 6, { size: 6, color: set >= 1 ? '#7dff7d' : '#ffffff', align: 'center' });
   }
   if (play.ballTarget && play.phase === 'air') {
     const c = cam.toScreen(play.ballTarget.x, play.ballTarget.y);
