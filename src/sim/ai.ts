@@ -122,12 +122,12 @@ function passBlock(play: Play, p: Player): void {
   }
 }
 
-/** Nearest unblocked defender in front of a run blocker, preferring ones nobody has yet. */
+/** Nearest unblocked defender in front of a run blocker, preferring ones nobody has yet. The zone-read key is left alone. */
 function pickRunTarget(play: Play, p: Player): Player | null {
   let best: Player | null = null;
   let bestScore = Infinity;
   for (const d of play.def) {
-    if (d.down || d.pos.x < p.pos.x - 1) continue;
+    if (d.down || d === play.readKey || d.pos.x < p.pos.x - 1) continue;
     const dd = dist(d.pos, p.pos);
     if (dd > 8) continue;
     const helpers = play.off.filter((o) => o !== p && o.mark === d).length;
@@ -231,6 +231,10 @@ export function thinkDefense(play: Play, d: Player): void {
     pursue(d, c);
     return;
   }
+  if (d === play.readKey && (play.phase === 'snap' || (play.phase === 'live' && c === play.qb))) {
+    readKey(play, d);
+    return;
+  }
   if (play.phase === 'live' && play.time >= d.fitAt && play.time < d.fitUntil) {
     runFit(play, d);
     return;
@@ -248,6 +252,18 @@ function runFit(play: Play, d: Player): void {
   const tgt = { x: play.los + depth, y: lerp(d.start.y, play.hole.y, 0.35) };
   d.goal = tgt;
   d.want = seek(d, tgt, maxSpeed(d) * 0.95, 0.6);
+}
+
+/** Zone-read key: crash down the line on the back, or stay home and squeeze, keeping outside leverage on the QB. */
+function readKey(play: Play, d: Player): void {
+  if (play.keyCrash) {
+    d.goal = play.rb.pos;
+    pursue(d, play.rb, 0.95);
+    return;
+  }
+  const tgt = { x: play.los + 0.8, y: lerp(d.start.y, play.qb.pos.y, 0.25) };
+  d.goal = tgt;
+  d.want = seek(d, tgt, maxSpeed(d) * 0.5, 0.5);
 }
 
 function runAssignment(play: Play, d: Player): void {

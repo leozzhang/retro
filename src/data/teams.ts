@@ -128,15 +128,19 @@ export const DEF_SLOTS = ['DE1', 'DT1', 'DT2', 'DE2', 'WLB', 'MLB', 'CB1', 'CB2'
 export const ST_SLOTS = ['K', 'P'] as const;
 /** Depth players a formation can sub into an on-field slot. Generated last so existing ratings don't change. */
 export const OFF_EXTRA = ['FB', 'TE2', 'WR4'] as const;
+/** Defensive depth players for personnel packages: a strongside backer (base) and a dime back. Generated last. */
+export const DEF_EXTRA = ['SAM', 'DIME'] as const;
 export type OffSlot = (typeof OFF_SLOTS)[number];
 export type DefSlot = (typeof DEF_SLOTS)[number];
 export type ExtraSlot = (typeof OFF_EXTRA)[number];
 export type RosterOffSlot = OffSlot | ExtraSlot;
+export type DefExtraSlot = (typeof DEF_EXTRA)[number];
+export type RosterDefSlot = DefSlot | DefExtraSlot;
 
-const SLOT_ROLE: Record<string, Role> = {
+export const SLOT_ROLE: Record<string, Role> = {
   QB: 'QB', RB: 'RB', X: 'WR', Z: 'WR', SL: 'WR', TE: 'TE', LT: 'OL', LG: 'OL', C: 'OL', RG: 'OL', RT: 'OL',
   DE1: 'DL', DT1: 'DL', DT2: 'DL', DE2: 'DL', WLB: 'LB', MLB: 'LB', CB1: 'CB', CB2: 'CB', NB: 'CB', FS: 'S', SS: 'S', K: 'K', P: 'P',
-  FB: 'RB', TE2: 'TE', WR4: 'WR',
+  FB: 'RB', TE2: 'TE', WR4: 'WR', SAM: 'LB', DIME: 'CB',
 };
 
 /** Per-slot tweaks on top of the role template: a fullback is a blocking back. */
@@ -206,7 +210,7 @@ export function generateRoster(team: Team): Record<string, RosterPlayer> {
   const rng = mulberry32(hashString(team.id));
   const roster: Record<string, RosterPlayer> = {};
   const used = new Set<number>();
-  for (const slot of [...OFF_SLOTS, ...DEF_SLOTS, ...ST_SLOTS, ...OFF_EXTRA]) {
+  for (const slot of [...OFF_SLOTS, ...DEF_SLOTS, ...ST_SLOTS, ...OFF_EXTRA, ...DEF_EXTRA]) {
     const role = SLOT_ROLE[slot];
     const st = (ST_SLOTS as readonly string[]).includes(slot);
     const offense = (OFF_SLOTS as readonly string[]).includes(slot) || (OFF_EXTRA as readonly string[]).includes(slot);

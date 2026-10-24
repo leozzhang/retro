@@ -4,12 +4,13 @@ import { mulberry32 } from './engine/math';
 import {
   advanceSim, afterPlay, clockText, newClock, penaltySpot, playClockText, readyForPlay, tickBetween, tickLive, type Clock,
 } from './game/clock';
-import { DEF_CALLS } from './data/defenses';
+import { DEF_CALLS, packageFor, type DefCall } from './data/defenses';
 import { ACE, EMPTY, FORMATIONS, GUN_TRIPS, I_FORM, PLAYBOOK, type Formation, type PlayDef } from './data/plays';
 import { generateRoster, TEAMS } from './data/teams';
 import { HASH_BOT, HASH_TOP, STEP } from './engine/constants';
 import type { Input } from './engine/input';
 import { handoffKind, Play } from './game/playState';
+import { matchDefense } from './game/matchups';
 import { alignY, personnelOf, resolvePlay } from './game/resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, type KickOutcome, type PlayOutcome,
@@ -321,9 +322,9 @@ describe('playbook', () => {
   const play = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
   const offR = generateRoster(TEAMS[0]);
   const defR = generateRoster(TEAMS[1]);
-  const snapPlay = (def: PlayDef, flip = false) =>
+  const snapPlay = (def: PlayDef, flip = false, call: DefCall = DEF_CALLS[0]) =>
     new Play({
-      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: def, defCall: DEF_CALLS[0],
+      offTeam: TEAMS[0], defTeam: TEAMS[1], offRoster: offR, defRoster: defR, play: def, defCall: call,
       press: {}, los: 35, ballY: MID, flip, rng: mulberry32(1),
     });
   const idle = {
@@ -448,5 +449,127 @@ describe('playbook', () => {
     const dl = p.def.filter((d) => d.role === 'DL').sort((a, b) => a.pos.y - b.pos.y);
     expect(p.rb.mark).toBe(dl[0]); // strong is right, so the left end is the back's
     for (const d of dl) expect(p.off.some((o) => o.mark === d)).toBe(true);
+  });
+
+  // ---------------------------------------------------------------- Phase 2: personnel, power, zone read
+  const inForm = (f: Formation): PlayDef => ({ id: 't', name: 'T', kind: 'pass', formation: f, block: 'pass', read: 'none', flip: 'fixed', drop: 1, tip: '' });
+
+  it('the defense picks its package from offensive personnel', () => {
+    expect(['21', '12', '22', '11', '20', '10'].map(packageFor)).toEqual(['base', 'base', 'base', 'nickel', 'nickel', 'dime']);
+    expect(defR.SAM.role).toBe('LB');
+    expect(defR.DIME.role).toBe('CB');
+    const slots = (f: Formation) => snapPlay(inForm(f)).def.map((d) => d.slot);
+    expect(snapPlay(inForm(I_FORM)).defPackage).toBe('base');
+    expect(slots(I_FORM)).toContain('SAM');
+    expect(slots(I_FORM)).not.toContain('NB');
+    expect(slots(GUN_TRIPS)).toContain('NB');
+    expect(snapPlay(inForm(EMPTY)).defPackage).toBe('dime');
+    expect(slots(EMPTY)).toContain('DIME');
+    expect(slots(EMPTY)).not.toContain('MLB');
+  });
+
+  it('cover classes follow alignment, not the slot name', () => {
+    expect(resolvePlay(inForm(I_FORM), MID, false).cover).toMatchObject({ SL: 'back', RB: 'back', TE: 'inline', X: 'wide', Z: 'wide' });
+    expect(resolvePlay(inForm(ACE), MID, false).cover.SL).toBe('inline');
+    expect(resolvePlay(inForm(EMPTY), MID, false).cover).toMatchObject({ RB: 'slot', TE: 'slot', SL: 'slot' });
+    expect(resolvePlay(play('mesh'), MID, false).cover).toMatchObject({ SL: 'slot', TE: 'inline', RB: 'back' });
+  });
+
+  it('11-personnel plays keep every call exactly as written', () => {
+    for (const p of PLAYBOOK) {
+      for (const call of DEF_CALLS) {
+        for (const flip of [false, true]) {
+          const plan = matchDefense(call, p, resolvePlay(p, MID, flip));
+          expect(plan.pkg, p.id).toBe('nickel');
+          expect(plan.assign, `${p.id} ${call.id}`).toEqual(call.assign);
+        }
+      }
+    }
+  });
+
+  it('no defensive back covers a back, nobody is double-covered, and five-man calls cover every eligible', () => {
+    for (const f of FORMATIONS) {
+      for (const call of DEF_CALLS) {
+        const p = snapPlay(inForm(f), false, call);
+        const rp = p.resolved;
+        const coverOf = (o: { slot: string }) => rp.cover[(Object.keys(rp.cast) as (keyof typeof rp.cast)[]).find((k) => rp.cast[k] === o.slot)!];
+        const targets = p.def.filter((d) => d.manTarget).map((d) => d.manTarget!);
+        expect(new Set(targets).size, `${f.name} ${call.id}`).toBe(targets.length);
+        for (const d of p.def) {
+          if (d.role === 'CB' && d.manTarget) expect(coverOf(d.manTarget), `${f.name} ${call.id}: ${d.slot} on ${d.manTarget.slot}`).not.toBe('back');
+        }
+        const eligible = p.off.filter((o) => o.role !== 'QB' && o.role !== 'OL');
+        if (targets.length === 5) expect(new Set(targets)).toEqual(new Set(eligible));
+      }
+    }
+    const iform = snapPlay(inForm(I_FORM));
+    const fb = iform.off.find((o) => o.slot === 'FB')!;
+    expect(iform.def.find((d) => d.manTarget === fb)?.slot).toBe('SAM');
+  });
+
+  it('Power pulls the backside guard, and a mirrored Power pulls the other one', () => {
+    expect(play('power').scheme?.pulls).toEqual([{ who: 'LG', job: 'lead' }]);
+    expect(resolvePlay(play('power'), MID, false).pulls[0].who).toBe('LG');
+    expect(resolvePlay(play('power'), MID, true).pulls[0].who).toBe('RG');
+    const p = snapPlay(play('power'), true);
+    const rg = p.off.find((o) => o.slot === 'RG')!;
+    expect(rg.pull).toBe('lead');
+    expect(p.off.find((o) => o.slot === 'LG')!.pull).toBeNull();
+    p.snap();
+    run(p, 0.6);
+    expect(rg.pos.y).toBeLessThan(rg.start.y - 0.8); // mirrored: the hole is on the left
+  });
+
+  describe('zone read', () => {
+    const start = (crash: boolean, flip = false) => {
+      const p = snapPlay(play('zone-read'), flip);
+      p.snap();
+      p.keyCrash = crash;
+      return p;
+    };
+
+    it('leaves the backside end unblocked as the read key', () => {
+      const p = start(false);
+      expect(p.readKey?.slot).toBe('DE1'); // IZ hits right, so the left end is the key
+      expect(p.off.some((o) => o.mark === p.readKey)).toBe(false);
+      run(p, 0.5);
+      expect(p.readKey!.engagedBy).toHaveLength(0);
+      expect(start(false, true).readKey?.slot).toBe('DE2');
+      expect(snapPlay(play('inside-zone')).readKey).toBeNull();
+    });
+
+    it('the key either crashes on the back or stays home, and the QB can see which', () => {
+      const crash = start(true);
+      const home = start(false);
+      run(crash, 0.5);
+      run(home, 0.5);
+      expect(crash.readKey!.pos.y - crash.readKey!.start.y).toBeGreaterThan(1.5);
+      expect(crash.keyCrashing()).toBe(true);
+      expect(home.keyCrashing()).toBe(false);
+      expect(home.readKey!.pos.x).toBeGreaterThan(home.los);
+    });
+
+    it('without a give the QB pulls it when the mesh ends and runs outside the key', () => {
+      const p = start(true);
+      for (let i = 0; i < 120 && !p.kept; i++) run(p, STEP);
+      expect(p.kept).toBe(true);
+      expect(p.handedOff).toBe(false);
+      expect(p.phase).toBe('run');
+      expect(p.carrier).toBe(p.qb);
+      expect(p.hole.y).toBeLessThan(p.readKey!.pos.y); // to the key's outside, not the IZ hole
+      expect(p.readKey!.reactAt - p.time).toBeGreaterThan(0.35); // he crashed, so he's late to the QB
+    });
+
+    it('a give during the ride is a handoff, and an end who stayed home is late to the back', () => {
+      const p = start(false);
+      run(p, 0.45);
+      expect(p.handoffOption()).toBe('handoff');
+      p.handoff();
+      expect(p.handedOff).toBe(true);
+      expect(p.readKey!.reactAt - p.time).toBeGreaterThan(0.35);
+      // The ride stretches handoff reach on a zone read.
+      expect(handoffKind({ x: 0, y: 0 }, { x: -1, y: 2.5 }, 5)).toBe('pitch');
+      expect(handoffKind({ x: 0, y: 0 }, { x: -1, y: 2.5 }, 5, 3.2)).toBe('handoff');
+    });
   });
 });

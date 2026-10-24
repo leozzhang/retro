@@ -1,5 +1,5 @@
 import { FIELD_W } from '../engine/constants';
-import type { DefSlot, OffSlot } from './teams';
+import type { DefExtraSlot, DefSlot, OffSlot } from './teams';
 
 export type Assign =
   | { kind: 'rush' }
@@ -13,6 +13,7 @@ export interface DefCall {
   /** How many safeties are deep pre-snap: the main tell for reading coverage. */
   shell: 'two-high' | 'one-high' | 'zero';
   weight: number;
+  /** Man targets are written against 11 personnel; `matchDefense` re-keys them to whoever lines up there. */
   assign: Record<DefSlot, Assign>;
 }
 
@@ -70,4 +71,20 @@ export function pickDefCall(rng: () => number): DefCall {
     if (r <= 0) return c;
   }
   return DEF_CALLS[0];
+}
+
+/** Defensive personnel, chosen from the offense's personnel at the snap. */
+export type DefPackage = 'base' | 'nickel' | 'dime';
+
+/** Depth players each package subs in: base trades the nickel for a SAM backer, dime trades the MIKE for a sixth DB. */
+export const PACKAGE_SUBS: Record<DefPackage, Partial<Record<DefSlot, DefExtraSlot>>> = {
+  base: { NB: 'SAM' },
+  nickel: {},
+  dime: { MLB: 'DIME' },
+};
+
+/** Three or more backs and tight ends (21, 12, 22) get base; one or fewer (10) gets dime; 11 and 20 get nickel. */
+export function packageFor(personnel: string): DefPackage {
+  const big = Number(personnel[0]) + Number(personnel[1]);
+  return big >= 3 ? 'base' : big <= 1 ? 'dime' : 'nickel';
 }

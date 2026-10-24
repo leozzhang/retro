@@ -22,6 +22,7 @@ Controls are listed in [README.md](README.md).
 - `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, blocking, pursuit), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
 - `game/`:
   - `resolvePlay.ts`: lays a play out for the snap (mirroring, personnel, concepts to slot routes). See [docs/PLAYBOOK.md](docs/PLAYBOOK.md)
+  - `matchups.ts`: the defense's package and man matchups for the offense on the field
   - `playState.ts`: the `Play` class, the state machine for one snap, including handoffs
   - `kickPlay.ts`: the `KickPlay` class (FG/XP, punts, kickoffs) and the special-teams AI
   - `rules.ts`: down and distance, scoring, kick spots, CPU drive sim
@@ -41,6 +42,7 @@ Controls are listed in [README.md](README.md).
   - `catchOdds` (`sim/catching.ts`)
   - `tackleChance` (`sim/tackling.ts`)
   - shed and push rates (`Play.updateEngagements`), `RUN_BLOCK_EDGE`, `ARM_TACKLE` (`game/playState.ts`)
+  - zone read: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH` (`game/playState.ts`)
   - `pitchOdds`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
   - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd` (`sim/kicking.ts`)

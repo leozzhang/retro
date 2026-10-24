@@ -1,4 +1,4 @@
-import type { DefCall } from '../data/defenses';
+import type { DefCall, DefPackage } from '../data/defenses';
 import { ROUTES, type PlayDef } from '../data/plays';
 import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type RosterPlayer, type Team } from '../data/teams';
 import type { Camera } from '../engine/camera';
@@ -14,6 +14,7 @@ import {
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import { TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import { matchDefense } from './matchups';
 import { alignY, resolvePlay, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
 
@@ -54,6 +55,16 @@ const RUN_BLOCK_EDGE = 3;
 const ARM_TACKLE = 0.5;
 /** RB this close to the QB early on a play-action call sells the fake. */
 const FAKE_RANGE = 2;
+/** Chance the zone-read key crashes on the back; otherwise he stays home on the QB. */
+const KEY_CRASH = 0.5;
+/** Extra reaction time for a read key who guessed wrong (crashed on a keep, stayed home on a give). */
+const KEY_FOOLED = 0.35;
+/** Zone read: the QB rides the back this far, so the give stays a handoff longer than on a called run. */
+const MESH_REACH = 3.2;
+/** Zone read keep: the QB aims for the alley this far outside wherever the read key is. */
+const KEEP_WIDTH = 3.5;
+/** Zone read: the QB pulls it if the back never reaches the mesh this long after the snap. */
+const MESH_TIME = 1.2;
 
 export type HandoffKind = 'handoff' | 'pitch';
 
@@ -62,10 +73,10 @@ export type HandoffKind = 'handoff' | 'pitch';
  * a handoff it's a pitch (or a shovel, if he's ahead of the QB), which needs a
  * yard of cushion behind the line of scrimmage.
  */
-export function handoffKind(qb: Vec, rb: Vec, los: number): HandoffKind | null {
+export function handoffKind(qb: Vec, rb: Vec, los: number, reach = HANDOFF_RANGE): HandoffKind | null {
   if (rb.x >= los - 0.3) return null;
   const d = dist(qb, rb);
-  if (d <= HANDOFF_RANGE) return 'handoff';
+  if (d <= reach) return 'handoff';
   if (d <= PITCH_RANGE && rb.x <= los - 1) return 'pitch';
   return null;
 }
@@ -77,8 +88,8 @@ export class Play {
   readonly qb: Player;
   readonly center: Player;
   readonly rb: Player;
-  /** Where the run is designed to hit (end of the RB's run path); run fits and blocks key on it. */
-  readonly hole: Vec;
+  /** Where the run is designed to hit (end of the RB's run path); run fits and blocks key on it. Moves on a QB keep. */
+  hole: Vec;
   readonly ball: Ball;
   readonly los: number;
   readonly ballY: number;
@@ -86,7 +97,11 @@ export class Play {
   /** The play as laid out for this snap (mirroring, personnel, concept routes). */
   readonly resolved: ResolvedPlay;
   readonly defCall: DefCall;
+  /** Defensive personnel for this snap, matched to the offense's. */
+  readonly defPackage: DefPackage;
   readonly qbDrop: Vec;
+  /** Zone read: the backside end, left unblocked for the QB to read. */
+  readonly readKey: Player | null = null;
   private readonly rng: Rng;
 
   phase: Phase = 'presnap';
@@ -111,6 +126,12 @@ export class Play {
   /** The ball in the air is a pitch, not a forward pass. */
   pitch = false;
   faked = false;
+  /** Zone read: the read key crashes on the back this snap (decided at the snap). */
+  keyCrash = false;
+  /** Zone read: the back has reached the mesh. */
+  private meshed = false;
+  /** Zone read: the QB pulled it. */
+  kept = false;
 
   constructor(s: PlaySetup) {
     this.los = s.los;
@@ -131,7 +152,7 @@ export class Play {
       const rn = rp.routes[slot];
       p.isBlocker = p.role === 'OL' || rn === 'block';
       p.thenBlock = !!(rn && ROUTES[rn].thenBlock);
-      p.pull = s.play.scheme?.pulls?.find((pl) => pl.who === slot)?.job ?? null;
+      p.pull = rp.pulls.find((pl) => pl.who === slot)?.job ?? null;
       if (rn && rn !== 'block') this.buildRoute(p, rn);
       this.off.push(p);
       bySlot.set(slot, p);
@@ -147,13 +168,22 @@ export class Play {
         ? { ...this.rb.route[this.rb.route.length - 1] }
         : { x: this.los + 1.5, y: this.ballY };
 
+    const plan = matchDefense(s.defCall, s.play, rp);
+    this.defPackage = plan.pkg;
     for (const slot of DEF_SLOTS) {
-      const a = s.defCall.assign[slot];
-      const d = makePlayer('def', s.defRoster[slot], defU, { x: 0, y: 0 });
+      const a = plan.assign[slot];
+      const d = makePlayer('def', s.defRoster[plan.cast[slot]], defU, { x: 0, y: 0 });
       d.assign = a;
       d.pos = this.defAlignment(slot, d, bySlot, s.press[slot] ?? false);
       d.start = { ...d.pos };
       this.def.push(d);
+    }
+
+    if (s.play.read === 'zoneRead') {
+      // The read key is the outermost lineman on the backside, away from the hole.
+      const back = -(Math.sign(this.hole.y - this.ballY) || rp.strongSign);
+      const dl = this.def.filter((d) => d.role === 'DL');
+      this.readKey = dl.reduce((a, b) => ((b.pos.y - a.pos.y) * back > 0 ? b : a));
     }
 
     this.players = [...this.off, ...this.def];
@@ -214,7 +244,7 @@ export class Play {
       const inside = Math.sign(by - t.pos.y) || 1;
       if (d.role === 'CB') {
         d.press = press;
-        d.cushion = press ? 1 : slot === 'NB' ? 4.5 : 6.5;
+        d.cushion = press ? 1 : slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5;
         d.turned = press;
         pos = { x: los + d.cushion, y: t.pos.y + inside * 0.8 };
       } else if (d.role === 'LB') {
@@ -228,7 +258,7 @@ export class Play {
       pos = { x: los + 12.5 + this.rng() * 1.5, y: (a.yMin + a.yMax) / 2 };
     } else if (a.kind === 'robber') {
       pos = { x: los + 9, y: by };
-    } else if (d.role === 'LB') {
+    } else if (d.role !== 'DL') {
       pos = { x: los + 3, y: pos.y }; // walked-up blitzer: a tell for the QB
     }
     return { x: Math.min(pos.x, FIELD_LEN - 0.5), y: clamp(pos.y, 1, FIELD_W - 1) };
@@ -241,6 +271,7 @@ export class Play {
     const from = { x: this.center.pos.x + 0.3, y: this.center.pos.y, z: 0.4 };
     const to = { x: this.qb.pos.x, y: this.qb.pos.y, z: 1.2 };
     launch(this.ball, from, to, dist(from, to) / 16, 0.15, 'snap');
+    if (this.readKey) this.keyCrash = this.rng() < KEY_CRASH;
     if (this.playDef.block === 'run') this.assignRunBlocks();
     else this.assignProtection();
     for (const d of this.def) {
@@ -260,10 +291,10 @@ export class Play {
     }
   }
 
-  /** Down linemen get the nearest lineman, uncovered linemen climb to a backer, the rest stalk. */
+  /** Down linemen get the nearest lineman, uncovered linemen climb to a backer, the rest stalk. The zone-read key is left alone. */
   private assignRunBlocks(): void {
     const ol = this.off.filter((o) => o.role === 'OL' && !o.pull);
-    const dl = this.def.filter((d) => d.role === 'DL');
+    const dl = this.def.filter((d) => d.role === 'DL' && d !== this.readKey);
     for (const r of dl) {
       let best: Player | null = null;
       for (const b of ol) if (!b.mark && (!best || Math.abs(b.pos.y - r.pos.y) < Math.abs(best.pos.y - r.pos.y))) best = b;
@@ -275,7 +306,7 @@ export class Play {
       const taken = marked();
       let best: Player | null = null;
       for (const d of this.def) {
-        if (taken.has(d) || d.pos.x < b.pos.x - 1) continue;
+        if (taken.has(d) || d === this.readKey || d.pos.x < b.pos.x - 1) continue;
         if (b.role === 'OL' && d.role !== 'LB') continue;
         if (!best || dist(d.pos, b.pos) < dist(best.pos, b.pos)) best = d;
       }
@@ -403,6 +434,7 @@ export class Play {
       this.handoff();
       return;
     }
+    if (this.readKey && this.updateMesh()) return;
     if (this.playDef.kind === 'pa' && !this.faked && this.time - this.snapTime < 1.3 && dist(this.rb.pos, qb.pos) < FAKE_RANGE) {
       this.sellFake();
     }
@@ -431,7 +463,7 @@ export class Play {
     const rb = this.rb;
     if (this.phase !== 'live' || this.carrier !== qb || this.scramble || this.thrown || qb.down) return null;
     if (this.playDef.qbRun || rb.isBlocker || rb.down || rb.engaged || rb.stun > 0) return null;
-    return handoffKind(qb.pos, rb.pos, this.los);
+    return handoffKind(qb.pos, rb.pos, this.los, this.readKey ? MESH_REACH : HANDOFF_RANGE);
   }
 
   handoff(): void {
@@ -441,7 +473,7 @@ export class Play {
     const rb = this.rb;
     this.aim = null;
     this.handedOff = true;
-    this.reactToRun();
+    this.reactToRun(this.readKey && !this.keyCrash ? this.readKey : null);
     if (kind === 'pitch') {
       const t = dist(qb.pos, rb.pos) / PITCH_SPEED;
       // Lead the back along his path even if he's only just starting to move.
@@ -469,8 +501,44 @@ export class Play {
     this.phase = 'run';
   }
 
-  /** Defenders key the handoff: front seven fast, defenders turned on receivers slower. */
-  private reactToRun(): void {
+  /**
+   * Zone read: ride the back through the mesh. Once he's carried past the QB
+   * without a give (or never got there), the QB pulls it. Returns true on a keep.
+   */
+  private updateMesh(): boolean {
+    const d = dist(this.rb.pos, this.qb.pos);
+    if (d <= MESH_REACH) this.meshed = true;
+    else if (this.meshed || this.time - this.snapTime > MESH_TIME) {
+      this.keep();
+      return true;
+    }
+    return false;
+  }
+
+  /** The read key is coming down the line at the back (moving inside, not just upfield): the cue to pull it. */
+  keyCrashing(): boolean {
+    const k = this.readKey;
+    if (!k) return false;
+    const inside = Math.sign(this.ballY - k.start.y);
+    return (k.pos.y - k.start.y) * inside > 1.5 || k.vel.y * inside > 4.5;
+  }
+
+  /** Zone read keep: the QB runs for the alley outside wherever the read key is, and the back carries out his fake. */
+  private keep(): void {
+    const key = this.readKey!;
+    const out = Math.sign(key.start.y - this.ballY) || -this.resolved.strongSign;
+    this.kept = true;
+    this.aim = null;
+    this.hole = { x: this.los + 1, y: clamp(key.pos.y + out * KEEP_WIDTH, 2, FIELD_W - 2) };
+    // He's been riding the mesh, so he pulls it already moving.
+    this.qb.vel = scale(norm(sub(this.hole, this.qb.pos)), maxSpeed(this.qb) * 0.5);
+    this.reactToRun(this.keyCrash ? key : null);
+    this.phase = 'run';
+    this.popup('KEEP', this.qb.pos, '#9ad7ff');
+  }
+
+  /** Defenders key the handoff: front seven fast, defenders turned on receivers slower. A fooled read key is slower still. */
+  private reactToRun(fooled: Player | null = null): void {
     for (const d of this.def) {
       const slow = 1 - d.r.awr / 100;
       const t = d.manTarget;
@@ -479,7 +547,7 @@ export class Play {
       else if (d.role === 'DL' || d.role === 'LB' || t === this.rb) react = 0.1 + slow * 0.25;
       else if (t && !t.isBlocker) react = 0.4 + slow * 0.4;
       else react = 0.3 + slow * 0.3;
-      d.reactAt = this.time + react;
+      d.reactAt = this.time + react + (d === fooled ? KEY_FOOLED : 0);
     }
   }
 
@@ -677,6 +745,7 @@ export class Play {
       for (const d of this.def) {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
         if (runBlocking && dist(d.pos, this.carrier!.pos) > 10) continue;
+        if (!runBlocking && d === this.readKey) continue; // left unblocked on purpose
         if (d.engagedBy.length === 1 && b.mark !== d) continue;
         // Blockers with an assignment work to their man rather than grabbing whoever they bump into.
         if (!runBlocking && b.isBlocker && b.mark && !b.mark.down && b.mark !== d) continue;

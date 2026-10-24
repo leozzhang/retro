@@ -112,29 +112,41 @@ function perPlayRows(plays: PlayDef[], rng: Rng): string[] {
   return rows;
 }
 
-/** Auto-QB hands off (or pitches on the toss) as soon as it's on; `autoRun` carries the ball. */
+/** Zone read: the auto-QB rides the back this long after the snap before reading the key. */
+const READ_AT = 0.55;
+
+/**
+ * Auto-QB hands off (or pitches on the toss) as soon as it's on; `autoRun` carries the ball.
+ * On a zone read it rides the mesh, then gives unless the key is crashing (then the QB keeps).
+ */
 function runRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
   const all = { n: 0, yards: 0, stuff: 0, boom: 0, list: [] as number[] };
   for (const playDef of plays) {
     for (const call of DEF_CALLS) {
-      const s = { n: 0, yards: 0, stuff: 0, boom: 0, fum: 0, td: 0, none: 0 };
+      const s = { n: 0, yards: 0, stuff: 0, boom: 0, fum: 0, td: 0, none: 0, keep: 0, keepY: 0 };
       for (let i = 0; i < REPS / 2; i++) {
         const play = newPlay(playDef, call, rng);
         play.snap();
         for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
           const opt = play.handoffOption();
-          if (opt === 'handoff' || (opt === 'pitch' && playDef.read === 'pitch')) play.handoff();
-          if (play.handedOff) play.controlled = null;
+          const zr = playDef.read === 'zoneRead';
+          const ready = !zr || (play.time - play.snapTime >= READ_AT && !play.keyCrashing());
+          if ((opt === 'handoff' && ready) || (opt === 'pitch' && playDef.read === 'pitch')) play.handoff();
+          if (play.handedOff || play.kept) play.controlled = null;
           play.update(STEP, fakeInput, cam);
         }
         const o = play.outcome;
         if (!o) continue;
-        if (!play.handedOff) {
+        if (!play.handedOff && !play.kept) {
           s.none++;
           continue;
         }
         const yds = o.spot - LOS;
+        if (play.kept) {
+          s.keep++;
+          s.keepY += yds;
+        }
         s.n++;
         s.yards += yds;
         all.list.push(yds);
@@ -150,7 +162,8 @@ function runRows(plays: PlayDef[], rng: Rng): string[] {
       const pct = (k: number) => `${((k / Math.max(1, s.n)) * 100).toFixed(0)}%`;
       rows.push(
         `RUN  ${playDef.name.padEnd(13)} ${call.name.padEnd(15)} | ypc ${(s.yards / Math.max(1, s.n)).toFixed(1)} ` +
-          `stuff ${pct(s.stuff)} 10+ ${pct(s.boom)} fum ${s.fum} td ${s.td}${s.none ? ` no-handoff ${s.none}` : ''}`,
+          `stuff ${pct(s.stuff)} 10+ ${pct(s.boom)} fum ${s.fum} td ${s.td}${s.none ? ` no-handoff ${s.none}` : ''}` +
+          `${s.keep ? ` keep ${s.keep} (${(s.keepY / s.keep).toFixed(1)} ypc)` : ''}`,
       );
     }
   }

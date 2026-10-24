@@ -1,5 +1,5 @@
 import { CONCEPTS, type Concept, type RecNum } from '../data/concepts';
-import type { Align, Formation, PlayDef, RouteName } from '../data/plays';
+import type { Align, Formation, PlayDef, Pull, RouteName } from '../data/plays';
 import { OFF_SLOTS, type OffSlot, type RosterOffSlot } from '../data/teams';
 import { FIELD_W } from '../engine/constants';
 
@@ -9,7 +9,15 @@ export const BACKFIELD_DX = -2.5;
 const MID_HASH = 0.5;
 
 const OL_SLOTS: readonly OffSlot[] = ['LT', 'LG', 'C', 'RG', 'RT'];
-const SKILL_SLOTS = OFF_SLOTS.filter((s) => s !== 'QB' && !OL_SLOTS.includes(s));
+/** Line slots swap sides when a play mirrors. */
+const MIRROR_OL: Partial<Record<OffSlot, OffSlot>> = { LT: 'RT', LG: 'RG', RG: 'LG', RT: 'LT' };
+export const SKILL_SLOTS = OFF_SLOTS.filter((s) => s !== 'QB' && !OL_SLOTS.includes(s));
+
+/**
+ * How a skill player lines up, which is what man coverage matches on: the #1 receiver on each
+ * side is 'wide', other detached receivers are 'slot', attached ends are 'inline', backs are 'back'.
+ */
+export type CoverClass = 'wide' | 'slot' | 'inline' | 'back';
 
 /** A play laid out for one snap: mirrored as needed, with every skill slot's job spelled out. */
 export interface ResolvedPlay {
@@ -18,6 +26,10 @@ export interface ResolvedPlay {
   cast: Record<OffSlot, RosterOffSlot>;
   /** Every skill slot gets a route ('block' if nothing else); the QB and OL have none. */
   routes: Partial<Record<OffSlot, RouteName>>;
+  /** Every skill slot's alignment class. */
+  cover: Partial<Record<OffSlot, CoverClass>>;
+  /** The play's pulls, with line slots swapped if it's mirrored. */
+  pulls: Pull[];
   /** +1 = the strong side is +y. */
   strongSign: 1 | -1;
   dropY: number;
@@ -80,11 +92,18 @@ export function resolvePlay(play: PlayDef, ballY: number, userFlip: boolean): Re
     sides[side === strongSign ? 'strong' : 'weak'].push(s);
   }
 
+  const recsOf = (side: 'strong' | 'weak') => [...sides[side]].sort((a, b) => Math.abs(yAt(b) - mid) - Math.abs(yAt(a) - mid));
+  const cover: Partial<Record<OffSlot, CoverClass>> = {};
+  for (const s of backs) cover[s] = 'back';
+  for (const side of ['strong', 'weak'] as const) {
+    recsOf(side).forEach((s, i) => (cover[s] = align[s].mode === 'rel' ? 'inline' : i === 0 ? 'wide' : 'slot'));
+  }
+
   const routes: Partial<Record<OffSlot, RouteName>> = {};
   for (const side of ['strong', 'weak'] as const) {
     const id = play[side];
     if (!id) continue;
-    const recs = [...sides[side]].sort((a, b) => Math.abs(yAt(b) - mid) - Math.abs(yAt(a) - mid));
+    const recs = recsOf(side);
     // A concept covers as many receivers as the side has (3x1 verts gets a third seam, 2x2 doesn't).
     let reached = 0;
     for (const [n, rn] of Object.entries((CONCEPTS[id] as Concept).routes)) {
@@ -101,6 +120,7 @@ export function resolvePlay(play: PlayDef, ballY: number, userFlip: boolean): Re
   }
   for (const s of SKILL_SLOTS) routes[s] ??= 'block';
 
+  const pulls = (play.scheme?.pulls ?? []).map((pl) => (mirrored ? { ...pl, who: MIRROR_OL[pl.who] ?? pl.who } : pl));
   const dropY = play.dropY ?? 0;
-  return { align, cast: castOf(f), routes, strongSign, dropY: mirrored ? -dropY : dropY, mirrored };
+  return { align, cast: castOf(f), routes, cover, pulls, strongSign, dropY: mirrored ? -dropY : dropY, mirrored };
 }

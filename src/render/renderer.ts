@@ -93,7 +93,7 @@ function drawDebug(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
     g.ellipse(c.x, c.y, CATCH_REACH * 12, CATCH_REACH * 5.2, 0, 0, Math.PI * 2);
     g.stroke();
   }
-  text(g, `DEF: ${play.defCall.name}`, 6, 330, { size: 8, color: '#ffb3b3' });
+  text(g, `DEF: ${play.defCall.name} (${play.defPackage.toUpperCase()})`, 6, 330, { size: 8, color: '#ffb3b3' });
 }
 
 export function drawShadow(g: CanvasRenderingContext2D, x: number, y: number, w: number): void {

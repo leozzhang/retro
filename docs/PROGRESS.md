@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-23_
+_Last updated: 2026-10-24_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -147,6 +147,37 @@ These are Python scripts in `analysis/` that read the Big Data Bowl 2027 data. N
   - **Dagger and Curl Flat (vs Cover 1, 2.2 s):** these collapsed to 0–10%, but that's a harness artifact. The auto-QB targets the flat runner and leads him out of bounds ("Out of bounds" / "Nobody home" on nearly every rep).
   - **Slant Flat at 1.2 s:** jumped from 21–36% to 74–77%, the same artifact in reverse. The slot now starts 18.6 from the sideline instead of 14, so his flat stays in bounds.
 
+## Done: playbook system, Phase 2 prerequisites (2026-10-24)
+Design notes are in [PLAYBOOK.md](PLAYBOOK.md).
+- **Defense vs. personnel** (`game/matchups.ts`):
+  - The package follows the offense's personnel: base (SAM for the nickel) against 21/12, nickel against 11, dime (DIME for the MIKE) against 10. The new depth defenders `DEF_EXTRA` are generated last, so existing ratings are unchanged.
+  - Man assignments are matched to where players line up (`cover` classes from `resolvePlay`), not to slot names. In I-Form the SAM takes the FB. No DB covers a back in any formation, and five-man calls cover every eligible.
+  - All 11-personnel plays keep their calls exactly, so every pass, PA, per-play and kick row in `balance.txt` came out byte-identical.
+  - The HUD shows the package next to the call, for example `DEF: 2 Man Under (BASE)`.
+  - Small fixes: off-ball DBs use the 4.5-yd cushion regardless of slot, and any non-DL blitzer walks up (a dime back blitzing in Cover 0, for example).
+- **Zone Read is a real read:**
+  - The backside end is left unblocked and either crashes on the back or stays home (50/50 at the snap).
+  - The QB rides the mesh (handoff reach 3.2 yd). If he doesn't give, he keeps automatically when the back clears the mesh, and runs for the alley outside the key.
+  - A key who guessed wrong reacts late (`KEY_FOOLED`).
+  - The harness auto-QB reads the key at 0.55 s (`keyCrashing()`), and its keeps now count as runs (`keep N` on the row).
+- **Power pulls the backside guard** on a `lead`, using the existing pull scheme. Pulls now mirror with the play (LG ↔ RG).
+- **Tests:** 9 new ones covering packages, cover classes, unchanged 11-personnel calls, no DB on a back, mirrored pulls, the zone-read key, crash vs. home, the auto keep, and the fooled key.
+- **Balance, before → after (60 reps per row):**
+
+  | Run, defense | YPC | Stuffs |
+  | --- | --- | --- |
+  | Power, 2 Man | 7.2 → 7.0 | 47% → 43% |
+  | Power, Cover 1 | 3.9 → 2.3 | 40% → 40% |
+  | Power, Cover 0 | 3.1 → 1.0 | 43% → 37% |
+  | Zone Read, 2 Man | 4.1 → 2.9 | 25% → 22% |
+  | Zone Read, Cover 1 | 11.3 → 1.2 | 23% → 25% |
+  | Zone Read, Cover 0 | 0.5 → 1.2 | 77% → 30% |
+  | All runs | 4.5 → 3.8 (median 1.6 → 1.1) | 38% → 33% |
+
+  - **Power:** a 300-rep side test (no pull / lead / kick) gave 5.7 / 5.4 / 4.6 YPC against 2 Man, 4.2 / 3.7 / 3.4 against Cover 1, and 4.0 / 1.7 / 1.8 against Cover 0. The pull trims stuffs but loses the long runs. It hurts most against Cover 0, where the guard leaves and nobody picks up the backside blitzer. A kick-out guard arrives after the back, even with the end left for him.
+  - **Zone Read:** the auto-QB reads the key perfectly. Gives net about 6.1 / 3.0 / 3.5 YPC. Keeps net only 0.3 / -0.3 / -0.7: the auto-runner QB starts 5 yd deep and the alley defender (the NB or CB1 in man, the robber in Cover 1) gets him near the line. A keep against a home key loses about 2.3. The old 11.3 against Cover 1 was a handful of long IZ runs in 60 reps.
+  - **Toss** moved (2 Man 5.7 → 11.0, Cover 0 0.7 → -1.3) only because Power now uses the shared RNG differently. Nothing about Toss changed; the rows are just noisy at 60 reps.
+
 ## Balance baseline
 From `npm run balance` (Georgia offense vs Alabama defense).
 - **Pass and PA rows:** an auto-QB throws to the most open receiver after a fixed hold time.
@@ -164,9 +195,10 @@ From `npm run balance` (Georgia offense vs Alabama defense).
 | 2 Man Under | 2.2s | 62% | 3.6% | 9/120 | 7.9 |
 | Cover 1 Robber | 2.2s | 71% | 1.8% | 8/120 | 17.1 (vs 3.1 for straight dropbacks) |
 
-Runs, all plays and defenses: **4.5 YPC, median 1.6**, 38% for 0 or fewer yards, 13% gain 10 or more. By defense:
-- Against 2 Man and Cover 1: about 4–11 YPC. Outside Zone and Toss against 2 Man are best; Power and Toss against Cover 1 are worst.
-- Against Cover 0: about 0.3–3 YPC with 73–90% stuffs on IZ, Zone Read and Toss. Power is 3.1 YPC (43% stuffs) and Outside Zone 2.1 (18% stuffs).
+Runs, all plays and defenses: **3.8 YPC, median 1.1**, 33% for 0 or fewer yards, 10% gain 10 or more. By defense:
+- Against 2 Man and Cover 1: about 1–11 YPC. Outside Zone and Toss against 2 Man are best; Zone Read against Cover 1 and Power against Cover 1 are worst.
+- Against Cover 0: IZ 0.3 YPC (73% stuffs), Toss -1.3 (98%), Power 1.0 (37%), Zone Read 1.2 (30%), Outside Zone 2.1 (18%).
+- Zone Read: the harness reads the key (give about 3–6 YPC, keep about -0.7 to 0.3).
 - Toss: only works against 2 Man.
 
 The `PLAY` rows at the end of `balance.txt` give the same numbers per play.
@@ -213,8 +245,10 @@ Reading the defense matters: don't run inside, or pitch, into the zero blitz. Ho
 - **Toss pitch timing:** if you pitch the instant the ball is snapped, the RB catches it nearly standing still.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
 - **No zone underneath coverage:** defenses are man or deep zones only.
-- **Zone Read is still just Inside Zone.** Its `read: 'zoneRead'` is set, but nothing acts on it yet: the backside end is still blocked, and there's no QB keep logic. RPOs are the same apart from the tagged route.
-- **Defenses don't react to personnel:** in I-Form the nickel follows the FB in man coverage. The new formations are unused until defenses adjust.
+- **RPOs are still Inside Zone plus a tagged route.** There's no read on a defender yet.
+- **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB shed at once. A human steering the QB should do better; check by playing before tuning.
+- **Power vs. Cover 0 got worse** with the pull (3.1 → 1.0 YPC): when the guard leaves, nobody picks up the backside blitzer. A down-block or hinge rule for the backside would fix it, but that's beyond the existing pull scheme.
+- **The read key's crash is a coin flip.** It doesn't depend on the call, the down, or the key's awareness yet.
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 
 ## Next up (rough priority)
@@ -224,10 +258,10 @@ Reading the defense matters: don't run inside, or pitch, into the zero blitz. Ho
    - Use per-route completion % as balance targets, after fixing the harness's out-of-bounds aim.
    - Check the run-game dip from the wider line.
 1. **Playbook, Phase 2:**
-   - Power with a pulling guard, and Zone Read leaving the backside end unblocked (with QB keep logic).
    - Trips plays set to `flip: 'field'`.
-   - Defensive alignment and matchups keyed on personnel.
-   - New plays from I-Form, Ace and Empty.
+   - New plays from I-Form, Ace and Empty (the defense now adjusts to them).
+   - Backside blocking rules for gap runs (down blocks, hinge), then revisit Power against Cover 0.
+   - An RPO read on a defender.
    - Then re-baseline the balance numbers.
 1. Full FBS database: all conferences and teams, realistic strength tiers, then real rosters.
 2. Clock tools: timeouts (3 per half), spike, kneel, college overtime.

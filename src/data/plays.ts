@@ -315,7 +315,8 @@ export const PLAYBOOK: PlayDef[] = [
   },
   {
     id: 'power', name: 'Power', kind: 'run', formation: SINGLEBACK,
-    backs: { RB: 'power' }, block: 'run', read: 'handoff', flip: 'fixed', drop: 2.4,
+    backs: { RB: 'power' }, block: 'run', scheme: { pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'handoff', flip: 'fixed', drop: 2.4,
     tip: 'Downhill off tackle. Good in short yardage.',
   },
   {
