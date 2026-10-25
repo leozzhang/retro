@@ -12,9 +12,21 @@ import type { SeasonState } from './season/types';
 
 const pctText = (x: number) => `${(x * 100).toFixed(1)}%`;
 
+/**
+ * Real FBS-vs-FBS references, 2024-25 regular season and postseason (ESPN scores, 1,606 games; ranked
+ * losses from the AP rank at kickoff). See docs/SEASON.md.
+ */
+const REAL = { ppg: 26.5, oneScore: 38.0, by28: 18.9, by35: 10.0, shutout: 1.5, ot: 5.0, homeConf: 55.8, rankedLosses: 5.5, toUnranked: 2.5 };
+
 function aggregate(seasons: SeasonState[]): string[] {
   let games = 0;
   let pts = 0;
+  let oneScore = 0;
+  let by28 = 0;
+  let by35 = 0;
+  let shutouts = 0;
+  let confHome = 0;
+  let confGames = 0;
   let homeWins = 0;
   let nonNeutral = 0;
   let ot = 0;
@@ -29,6 +41,16 @@ function aggregate(seasons: SeasonState[]): string[] {
       pts += r.home + r.away;
       yards += r.box.home.yards + r.box.away.yards;
       if (r.ot) ot++;
+      const m = Math.abs(r.home - r.away);
+      if (m <= 8) oneScore++;
+      if (m >= 28) by28++;
+      if (m >= 35) by35++;
+      if (!r.home) shutouts++;
+      if (!r.away) shutouts++;
+      if (g.kind === 'conf') {
+        confGames++;
+        if (r.home > r.away) confHome++;
+      }
       if (!g.neutral) {
         nonNeutral++;
         if (r.home > r.away) homeWins++;
@@ -50,12 +72,18 @@ function aggregate(seasons: SeasonState[]): string[] {
   const n = seasons.length;
   return [
     `SEASONS ${n}  (regular-season games only)`,
-    `points per team per game  ${(pts / games / 2).toFixed(1)}   (FBS ~28)`,
-    `yards per team per game   ${(yards / games / 2).toFixed(0)}   (FBS ~390)`,
-    `home win %                ${pctText(homeWins / nonNeutral)}   (FBS ~57%)`,
-    `overtime %                ${pctText(ot / games)}   (FBS ~5%)`,
-    `ranked losses per week    ${(rankedLosses / n / 14).toFixed(1)}`,
-    `  to unranked teams       ${(upsets / n / 14).toFixed(1)}`,
+    '                           sim      real FBS',
+    `points per team per game  ${(pts / games / 2).toFixed(1).padStart(6)}   ${REAL.ppg}`,
+    `one-score games (<= 8)    ${pctText(oneScore / games).padStart(6)}   ${REAL.oneScore}%`,
+    `won by 28+                ${pctText(by28 / games).padStart(6)}   ${REAL.by28}%`,
+    `won by 35+                ${pctText(by35 / games).padStart(6)}   ${REAL.by35}%`,
+    `team shutouts             ${pctText(shutouts / games / 2).padStart(6)}   ${REAL.shutout}%`,
+    `overtime                  ${pctText(ot / games).padStart(6)}   ${REAL.ot}%`,
+    `home win %, conference    ${pctText(confHome / confGames).padStart(6)}   ${REAL.homeConf}%`,
+    `home win %, all           ${pctText(homeWins / nonNeutral).padStart(6)}   (real non-conference schedules put favorites at home)`,
+    `ranked losses per week    ${(rankedLosses / n / 14).toFixed(1).padStart(6)}   ${REAL.rankedLosses}`,
+    `  to unranked teams       ${(upsets / n / 14).toFixed(1).padStart(6)}   ${REAL.toUnranked}`,
+    `yards per team per game   ${(yards / games / 2).toFixed(0).padStart(6)}   ~390`,
     'average wins by tier (incl. postseason): ' +
       [...tierWins.entries()].sort((a, b) => a[0] - b[0]).map(([t, w]) => `T${t} ${(w.reduce((a, b) => a + b, 0) / w.length).toFixed(1)}`).join('  '),
   ];

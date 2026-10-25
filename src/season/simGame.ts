@@ -1,7 +1,7 @@
 import type { Athlete } from '../data/athletes';
 import { athleteName, starters, teamRatings, type Squad } from '../data/depth';
 import { overall, SLOT_POS } from '../data/positions';
-import { clamp, type Rng } from '../engine/math';
+import { clamp, gauss, type Rng } from '../engine/math';
 import { simulateDrive, userStartAfter, type DriveClock, type DriveSim } from '../game/rules';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { GameResult, PlayerLine, TeamLine } from './types';
@@ -12,8 +12,14 @@ import type { GameResult, PlayerLine, TeamLine } from './types';
  * it's the place to add depth (targets by route, carries by back, defensive stats).
  */
 
-/** Overall points the home side gets on both offense and defense. */
-export const HOME_EDGE = 1.5;
+/**
+ * Game-level tuning, fit with `DRIVE_SIM` (game/rules.ts) to real 2024-25 FBS scores (docs/SEASON.md).
+ * - `homeEdge`: overall points the home side gets on both offense and defense.
+ * - `paceSd`: game-to-game spread of time per play, so some games have more possessions than others.
+ * - `script`: overall points the offense loses per point of lead (the lead capped at `scriptCap`). A
+ *   leading team eases off and a trailing one presses, so favorites often win closer than the talent gap.
+ */
+export const GAME_SIM = { homeEdge: 1.5, paceSd: 0.12, script: 0.15, scriptCap: 21 };
 const HALF_SECS = 1800;
 /** Where an overtime possession starts, in yards from the offense's own goal (the opponent's 25). */
 const OT_START = 75;
@@ -188,7 +194,8 @@ export interface SimOptions {
 }
 
 export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {}): GameResult {
-  const edge = opts.neutral ? 0 : HOME_EDGE;
+  const edge = opts.neutral ? 0 : GAME_SIM.homeEdge;
+  const pace = clamp(1 + gauss(rng) * GAME_SIM.paceSd, 0.7, 1.3);
   const h = side(home, opts.plans?.home ?? autoGamePlan(home, away), edge);
   const a = side(away, opts.plans?.away ?? autoGamePlan(away, home), 0);
   const firstHalf = rng() < 0.5 ? h : a;
@@ -200,8 +207,9 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
       const dfn = off === h ? a : h;
       const lead = off.tl.points - dfn.tl.points;
       const late = left < (half === 1 ? 300 : 120);
-      const clock: DriveClock = { timeLeft: left, hurry: lead < 0 && late, milk: lead > 0 && half === 1 && left < 600 };
-      const d = simulateDrive(off.off, dfn.def, start, rng, clock);
+      const clock: DriveClock = { timeLeft: left, hurry: lead < 0 && late, milk: lead > 0 && half === 1 && left < 600, pace };
+      const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
+      const d = simulateDrive(off.off - script, dfn.def, start, rng, clock);
       left -= d.secs;
       credit(off, d, rng);
       if (d.result === 'END OF HALF') break;
@@ -222,7 +230,7 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
  */
 export function settleTie(result: GameResult, home: Squad, away: Squad, rng: Rng, neutral = false): GameResult {
   if (result.home !== result.away) return result;
-  const edge = neutral ? 0 : HOME_EDGE;
+  const edge = neutral ? 0 : GAME_SIM.homeEdge;
   const h = side(home, autoGamePlan(home, away), edge);
   const a = side(away, autoGamePlan(away, home), 0);
   h.tl.points = result.home;
@@ -233,6 +241,6 @@ export function settleTie(result: GameResult, home: Squad, away: Squad, rng: Rng
 
 /** Rough win probability for the home side from the team overalls, for previews and upset detection. */
 export function winOdds(home: Squad, away: Squad, neutral = false): number {
-  const gap = teamRatings(home).ovr - teamRatings(away).ovr + (neutral ? 0 : HOME_EDGE * 2);
+  const gap = teamRatings(home).ovr - teamRatings(away).ovr + (neutral ? 0 : GAME_SIM.homeEdge * 2);
   return clamp(1 / (1 + Math.exp(-gap / 4)), 0.01, 0.99);
 }

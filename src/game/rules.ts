@@ -199,15 +199,45 @@ export interface DriveClock {
   hurry: boolean;
   /** Leading late: huddle up and run the play clock down. */
   milk: boolean;
+  /** Time per play multiplier: a fast-tempo game is under 1 (more possessions). */
+  pace?: number;
 }
 
 const NO_CLOCK: DriveClock = { timeLeft: Infinity, hurry: false, milk: false };
 
 /** Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap. */
 function simPlaySecs(c: DriveClock, rng: Rng): number {
+  const pace = c.pace ?? 1;
   if (c.hurry) return clamp(15 + gauss(rng) * 4, 7, 25);
   if (rng() < 0.3) return clamp(7 + gauss(rng) * 2, 4, 12); // incompletion / out of bounds
-  return clamp((c.milk ? 38 : 32) + gauss(rng) * 6, 18, 45);
+  return clamp(((c.milk ? 38 : 32) + gauss(rng) * 6) * pace, 14, 45);
+}
+
+/**
+ * The drive sim's play model, tuned so simulated FBS games match real 2024-25 score distributions
+ * (scoring, close games and blowouts; see docs/SEASON.md). A play gains a normal "grind" draw shifted
+ * by the rating gap, or with `explosive` odds a big play with a long tail. Big plays are what let
+ * underdogs score and keep luck large enough that favorites lose about as often as real ones.
+ */
+export const DRIVE_SIM = {
+  /** Mean and spread of an ordinary play, yards. */
+  base: 4.6,
+  sd: 5,
+  /** Yards per play per point of offense-minus-defense overall. */
+  edgePerPoint: 0.12,
+  /** Odds of an explosive play (20+ yards about 6% of plays, like FBS offenses). */
+  explosive: 0.06,
+  /** An explosive play gains `explosiveMin` plus an exponential tail with this mean. */
+  explosiveMin: 15,
+  explosiveTail: 12,
+  turnover: 0.022,
+};
+
+/** Yards on one simulated play. */
+function simGain(diff: number, rng: Rng): number {
+  const T = DRIVE_SIM;
+  if (rng() < T.explosive) return Math.round(T.explosiveMin - Math.log(1 - rng()) * T.explosiveTail);
+  return Math.max(-6, Math.round(T.base + diff * T.edgePerPoint + gauss(rng) * T.sd));
 }
 
 /**
@@ -215,7 +245,8 @@ function simPlaySecs(c: DriveClock, rng: Rng): number {
  * `start` is in yards from the CPU's own goal line.
  */
 export function simulateDrive(offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK): DriveSim {
-  const edge = (offOvr - defOvr) * 0.15;
+  const diff = offOvr - defOvr;
+  const edge = diff * DRIVE_SIM.edgePerPoint;
   let yard = start;
   let down = 1;
   let toGo = 10;
@@ -228,8 +259,8 @@ export function simulateDrive(offOvr: number, defOvr: number, start: number, rng
     if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
     plays++;
     secs += simPlaySecs(clock, rng);
-    if (rng() < 0.022) return done(0, 'TURNOVER');
-    const gain = Math.max(-6, Math.round(4.6 + edge + gauss(rng) * 6.5));
+    if (rng() < DRIVE_SIM.turnover) return done(0, 'TURNOVER');
+    const gain = simGain(diff, rng);
     yard += gain;
     toGo -= gain;
     if (yard >= 100) return done(7, 'TOUCHDOWN', 100);

@@ -39,7 +39,7 @@ Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (wee
 
 ## Systems
 - **Schedule** (`schedule.ts`): rivalries first (rivalry-week games in week 14), then conference games, then non-conference games to 12 each, one game a week per team, spread over 14 weeks. Pairing is "neediest team first" with restarts, and weeks are assigned most-constrained game first. Conference games lean late and non-conference games early (`nonConfWeeks`). Home and away are balanced per team. Odd conferences may leave a team one conference game short; it becomes a non-conference game. Divisions aren't modeled.
-- **CPU game sim** (`simGame.ts`): alternating possessions of `simulateDrive` (from `game/rules.ts`) with team off/def ratings plus `HOME_EDGE`, a game clock per half (hurry-up and milking late), and untimed overtime from the 25 (no ties). Each drive's yards are split between pass and run by the game plan; completions go to receivers weighted by `TARGETS` and their overall, and carries to the RB and QB by `QB_RUN_SHARE`. Touchdowns, field goals and interceptions are credited to players. No defensive stats yet.
+- **CPU game sim** (`simGame.ts`): alternating possessions of `simulateDrive` (from `game/rules.ts`) with team off/def ratings plus `GAME_SIM.homeEdge`, a game clock per half (hurry-up and milking late) with a random per-game pace, a game script (the leading offense loses `script` overall points per point of lead), and untimed overtime from the 25 (no ties). See "Score calibration" below. Each drive's yards are split between pass and run by the game plan; completions go to receivers weighted by `TARGETS` and their overall, and carries to the RB and QB by `QB_RUN_SHARE`. Touchdowns, field goals and interceptions are credited to players. No defensive stats yet.
 - **Standings** (`standings.ts`): conference win %, then `TIEBREAKERS` in order (head-to-head among the tied teams, overall record, conference margin, a seeded coin flip). Conference records count only conference games, not the title game.
 - **Polls** (`polls.ts`): `AP_WEIGHTS` (62 voters) and `CFP_WEIGHTS` (13 members). Each voter scores every team on wins and losses, strength of schedule, capped margin, a preseason prior from the roster overall and prestige that fades by week 9 (AP only), and inertia toward last week's rank, plus personal noise. Ballots are counted Borda style.
 - **Postseason** (`postseason.ts`): title games between the top two in the standings (neutral site). Selection uses the final committee order: the top `autoBids` conference champions plus the best remaining teams, seeded straight. The bracket is the next power of two, so 12 teams give 4 byes; the first round is on campus. Bowls take the best remaining team from each tie-in conference, with 6+ wins, in `BOWLS` order.
@@ -57,13 +57,55 @@ Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (wee
 | Esc | Back to the title (the season stays in memory and saved) |
 
 ## Report
-`npm run season` simulates whole seasons headlessly (`SEASONS=n`, default 5) and writes `season.txt`: points and yards per game, home win %, overtime %, ranked losses per week, average wins by program tier, then one season in detail (final top 25, champions, bracket, bowls, leaders, awards).
+`npm run season` simulates whole seasons headlessly (`SEASONS=n`, default 5) and writes `season.txt`: scoring, close games and blowouts, shutouts, overtime, home wins and ranked losses next to the real FBS values (below), average wins by program tier, then one season in detail (final top 25, champions, bracket, bowls, leaders, awards).
+
+## Score calibration (2026-10-24)
+Simulated scores are fit to real games, not guesses. The real data are 1,606 FBS-vs-FBS games from 2024 and 2025 (regular season and postseason), from ESPN's public scoreboard API, with each team's AP rank at kickoff. FCS opponents are left out (FBS teams are those with 6+ games in the feed).
+
+**The first version had too many blowouts and too few close games:**
+- One-score games were 29.3% (real 38.0%, about 7 standard errors apart) and 28+ blowouts 25.2% (real 18.9%), with 19 points per team and 6.3% team shutouts (real 1.5%).
+- Ratings decided too much: each overall point was worth 2.5 points of margin. Ratings explained about 20 points of the margin spread and luck only 13. In real games it's about 13 and 16.
+- There were no big plays. Each play's gain was a symmetric normal (4.6 ± 6.5 yards), so under 1% of plays went for 20+ yards. Scoring needed long drives, and any talent edge compounded over them.
+
+**The model now:**
+- `DRIVE_SIM` (`game/rules.ts`): an ordinary play gains 4.6 ± 5 yards, plus `edgePerPoint` (0.12) per overall point. With `explosive` odds (6%), a play instead gains 15 yards plus an exponential tail averaging 12.
+- `GAME_SIM` (`season/simGame.ts`):
+  - `paceSd` (0.12): a random per-game tempo, so game totals vary like real ones.
+  - `script` (0.15 overall points per point of lead, the lead capped at 21): the leading offense eases off and the trailing one presses. Favorites usually win, but often by less than the talent gap. Without it, matching the real close-game rate made upsets too common, and matching the upset rate made close games too rare.
+- AP `inertia` went from 2.5 to 4.5. With closer games, an unbeaten No. 1 kept falling after narrow wins, which real voters don't do.
+
+**Result** (20 seasons on seeds the tuning didn't use):
+
+| | Real FBS 2024–25 | Sim | First version |
+| --- | --- | --- | --- |
+| Points per team | 26.5 | 26.3 | 19.1 |
+| Combined points, 10th–90th percentile | 33–75 | 34–72 | 22–55 |
+| Median margin | 14 | 14 | 16 |
+| Decided by 3 or fewer | 16.9% | 10.9% | 10.0% |
+| One-score games (8 or fewer) | 38.0% | 33.2% | 29.3% |
+| Won by 21+ | 33.3% | 33.2% | 39.4% |
+| Won by 28+ | 18.9% | 20.1% | 25.2% |
+| Won by 35+ | 10.0% | 11.1% | 15.1% |
+| Team shutouts | 1.5% | 1.1% | 6.3% |
+| Overtime | 5.0% | 3.9% | 3.4% |
+| Home win %, conference games | 55.8% | 56.1% | 56.9% |
+| Ranked losses per week (to unranked) | 5.5 (2.5) | 5.0 (2.4) | 4.8 (2.2) |
+| Ranked 11–25 beat unranked, conference games | 75.1% (169 games) | ~76% | ~69% |
+| Top 10 beat unranked, conference games | 79.6% (108 games) | ~89% | ~74% |
+
+**What's still off:**
+- **Games decided by 3 or fewer:** 10.9% vs 16.9%. Real margins land on exactly 3 in 10% of games, the sim's in about 6.5%, because real endgames cluster on field goals. A "tied or down 3 late, play for the field goal" rule barely moved it, so it wasn't kept.
+- **Top-10 teams beat unranked conference opponents too often:** about 89% vs 79.6%, but the real sample is only 108 games (±4 points).
+- **Yards per team** are about 430 against roughly 390. Big plays add yards faster than points.
+- **Non-conference games** in real life are deliberately lopsided (68% home wins, 28% won by 28+), while the sim pairs non-conference opponents at random. That's a schedule-generator job, not a game-sim one.
+
+**The live game's CPU drives use the same model.** At an even matchup the CPU now scores 1.94 points per drive (touchdowns on 23% of drives), up from 1.17 (12%). A 32-point mismatch gives the weaker offense 0.27.
+
+The comparison scripts (the ESPN fetch and a Python comparison) were scratch tools and aren't in the repo. `npm run season` prints the key measures next to the real values.
 
 ## Known placeholders and flags (not tuned)
-- **Scoring is low:** 19.2 points per team per game against FBS ~28, and 349 yards against ~390. That comes from `simulateDrive`'s gain model, which the live game also uses for the CPU's drives.
 - **Leaders are inflated:** only starters get credit, so a top QB throws for 5,000–6,000 yards and a feature back runs for 2,500+. Backups, rotation and receiver depth would fix it.
 - **The Heisman leans to running backs** with these production weights.
 - **Live games record only the score.** The user's players have no stats, so they never lead or win awards.
 - Average wins by tier: T1 10.2, T2 8.8, T3 5.8, T4 6.1, T5 2.8. Tier 4 above tier 3 is mostly the Group of Five teams beating each other.
-- About 2 ranked teams a week lose to unranked teams.
 - The playoff format is the 2024–25 12-team format with straight seeding. The New Year's Six hosting playoff games and real bowl selection orders aren't modeled.

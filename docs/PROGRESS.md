@@ -561,6 +561,38 @@ The whole season loop exists end to end, each system with a simple first version
   - **The Heisman leans to running backs.**
   - **Live games record only the score,** so the user's players never lead stats or win awards.
 
+## Done: season sim fit to real scores (2026-10-24)
+Simulated seasons had too many blowouts and too few close games. Comparing them with every real FBS-vs-FBS game from 2024–25 (1,606 games from ESPN's public scoreboard API) confirmed it was the model, not chance:
+- one-score games 29.3% vs 38.0% (about 7 standard errors)
+- 28+ blowouts 25.2% vs 18.9%
+- 19 points per team vs 26.5
+- 6.3% team shutouts vs 1.5%
+
+Method and full tables are in [SEASON.md](SEASON.md) under "Score calibration".
+- **Causes:** ratings decided too much (each overall point was worth 2.5 points of margin), and the drive sim had no big plays. It used a symmetric 4.6 ± 6.5-yard gain, so under 1% of plays went for 20+, and a talent edge compounded over long drives.
+- **`DRIVE_SIM`** (`game/rules.ts`): 6% explosive plays (15 yards plus an exponential tail), a tighter ordinary gain (± 5), and 0.12 yards per play per overall point (was 0.15).
+- **`GAME_SIM`** (`season/simGame.ts`, replaces `HOME_EDGE`): a random per-game pace, and a game script where the leading offense eases off. Without the script, matching the real close-game rate made upsets too common, and matching the upset rate made close games too rare.
+- **AP inertia 2.5 → 4.5,** because an unbeaten No. 1 kept dropping after narrow wins.
+- **Now** (20 held-out seasons, real values in parentheses):
+
+  | Measure | Sim | Real |
+  | --- | --- | --- |
+  | Points per team | 26.3 | 26.5 |
+  | One-score games | 33.2% | 38.0% |
+  | Won by 28+ | 20.1% | 18.9% |
+  | Won by 35+ | 11.1% | 10.0% |
+  | Team shutouts | 1.1% | 1.5% |
+  | Median margin | 14 | 14 |
+  | Ranked losses per week | 5.0 | 5.5 |
+  | Home win %, conference games | 56.1% | 55.8% |
+
+- **Still off:**
+  - Games decided by 3 or fewer: 10.9% vs 16.9%.
+  - Top-10 teams beat unranked conference opponents about 89% of the time, against 79.6% (only 108 real games).
+  - Yards per team: about 430 vs about 390.
+- **The live game changes too.** The CPU's simulated drives use the same model, so an even CPU opponent now scores about 1.9 points per drive (was 1.2). `npm run balance` doesn't cover CPU drives, so it's unaffected.
+- **`npm run season`** now prints each measure next to the real value. All 111 tests pass.
+
 ## Balance baseline
 From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
@@ -615,7 +647,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
 - **No injury mechanic yet:** `Athlete.injury`, the depth chart and the season's `teamState.injuries` (healed weekly) are ready for it.
-- **Season placeholders** (details in [SEASON.md](SEASON.md)): sim scoring is low (19 points per game), stat leaders are inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
+- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
@@ -648,7 +680,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; tune the sim's scoring (about 28 points) and spread credit to backups; injuries from games; user depth chart and game plan screens (the `delegate` flags are ready); then the offseason: graduation, progression from `potential`/`dev`, recruiting from `stars`/hometowns, and the coaching carousel.
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; injuries from games; user depth chart and game plan screens (the `delegate` flags are ready); then the offseason: graduation, progression from `potential`/`dev`, recruiting from `stars`/hometowns, and the coaching carousel.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

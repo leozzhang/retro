@@ -30,7 +30,7 @@ export interface VoterWeights {
 }
 
 export const AP_WEIGHTS: VoterWeights = {
-  voters: 62, win: 1, loss: 2, sos: 1.5, margin: 1.2, prior: 3, priorFade: 9, inertia: 2.5, noise: 0.6,
+  voters: 62, win: 1, loss: 2, sos: 1.5, margin: 1.2, prior: 3, priorFade: 9, inertia: 4.5, noise: 0.6,
 };
 
 /** The committee: no preseason prior, more weight on schedule, little inertia, and 13 members who mostly agree. */
