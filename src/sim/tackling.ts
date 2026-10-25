@@ -8,6 +8,24 @@ export function tackleChance(tkl: number, carrierElu: number, carrierStr: number
   return clamp(p, 0.15, 0.97);
 }
 
+/**
+ * Open-field tackles in the kick return game. The skill gap is squeezed through a tanh, so an elite
+ * returner gets a small edge, not a linear one: cover units are mostly offensive starters with
+ * low tackle ratings, and the linear curve let elite returners shed them nearly every time.
+ * Each tackle he's already broken on the return adds `BROKEN_TOLL` (balance and speed lost,
+ * pursuit converging), so a long chain of misses stays rare.
+ */
+export const RETURN_TACKLE_BASE = 0.84;
+export const RETURN_GAP_SCALE = 0.25;
+export const RETURN_GAP_SOFT = 25;
+export const BROKEN_TOLL = 0.12;
+
+export function returnTackleChance(tkl: number, carrierElu: number, carrierStr: number, broken: number): number {
+  const gap = tkl - (carrierElu * 0.6 + carrierStr * 0.4);
+  const p = RETURN_TACKLE_BASE + RETURN_GAP_SCALE * Math.tanh(gap / RETURN_GAP_SOFT) + BROKEN_TOLL * broken;
+  return clamp(p, 0.3, 0.97);
+}
+
 /** Yards a tackled ball carrier falls forward per yd/s of forward speed (plus a strength edge). */
 export const FALL_FORWARD = 0.2;
 

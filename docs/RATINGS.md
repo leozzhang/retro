@@ -21,7 +21,7 @@ Every rating is a 0-99 number that some sim formula reads. The rule: **no rating
 | | `pac` Poise | Scales the extra error under pressure the same way | `throwErrorSd` |
 | Blocking | `pbk` Pass Block | The blocker's side of pass-pro engagements (80%, with `str`) | `Play.updateEngagements` |
 | | `rbk` Run Block | The blocker's side of run blocks and special-teams blocks (80%, with `str`) | `runEngagement`, `sim/blocking.ts` |
-| Defense | `tkl` Tackle | Chance to bring the carrier down on contact (also dives) | `tackleChance` |
+| Defense | `tkl` Tackle | Chance to bring the carrier down on contact (also dives). Offensive players' `tkl` is their special-teams coverage tackle | `tackleChance`; `returnTackleChance` on kick returns (skill gap compressed) |
 | | `rsh` Pass Rush | 70% of a defender's power against pass blocks: push and shed rate | `Play.updateEngagements` |
 | | `bsh` Block Shedding | 70% of a defender's power against run and special-teams blocks | `runEngagement`, `sim/blocking.ts` |
 | | `mcv` Man Coverage | Reaction lag trailing a receiver in man; reaction to the throw when in man | `cover`, `Play.throwBall` |

@@ -511,9 +511,28 @@ Design notes are in [RATINGS.md](RATINGS.md) (what every rating does, overall fo
 ### Flags (not tuned)
 - **Talent gaps are far too steep in the live sim.** With real FBS spreads, Georgia's offense (88) against Sacramento State's defense (56) runs for 35.7 YPC (nearly every run a TD) and 15.8 per pass; Sacramento State against Georgia's defense gets -1.8 and -2.5. Even matchups play normally at any level (Sac State vs UTEP: 3.4 YPC). The rating-to-outcome curves (speed, tackling, block power) need compressing before full seasons are playable. The CPU drive sim is milder (5.1 points per drive vs 0.01).
 - **The run game is very sensitive to the ball carrier.** The old baseline's Georgia back was a lucky roll (99 elusiveness, 87 strength), and swapping him for a template back cost about 1.2 YPC on the core runs. The new reference baseline is lower for that reason (see below), not because of a change in the sim.
-- **Elite returners beat punt coverage:** with the real Alabama returner (99 speed, 90 elusiveness), punts gave up 8-9 return TDs per 300; at elusiveness 80 it's 2. Watch it once playable returns exist.
+- **Elite returners beat punt coverage:** with the real Alabama returner (99 speed, 90 elusiveness), punts gave up 8-9 return TDs per 300; at elusiveness 80 it's 2. Fixed in the next section.
 - **The press jam is weak** (short, and only on 35% of snaps: `prs`/`rls` worth 0.03-0.21 yards per play across the two sensitivity runs), and **zone coverage is nearly unused** until zone calls exist. Their weights assume they'll matter.
 - **QB ratings can't be measured** by the auto-QB harness (it throws to the most open man at a fixed time). Their overall weights are judgment.
+
+## Done: return TDs made rare (2026-10-24)
+Elite returners were breaking 2 tackles a return and scoring on 9-15% of returns, and a top program returning against a weak one scored on 27-29%. Real FBS punt returns score on about 1%. Measured on line-drive punts (nearly every one returned), 400 reps per case:
+
+| Case | Before: TD % of returns, broken tackles per return | After |
+| --- | --- | --- |
+| Template returner (reference 90 vs 88) | 5.3%, 1.30 | 1.0%, 0.35 |
+| Speed 95, elusiveness 80 | 2.3%, 1.22 | 0.5%, 0.33 |
+| Speed 99, elusiveness 90 | 8.3%, 1.63 | 1.3%, 0.43 |
+| Speed 99, elusiveness 97 | 15.3%, 2.02 | 1.3%, 0.41 |
+| Alabama returns vs Sacramento State coverage | 26.8%, 0.98 | 1.8%, 0.41 |
+| Sacramento State returns vs Alabama coverage | 0.0%, 0.81 | 0.3%, 0.24 |
+
+Three causes, three changes:
+- **Linear tackle odds.** `returnTackleChance` (`sim/tackling.ts`) runs the tackler-vs-carrier gap through a tanh (`RETURN_TACKLE_BASE`, `RETURN_GAP_SCALE`, `RETURN_GAP_SOFT`), so an elite returner gets a few points per attempt, not 20. Each tackle he's already broken on the return adds `BROKEN_TOLL` (0.12) to the next one: one or two misses happen, a chain of four doesn't. Kick returns only; scrimmage still uses `tackleChance`.
+- **Junk tackle ratings on the cover unit.** Punt coverage is the offense's starters, whose `tkl` was a 35-45 placeholder. Offensive templates now carry a special-teams tackle rating (HB 55, FB 62, WR 50, TE 60, OL 55, slope 0.3), like the earlier `bsh` fix. `tkl` has no weight in their overall. In scrimmage it's read only on interception and fumble returns; that reshuffled the shared RNG, so every scrimmage row in `balance.txt` moved. Re-seeding the old and new templates (two seeds each) put both inside the same band (core runs 4.05-4.44 YPC), so it's noise.
+- **The speed gap between units.** Most remaining TDs against weak programs had no broken tackle at all: slow cover men (offensive linemen at 46 speed) couldn't stay with a fast returner's cuts, and blocking hardly mattered (10.6 of 11 cover men were free at the TD). Longer pursuit leads didn't help. Now `ST_SPEED_GAP` (`game/kickPlay.ts`) keeps half the speed and acceleration gap between the two units on punts and kickoffs. Each unit is measured against its positions' templates, so players keep their order within the unit and the returner keeps his own edge. Rosters aren't changed.
+- **Flag:** returned full-power punts now average about 5.5 yards (it was 10.0; FBS is about 8-9). Line drives average 10.4 and deep kickoffs 14.5. The full punt's hang time lets coverage arrive with the catch, and misses no longer chain. Not tuned. Watch it once returns are playable.
+- **Tests:** 2 new (the elite returner's edge stays small and broken tackles add up; the speed squeeze keeps the order within a unit and leaves rosters alone). 102 in total.
 
 ## Balance baseline
 From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.
@@ -537,6 +556,7 @@ From `npm run balance` on the **reference matchup** (template players, offense 9
 **Runs:**
 - All 26 run rows (with RPO gives and QB runs): 3.6 YPC, median 2.1, 16% stuffs, 20% gaining 4+, 8% gaining 10+.
 - The original five runs (IZ, OZ, Power, Toss, Zone Read): 4.4 YPC, median 2.8, 12% stuffs, 28% gaining 4+, 11% gaining 10+. The FBS target is 4.5-5.5 YPC, about 18% stuffs and about 45% gaining 4+.
+- Since the return fix, the same seed reads 3.4 YPC on all runs and 4.0 on the core five, but that's RNG reshuffle, not a change in the run game (see the return-fix section). Across seeds the core five run 4.0-4.4.
 
 **Short yardage (3rd and 1):** Power 69-78%, Iso 82-85%, QB Sneak 82-89%, QB Power 58-63% (14% against Cover 0).
 
@@ -546,18 +566,18 @@ The per-play `RUN` and `PLAY` rows in `balance.txt` have the details. Reading th
 The NFL completion %, yards per target and man/zone splits by route are in [TARGETS.md](TARGETS.md). They're not tuned toward yet; they belong with the defense work.
 These need a harness that targets by route (or by read), not "most open". The current one over-throws flats and checkdowns. The `ROUTE` rows are a first step: they target one route per row, against man calls only.
 
-**Special teams:** an auto-kicker with fixed aim per kick type and perfect meter timing, 200 reps each, in random wind. Kicks use their own seed, so the scrimmage rows don't move.
+**Special teams** (after the return fix): an auto-kicker with fixed aim per kick type and perfect meter timing, 200 reps each, in random wind. Kicks use their own seed, so the scrimmage rows don't move.
 
 | Kick | Result |
 | --- | --- |
-| Punt from own 30 (full power) | Gross 41.1, net 37.9. 67% fair caught, 10.0-yard average return, 0 blocks, 1 return TD |
-| Pooch from opp 40 (74% power) | 82% downed or caught inside the 20, 92% fair caught, 7 muffs recovered |
-| Coffin corner from opp 38 | 100% inside the 20: 50% out of bounds, 28% touchbacks |
-| Line drive from own 30 | Gross 43.4, net 31.7. 97% returned (13.0 average), 3% returned for TDs |
-| Deep kickoff | 72% touchbacks. CPU starts at its 24.3; 17.5-yard average return |
-| Sky kickoff | CPU starts at its 30.6. 18% fair caught |
-| Squib | CPU starts at its 34.7. 6 returned for TDs |
-| Corner kickoff | CPU starts at its 23.1. 9% out of bounds |
+| Punt from own 30 (full power) | Gross 42.4, net 40.6. 68% fair caught, 5.5-yard average return, 0 blocks, 0 return TDs |
+| Pooch from opp 40 (74% power) | 80% inside the 20, 87% fair caught, 6 muffs recovered |
+| Coffin corner from opp 38 | 99% inside the 20: 55% out of bounds, 27% touchbacks |
+| Line drive from own 30 | Gross 45.8, net 35.5. 98% returned (10.4 average), 1 returned for a TD |
+| Deep kickoff | 76% touchbacks. CPU starts at its 23.6; 14.5-yard average return |
+| Sky kickoff | CPU starts at its 30.9. 14% fair caught |
+| Squib | CPU starts at its 35.3. 3 returned for TDs |
+| Corner kickoff | CPU starts at its 23.1. 10% out of bounds |
 | FG, straight aim, calm | 20-29: 96%, 30-39: 88%, 40-49: 72%, 50-59: 35% |
 | FG, straight aim, wind | 20-29: 94%, 30-39: 78%, 40-49: 65%, 50-59: 41%. The auto-kicker doesn't allow for wind |
 

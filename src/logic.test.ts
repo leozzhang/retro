@@ -33,7 +33,8 @@ import { cutKeep, facingQB } from './sim/ai';
 import { catchOdds, HANDOFF_ODDS, PITCH_REACH, pitchOdds } from './sim/catching';
 import { endurance, maxSpeed, type Player } from './sim/player';
 import { playSide, runEngagement } from './sim/runBlocking';
-import { fallForward, tackleChance } from './sim/tackling';
+import { fallForward, returnTackleChance, tackleChance } from './sim/tackling';
+import { referenceRoster } from './harness';
 
 const UGA = teamById('georgia');
 const BAMA = teamById('alabama');
@@ -180,6 +181,30 @@ describe('route running', () => {
 describe('tackling', () => {
   it('elusive backs cause misses', () => {
     expect(tackleChance(80, 95, 70)).toBeLessThan(tackleChance(80, 60, 70));
+  });
+  it('an elite returner gets only a small edge on cover men, and broken tackles add up against him', () => {
+    const cover = templateValue('WR', 'tkl', 88); // a gunner
+    const avg = returnTackleChance(cover, 80, 62, 0);
+    const elite = returnTackleChance(cover, 97, 80, 0);
+    expect(elite).toBeLessThan(avg);
+    expect(avg - elite).toBeLessThan(0.08);
+    expect(elite).toBeGreaterThan(0.55);
+    expect(returnTackleChance(cover, 97, 80, 1)).toBeGreaterThan(elite + 0.1);
+  });
+  it('special teams squeeze the speed gap between units, keeping order within each', () => {
+    const slow = referenceRoster(56);
+    const fast = referenceRoster(88);
+    const kp = new KickPlay({
+      kickTeam: teamById('alabama'), recvTeam: teamById('georgia'), kickRoster: slow, recvRoster: fast,
+      def: kickDef('punt'), los: 40, ballY: 26.6, wind: CALM, rng: mulberry32(1),
+    });
+    const on = (ps: Player[], slot: string) => ps.find((p) => p.slot === slot)!.r.spd;
+    const before = fast.Z.r.spd - slow.X.r.spd;
+    const after = on(kp.recv, 'Z') - on(kp.kick, 'X');
+    expect(after).toBeGreaterThan(before * 0.4);
+    expect(after).toBeLessThan(before * 0.75);
+    expect(on(kp.kick, 'X')).toBeGreaterThan(on(kp.kick, 'LT'));
+    expect(slow.X.r.spd).toBe(referenceRoster(56).X.r.spd); // the rosters themselves are untouched
   });
 });
 

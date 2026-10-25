@@ -46,7 +46,8 @@ export function heightLabel(inches: number): string {
  * physical limits barely move (an elite tackle is still slow). Unlisted ratings use `REST`.
  * Anchored so a level-88 player matches the ratings the playbook was balanced with (the old
  * 89-overall team templates). `bsh` and `rbk` off a player's own side of the ball are for
- * special-teams coverage and return blocks; an offensive player sheds with his strength profile.
+ * special-teams coverage and return blocks; an offensive player sheds with his strength profile,
+ * and his `tkl` is his coverage tackle (it carries no weight in his overall).
  */
 type Template = Partial<Record<RatingKey, [number, number]>>;
 const REST: [number, number] = [32, 0.1];
@@ -59,23 +60,23 @@ export const TEMPLATES: Record<Position, Template> = {
   },
   HB: {
     spd: [89, 0.5], acc: [89, 0.5], str: [75, 0.6], sta: [88, 0.5], elu: [80, 1], cth: [67, 0.8], cit: [60, 0.6],
-    rte: [62, 0.6], rls: [60, 0.4], pbk: [52, 0.8], rbk: [50, 0.6], tkl: [38, 0], prc: [55, 0.3], bsh: [75, 0.6],
+    rte: [62, 0.6], rls: [60, 0.4], pbk: [52, 0.8], rbk: [50, 0.6], tkl: [55, 0.3], prc: [55, 0.3], bsh: [75, 0.6],
   },
   FB: {
     spd: [83, 0.4], acc: [83, 0.4], str: [79, 0.8], sta: [75, 0.4], elu: [65, 0.4], cth: [62, 0.6], cit: [58, 0.5],
-    rte: [55, 0.4], rls: [58, 0.3], pbk: [62, 1], rbk: [64, 1], tkl: [42, 0], bsh: [79, 0.8],
+    rte: [55, 0.4], rls: [58, 0.3], pbk: [62, 1], rbk: [64, 1], tkl: [62, 0.3], bsh: [79, 0.8],
   },
   WR: {
     spd: [91, 0.5], acc: [90, 0.5], str: [57, 0.4], sta: [90, 0.5], elu: [79, 0.8], cth: [79, 1], cit: [77, 1],
-    rte: [83, 1], rls: [56, 0.5], rbk: [45, 0.5], pbk: [38, 0.3], tkl: [35, 0], bsh: [57, 0.4],
+    rte: [83, 1], rls: [56, 0.5], rbk: [45, 0.5], pbk: [38, 0.3], tkl: [50, 0.3], bsh: [57, 0.4],
   },
   TE: {
     spd: [79, 0.5], acc: [77, 0.5], str: [75, 0.6], sta: [78, 0.5], elu: [66, 0.5], cth: [73, 1], cit: [71, 1],
-    rte: [71, 1], rls: [70, 0.5], rbk: [64, 1], pbk: [62, 1], tkl: [42, 0], bsh: [75, 0.6],
+    rte: [71, 1], rls: [70, 0.5], rbk: [64, 1], pbk: [62, 1], tkl: [60, 0.3], bsh: [75, 0.6],
   },
-  OT: { spd: [55, 0.3], acc: [58, 0.4], str: [83, 0.8], sta: [55, 0.3], pbk: [78, 1], rbk: [76, 1], tkl: [45, 0], bsh: [83, 0.8], cth: [37, 0] },
-  OG: { spd: [53, 0.3], acc: [57, 0.4], str: [84, 0.8], sta: [55, 0.3], pbk: [76, 1], rbk: [78, 1], tkl: [45, 0], bsh: [84, 0.8], cth: [37, 0] },
-  C: { spd: [53, 0.3], acc: [58, 0.4], str: [82, 0.8], sta: [55, 0.3], pbk: [77, 1], rbk: [77, 1], tkl: [45, 0], bsh: [82, 0.8], cth: [37, 0] },
+  OT: { spd: [55, 0.3], acc: [58, 0.4], str: [83, 0.8], sta: [55, 0.3], pbk: [78, 1], rbk: [76, 1], tkl: [55, 0.3], bsh: [83, 0.8], cth: [37, 0] },
+  OG: { spd: [53, 0.3], acc: [57, 0.4], str: [84, 0.8], sta: [55, 0.3], pbk: [76, 1], rbk: [78, 1], tkl: [55, 0.3], bsh: [84, 0.8], cth: [37, 0] },
+  C: { spd: [53, 0.3], acc: [58, 0.4], str: [82, 0.8], sta: [55, 0.3], pbk: [77, 1], rbk: [77, 1], tkl: [55, 0.3], bsh: [82, 0.8], cth: [37, 0] },
   DE: {
     spd: [72, 0.6], acc: [76, 0.6], str: [80, 0.7], sta: [62, 0.3], elu: [42, 0.2], cth: [45, 0.2], tkl: [72, 1],
     rsh: [81, 1], bsh: [77, 1], mcv: [42, 0.3], zcv: [44, 0.3], prs: [50, 0.3], prc: [66, 0.8], rbk: [42, 0.3],

@@ -49,7 +49,7 @@ Controls are listed in [README.md](README.md).
   - `throwErrorSd`, `ACC_BANDS`, `composure` (`sim/passing.ts`)
   - `catchOdds`, and the set-receiver bonus `SET_HANDS`, `SET_CONTEST` (`sim/catching.ts`)
   - route running: `BURST`, `BURST_TAPER`, `PLANT_DECEL`, `cutKeep`, `TURN_TIME`, `SET_MAX_SPEED` (`sim/ai.ts`)
-  - `tackleChance`, `FALL_FORWARD` (`sim/tackling.ts`)
+  - `tackleChance`, `FALL_FORWARD`; kick returns: `returnTackleChance`, `BROKEN_TOLL` (`sim/tackling.ts`)
   - pass-pro shed and push rates (`Play.updateEngagements`), `ARM_TACKLE` (`game/playState.ts`)
   - run blocks: `RUN_BLOCK_EDGE`, `REACH_PENALTY`, `BLOCK_ROLL_SD`, `WASH_RATE`, `COMBO_CLIMB`, `SHED_WIN`, `SHED_LEVERED`, `ARM_LEVERED`, `RUN_ENGAGE`, `DRAW_SET` (`sim/runBlocking.ts`)
   - defense vs. the run: `LB_FIT_DEPTH`, `MAN_DEPTH`, `TRASH_SPEED`, `PURSUIT_LEAD` (`sim/ai.ts`)
@@ -57,7 +57,7 @@ Controls are listed in [README.md](README.md).
   - `pitchOdds`, `PITCH_REACH`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
   - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd`; the kick timing meter `METER_HALF`, `MISTIME_DIR`, `MISTIME_CURVE`, `GREEN_BASE`, `GREEN_KAC` (`sim/kicking.ts`)
-  - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)
+  - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `ST_SPEED_GAP`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)
   - sprint: `SPRINT_TIME`, `SPRINT_RECOVER` (`game/playState.ts`), scaled by `endurance` (`sim/player.ts`)
   - blocking anchor `ANCHOR_STR` (`data/ratings.ts`); overall weights `OVR_WEIGHTS` (`data/positions.ts`); rating templates and archetypes (`data/athletes.ts`); roster levels `CLASS_ADJ`, `LEVEL_SD`, `STANDOUT_LEVEL`, `UNIT_STEP`, `GROWTH` (`data/rosterGen.ts`); team weights `TEAM_WEIGHTS` (`data/depth.ts`)
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.

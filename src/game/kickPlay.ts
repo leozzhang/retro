@@ -2,6 +2,8 @@ import {
   FG_BLOCK, FG_UNIT, HOLD_DEPTH, KICKOFF_RETURN, KICKOFF_UNIT, PUNT_RETURN, PUNT_UNIT,
   type KickDef, type KickUnit, type StSpot,
 } from '../data/specialTeams';
+import { templateValue } from '../data/athletes';
+import { SLOT_POS } from '../data/positions';
 import type { RosterPlayer, Team } from '../data/teams';
 import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, PPY_X, PPY_Y } from '../engine/constants';
 import { VIEW_YARDS } from '../engine/camera';
@@ -18,7 +20,7 @@ import {
 } from '../sim/kicking';
 import { knockDown, makePlayer, maxSpeed, seek, seekTimed, setPose, stepPlayer, tickTimers, type Player } from '../sim/player';
 import { MIN_DRAG_PX, type Aim } from '../sim/passing';
-import { TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import { returnTackleChance, TACKLE_RANGE } from '../sim/tackling';
 import type { Popup } from './playState';
 import { fieldLabel, type KickOutcome, type KickResult } from './rules';
 
@@ -69,6 +71,13 @@ const RETURN_BLOCK_EDGE = 15;
  */
 const DIVE_RANGE = 2.2;
 const DIVE_ODDS = 0.45;
+/**
+ * Share of the speed gap between the two units that survives on punts and kickoffs. Each side is
+ * measured against its positions' templates, then both are moved toward each other, so players keep
+ * their order within the unit and an elite returner keeps his own edge. Without it a slow coverage
+ * unit (a weak program's offensive starters) gave up a TD on 8% of returns to a top program.
+ */
+const ST_SPEED_GAP = 0.5;
 /** Returner's top speed with the ball, as a fraction of his max (carrying it and setting up cuts). */
 const RETURN_SPEED = 0.95;
 
@@ -125,6 +134,8 @@ export class KickPlay {
   popups: Popup[] = [];
   /** Where the receiver caught it, for return yardage. */
   private catchX = 0;
+  /** Tackles the returner has broken so far (each makes the next one likelier to hold). */
+  private broken = 0;
 
   constructor(s: KickSetup) {
     this.def = s.def;
@@ -154,6 +165,7 @@ export class KickPlay {
       p.job = sp.job;
       this.recv.push(p);
     }
+    if (this.unit === 'punt' || this.unit === 'kickoff') this.squeezeSpeedGap();
     this.players = [...this.kick, ...this.recv];
     this.kicker = this.kick.find((p) => p.job === 'kicker' || p.job === 'punter')!;
     this.holder = this.kick.find((p) => p.job === 'holder') ?? null;
@@ -169,6 +181,16 @@ export class KickPlay {
       this.kickSpot = { x: s.los - HOLD_DEPTH, y: s.ballY, z: 0.1 };
     }
     if (this.holder) setPose(this.holder, 'hold', Infinity);
+  }
+
+  /** Move both units' speed and acceleration toward each other by `1 - ST_SPEED_GAP` of the gap. */
+  private squeezeSpeedGap(): void {
+    for (const k of ['spd', 'acc'] as const) {
+      const level = (ps: Player[]) => ps.reduce((a, p) => a + p.r[k] - templateValue(SLOT_POS[p.slot], k, 75), 0) / ps.length;
+      const shift = ((level(this.recv) - level(this.kick)) * (1 - ST_SPEED_GAP)) / 2;
+      for (const p of this.kick) p.r = { ...p.r, [k]: clamp(p.r[k] + shift, 0, 99) };
+      for (const p of this.recv) p.r = { ...p.r, [k]: clamp(p.r[k] - shift, 0, 99) };
+    }
   }
 
   // ------------------------------------------------------------ control
@@ -674,7 +696,7 @@ export class KickPlay {
       const closing = (c.vel.x - t.vel.x) * (c.pos.x - t.pos.x) + (c.vel.y - t.vel.y) * (c.pos.y - t.pos.y) < -0.5 * d;
       if (!arm && !closing && d > TACKLE_RANGE && d < DIVE_RANGE) {
         t.tackleCd = 1.2;
-        if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * DIVE_ODDS) {
+        if (this.rng() < returnTackleChance(t.r.tkl, c.r.elu, c.r.str, this.broken) * DIVE_ODDS) {
           knockDown(c);
           knockDown(t);
           this.endReturn(c, `Diving stop by #${t.num} ${t.name}`);
@@ -684,7 +706,7 @@ export class KickPlay {
         continue;
       }
       if (d > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * (arm ? ARM_TACKLE : 1)) {
+      if (this.rng() < returnTackleChance(t.r.tkl, c.r.elu, c.r.str, this.broken) * (arm ? ARM_TACKLE : 1)) {
         knockDown(c);
         knockDown(t);
         this.endReturn(c, `Tackled by #${t.num} ${t.name}`);
@@ -696,6 +718,7 @@ export class KickPlay {
       }
       knockDown(t, 0.9);
       t.tackleCd = 1.6;
+      this.broken++;
       c.vel = scale(c.vel, 0.55);
       this.popup('BROKEN TACKLE!', c.pos, '#ff9a5a');
     }
