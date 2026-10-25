@@ -52,6 +52,42 @@ export function buildDepth(athletes: Athlete[]): DepthChart {
   return depth;
 }
 
+/**
+ * A position's depth order, as the depth chart screen shows it: the players of that natural
+ * position in the order of the first slot it fills (X for WR, LT for OT, CB1 for CB).
+ */
+export function positionOrder(squad: Squad, pos: Position): Athlete[] {
+  const byId = new Map(squad.athletes.map((a) => [a.id, a]));
+  const slot = PICK_ORDER.find((s) => SLOT_POS[s] === pos)!;
+  const listed = (squad.depth[slot] ?? []).map((id) => byId.get(id)).filter((a): a is Athlete => a?.pos === pos);
+  // Anyone missing from the list (a chart saved before a roster change) goes to the bottom.
+  const seen = new Set(listed.map((a) => a.id));
+  return [...listed, ...squad.athletes.filter((a) => a.pos === pos && !seen.has(a.id))];
+}
+
+/**
+ * Move one player within his position's order, and rebuild every slot that position can fill: each
+ * slot lists its candidate positions' orders back to back, natural position first. `starters` fills
+ * slots in `PICK_ORDER` and skips anyone already starting, so WR #1-#4 land on X, Z, SL and WR4.
+ */
+export function reorderPosition(squad: Squad, pos: Position, from: number, to: number): DepthChart {
+  const orders = new Map<Position, Athlete[]>();
+  const order = (p: Position) => {
+    if (!orders.has(p)) orders.set(p, positionOrder(squad, p));
+    return orders.get(p)!;
+  };
+  const list = [...order(pos)];
+  const [moved] = list.splice(from, 1);
+  list.splice(Math.max(0, Math.min(list.length, to)), 0, moved);
+  orders.set(pos, list);
+  const depth: DepthChart = { ...squad.depth };
+  for (const slot of PICK_ORDER) {
+    if (!SLOT_CANDIDATES[slot].includes(pos)) continue;
+    depth[slot] = SLOT_CANDIDATES[slot].flatMap((p) => order(p).map((a) => a.id));
+  }
+  return depth;
+}
+
 export function healthy(a: Athlete): boolean {
   return !a.injury || a.injury.weeks <= 0;
 }

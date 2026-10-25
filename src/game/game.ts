@@ -1,7 +1,8 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
 import { FORMATIONS, PLAY_TABS, playsOfKind, ROUTES, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
-import { buildSquad, rosterFor, teamRatings } from '../data/depth';
+import { buildSquad, onField, positionOrder, reorderPosition, teamRatings, type Squad } from '../data/depth';
+import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
 import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
@@ -13,9 +14,12 @@ import { drawBanner, drawHint, drawPlayClock, drawScorebug } from '../render/hud
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
-import { drawSeason, SEASON_TABS, type SeasonView } from '../render/seasonScreen';
+import { drawSeason, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { DEPTH_BTN, drawTeam, dropIndex, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
+import { setUserDepth, useStaffDepth } from '../season/staff';
+import { squadFor } from '../season/world';
 import type { GameResult, SeasonGame, SeasonState } from '../season/types';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { getSprite, teamUniform } from '../render/sprites';
@@ -33,7 +37,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -107,6 +111,9 @@ export class Game {
   private qIdx = QUARTER_OPTIONS.indexOf(8);
   private user!: Team;
   private cpu!: Team;
+  /** The two squads in this game: the season's (injuries, the user's depth chart) in a season game. */
+  private userSquad!: Squad;
+  private cpuSquad!: Squad;
   private userRoster!: Record<string, RosterPlayer>;
   private cpuRoster!: Record<string, RosterPlayer>;
   private crowd: HTMLCanvasElement | null = null;
@@ -139,6 +146,7 @@ export class Game {
   private season: SeasonState | null = null;
   private seasonGame: SeasonGame | null = null;
   private seasonView: SeasonView = { tab: 0, sub: 0 };
+  private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   /** A season is saved in this browser (checked once; parsing it every frame would be slow). */
   private savedSeason = hasSavedSeason();
   private debug = false;
@@ -163,6 +171,9 @@ export class Game {
         break;
       case 'season':
         this.updateSeason(input);
+        break;
+      case 'team':
+        this.updateTeam(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -280,11 +291,13 @@ export class Game {
     }
   }
 
-  private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx]): void {
+  private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx], squads?: { user: Squad; cpu: Squad }): void {
     this.user = user;
     this.cpu = cpu;
-    this.userRoster = rosterFor(this.user);
-    this.cpuRoster = rosterFor(this.cpu);
+    this.userSquad = squads?.user ?? buildSquad(user);
+    this.cpuSquad = squads?.cpu ?? buildSquad(cpu);
+    this.userRoster = onField(this.userSquad);
+    this.cpuRoster = onField(this.cpuSquad);
     this.crowd = makeCrowd(this.user, this.cpu);
     this.score = { user: 0, cpu: 0 };
     this.clock = newClock(QUARTER_OPTIONS[this.qIdx]);
@@ -316,6 +329,10 @@ export class Game {
       this.titleTime = 0;
       return;
     }
+    if (input.hit('KeyT') || (input.mouse.pressed && inBox(TEAM_BTN, input.mouse.x, input.mouse.y))) {
+      this.toTeam();
+      return;
+    }
     const sim = input.hit('KeyX');
     if (!input.hit('Space', 'Enter') && !sim) return;
     if (seasonOver(s)) {
@@ -325,13 +342,79 @@ export class Game {
       if (game && !sim) {
         // Play it on the field; the final screen writes the result back.
         const u = s.config.userTeamId;
+        const opp = game.home === u ? game.away : game.home;
         this.seasonGame = game;
-        this.startGame(teamById(u), teamById(game.home === u ? game.away : game.home));
+        this.startGame(teamById(u), teamById(opp), { user: squadFor(s, u), cpu: squadFor(s, opp) });
         return;
       }
       advanceWeek(s);
     }
     saveSeason(this.season!);
+  }
+
+  // ------------------------------------------------------------ team page
+
+  private toTeam(): void {
+    this.screen = 'team';
+    this.teamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
+  }
+
+  private setTeamPos(i: number): void {
+    Object.assign(this.teamView, { pos: i, sel: 0, drag: null });
+  }
+
+  /** G or the header toggle: take the depth chart from the staff (starting from theirs), or hand it back. */
+  private toggleStaffDepth(): void {
+    const s = this.season!;
+    if (s.config.delegate.depthChart) setUserDepth(s, { ...squadFor(s, s.config.userTeamId).depth });
+    else useStaffDepth(s);
+    saveSeason(s);
+  }
+
+  /** Depth chart and player cards: click a tab for its card, drag it to a new spot to reorder. */
+  private updateTeam(input: Input): void {
+    const s = this.season!;
+    const v = this.teamView;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace', 'KeyT')) {
+      this.screen = 'season';
+      return;
+    }
+    const n = POSITIONS.length;
+    if (input.hit('KeyA', 'ArrowLeft')) this.setTeamPos((v.pos + n - 1) % n);
+    if (input.hit('KeyD', 'ArrowRight')) this.setTeamPos((v.pos + 1) % n);
+    if (input.hit('KeyG')) this.toggleStaffDepth();
+    const squad = squadFor(s, s.config.userTeamId);
+    const pos = POSITIONS[v.pos];
+    const rows = positionOrder(squad, pos).length;
+    if (input.hit('KeyW', 'ArrowUp')) v.sel = (v.sel + rows - 1) % rows;
+    if (input.hit('KeyS', 'ArrowDown')) v.sel = (v.sel + 1) % rows;
+    if (input.mouse.pressed) {
+      const tab = tabAt(x, y);
+      const row = rowAt(x, y, rows);
+      if (tab >= 0) this.setTeamPos(tab);
+      else if (inBox(DEPTH_BTN, x, y)) this.toggleStaffDepth();
+      else if (row >= 0) v.drag = { from: row, y0: y, moved: false };
+    }
+    if (!v.drag) return;
+    if (input.mouse.down) {
+      if (Math.abs(y - v.drag.y0) > 4) v.drag.moved = true;
+      return;
+    }
+    // Released: a click selects; a drag drops the tab into its new spot.
+    const d = v.drag;
+    v.drag = null;
+    if (!d.moved) {
+      v.sel = d.from;
+      return;
+    }
+    const to = dropIndex(y, d.from, rows);
+    v.sel = to;
+    if (to === d.from) return;
+    setUserDepth(s, reorderPosition(squad, pos, d.from, to));
+    saveSeason(s);
   }
 
   /** The live game is over: hand the score to the season (box score to come) and go back to the hub. */
@@ -742,7 +825,7 @@ export class Game {
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
     const late = (c.quarter === 4 && left < 300) || (c.quarter === 2 && left < 120);
-    const sim = simulateDrive(teamRatings(buildSquad(this.cpu)).off, teamRatings(buildSquad(this.user)).def, start, this.rng, {
+    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, {
       timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
     });
     const { halfOver } = advanceSim(c, sim.secs);
@@ -802,6 +885,11 @@ export class Game {
     }
     if (this.screen === 'season') {
       drawSeason(g, this.season!, this.seasonView);
+      return;
+    }
+    if (this.screen === 'team') {
+      const s = this.season!;
+      drawTeam(g, s, squadFor(s, s.config.userTeamId), this.teamView);
       return;
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);

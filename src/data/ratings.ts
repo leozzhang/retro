@@ -47,6 +47,8 @@ export const RATING_KEYS: RatingKey[] = [
 
 export interface RatingInfo {
   label: string;
+  /** What it does, in plain words, for the player card. */
+  blurb: string;
   /** What it changes on the field. */
   effect: string;
   /** Where the formula lives. */
@@ -54,32 +56,32 @@ export interface RatingInfo {
 }
 
 export const RATING_INFO: Record<RatingKey, RatingInfo> = {
-  spd: { label: 'Speed', effect: 'Top speed (4.8 + 4.2·spd/100 yd/s); 30% of a defender\'s power against blocks', where: 'sim/player.ts maxSpeed' },
-  acc: { label: 'Acceleration', effect: 'How fast he reaches top speed', where: 'sim/player.ts accelOf' },
-  str: { label: 'Strength', effect: 'Breaking tackles (40% of the carrier side), falling forward, and 20% of a blocker\'s anchor', where: 'sim/tackling.ts, blockValue' },
-  sta: { label: 'Stamina', effect: 'How long a full sprint lasts and how fast it recovers', where: 'sim/player.ts endurance' },
-  elu: { label: 'Elusiveness', effect: 'Making tacklers miss (60% of the carrier side)', where: 'sim/tackling.ts tackleChance' },
-  cth: { label: 'Catching', effect: 'Hands on open catches, pitches and kicks; a defender\'s ball skills on interceptions', where: 'sim/catching.ts' },
-  cit: { label: 'Catch in Traffic', effect: 'Share of a contested ball', where: 'sim/catching.ts catchOdds' },
-  rte: { label: 'Route Running', effect: 'Burst off the line and out of breaks, speed kept through cuts, settling to face the QB', where: 'sim/ai.ts runRoute, cutKeep' },
-  rls: { label: 'Release', effect: 'Beating the press jam at the snap', where: 'game/playState.ts snap' },
-  arm: { label: 'Throw Power', effect: 'Max throw distance and ball speed', where: 'sim/passing.ts, sim/ball.ts' },
-  sac: { label: 'Short Accuracy', effect: 'Throw error to about 10 yd', where: 'sim/passing.ts throwErrorSd' },
-  mac: { label: 'Medium Accuracy', effect: 'Throw error at about 14-20 yd', where: 'sim/passing.ts throwErrorSd' },
-  dac: { label: 'Deep Accuracy', effect: 'Throw error at 28+ yd', where: 'sim/passing.ts throwErrorSd' },
-  tup: { label: 'Throw on the Run', effect: 'Extra throw error while moving (80 = baseline)', where: 'sim/passing.ts throwErrorSd' },
-  pac: { label: 'Poise', effect: 'Extra throw error under pressure (80 = baseline)', where: 'sim/passing.ts throwErrorSd' },
-  pbk: { label: 'Pass Block', effect: 'The blocker\'s side of pass-pro engagements', where: 'game/playState.ts updateEngagements' },
-  rbk: { label: 'Run Block', effect: 'The blocker\'s side of run blocks and special-teams blocks', where: 'sim/runBlocking.ts, sim/blocking.ts' },
-  tkl: { label: 'Tackle', effect: 'Chance to bring the carrier down on contact', where: 'sim/tackling.ts tackleChance' },
-  rsh: { label: 'Pass Rush', effect: '70% of a defender\'s power against pass blocks: push and shed rate', where: 'game/playState.ts updateEngagements' },
-  bsh: { label: 'Block Shedding', effect: '70% of a defender\'s power against run blocks and special-teams blocks', where: 'sim/runBlocking.ts, sim/blocking.ts' },
-  mcv: { label: 'Man Coverage', effect: 'Reaction lag trailing a receiver in man; reaction to the throw in man', where: 'sim/ai.ts cover, Play.throwBall' },
-  zcv: { label: 'Zone Coverage', effect: 'Reaction to the throw from a zone', where: 'Play.throwBall' },
-  prs: { label: 'Press', effect: 'Winning the jam at the line', where: 'game/playState.ts snap' },
-  prc: { label: 'Play Recognition', effect: 'Reading run, play action and pitches; run-fit timing; 40% of interception ball skills', where: 'game/playState.ts reactToRun, sellFake' },
-  kpw: { label: 'Kick Power', effect: 'Leg speed: distance on kicks and punts', where: 'sim/kicking.ts legSpeed' },
-  kac: { label: 'Kick Accuracy', effect: 'Kick error and the width of the timing meter\'s green', where: 'sim/kicking.ts' },
+  spd: { label: 'Speed', blurb: 'Top speed. Also helps a defender fight through blocks.', effect: 'Top speed (4.8 + 4.2·spd/100 yd/s); 30% of a defender\'s power against blocks', where: 'sim/player.ts maxSpeed' },
+  acc: { label: 'Acceleration', blurb: 'How quickly he hits full speed off the snap and out of cuts.', effect: 'How fast he reaches top speed', where: 'sim/player.ts accelOf' },
+  str: { label: 'Strength', blurb: 'Breaking tackles, falling forward, and anchoring blocks.', effect: 'Breaking tackles (40% of the carrier side), falling forward, and 20% of a blocker\'s anchor', where: 'sim/tackling.ts, blockValue' },
+  sta: { label: 'Stamina', blurb: 'How long he can hold a full sprint, and how fast it comes back.', effect: 'How long a full sprint lasts and how fast it recovers', where: 'sim/player.ts endurance' },
+  elu: { label: 'Elusiveness', blurb: 'Making tacklers miss when he has the ball.', effect: 'Making tacklers miss (60% of the carrier side)', where: 'sim/tackling.ts tackleChance' },
+  cth: { label: 'Catching', blurb: 'Hands on catches, pitches and kicks. On defense, ball skills.', effect: 'Hands on open catches, pitches and kicks; a defender\'s ball skills on interceptions', where: 'sim/catching.ts' },
+  cit: { label: 'Catch in Traffic', blurb: 'Winning the ball when a defender is right there with him.', effect: 'Share of a contested ball', where: 'sim/catching.ts catchOdds' },
+  rte: { label: 'Route Running', blurb: 'Sharp breaks: bursting out of cuts and settling open.', effect: 'Burst off the line and out of breaks, speed kept through cuts, settling to face the QB', where: 'sim/ai.ts runRoute, cutKeep' },
+  rls: { label: 'Release', blurb: 'Getting off the line cleanly when a corner presses him.', effect: 'Beating the press jam at the snap', where: 'game/playState.ts snap' },
+  arm: { label: 'Throw Power', blurb: 'How far and how fast he can throw it.', effect: 'Max throw distance and ball speed', where: 'sim/passing.ts, sim/ball.ts' },
+  sac: { label: 'Short Accuracy', blurb: 'Accuracy on short throws, out to about 10 yards.', effect: 'Throw error to about 10 yd', where: 'sim/passing.ts throwErrorSd' },
+  mac: { label: 'Medium Accuracy', blurb: 'Accuracy on intermediate throws, about 14 to 20 yards.', effect: 'Throw error at about 14-20 yd', where: 'sim/passing.ts throwErrorSd' },
+  dac: { label: 'Deep Accuracy', blurb: 'Accuracy on deep shots, 28 yards and beyond.', effect: 'Throw error at 28+ yd', where: 'sim/passing.ts throwErrorSd' },
+  tup: { label: 'Throw on the Run', blurb: 'Keeping his accuracy when throwing on the move.', effect: 'Extra throw error while moving (80 = baseline)', where: 'sim/passing.ts throwErrorSd' },
+  pac: { label: 'Poise', blurb: 'Keeping his accuracy with a pass rusher in his face.', effect: 'Extra throw error under pressure (80 = baseline)', where: 'sim/passing.ts throwErrorSd' },
+  pbk: { label: 'Pass Block', blurb: 'Holding up against pass rushers in protection.', effect: 'The blocker\'s side of pass-pro engagements', where: 'game/playState.ts updateEngagements' },
+  rbk: { label: 'Run Block', blurb: 'Clearing the hole on runs, and blocking on returns.', effect: 'The blocker\'s side of run blocks and special-teams blocks', where: 'sim/runBlocking.ts, sim/blocking.ts' },
+  tkl: { label: 'Tackle', blurb: 'Bringing the ball carrier down when he gets his hands on him.', effect: 'Chance to bring the carrier down on contact', where: 'sim/tackling.ts tackleChance' },
+  rsh: { label: 'Pass Rush', blurb: 'Beating pass blockers to get after the quarterback.', effect: '70% of a defender\'s power against pass blocks: push and shed rate', where: 'game/playState.ts updateEngagements' },
+  bsh: { label: 'Block Shedding', blurb: 'Getting off run blocks to make the play.', effect: '70% of a defender\'s power against run blocks and special-teams blocks', where: 'sim/runBlocking.ts, sim/blocking.ts' },
+  mcv: { label: 'Man Coverage', blurb: 'Staying with his man in man coverage, and jumping the throw.', effect: 'Reaction lag trailing a receiver in man; reaction to the throw in man', where: 'sim/ai.ts cover, Play.throwBall' },
+  zcv: { label: 'Zone Coverage', blurb: 'Reacting to the throw when playing a zone.', effect: 'Reaction to the throw from a zone', where: 'Play.throwBall' },
+  prs: { label: 'Press', blurb: 'Jamming a receiver at the line to throw off his route.', effect: 'Winning the jam at the line', where: 'game/playState.ts snap' },
+  prc: { label: 'Play Recognition', blurb: 'Reading runs, play action and pitches; jumping throws.', effect: 'Reading run, play action and pitches; run-fit timing; 40% of interception ball skills', where: 'game/playState.ts reactToRun, sellFake' },
+  kpw: { label: 'Kick Power', blurb: 'Leg strength: distance on field goals, punts and kickoffs.', effect: 'Leg speed: distance on kicks and punts', where: 'sim/kicking.ts legSpeed' },
+  kac: { label: 'Kick Accuracy', blurb: 'Kicking accuracy, and a wider sweet spot on the timing meter.', effect: 'Kick error and the width of the timing meter\'s green', where: 'sim/kicking.ts' },
 };
 
 /** Share of a blocker's value that comes from strength (his anchor); the rest is the block rating. */

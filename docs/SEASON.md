@@ -19,6 +19,7 @@ The season framework: every system in the week loop exists end to end, each behi
 ## State
 `SeasonState` (`season/types.ts`) is plain JSON. A test checks that a season saved mid-way and reloaded finishes identically.
 - **Rosters aren't stored.** They regenerate from the team id (`buildSquad`). `teamState` holds only this season's changes: injuries, a user depth chart, a user game plan. `squadFor(state, id)` lays them over the generated roster.
+- **The user's depth chart** is edited on the team page (T in the hub) per position. `reorderPosition` (`data/depth.ts`) moves a player in his position's order and rebuilds every slot that position can fill, natural position first; `starters` then fills slots in `PICK_ORDER`, so WR #1-#4 play X, Z, SL and WR4 and an injured starter's backup steps in. The first edit calls `setUserDepth` (`season/staff.ts`), which turns off `delegate.depthChart` so `prep` keeps the chart; `useStaffDepth` hands it back. Live season games use `squadFor` for both teams, so the user's chart and both teams' injuries are on the field.
 - **Records, standings, season stats and award races are computed** from the game results whenever they're needed, never stored (like team ratings).
 - **Seeding:** every random draw comes from `seasonRng(state, ...parts)`, so a game's result depends only on the season seed and the game id, not on the order things are simulated in.
 - **Saves** (`season/save.ts`): localStorage, versioned key. Box-score lines leave out zero stats (a full season is about 2.8 MB raw and 1.6 MB packed, against a localStorage limit of about 5 MB). There's no save-slot UI yet: N on the title screen starts a new season (over the old one), and C continues.
@@ -28,7 +29,7 @@ The season framework: every system in the week loop exists end to end, each behi
 
 | Step | Now | Later |
 | --- | --- | --- |
-| `prep` | Game plans for every team playing (`autoGamePlan`: pass share from the program's scheme), the user's if not delegated. Delegated depth charts are reset to the staff chart | User depth chart and game-plan screens; opponent-specific plans; fatigue |
+| `prep` | Game plans for every team playing (`autoGamePlan`: pass share from the program's scheme), the user's if not delegated. Delegated depth charts are reset to the staff chart | Game-plan screen; opponent-specific plans; fatigue |
 | `play` | The user's game takes the live result (a tie goes to simulated overtime with `settleTie`); every other game is `simGame` | Live box-score capture; a "watch" mode |
 | `results` | Injuries count down | Injuries from games, suspensions |
 | `rankings` | AP poll every week; CFP rankings from `CALENDAR.cfpStartWeek` until selection | |

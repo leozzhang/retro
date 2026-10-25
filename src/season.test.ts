@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSquad } from './data/depth';
+import { buildSquad, positionOrder, reorderPosition, starters, teamRatings } from './data/depth';
 import { CALENDAR } from './data/season/calendar';
 import { CONF_RULES } from './data/season/conferences';
 import { BOWL_WINS, CFP_FORMAT } from './data/season/postseason';
@@ -15,6 +15,8 @@ import { settleTie, simGame } from './season/simGame';
 import { records, standings, winner } from './season/standings';
 import { leaders } from './season/stats';
 import { packSeason, unpackSeason } from './season/save';
+import { setUserDepth, useStaffDepth } from './season/staff';
+import { squadFor } from './season/world';
 import type { GameResult, SeasonGame, SeasonState } from './season/types';
 
 const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
@@ -175,6 +177,24 @@ describe('season', () => {
     simSeason(a);
     simSeason(b);
     expect(JSON.parse(JSON.stringify(b))).toEqual(JSON.parse(JSON.stringify(a)));
+  });
+
+  it('a user depth chart survives the week and a save; handing it back restores the staff chart', () => {
+    const s = newSeason(defaultConfig('georgia'), 11);
+    const base = squadFor(s, 'georgia');
+    const qbs = positionOrder(base, 'QB');
+    // Promote the worst QB: the team gets worse, and stays that way through a simulated week.
+    setUserDepth(s, reorderPosition(base, 'QB', qbs.length - 1, 0));
+    expect(s.config.delegate.depthChart).toBe(false);
+    expect(starters(squadFor(s, 'georgia')).QB.id).toBe(qbs[qbs.length - 1].id);
+    expect(teamRatings(squadFor(s, 'georgia')).off).toBeLessThan(teamRatings(base).off);
+    advanceWeek(s);
+    expect(starters(squadFor(s, 'georgia')).QB.id).toBe(qbs[qbs.length - 1].id);
+    const back = JSON.parse(JSON.stringify(s)) as SeasonState;
+    expect(starters(squadFor(back, 'georgia')).QB.id).toBe(qbs[qbs.length - 1].id);
+    useStaffDepth(s);
+    expect(s.config.delegate.depthChart).toBe(true);
+    expect(starters(squadFor(s, 'georgia')).QB.id).toBe(qbs[0].id);
   });
 
   it('saves drop zero stats and restore them', () => {

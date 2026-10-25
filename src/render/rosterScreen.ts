@@ -16,16 +16,16 @@ function keyRatings(pos: Position): RatingKey[] {
   return (Object.entries(OVR_WEIGHTS[pos]) as [RatingKey, number][]).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k);
 }
 
-function shortName(a: Athlete): string {
+export function shortName(a: Athlete, max = 15): string {
   const n = `${a.first[0]}. ${a.last}`.toUpperCase();
-  return n.length > 15 ? n.slice(0, 15) : n;
+  return n.length > max ? n.slice(0, max) : n;
 }
 
-function ovrColor(o: number): string {
+export function ovrColor(o: number): string {
   return o >= 90 ? '#ffd23f' : o >= 80 ? '#7dff9a' : o >= 70 ? '#ffffff' : o >= 60 ? '#cfd6df' : '#8fa0b8';
 }
 
-function stars(n: number): string {
+export function stars(n: number): string {
   return '*'.repeat(n);
 }
 

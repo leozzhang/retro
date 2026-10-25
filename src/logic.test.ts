@@ -6,11 +6,13 @@ import {
 } from './game/clock';
 import { DEF_CALLS, packageFor, type DefCall } from './data/defenses';
 import { ACE, EMPTY, FORMATIONS, GUN_TRIPS, I_FORM, PLAYBOOK, type Formation, type PlayDef } from './data/plays';
-import { athleteName, buildSquad, freshSquad, onField, PICK_ORDER, rosterFor, starters, teamRatings } from './data/depth';
+import {
+  athleteName, buildSquad, freshSquad, onField, PICK_ORDER, positionOrder, reorderPosition, rosterFor, SLOT_CANDIDATES, starters, teamRatings,
+} from './data/depth';
 import { templateValue } from './data/athletes';
 import { TEAM_STATE } from './data/fbs/geo';
 import { CONFERENCES } from './data/fbs/profile';
-import { overall, overallRaw, OVR_WEIGHTS, POSITIONS, SLOT_POS, type Position } from './data/positions';
+import { overall, overallBreakdown, overallRaw, OVR_WEIGHTS, POSITIONS, SLOT_POS, type Position } from './data/positions';
 import { passBlockValue, RATING_INFO, RATING_KEYS, runBlockValue, type Ratings } from './data/ratings';
 import { COMPOSITION } from './data/rosterGen';
 import { DEF_EXTRA, DEF_SLOTS, OFF_EXTRA, OFF_SLOTS, ST_SLOTS, teamById, TEAMS } from './data/teams';
@@ -1055,7 +1057,77 @@ describe('ratings', () => {
   });
 
   it('every rating is documented', () => {
-    for (const k of RATING_KEYS) expect(RATING_INFO[k].effect.length).toBeGreaterThan(10);
+    for (const k of RATING_KEYS) {
+      expect(RATING_INFO[k].effect.length).toBeGreaterThan(10);
+      // The player card word-wraps "LABEL: blurb" into two 44-character lines; 76 always fits.
+      expect(RATING_INFO[k].blurb.length).toBeGreaterThan(10);
+      expect(RATING_INFO[k].label.length + 2 + RATING_INFO[k].blurb.length).toBeLessThanOrEqual(76);
+    }
+  });
+
+  it('the overall breakdown adds up to the overall', () => {
+    const generated = buildSquad(UGA).athletes.slice(0, 40);
+    for (const pos of POSITIONS) {
+      const players = [onTemplate(pos, 82), flat(60), ...generated.map((a) => a.r)];
+      for (const r of players) {
+        const parts = overallBreakdown(r, pos);
+        expect(parts.reduce((s, p) => s + p.delta, 75)).toBeCloseTo(overallRaw(r, pos), 9);
+        expect(parts.reduce((s, p) => s + p.share, 0)).toBeCloseTo(1, 9);
+        expect(parts.map((p) => p.key).sort()).toEqual(Object.keys(OVR_WEIGHTS[pos]).sort());
+        for (let i = 1; i < parts.length; i++) expect(parts[i].share).toBeLessThanOrEqual(parts[i - 1].share);
+      }
+    }
+  });
+});
+
+describe('depth chart editing', () => {
+  it('an auto chart lists each position by overall', () => {
+    const sq = freshSquad(UGA);
+    for (const pos of POSITIONS) {
+      const order = positionOrder(sq, pos);
+      expect(order.length).toBe(sq.athletes.filter((a) => a.pos === pos).length);
+      for (let i = 1; i < order.length; i++) expect(overall(order[i].r, pos)).toBeLessThanOrEqual(overall(order[i - 1].r, pos));
+    }
+  });
+
+  it('moving a WR to the top makes him the X; the rest shift down through Z, SL and WR4', () => {
+    const sq = freshSquad(UGA);
+    const before = positionOrder(sq, 'WR');
+    sq.depth = reorderPosition(sq, 'WR', 4, 0);
+    const after = positionOrder(sq, 'WR');
+    expect(after.map((a) => a.id)).toEqual([before[4], before[0], before[1], before[2], before[3], ...before.slice(5)].map((a) => a.id));
+    const st = starters(sq);
+    expect([st.X.id, st.Z.id, st.SL.id, st.WR4.id]).toEqual(after.slice(0, 4).map((a) => a.id));
+    // Moving him back down works the same way.
+    sq.depth = reorderPosition(sq, 'WR', 0, 4);
+    expect(positionOrder(sq, 'WR').map((a) => a.id)).toEqual(before.map((a) => a.id));
+  });
+
+  it('every slot keeps every candidate exactly once, natural position first', () => {
+    const sq = freshSquad(UGA);
+    for (const pos of POSITIONS) sq.depth = reorderPosition(sq, pos, positionOrder(sq, pos).length - 1, 0);
+    for (const slot of PICK_ORDER) {
+      const list = sq.depth[slot];
+      const want = sq.athletes.filter((a) => SLOT_CANDIDATES[slot].includes(a.pos)).map((a) => a.id);
+      expect(new Set(list).size).toBe(list.length);
+      expect([...list].sort()).toEqual([...want].sort());
+      const byId = new Map(sq.athletes.map((a) => [a.id, a]));
+      expect(byId.get(list[0])!.pos).toBe(SLOT_CANDIDATES[slot][0]);
+    }
+  });
+
+  it('an injured new starter is skipped; an OT move reaches LT, RT and the TE2 list', () => {
+    const sq = freshSquad(UGA);
+    const wrs = positionOrder(sq, 'WR');
+    sq.depth = reorderPosition(sq, 'WR', 5, 0);
+    wrs[5].injury = { weeks: 2 };
+    expect(starters(sq).X.id).toBe(wrs[0].id);
+    const ots = positionOrder(sq, 'OT');
+    sq.depth = reorderPosition(sq, 'OT', ots.length - 1, 0);
+    expect(starters(sq).LT.id).toBe(ots[ots.length - 1].id);
+    expect(starters(sq).RT.id).toBe(ots[0].id);
+    const te2Ots = sq.depth.TE2.filter((id) => ots.some((a) => a.id === id));
+    expect(te2Ots[0]).toBe(ots[ots.length - 1].id);
   });
 });
 

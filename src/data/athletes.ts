@@ -154,6 +154,33 @@ export const ARCHETYPES: Record<Position, Record<string, Partial<Record<RatingKe
   P: { power: { kpw: 6, kac: -3 }, accurate: { kac: 5, kpw: -3 } },
 };
 
+/** Archetype names for the player card, where the key alone doesn't say it ("run" means a different thing for a guard and a linebacker). */
+const ARCHETYPE_LABEL: Partial<Record<Position, Record<string, string>>> = {
+  QB: { pocket: 'Pocket Passer', dual: 'Dual Threat', scrambler: 'Scrambler' },
+  HB: { elusive: 'Elusive Back', power: 'Power Back', receiving: 'Receiving Back' },
+  FB: { blocking: 'Blocking Back' },
+  WR: { possession: 'Possession', deep: 'Deep Threat', slot: 'Slot' },
+  TE: { receiving: 'Receiving', blocking: 'Blocking' },
+  OT: { pass: 'Pass Protector', run: 'Run Blocker' },
+  OG: { pass: 'Pass Protector', run: 'Run Blocker' },
+  C: { pass: 'Pass Protector', run: 'Run Blocker' },
+  DE: { speed: 'Speed Rusher', power: 'Power Rusher' },
+  DT: { power: 'Run Stuffer', quick: 'Interior Rusher' },
+  OLB: { run: 'Run Stopper', coverage: 'Coverage', rusher: 'Edge Rusher' },
+  MLB: { run: 'Run Stopper', coverage: 'Coverage' },
+  CB: { man: 'Man Corner', zone: 'Zone Corner' },
+  FS: { coverage: 'Centerfielder', hybrid: 'Hybrid', box: 'Box Safety' },
+  SS: { coverage: 'Coverage', hybrid: 'Hybrid', box: 'Box Safety' },
+  K: { accurate: 'Accurate', power: 'Big Leg' },
+  P: { accurate: 'Accurate', power: 'Big Leg' },
+};
+
+export function archetypeLabel(a: Pick<Athlete, 'pos' | 'archetype'>): string {
+  return ARCHETYPE_LABEL[a.pos]?.[a.archetype] ?? a.archetype;
+}
+
+export const DEV_LABEL: Record<DevTrait, string> = { normal: 'Normal', impact: 'Impact', star: 'Star', elite: 'Elite' };
+
 /** Height (in) and weight (lb): mean and spread per position. */
 export const BUILD: Record<Position, { h: [number, number]; w: [number, number] }> = {
   QB: { h: [74.5, 1.6], w: [215, 12] },

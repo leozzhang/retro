@@ -1,4 +1,5 @@
 import { buildDepth, type DepthChart, type Squad } from '../data/depth';
+import type { SeasonState } from './types';
 
 /**
  * Staff automation: each management system has an `auto*` version that the CPU teams always use and
@@ -21,4 +22,17 @@ export function autoGamePlan(squad: Squad, _opponent: Squad): GamePlan {
 /** The position coaches' depth chart: best fit at each slot (injured players are skipped at game time by `starters`). */
 export function autoDepthChart(squad: Squad): DepthChart {
   return buildDepth(squad.athletes);
+}
+
+/** The user's own depth chart. It takes the job from the staff until the user hands it back. */
+export function setUserDepth(state: SeasonState, depth: DepthChart): void {
+  const u = state.config.userTeamId;
+  (state.teamState[u] ??= {}).depth = depth;
+  state.config.delegate.depthChart = false;
+}
+
+/** Hand the depth chart back to the staff: their chart from now on. */
+export function useStaffDepth(state: SeasonState): void {
+  delete state.teamState[state.config.userTeamId]?.depth;
+  state.config.delegate.depthChart = true;
 }

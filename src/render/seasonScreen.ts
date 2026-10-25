@@ -34,6 +34,9 @@ const GOLD = '#ffd23f';
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
+/** The button to the team page (depth chart and player cards), bottom right. */
+export const TEAM_BTN = { x: VIEW_W - 76, y: 328, w: 70, h: 15 };
+
 function resultText(g: SeasonGame, team: string): string {
   const r = g.result;
   if (!r) return '';
@@ -114,8 +117,11 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
       drawPlayoff(g, s);
       break;
   }
+  g.fillStyle = team.colors.primary;
+  g.fillRect(TEAM_BTN.x, TEAM_BTN.y, TEAM_BTN.w, TEAM_BTN.h);
+  text(g, 'TEAM', TEAM_BTN.x + TEAM_BTN.w / 2, TEAM_BTN.y + 4, { align: 'center' });
   const play = userGameThisWeek(s) ? 'SPACE: PLAY  X: SIM' : s.phase === 'complete' ? '' : 'SPACE: ADVANCE';
-  drawHint(g, `${play}   A/D: TAB  W/S: PAGE   ESC: TITLE`);
+  drawHint(g, `${play}   A/D: TAB  W/S: PAGE  T: TEAM  ESC: TITLE`);
 }
 
 function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {

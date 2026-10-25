@@ -593,6 +593,19 @@ Method and full tables are in [SEASON.md](SEASON.md) under "Score calibration".
 - **The live game changes too.** The CPU's simulated drives use the same model, so an even CPU opponent now scores about 1.9 points per drive (was 1.2). `npm run balance` doesn't cover CPU drives, so it's unaffected.
 - **`npm run season`** now prints each measure next to the real value. All 111 tests pass.
 
+## Done: team page, depth chart and player cards (2026-10-24)
+- **Team page** (`render/teamScreen.ts`): T or the TEAM button in the season hub; Esc returns to the hub.
+  - Header: record, live OVR / OFF / DEF / ST (they update as you reorder), and `DEPTH: YOURS / STAFF`.
+  - One tab per position (17); a tab turns orange when someone at that position is hurt.
+  - **Depth chart:** one player tab per player, in depth order: the slot he starts at this week (X, Z, SL, LT, NB...; gold strip), or his depth rank, or OUT in red; number, name, position, OVR.
+  - **Drag a tab** up or down to reorder (a gold line shows where it lands). Click selects. W/S also selects.
+  - **Player card:** name, number, position, archetype (`archetypeLabel`), class, height, weight, hometown, stars, potential, dev trait, injury status, and the slot he's starting at. Then the **OVR breakdown** (`overallBreakdown` in `data/positions.ts`): each rating in that position's overall, heaviest first, with value, bar, weight share and overall points gained or lost against a 75 (they sum to the overall). The ratings that don't count at his position sit in a small grid below. Hover any rating for a plain-language line on what it does (`RATING_INFO.blurb`).
+- **Depth chart model:** per position, stored as the existing slot-based `TeamState.depth`, so no save change. `positionOrder` and `reorderPosition` in `data/depth.ts`; see SEASON.md.
+- **Delegation:** the first drag (or G) takes the chart from the staff (`setUserDepth`, `delegate.depthChart = false`), so the weekly prep no longer resets it. G hands it back (`useStaffDepth`).
+- **Fix: live season games now use the season squads** (`squadFor`) for both teams, so the user's depth chart and both teams' injuries reach the field and the CPU drive sim. Before, the live game always used the generated roster's auto chart. Exhibition games are unchanged.
+- **Tests:** breakdown sums to the overall; auto order is by overall; moving a WR to #1 makes him the X; every slot keeps every candidate once; an injured new starter is skipped; an OT move reaches LT/RT and TE2; a user chart survives a week and a JSON round trip, and handing it back restores the staff chart. Every rating has a blurb that fits the card.
+- **Not checked by hand yet:** the page in the browser (layout at 640×360, dragging feel).
+
 ## Balance baseline
 From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
@@ -680,7 +693,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; injuries from games; user depth chart and game plan screens (the `delegate` flags are ready); then the offseason: graduation, progression from `potential`/`dev`, recruiting from `stars`/hometowns, and the coaching carousel.
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; injuries from games; more on the team page (confidence, mentality, season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, progression from `potential`/`dev`, recruiting from `stars`/hometowns, and the coaching carousel.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

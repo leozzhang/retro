@@ -65,6 +65,28 @@ export function overallRaw(r: Ratings, pos: Position): number {
   return 75 + sum / wsum;
 }
 
+/** One rating's part in an overall: its share of the weight, and the overall points it adds or costs against a 75. */
+export interface OvrPart {
+  key: RatingKey;
+  value: number;
+  share: number;
+  delta: number;
+}
+
+/** What makes up an overall, heaviest weight first. `75 + Σ delta` is `overallRaw`. */
+export function overallBreakdown(r: Ratings, pos: Position): OvrPart[] {
+  const entries = Object.entries(OVR_WEIGHTS[pos]) as [RatingKey, number][];
+  let wsum = 0;
+  let wtot = 0;
+  for (const [k, w] of entries) {
+    wsum += w * (TEMPLATES[pos][k] ?? [75, 1])[1];
+    wtot += w;
+  }
+  return entries
+    .map(([k, w]) => ({ key: k, value: r[k], share: w / wtot, delta: ((r[k] - (TEMPLATES[pos][k] ?? [75, 1])[0]) * w) / wsum }))
+    .sort((a, b) => b.share - a.share);
+}
+
 /** Overall at a position, 25-99. */
 export function overall(r: Ratings, pos: Position): number {
   return Math.round(Math.min(99, Math.max(25, overallRaw(r, pos))));
