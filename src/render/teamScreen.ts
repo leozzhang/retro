@@ -73,7 +73,7 @@ export function inBox(b: { x: number; y: number; w: number; h: number }, x: numb
   return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
 }
 
-function wrap(s: string, n: number): string[] {
+export function wrap(s: string, n: number): string[] {
   const out: string[] = [];
   let line = '';
   for (const w of s.split(' ')) {

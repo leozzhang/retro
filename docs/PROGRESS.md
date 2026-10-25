@@ -281,7 +281,7 @@ The original five runs (IZ, OZ, Power, Toss, Zone Read), averaged over the three
 - `fixed`: balanced 2x2 shells and the 18 legacy plays
 
 ### Call screen
-- Formation chips under the PASS / RUN / PLAY ACTION tabs: A/D or the wheel switches them, and a click works too. The chip is remembered per tab.
+- Formation chips under the PASS / RUN / PLAY ACTION tabs: A/D or the wheel switches them, and a click works too. The chip is remembered per tab. (The first chip, ALL, is now STARRED; see the playbook page section.)
 - A 3×3 card grid, with W/S to page.
 - Cards zoom to their own play, so runs are readable, and pull paths are drawn as dotted lines.
 
@@ -605,6 +605,22 @@ Method and full tables are in [SEASON.md](SEASON.md) under "Score calibration".
 - **Fix: live season games now use the season squads** (`squadFor`) for both teams, so the user's depth chart and both teams' injuries reach the field and the CPU drive sim. Before, the live game always used the generated roster's auto chart. Exhibition games are unchanged.
 - **Tests:** breakdown sums to the overall; auto order is by overall; moving a WR to #1 makes him the X; every slot keeps every candidate once; an injured new starter is skipped; an OT move reaches LT/RT and TE2; a user chart survives a week and a JSON round trip, and handing it back restores the staff chart. Every rating has a blurb that fits the card.
 - **Not checked by hand yet:** the page in the browser (layout at 640×360, dragging feel).
+
+## Done: playbook page and starred plays (2026-10-25)
+- **Playbook page** (`render/playbookScreen.ts`): P or the PLAYBOOK button (left of TEAM) in the season hub.
+  - Tabs: STARRED, PASS, RUN, PLAY ACTION. Each shows a 4×3 grid of play cards with the call screen's mini diagram; W/S or the wheel pages through them. Special teams kicks aren't included because they have no formation to draw.
+  - **Click a card** to open the detail view. It shows the user's **current starters** (`starters(squadFor(...))`, so injuries and the user's depth chart count) as numbered chips in the formation, with the offense moving up. Each player's job is drawn:
+    - routes in color, with an arrow when the route keeps going, a dot when he settles, and a T-bar for lead blocks and play-action fakes;
+    - run paths bold white;
+    - linemen's blocks as short T-bars, angled by the scheme: forward and playside for zone, wider for stretch, back-side down blocks for gap and trap, back for pass sets (angled for slides);
+    - pullers dotted behind the line to the hole;
+    - the QB's drop, or his path on a designed run.
+  - The panel lists the formation, the scheme and read (`schemeText`), the tip, then each player's position, number, name and job (`jobOf`, 8 characters or fewer). Hovering a chip or a row highlights the other one and shows the player's OVR. A/D steps through the tab, F mirrors the play, Esc goes back to the grid.
+- **Starred plays** (`game/starred.ts`): click the star on any card (playbook page or call screen), Space or the button in the detail view. They're stored in their own localStorage key, not in the season, so they apply to every game, exhibitions included. Unknown ids are dropped on load.
+- **Call screen:** the formation chips' ALL is replaced by **STARRED**, the tab's starred plays. It's the default chip when the tab has any starred plays; otherwise the first formation is. An empty STARRED chip says how to add plays. The cards' mini diagram moved to `render/playDiagram.ts` (`drawMiniPlay`), shared with the playbook page.
+- **Tests:** every play's 11 jobs are non-empty and fit the panel, mirrored too; a puller reads PULL and a pass-pro lineman PROTECT; starred parsing drops junk and unknown ids; toggling a star works without storage.
+- **Checked in headless Chrome** (CDP canvas snapshots): the hub buttons, the grid, detail views (Mesh, Power O, PA Boot Flood, Speed Option, Curl Flat), starring by click, and the call screen's STARRED chip. A QB under center is drawn a chip behind the center so both numbers show.
+- **Rough edges:** long play names are cut at 16 characters on the grid cards ("I-FORM DEEP CROS"). The option QB's path down the line isn't drawn, only his mesh point. Deep routes run off the top of the field.
 
 ## Balance baseline
 From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.

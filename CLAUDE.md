@@ -38,7 +38,7 @@ Controls are listed in [README.md](README.md).
   - `game.ts`: screens (title with conference and team pickers, roster, season hub, play call with PAT and kickoff modes, play, kick, notices, final). A season game's final screen writes the score back with `advanceWeek`
 - `season/`: the season engine, headless and plain JSON (`types.ts`): the week loop (`season.ts`), schedule, CPU game sim with box scores (`simGame.ts`), standings and tiebreakers, AP and CFP polls, postseason, stats, awards, news, staff automation (`staff.ts`), coach career, saves. See [docs/SEASON.md](docs/SEASON.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
-- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, and the season hub (`seasonScreen.ts`)
+- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports
 
 ## Conventions

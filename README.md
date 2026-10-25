@@ -22,9 +22,10 @@ npm run season     # headless full seasons -> season.txt
 | Start the game | Enter |
 | Season | N on the title screen starts a season with your team; C continues the saved one. In the hub: A/D tabs, W/S pages within a tab, Space plays this week's game, X simulates it, Esc goes back to the title. See [docs/SEASON.md](docs/SEASON.md) |
 | Team page | T (or the TEAM button) in the season hub. A/D or click a tab to pick a position, click a player for his card, drag a player up or down the depth chart to reorder it. G hands the depth chart to your staff or takes it back. Esc returns to the hub |
+| Playbook page | P (or the PLAYBOOK button) in the season hub. A/D or click a tab (Starred, Pass, Run, Play Action), W/S pages. Click a card to see it drawn with your starters; click a card's star to save the play. In a play: A/D previous/next, Space star, F flip, Esc back |
 | Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |
 | Playbook tab (Pass / Run / Play Action / Special) | Click a tab, or Q/E or Tab |
-| Formation filter | A/D or the mouse wheel (or click a chip) picks a formation under the tab; W/S pages when there are more than 9 plays |
+| Formation filter | A/D or the mouse wheel (or click a chip) picks STARRED (your starred plays on this tab) or a formation; W/S pages when there are more than 9 plays. Click a card's star to star or unstar it |
 | Call a play | Click a card or press 1–9. Watch the play clock: if it runs out, it's delay of game |
 | Speed option | Right-click to pitch while you attack the end; run past the line to keep it |
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |

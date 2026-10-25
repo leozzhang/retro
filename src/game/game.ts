@@ -1,5 +1,5 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
-import { FORMATIONS, PLAY_TABS, playsOfKind, ROUTES, type Formation, type PlayDef } from '../data/plays';
+import { FORMATIONS, PLAY_TABS, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { buildSquad, onField, positionOrder, reorderPosition, teamRatings, type Squad } from '../data/depth';
 import { POSITIONS } from '../data/positions';
@@ -8,17 +8,22 @@ import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
-import { clamp, type Vec3 } from '../engine/math';
+import type { Vec3 } from '../engine/math';
 import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawHint, drawPlayClock, drawScorebug } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
-import { drawSeason, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import {
+  BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
+} from '../render/playbookScreen';
+import { drawMiniPlay, drawStar } from '../render/playDiagram';
+import { BOOK_BTN, drawSeason, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
 import { DEPTH_BTN, drawTeam, dropIndex, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
 import { setUserDepth, useStaffDepth } from '../season/staff';
+import { loadStarred, toggleStar } from './starred';
 import { squadFor } from '../season/world';
 import type { GameResult, SeasonGame, SeasonState } from '../season/types';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
@@ -30,14 +35,14 @@ import {
 } from './clock';
 import { KickPlay } from './kickPlay';
 import { Play } from './playState';
-import { alignY, personnelOf, resolvePlay } from './resolvePlay';
+import { personnelOf } from './resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, userStartAfter,
   type Applied, type Drive,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'playbook' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -85,12 +90,16 @@ function cardRect(i: number) {
   return { x: CARD_X0 + (i % 3) * (CARD_W + CARD_GAP), y: CARD_Y0 + Math.floor(i / 3) * (CARD_H + CARD_ROW_GAP), w: CARD_W, h: CARD_H };
 }
 
-/** Formation filter chips for one playbook tab: ALL, then each formation the tab uses (in `FORMATIONS` order). */
-function chipsFor(plays: PlayDef[]): (Formation | null)[] {
-  return [null, ...FORMATIONS.filter((f) => plays.some((p) => p.formation === f))];
+/** Filter chips for one playbook tab: the user's starred plays, then each formation the tab uses (in `FORMATIONS` order). */
+type Chip = Formation | 'starred';
+
+function chipsFor(plays: PlayDef[]): Chip[] {
+  return ['starred', ...FORMATIONS.filter((f) => plays.some((p) => p.formation === f))];
 }
 
-const chipLabel = (f: Formation | null) => (f ? f.name.toUpperCase() : 'ALL');
+const chipLabel = (f: Chip) => (f === 'starred' ? 'STARRED' : f.name.toUpperCase());
+/** Room for the star icon in front of the STARRED label. */
+const STAR_ICON_W = 10;
 
 function tabRect(i: number, n: number) {
   const x0 = (VIEW_W - (n * TAB_W + (n - 1) * 4)) / 2;
@@ -147,6 +156,11 @@ export class Game {
   private seasonGame: SeasonGame | null = null;
   private seasonView: SeasonView = { tab: 0, sub: 0 };
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
+  private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
+  /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
+  private starred = loadStarred();
+  /** Mouse on the call screen, for the cards' star hover. */
+  private callMouse = { x: 0, y: 0 };
   /** A season is saved in this browser (checked once; parsing it every frame would be slow). */
   private savedSeason = hasSavedSeason();
   private debug = false;
@@ -174,6 +188,9 @@ export class Game {
         break;
       case 'team':
         this.updateTeam(input);
+        break;
+      case 'playbook':
+        this.updateBook(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -333,6 +350,10 @@ export class Game {
       this.toTeam();
       return;
     }
+    if (input.hit('KeyP') || (input.mouse.pressed && inBox(BOOK_BTN, input.mouse.x, input.mouse.y))) {
+      this.toBook();
+      return;
+    }
     const sim = input.hit('KeyX');
     if (!input.hit('Space', 'Enter') && !sim) return;
     if (seasonOver(s)) {
@@ -417,6 +438,67 @@ export class Game {
     saveSeason(s);
   }
 
+  // ------------------------------------------------------------ playbook page
+
+  private toBook(): void {
+    this.screen = 'playbook';
+    this.bookView = { tab: this.starred.size ? 0 : 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
+  }
+
+  /** Play cards by tab; click one to see it drawn with your starters, click a star to save it. */
+  private updateBook(input: Input): void {
+    const v = this.bookView;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    const list = bookPlays(v.tab, this.starred);
+    if (v.open) {
+      const at = list.findIndex((p) => p.id === v.open);
+      if (input.hit('Escape', 'Backspace')) {
+        v.open = null;
+        return;
+      }
+      // Unstarring a play on the STARRED tab keeps it open; A/D then steps through what's left.
+      const d = (input.hit('KeyD', 'ArrowRight') ? 1 : 0) - (input.hit('KeyA', 'ArrowLeft') ? 1 : 0);
+      if (d && list.length) {
+        const next = at < 0 ? (d > 0 ? 0 : list.length - 1) : (at + d + list.length) % list.length;
+        v.open = list[next].id;
+        v.page = Math.floor(next / BOOK_PAGE);
+      }
+      if (input.hit('KeyF')) v.flip = !v.flip;
+      if (input.hit('Space') || (input.mouse.pressed && inBox(STAR_BTN, x, y))) toggleStar(this.starred, v.open);
+      return;
+    }
+    if (input.hit('Escape', 'Backspace', 'KeyP')) {
+      this.screen = 'season';
+      return;
+    }
+    const n = BOOK_TABS.length;
+    const tabWas = v.tab;
+    if (input.hit('KeyA', 'ArrowLeft')) v.tab = (v.tab + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight')) v.tab = (v.tab + 1) % n;
+    if (v.tab !== tabWas) v.page = 0;
+    const pages = bookPages(v.tab, this.starred);
+    v.page = Math.min(v.page, pages - 1);
+    if (input.hit('KeyS', 'ArrowDown') || input.mouse.wheel > 0) v.page = (v.page + 1) % pages;
+    if (input.hit('KeyW', 'ArrowUp') || input.mouse.wheel < 0) v.page = (v.page + pages - 1) % pages;
+    if (!input.mouse.pressed) return;
+    const tab = bookTabAt(x, y);
+    if (tab >= 0) {
+      v.tab = tab;
+      v.page = 0;
+      return;
+    }
+    const shown = bookPlays(v.tab, this.starred).slice(v.page * BOOK_PAGE, v.page * BOOK_PAGE + BOOK_PAGE);
+    const i = bookCardAt(x, y, shown.length);
+    if (i < 0) return;
+    if (inBox(starRect(bookCardRect(i)), x, y)) toggleStar(this.starred, shown[i].id);
+    else {
+      v.open = shown[i].id;
+      v.flip = false;
+    }
+  }
+
   /** The live game is over: hand the score to the season (box score to come) and go back to the hub. */
   private finishSeasonGame(): void {
     const g = this.seasonGame!;
@@ -483,19 +565,20 @@ export class Game {
     return tab && tab.kind !== 'st' ? playsOfKind(tab.kind) : null;
   }
 
-  /** The formation chip in use on this tab: the first formation until the user picks one. */
+  /** The chip in use on this tab: STARRED if the tab has starred plays, else the first formation, until the user picks one. */
   private chipIndex(): number {
     const plays = this.tabPlays();
     if (!plays) return 0;
     const n = chipsFor(plays).length;
-    return Math.min(this.chip[this.tab] ?? (n > 1 ? 1 : 0), n - 1);
+    const starredHere = plays.some((p) => this.starred.has(p.id));
+    return Math.min(this.chip[this.tab] ?? (starredHere || n < 2 ? 0 : 1), n - 1);
   }
 
-  /** Plays under the current formation chip, before paging. */
+  /** Plays under the current chip, before paging. */
   private chipPlays(): PlayDef[] {
     const plays = this.tabPlays() ?? [];
     const f = chipsFor(plays)[this.chipIndex()];
-    return f ? plays.filter((p) => p.formation === f) : plays;
+    return f === 'starred' ? plays.filter((p) => this.starred.has(p.id)) : plays.filter((p) => p.formation === f);
   }
 
   private pageCount(): number {
@@ -505,7 +588,7 @@ export class Game {
   private chipRects(): { x: number; y: number; w: number; h: number }[] {
     const plays = this.tabPlays();
     if (!plays) return [];
-    const widths = chipsFor(plays).map((f) => chipLabel(f).length * 8 + 8);
+    const widths = chipsFor(plays).map((f) => chipLabel(f).length * 8 + 8 + (f === 'starred' ? STAR_ICON_W : 0));
     const gap = 4;
     let x = (VIEW_W - (widths.reduce((a, b) => a + b, 0) + gap * (widths.length - 1))) / 2;
     return widths.map((w) => {
@@ -544,6 +627,7 @@ export class Game {
       return;
     }
     const { x, y } = input.mouse;
+    this.callMouse = { x, y };
     if (input.mouse.pressed) {
       for (let i = 0; i < n; i++) {
         if (inRect(x, y, tabRect(i, n)) && this.tab !== i) {
@@ -563,6 +647,11 @@ export class Game {
     for (let i = 0; i < cards.length; i++) if (inRect(x, y, cardRect(i))) this.hover = i;
     let chosen = -1;
     for (let i = 0; i < cards.length; i++) if (input.hit(`Digit${i + 1}`, `Numpad${i + 1}`)) chosen = i;
+    const hc = this.hover >= 0 ? cards[this.hover] : undefined;
+    if (input.mouse.pressed && hc?.kind === 'play' && inRect(x, y, starRect(cardRect(this.hover)))) {
+      toggleStar(this.starred, hc.def.id); // the card's star saves the play; it doesn't call it
+      return;
+    }
     if (input.mouse.pressed && this.hover >= 0) chosen = this.hover;
     if (chosen >= 0) {
       input.mouse.pressed = false; // the click that picks a kick must not start its aim
@@ -892,6 +981,11 @@ export class Game {
       drawTeam(g, s, squadFor(s, s.config.userTeamId), this.teamView);
       return;
     }
+    if (this.screen === 'playbook') {
+      const s = this.season!;
+      drawPlaybook(g, squadFor(s, s.config.userTeamId), this.bookView, this.starred);
+      return;
+    }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
     drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
@@ -1058,8 +1152,16 @@ export class Game {
           g.fillStyle = '#ffd23f';
           g.fillRect(r.x, r.y + r.h - 1, r.w, 1);
         }
-        text(g, chipLabel(f), r.x + r.w / 2, r.y + 2, { align: 'center', color: on ? '#ffd23f' : '#8fa0b8', shadow: false });
+        const icon = f === 'starred' ? STAR_ICON_W : 0;
+        if (icon) drawStar(g, r.x + 5, r.y + 2, on || plays.some((p) => this.starred.has(p.id)));
+        text(g, chipLabel(f), r.x + (r.w + icon) / 2, r.y + 2, { align: 'center', color: on ? '#ffd23f' : '#8fa0b8', shadow: false });
       });
+      if (!cards.length) {
+        text(g, 'NO STARRED PLAYS ON THIS TAB', VIEW_W / 2, CARD_Y0 + 40, { size: 8, align: 'center', color: '#ffffff' });
+        text(g, 'A/D: PICK A FORMATION. CLICK THE STAR ON A CARD TO SAVE IT HERE.', VIEW_W / 2, CARD_Y0 + 56, {
+          align: 'center', color: '#8fa0b8', shadow: false,
+        });
+      }
     }
     cards.forEach((c, i) => {
       if (c.kind === 'play') this.drawCard(g, c.def, i);
@@ -1140,104 +1242,9 @@ export class Game {
     text(g, `${i + 1} ${p.name.toUpperCase()}`, r.x + 6, r.y + 5, { color: hot ? '#ffd23f' : '#ffffff' });
     text(g, `${p.formation.name.toUpperCase()}  ${personnelOf(p.formation)}`, r.x + 6, r.y + 15, { color: '#8fa0b8', shadow: false });
 
-    // Mini play diagram (offense moving right). Width is squashed like the game view, but each card
-    // zooms to its own play's spread, so a tight I-Form run reads as well as a four-wide pass.
-    const dh = r.h - 28;
-    const dy0 = r.y + 25;
-    const by = FIELD_W / 2;
-    const rp = resolvePlay(p, by, this.flipCall);
-    const ys: number[] = [];
-    const xs: number[] = [];
-    for (const [slot, a] of Object.entries(rp.align)) {
-      const y0 = alignY(a, by);
-      const rn = rp.routes[slot as keyof typeof rp.routes];
-      xs.push(a.dx);
-      if (rn === 'block' && a.mode === 'split') continue; // a split-out blocker is pinned to the edge instead
-      ys.push(y0);
-      const side = Math.sign(by - y0) || rp.strongSign;
-      if (rn) for (const [dn, ins] of ROUTES[rn].pts) {
-        ys.push(y0 + ins * side);
-        xs.push(Math.min(a.dx + dn, 40));
-      }
-    }
-    const half = clamp(Math.max(...ys.map((y) => Math.abs(y - by))) + 2, 8, FIELD_W / 2);
-    const minX = Math.min(...xs) - 1;
-    const xScale = Math.min(8, (r.w - 18) / (Math.max(...xs) + 2 - minX));
-    const sx = (x: number) => r.x + 8 + (x - minX) * xScale;
-    const sy = (y: number) => clamp(dy0 + dh / 2 + ((y - by) / (2 * half)) * dh, dy0, dy0 + dh);
-    g.fillStyle = 'rgba(255,255,255,0.15)';
-    g.fillRect(Math.round(sx(0)), dy0, 1, dh);
-    const colors = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
-    let ci = 0;
-    for (const [slot, a] of Object.entries(rp.align)) {
-      const x0 = a.dx;
-      const y0 = clamp(alignY(a, by), 1, FIELD_W - 1);
-      const route = rp.routes[slot as keyof typeof rp.routes];
-      if (!route || slot === 'QB') {
-        g.fillStyle = slot === 'QB' ? '#ffffff' : '#7d8796';
-        g.fillRect(Math.round(sx(x0)) - 1, Math.round(sy(y0)) - 1, 2, 2);
-        // Run blocking: linemen fire forward.
-        if (slot !== 'QB' && p.block === 'run') g.fillRect(Math.round(sx(x0)) + 1, Math.round(sy(y0)) - 2, 1, 4);
-        continue;
-      }
-      const def = ROUTES[route];
-      const col = def.run ? '#ffffff' : colors[ci++ % colors.length];
-      g.fillStyle = col;
-      g.fillRect(Math.round(sx(x0)) - 1, Math.round(sy(y0)) - 1, 3, 3);
-      if (route === 'block') {
-        if (p.block === 'run') {
-          g.fillStyle = '#7d8796';
-          g.fillRect(Math.round(sx(x0)) + 2, Math.round(sy(y0)) - 2, 1, 5);
-        }
-        continue;
-      }
-      const side = Math.sign(by - y0) || rp.strongSign;
-      g.strokeStyle = col;
-      g.lineWidth = def.run ? 2 : 1;
-      g.beginPath();
-      g.moveTo(sx(x0), sy(y0));
-      let px = x0;
-      let py = y0;
-      let lx = x0;
-      let ly = y0;
-      for (const [dn, ins] of def.pts) {
-        lx = px;
-        ly = py;
-        px = Math.min(x0 + dn, 40);
-        py = clamp(y0 + ins * side, 1, FIELD_W - 1);
-        g.lineTo(sx(px), sy(py));
-      }
-      g.stroke();
-      g.lineWidth = 1;
-      if (def.cont) {
-        const vx = px - lx;
-        const vy = py - ly;
-        const l = Math.hypot(vx, vy) || 1;
-        const s = def.run ? 4 : 3;
-        g.fillRect(Math.round(sx(px + (vx / l) * 0.8)) - 1, Math.round(sy(py + (vy / l) * 0.8)) - 1, s, s);
-      }
-    }
-
-    // Pullers: a dotted path flat behind the line to the hole (a kick-out aims just outside it).
-    const rbRoute = rp.routes.RB;
-    if (rp.pulls.length && rbRoute && ROUTES[rbRoute].run) {
-      const ry = clamp(alignY(rp.align.RB, by), 1, FIELD_W - 1);
-      const last = ROUTES[rbRoute].pts[ROUTES[rbRoute].pts.length - 1];
-      const holeY = ry + last[1] * (Math.sign(by - ry) || rp.strongSign);
-      const playSign = Math.sign(holeY - by) || rp.strongSign;
-      g.fillStyle = '#ffffff';
-      for (const pl of rp.pulls) {
-        const a = rp.align[pl.who];
-        const oy = alignY(a, by);
-        const ty = holeY + (pl.job === 'kick' ? playSign * 2.5 : 0);
-        const steps = Math.ceil(Math.abs(ty - oy) / 0.9);
-        for (let k = 1; k <= steps; k++) {
-          g.fillRect(Math.round(sx(a.dx - 0.8)), Math.round(sy(oy + ((ty - oy) * k) / steps)), 1, 1);
-        }
-        g.fillRect(Math.round(sx(a.dx - 0.8)) + 1, Math.round(sy(ty)) - 1, 2, 1);
-        g.fillRect(Math.round(sx(a.dx - 0.8)) + 3, Math.round(sy(ty)) - 1, 1, 1);
-      }
-    }
+    const sb = starRect(r);
+    drawStar(g, sb.x + 3, sb.y + 2, this.starred.has(p.id), inRect(this.callMouse.x, this.callMouse.y, sb));
+    drawMiniPlay(g, p, { x: r.x + 8, y: r.y + 25, w: r.w - 18, h: r.h - 28 }, this.flipCall);
   }
 
   private renderTitle(g: CanvasRenderingContext2D): void {

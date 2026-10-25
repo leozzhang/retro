@@ -55,6 +55,8 @@ Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (wee
 | W/S | Within a tab: the week on SCORES, the conference on STANDINGS, AP or CFP on POLLS, pages on NEWS |
 | Space | Play this week's game on the field (or advance the week with no game) |
 | X | Simulate this week's game |
+| T | Team page: depth chart and player cards |
+| P | Playbook page: every play drawn with your starters; star plays for the call screen's STARRED chip |
 | Esc | Back to the title (the season stays in memory and saved) |
 
 ## Report

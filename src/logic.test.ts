@@ -22,6 +22,8 @@ import type { Input } from './engine/input';
 import { handoffKind, Play } from './game/playState';
 import { matchDefense } from './game/matchups';
 import { alignY, personnelOf, resolvePlay } from './game/resolvePlay';
+import { jobOf, schemeText } from './render/playbookScreen';
+import { parseStarred, toggleStar } from './game/starred';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, type KickOutcome, type PlayOutcome,
 } from './game/rules';
@@ -1232,5 +1234,45 @@ describe('rosters', () => {
     const elite = buildSquad(UGA).athletes.find((a) => a.real && a.pos === 'QB')!;
     const field = onField(buildSquad(UGA));
     expect(field.QB.name).toBe(athleteName(elite));
+  });
+});
+
+describe('playbook page', () => {
+  it('labels every player on every play with a job that fits the panel', () => {
+    for (const p of PLAYBOOK) {
+      for (const flip of [false, true]) {
+        const rp = resolvePlay(p, 26.65, flip);
+        for (const slot of OFF_SLOTS) {
+          const job = jobOf(p, rp, slot);
+          expect(job.length, `${p.id} ${slot}`).toBeGreaterThan(0);
+          expect(job.length, `${p.id} ${slot} ${job}`).toBeLessThanOrEqual(8);
+        }
+        expect(schemeText(p, rp).length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('a pulling guard is labeled PULL, and an uncovered pass-pro lineman PROTECT', () => {
+    const power = PLAYBOOK.find((p) => p.scheme?.pulls?.length)!;
+    const rp = resolvePlay(power, 26.65, false);
+    expect(jobOf(power, rp, rp.pulls[0].who)).toBe('PULL');
+    const pass = PLAYBOOK.find((p) => p.block === 'pass' && !p.screen)!;
+    expect(jobOf(pass, resolvePlay(pass, 26.65, false), 'LG')).toBe('PROTECT');
+  });
+
+  it('starred plays load from storage, dropping unknown ids and junk', () => {
+    const id = PLAYBOOK[0].id;
+    expect([...parseStarred(JSON.stringify([id, 'no-such-play', 7]))]).toEqual([id]);
+    expect(parseStarred('not json').size).toBe(0);
+    expect(parseStarred('{"a":1}').size).toBe(0);
+    expect(parseStarred(null).size).toBe(0);
+  });
+
+  it('toggleStar adds and removes a play without storage', () => {
+    const s = new Set<string>();
+    toggleStar(s, PLAYBOOK[1].id);
+    expect(s.has(PLAYBOOK[1].id)).toBe(true);
+    toggleStar(s, PLAYBOOK[1].id);
+    expect(s.size).toBe(0);
   });
 });
