@@ -534,6 +534,33 @@ Three causes, three changes:
 - **Flag:** returned full-power punts now average about 5.5 yards (it was 10.0; FBS is about 8-9). Line drives average 10.4 and deep kickoffs 14.5. The full punt's hang time lets coverage arrive with the catch, and misses no longer chain. Not tuned. Watch it once returns are playable.
 - **Tests:** 2 new (the elite returner's edge stays small and broken tackles add up; the speed squeeze keeps the order within a unit and leaves rosters alone). 102 in total.
 
+## Done: season framework (2026-10-24)
+The whole season loop exists end to end, each system with a simple first version behind its own module, so details can be filled in one at a time. Design notes, the week pipeline and every placeholder are in [SEASON.md](SEASON.md).
+- **Three layers:** world data in `src/data/season/` (conference rules, 28 rivalries, the calendar, the 12-team CFP format, 32 bowls with tie-ins), a headless engine in `src/season/` with plain-JSON state, and the live game, which the hub launches and whose final screen writes the score back.
+- **Week loop** (`advanceWeek`): prep (staff game plans and depth charts) → play (the user's live result, everything else simulated) → results (injuries heal) → rankings (AP every week, CFP from week 9) → news → transition (regular season → championship week → selection → bowls and playoff rounds → complete). `nextSeason` rolls an open-ended season over with the same rosters.
+- **Schedule:** 12 games in 14 weeks for all 138 teams. Rivalries first (16 in rivalry week), conference games to `CONF_RULES`, then non-conference games. Deterministic per seed.
+- **CPU game sim:** `simulateDrive` possessions with team ratings, home edge, clock management and overtime; box scores credit the starters by game plan, target share and overall.
+- **Standings** with an ordered tiebreaker list; **AP poll** (62 simulated voters: record, strength of schedule, margin, a fading preseason prior, inertia, noise); **CFP rankings** (13 members, no prior); **title games**, **playoff selection** (5 auto-bids, straight seeding, byes from the bracket size), **bowls** by tie-in; **season stats, leaders and five awards** including a weekly Heisman watch; a **news feed**; a **coach job-security stub**.
+- **Staff automation:** `autoGamePlan` (pass share from the scheme) and `autoDepthChart`; `SeasonConfig.delegate` decides which ones the user hands off. Everything runs fully automated.
+- **Saves:** localStorage, versioned, with zero stats left out (2.8 MB → 1.6 MB for a full season). N on the title screen starts a season and C continues it.
+- **Hub screen** (`render/seasonScreen.ts`): header with rank, record and next game; tabs for schedule, scores around the country, standings, AP/CFP polls, news, leaders, awards and the bracket. Space plays the week's game, X simulates it. A live tie is settled by simulated overtime. Checked in headless Chrome: launching a game, the write-back, simming to the end, and continuing a save. No console errors.
+- **`npm run season`:** headless seasons → `season.txt` (about 0.7 s per season).
+- **Tests:** 9 new in `src/season.test.ts`: schedule validity and determinism; sim ties, determinism, talent and box-score totals; settling a live tie; tiebreakers; poll behavior; seed order; a full season (bracket, champions, bowl eligibility, leaders, awards, history); a JSON round trip mid-season; save packing. 111 in total.
+- **First report (5 seasons), flags not tuned:**
+
+  | Measure | Sim | FBS |
+  | --- | --- | --- |
+  | Points per team per game | 19.2 | ~28 |
+  | Yards per team per game | 349 | ~390 |
+  | Home win % | 56.7% | ~57% |
+  | Overtime % | 3.6% | ~5% |
+  | Average wins by tier | T1 10.2, T2 8.8, T3 5.8, T4 6.1, T5 2.8 | |
+
+  - **Scoring is low.** It comes from `simulateDrive`'s gain model, which the live game's CPU drives also use.
+  - **Leaders are inflated** (5,000–6,000 passing yards, 2,500+ rushing), because only starters get credit.
+  - **The Heisman leans to running backs.**
+  - **Live games record only the score,** so the user's players never lead stats or win awards.
+
 ## Balance baseline
 From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
@@ -582,12 +609,13 @@ These need a harness that targets by route (or by read), not "most open". The cu
 | FG, straight aim, wind | 20-29: 94%, 30-39: 78%, 40-49: 65%, 50-59: 41%. The auto-kicker doesn't allow for wind |
 
 ## In progress
-- Nothing right now. Not checked by hand yet: playing a full game with the new rosters (only screenshots of the title, roster and call screens).
+- Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
 ## Known bugs and rough edges
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
-- **No injury mechanic yet:** `Athlete.injury` and the depth chart are ready for it.
+- **No injury mechanic yet:** `Athlete.injury`, the depth chart and the season's `teamState.injuries` (healed weekly) are ready for it.
+- **Season placeholders** (details in [SEASON.md](SEASON.md)): sim scoring is low (19 points per game), stat leaders are inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
@@ -620,7 +648,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Use the roster model:** injuries during games, the user's depth chart editing, fatigue and substitutions; then seasons (schedules, standings), progression from `potential`/`dev`, and recruiting from `stars`/hometowns.
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; tune the sim's scoring (about 28 points) and spread credit to backups; injuries from games; user depth chart and game plan screens (the `delegate` flags are ready); then the offseason: graduation, progression from `potential`/`dev`, recruiting from `stars`/hometowns, and the coaching carousel.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

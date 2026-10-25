@@ -3,7 +3,7 @@ import { FORMATIONS, PLAY_TABS, playsOfKind, ROUTES, type Formation, type PlayDe
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { buildSquad, rosterFor, teamRatings } from '../data/depth';
 import { CONFERENCES } from '../data/fbs/profile';
-import { TEAMS, type RosterPlayer, type Team } from '../data/teams';
+import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
@@ -13,6 +13,10 @@ import { drawBanner, drawHint, drawPlayClock, drawScorebug } from '../render/hud
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
+import { drawSeason, SEASON_TABS, type SeasonView } from '../render/seasonScreen';
+import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
+import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
+import type { GameResult, SeasonGame, SeasonState } from '../season/types';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { getSprite, teamUniform } from '../render/sprites';
 import { text, textWidth } from '../render/text';
@@ -29,7 +33,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -131,6 +135,12 @@ export class Game {
   private hover = -1;
   /** The user mirrored the next play (F on the play-call screen). */
   private flipCall = false;
+  /** The season in progress (the hub screen), and the season game being played on the field. */
+  private season: SeasonState | null = null;
+  private seasonGame: SeasonGame | null = null;
+  private seasonView: SeasonView = { tab: 0, sub: 0 };
+  /** A season is saved in this browser (checked once; parsing it every frame would be slow). */
+  private savedSeason = hasSavedSeason();
   private debug = false;
   private titleTime = 0;
   private t = 0;
@@ -151,6 +161,9 @@ export class Game {
       case 'roster':
         this.updateRoster(input);
         break;
+      case 'season':
+        this.updateSeason(input);
+        break;
       case 'call':
         this.updateCall(dt, input);
         break;
@@ -165,8 +178,12 @@ export class Game {
         break;
       case 'final':
         if (input.hit('Space', 'Enter') || input.mouse.pressed) {
-          this.screen = 'title';
-          this.titleTime = 0;
+          if (this.seasonGame) {
+            this.finishSeasonGame();
+          } else {
+            this.screen = 'title';
+            this.titleTime = 0;
+          }
         }
         break;
     }
@@ -192,6 +209,19 @@ export class Game {
     if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
+    if (input.hit('KeyN')) {
+      this.season = newSeason(defaultConfig(TEAMS[this.userIdx].id), (Math.random() * 2 ** 31) >>> 0);
+      saveSeason(this.season);
+      this.toSeason();
+      return;
+    }
+    if (input.hit('KeyC')) {
+      this.season ??= loadSeason();
+      if (this.season) {
+        this.toSeason();
+        return;
+      }
+    }
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -250,9 +280,9 @@ export class Game {
     }
   }
 
-  private startGame(): void {
-    this.user = TEAMS[this.userIdx];
-    this.cpu = TEAMS[this.cpuIdx];
+  private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx]): void {
+    this.user = user;
+    this.cpu = cpu;
     this.userRoster = rosterFor(this.user);
     this.cpuRoster = rosterFor(this.cpu);
     this.crowd = makeCrowd(this.user, this.cpu);
@@ -264,6 +294,60 @@ export class Game {
     this.kickSketch.clear();
     this.tab = 0;
     this.toCall();
+  }
+
+  // ------------------------------------------------------------ season hub
+
+  private toSeason(): void {
+    this.screen = 'season';
+    this.seasonView = { tab: 0, sub: 0 };
+  }
+
+  private updateSeason(input: Input): void {
+    const s = this.season!;
+    const v = this.seasonView;
+    const n = SEASON_TABS.length;
+    if (input.hit('KeyA', 'ArrowLeft')) this.seasonView = { tab: (v.tab + n - 1) % n, sub: 0 };
+    if (input.hit('KeyD', 'ArrowRight')) this.seasonView = { tab: (v.tab + 1) % n, sub: 0 };
+    if (input.hit('KeyW', 'ArrowUp')) v.sub--;
+    if (input.hit('KeyS', 'ArrowDown')) v.sub++;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'title';
+      this.titleTime = 0;
+      return;
+    }
+    const sim = input.hit('KeyX');
+    if (!input.hit('Space', 'Enter') && !sim) return;
+    if (seasonOver(s)) {
+      if (s.config.length === 'open') this.season = nextSeason(s);
+    } else {
+      const game = userGameThisWeek(s);
+      if (game && !sim) {
+        // Play it on the field; the final screen writes the result back.
+        const u = s.config.userTeamId;
+        this.seasonGame = game;
+        this.startGame(teamById(u), teamById(game.home === u ? game.away : game.home));
+        return;
+      }
+      advanceWeek(s);
+    }
+    saveSeason(this.season!);
+  }
+
+  /** The live game is over: hand the score to the season (box score to come) and go back to the hub. */
+  private finishSeasonGame(): void {
+    const g = this.seasonGame!;
+    const s = this.season!;
+    const userHome = g.home === s.config.userTeamId;
+    const home = userHome ? this.score.user : this.score.cpu;
+    const away = userHome ? this.score.cpu : this.score.user;
+    const blank = (points: number) => ({ points, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 });
+    // TODO: record the live game's team and player stats from the plays.
+    const result: GameResult = { home, away, ot: 0, box: { home: blank(home), away: blank(away), players: [] } };
+    this.seasonGame = null;
+    advanceWeek(s, result);
+    saveSeason(s);
+    this.toSeason();
   }
 
   // ------------------------------------------------------------ play call
@@ -716,6 +800,10 @@ export class Game {
       drawRoster(g, buildSquad(TEAMS[this.rosterIdx]), this.rosterPage);
       return;
     }
+    if (this.screen === 'season') {
+      drawSeason(g, this.season!, this.seasonView);
+      return;
+    }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
     drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
@@ -785,7 +873,7 @@ export class Game {
     const { user, cpu } = this.score;
     const title = user === cpu ? 'FINAL: TIE' : user > cpu ? `FINAL: ${this.user.abbr} WINS` : `FINAL: ${this.cpu.abbr} WINS`;
     drawBanner(g, title, this.scoreLine(), user >= cpu ? '#ffd23f' : '#ff5a5a', `${this.user.school.toUpperCase()} VS ${this.cpu.school.toUpperCase()}`);
-    drawHint(g, 'CLICK OR SPACE FOR THE TITLE SCREEN');
+    drawHint(g, this.seasonGame ? 'CLICK OR SPACE TO CONTINUE THE SEASON' : 'CLICK OR SPACE FOR THE TITLE SCREEN');
   }
 
   private drawBallSpot(g: CanvasRenderingContext2D): void {
@@ -1082,7 +1170,9 @@ export class Game {
     if (Math.floor(this.titleTime * 2) % 2 === 0) {
       text(g, 'PRESS ENTER TO KICK OFF', VIEW_W / 2, 300, { size: 8, align: 'center', color: '#ffffff' });
     }
-    text(g, 'R / T: YOUR / OPPONENT ROSTER', VIEW_W / 2, 316, { size: 8, align: 'center', color: '#9ad7ff' });
+    text(g, `R / T: ROSTERS   N: NEW SEASON${this.season || this.savedSeason ? '   C: CONTINUE SEASON' : ''}`, VIEW_W / 2, 316, {
+      size: 8, align: 'center', color: '#9ad7ff',
+    });
     text(g, 'DRAG + RELEASE TO PASS.  R-CLICK HAND OFF.  WASD MOVE.  SHIFT SPRINT.', VIEW_W / 2, 334, {
       size: 8, align: 'center', color: '#8fa0b8',
     });

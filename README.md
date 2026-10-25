@@ -9,6 +9,7 @@ npm install
 npm run dev        # open http://localhost:5173
 npm test           # unit tests for rules, ball flight, catching, tackling, camera
 npm run balance    # AI balance report -> balance.txt
+npm run season     # headless full seasons -> season.txt
 ```
 
 ## Controls
@@ -19,6 +20,7 @@ npm run balance    # AI balance report -> balance.txt
 | Pick the opponent | Left/Right team, Up/Down conference |
 | View a roster | R (yours) or T (opponent's); A/D pages, Esc back |
 | Start the game | Enter |
+| Season | N on the title screen starts a season with your team; C continues the saved one. In the hub: A/D tabs, W/S pages within a tab, Space plays this week's game, X simulates it, Esc goes back to the title. See [docs/SEASON.md](docs/SEASON.md) |
 | Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |
 | Playbook tab (Pass / Run / Play Action / Special) | Click a tab, or Q/E or Tab |
 | Formation filter | A/D or the mouse wheel (or click a chip) picks a formation under the tab; W/S pages when there are more than 9 plays |
