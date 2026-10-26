@@ -1,7 +1,7 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
 import { FORMATIONS, PLAY_TABS, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
-import { buildSquad, onField, positionOrder, reorderPosition, teamRatings, type Squad } from '../data/depth';
+import { buildSquad, onField, reorderPosition, teamRatings, type Squad } from '../data/depth';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
 import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
@@ -19,9 +19,10 @@ import {
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
 import { BOOK_BTN, drawSeason, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
-import { DEPTH_BTN, drawTeam, dropIndex, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
+import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
+import type { InjuryLevel } from '../season/types';
 import { setUserDepth, useStaffDepth } from '../season/staff';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor } from '../season/world';
@@ -57,6 +58,8 @@ type Card = { kind: 'play'; def: PlayDef } | { kind: 'kick'; def: KickDef } | { 
 const KICKOFF_LINE = OWN_GOAL + 35;
 /** Field goal attempts longer than this get flagged on the card. */
 const FG_RANGE_HINT = 55;
+/** Injury settings for a new season, as I cycles them. */
+const INJURY_OPTIONS: InjuryLevel[] = ['normal', 'light', 'off'];
 
 interface Notice {
   title: string;
@@ -119,6 +122,8 @@ export class Game {
   private rosterIdx = 0;
   private rosterPage = 0;
   private qIdx = QUARTER_OPTIONS.indexOf(8);
+  /** The injury setting a new season starts with (I on the title screen). */
+  private injuryIdx = INJURY_OPTIONS.indexOf('normal');
   private user!: Team;
   private cpu!: Team;
   /** The two squads in this game: the season's (injuries, the user's depth chart) in a season game. */
@@ -240,8 +245,10 @@ export class Game {
     if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
+    if (input.hit('KeyI')) this.injuryIdx = (this.injuryIdx + 1) % INJURY_OPTIONS.length;
     if (input.hit('KeyN')) {
-      this.season = newSeason(defaultConfig(TEAMS[this.userIdx].id), (Math.random() * 2 ** 31) >>> 0);
+      const config = { ...defaultConfig(TEAMS[this.userIdx].id), injuries: INJURY_OPTIONS[this.injuryIdx] };
+      this.season = newSeason(config, (Math.random() * 2 ** 31) >>> 0);
       saveSeason(this.season);
       this.toSeason();
       return;
@@ -413,19 +420,21 @@ export class Game {
     if (input.hit('KeyG')) this.toggleStaffDepth();
     const squad = squadFor(s, s.config.userTeamId);
     const pos = POSITIONS[v.pos];
-    const rows = positionOrder(squad, pos).length;
+    const view = depthView(squad, pos);
+    const rows = view.rows.length;
     if (input.hit('KeyW', 'ArrowUp')) v.sel = (v.sel + rows - 1) % rows;
     if (input.hit('KeyS', 'ArrowDown')) v.sel = (v.sel + 1) % rows;
     if (input.mouse.pressed) {
       const tab = tabAt(x, y);
-      const row = rowAt(x, y, rows);
+      const row = rowAt(x, y, view);
       if (tab >= 0) this.setTeamPos(tab);
       else if (inBox(DEPTH_BTN, x, y)) this.toggleStaffDepth();
       else if (row >= 0) v.drag = { from: row, y0: y, moved: false };
     }
     if (!v.drag) return;
     if (input.mouse.down) {
-      if (Math.abs(y - v.drag.y0) > 4) v.drag.moved = true;
+      // The injured can be selected but not dragged: they're off the depth chart until they heal.
+      if (Math.abs(y - v.drag.y0) > 4 && v.drag.from < view.avail) v.drag.moved = true;
       return;
     }
     // Released: a click selects; a drag drops the tab into its new spot.
@@ -435,10 +444,11 @@ export class Game {
       v.sel = d.from;
       return;
     }
-    const to = dropIndex(y, d.from, rows);
+    const to = dropIndex(y, d.from, view.avail);
     v.sel = to;
     if (to === d.from) return;
-    setUserDepth(s, reorderPosition(squad, pos, d.from, to));
+    const [from, at] = fullMove(view, d.from, to);
+    setUserDepth(s, reorderPosition(squad, pos, from, at));
     saveSeason(s);
   }
 
@@ -1290,7 +1300,8 @@ export class Game {
     this.drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A/D TEAM  W/S CONF', true);
     this.drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
     text(g, 'VS', VIEW_W / 2, 196, { size: 16, align: 'center', color: '#ffffff' });
-    text(g, `<  QUARTERS: ${QUARTER_OPTIONS[this.qIdx]} MIN  >   (Q / E)`, VIEW_W / 2, 276, { align: 'center', color: '#9ad7ff' });
+    text(g, `<  QUARTERS: ${QUARTER_OPTIONS[this.qIdx]} MIN  >   (Q / E)`, VIEW_W / 2, 270, { align: 'center', color: '#9ad7ff' });
+    text(g, `NEW SEASON INJURIES: ${INJURY_OPTIONS[this.injuryIdx].toUpperCase()}   (I)`, VIEW_W / 2, 283, { align: 'center', color: '#8fa0b8', shadow: false });
 
     if (Math.floor(this.titleTime * 2) % 2 === 0) {
       text(g, 'PRESS ENTER TO KICK OFF', VIEW_W / 2, 300, { size: 8, align: 'center', color: '#ffffff' });

@@ -192,7 +192,7 @@ describe('progression', () => {
     const squad = buildSquad(teamById('georgia'));
     const grown = { ...squad, athletes: squad.athletes.map((x) => (x.id === base.id ? { ...x, r } : x)) };
     const ts: TeamState = { progress: { [base.id]: { xp: 10_000, lvl: 0, d: {} } } };
-    const g: GameGrade = { team: 'georgia', snaps: 70, share: 1, sum: 0, tags: {} };
+    const g: GameGrade = { team: 'georgia', snaps: 70, share: 1, sum: 0, tags: {}, hits: 0 };
     const events = progressTeam(ts, grown, new Map([[base.id, g]]), 3, 0.5, rng);
     expect(events.filter((e) => e.athlete.id === base.id)).toEqual([]);
     expect(ts.progress![base.id].lvl).toBe(0);

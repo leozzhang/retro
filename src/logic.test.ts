@@ -1122,7 +1122,7 @@ describe('depth chart editing', () => {
     const sq = freshSquad(UGA);
     const wrs = positionOrder(sq, 'WR');
     sq.depth = reorderPosition(sq, 'WR', 5, 0);
-    wrs[5].injury = { weeks: 2 };
+    wrs[5].injury = { weeks: 2, type: 'ANKLE SPRAIN' };
     expect(starters(sq).X.id).toBe(wrs[0].id);
     const ots = positionOrder(sq, 'OT');
     sq.depth = reorderPosition(sq, 'OT', ots.length - 1, 0);
@@ -1186,7 +1186,7 @@ describe('rosters', () => {
     const sq = freshSquad(UGA);
     const before = teamRatings(sq);
     const qb = starters(sq).QB;
-    qb.injury = { weeks: 3 };
+    qb.injury = { weeks: 3, type: 'ANKLE SPRAIN' };
     const after = starters(sq).QB;
     expect(after.id).not.toBe(qb.id);
     expect(onField(sq).QB.name).toBe(athleteName(after));

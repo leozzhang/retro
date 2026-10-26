@@ -1,3 +1,4 @@
+import type { Injury } from '../data/athletes';
 import type { DepthChart } from '../data/depth';
 import type { Position } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
@@ -21,7 +22,11 @@ export interface SeasonConfig {
   /** One season, or keep rolling into the next year. */
   length: 'single' | 'open';
   delegate: Delegation;
+  /** How often players get hurt (season/injuries.ts). Missing means normal. */
+  injuries?: InjuryLevel;
 }
+
+export type InjuryLevel = 'off' | 'light' | 'normal';
 
 export type GameKind = 'conf' | 'nonconf' | 'champ' | 'bowl' | 'cfp';
 
@@ -101,7 +106,7 @@ export interface Poll {
 
 export interface NewsItem {
   week: number;
-  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress';
+  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury';
   text: string;
   teams: string[];
 }
@@ -143,8 +148,10 @@ export interface Progress {
 
 /** What changed on a team's roster this season. */
 export interface TeamState {
-  /** Weeks out, by athlete id. */
-  injuries?: Record<string, number>;
+  /** Injured players, by athlete id. */
+  injuries?: Record<string, Injury>;
+  /** Health below 100, by athlete id (healthy players have no entry). */
+  health?: Record<string, number>;
   /** A user-edited depth chart; staff charts are rebuilt each week. */
   depth?: DepthChart;
   /** The user's game plan, when it isn't delegated. */
@@ -176,6 +183,21 @@ export interface LoggedPlay {
 export interface DriveLog {
   off: string;
   plays: LoggedPlay[];
+}
+
+/** One injury, as it happened: for the news, the season report and starts lost. */
+export interface InjuryEvent {
+  week: number;
+  team: string;
+  id: string;
+  name: string;
+  pos: Position;
+  weeks: number;
+  type: string;
+  season?: boolean;
+  /** He was starting when he got hurt. */
+  starter: boolean;
+  real?: boolean;
 }
 
 export interface CoachState {
@@ -210,4 +232,6 @@ export interface SeasonState {
   awards: Award[];
   coach?: CoachState;
   history: SeasonSummary[];
+  /** Every injury this season that cost a game, in order. */
+  injuryLog?: InjuryEvent[];
 }

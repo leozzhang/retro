@@ -1,18 +1,21 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
-import { buildSquad, starters } from './data/depth';
-import { overallRaw, POSITIONS } from './data/positions';
+import { buildSquad, healthOf, starters } from './data/depth';
+import { overallRaw, POS_ROLE, POSITIONS } from './data/positions';
 import { teamById, TEAMS } from './data/teams';
 import { latestPoll, rankIn } from './season/polls';
 import { champions } from './season/postseason';
-import { defaultConfig, newSeason, simSeason } from './season/season';
+import { advanceWeek, defaultConfig, newSeason, seasonOver } from './season/season';
 import { records, recordText, winner } from './season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
-import type { SeasonState } from './season/types';
+import type { InjuryLevel, SeasonState } from './season/types';
 import { squadFor } from './season/world';
 import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
 
-/** `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count. */
+/**
+ * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
+ * INJURIES=off|light|normal the injury setting (default normal).
+ */
 
 const pctText = (x: number) => `${(x * 100).toFixed(1)}%`;
 
@@ -139,6 +142,82 @@ function progression(seasons: SeasonState[]): string[] {
   return rows;
 }
 
+/**
+ * Real references for injuries (docs/INJURIES.md): share of injuries by position group (NCAA ISP),
+ * and the per team-season targets for each setting, scaled down from real FBS (18-20 starts lost).
+ */
+const ISP_SHARE: Record<string, number> = { DB: 17.8, OL: 15.6, DL: 15.4, LB: 11.7, WR: 11.2, RB: 10.2, TE: 5, QB: 3.7, K: 1 };
+const INJURY_TARGETS: Record<string, { startsLost: [number, number]; seasonEnd: [number, number]; qbClean: [number, number] }> = {
+  normal: { startsLost: [10, 12], seasonEnd: [0.3, 0.7], qbClean: [0.75, 0.85] },
+  light: { startsLost: [5, 6.5], seasonEnd: [0.15, 0.35], qbClean: [0.85, 0.95] },
+};
+const GROUP: Record<string, string> = { CB: 'DB', S: 'DB', OL: 'OL', DL: 'DL', LB: 'LB', WR: 'WR', RB: 'RB', TE: 'TE', QB: 'QB', K: 'K', P: 'K' };
+
+/** Injuries per team-season against the targets, by position against the ISP shares, and starting QBs. */
+function injuries(seasons: SeasonState[], level: string, banged: number[]): string[] {
+  let inj = 0;
+  let starts = 0;
+  let enders = 0;
+  let missed = 0;
+  const qbMiss: number[] = [];
+  const byGroup = new Map<string, number>();
+  const teamSeasons = seasons.length * TEAMS.length;
+  for (const s of seasons) {
+    const log = s.injuryLog ?? [];
+    const gamesMissed = (team: string, week: number, weeks: number) =>
+      s.games.filter((g) => (g.home === team || g.away === team) && g.week > week && g.week <= week + weeks).length;
+    const out = new Map<string, number>();
+    for (const e of log) {
+      const n = gamesMissed(e.team, e.week, e.weeks);
+      inj++;
+      if (e.season) enders++;
+      if (e.starter) starts += n;
+      out.set(e.id, (out.get(e.id) ?? 0) + n);
+      const g = GROUP[POS_ROLE[e.pos]];
+      byGroup.set(g, (byGroup.get(g) ?? 0) + 1);
+    }
+    missed += [...out.values()].filter((n) => n > 0).length;
+    for (const t of TEAMS) {
+      const qb = starters(buildSquad(t)).QB;
+      if (qb) qbMiss.push(out.get(qb.id) ?? 0);
+    }
+  }
+  const tgt = INJURY_TARGETS[level];
+  const flag = (x: number, [lo, hi]: [number, number]) => (tgt && (x < lo || x > hi) ? `  <-- target ${lo}-${hi}` : '');
+  const per = (x: number) => x / teamSeasons;
+  const qbClean = qbMiss.filter((n) => n === 0).length / qbMiss.length;
+  const rows = [
+    '', `INJURIES (setting ${level.toUpperCase()}), per team-season. Real FBS teams lose about 18-20 starts a season.`,
+    `injuries that cost a game ${per(inj).toFixed(2)}; players who missed a game ${per(missed).toFixed(2)}; ` +
+      `starter-games lost ${per(starts).toFixed(1)}${tgt ? flag(per(starts), tgt.startsLost) : ''}; season-ending ${per(enders).toFixed(2)}${tgt ? flag(per(enders), tgt.seasonEnd) : ''}`,
+    `starting QB (generated chart) games missed: none ${pctText(qbClean)}${tgt ? flag(qbClean, tgt.qbClean) : ''}, ` +
+      `1-2 ${pctText(qbMiss.filter((n) => n >= 1 && n <= 2).length / qbMiss.length)}, 3+ ${pctText(qbMiss.filter((n) => n >= 3).length / qbMiss.length)}${level === 'normal' ? ' (target about 8%)' : ''}`,
+    `starters banged up (health under 90) on a given week: ${pctText(banged.reduce((a, b) => a + b, 0) / Math.max(1, banged.length))}${level === 'normal' ? ' (target 10-20%)' : ''}`,
+    'group   share   ISP',
+  ];
+  for (const [g, real] of Object.entries(ISP_SHARE)) {
+    const sh = (byGroup.get(g) ?? 0) / Math.max(1, inj);
+    rows.push(`${g.padEnd(6)} ${pctText(sh).padStart(6)} ${`${real.toFixed(1)}%`.padStart(6)}`);
+  }
+  return rows;
+}
+
+/** Share of the 22 starters on every team below 90 health right now. */
+function bangedShare(s: SeasonState): number {
+  let n = 0;
+  let hurt = 0;
+  for (const t of TEAMS) {
+    const st = starters(squadFor(s, t.id));
+    for (const slot of [...OFF_SLOTS, ...DEF_SLOTS]) {
+      const a = st[slot];
+      if (!a) continue;
+      n++;
+      if (healthOf(a) < 90) hurt++;
+    }
+  }
+  return hurt / n;
+}
+
 function detail(s: SeasonState): string[] {
   const rows: string[] = [];
   const recs = records(s);
@@ -180,13 +259,21 @@ function detail(s: SeasonState): string[] {
 
 it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const n = Number(process.env.SEASONS ?? 5);
+  const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
   const seasons: SeasonState[] = [];
+  const banged: number[] = [];
   const t0 = Date.now();
   for (let i = 1; i <= n; i++) {
-    const s = newSeason(defaultConfig('georgia'), i);
-    simSeason(s);
+    const s = newSeason({ ...defaultConfig('georgia'), injuries: level }, i);
+    while (!seasonOver(s)) {
+      advanceWeek(s);
+      if (s.phase === 'regular') banged.push(bangedShare(s));
+    }
     seasons.push(s);
   }
-  const rows = [...aggregate(seasons), `time per season ${((Date.now() - t0) / n / 1000).toFixed(2)} s`, ...progression(seasons), ...detail(seasons[0])];
+  const rows = [
+    ...aggregate(seasons), `time per season ${((Date.now() - t0) / n / 1000).toFixed(2)} s`, ...progression(seasons),
+    ...injuries(seasons, level, banged), ...detail(seasons[0]),
+  ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

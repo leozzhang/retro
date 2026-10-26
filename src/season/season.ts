@@ -8,12 +8,13 @@ import { bowlGames, bracketGames, bracketRoundDone, confChampGames, newBracket, 
 import { SAVE_VERSION } from './save';
 import { generateSchedule } from './schedule';
 import { athleteName, type Squad } from '../data/depth';
-import { gradeGame } from './grades';
+import { gradeGame, type GameGrade } from './grades';
+import { healWeek, injureGame, outText } from './injuries';
 import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
 import { GAME_SIM, settleTie, simGame } from './simGame';
 import { autoGamePlan, type GamePlan } from './staff';
 import { records } from './standings';
-import type { DriveLog, GameResult, SeasonConfig, SeasonGame, SeasonState } from './types';
+import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState } from './types';
 import { seasonRng, squadFor } from './world';
 
 /**
@@ -22,7 +23,7 @@ import { seasonRng, squadFor } from './world';
  */
 
 export function defaultConfig(userTeamId: string): SeasonConfig {
-  return { userTeamId, coachCareer: false, length: 'single', delegate: { depthChart: true, gamePlan: true } };
+  return { userTeamId, coachCareer: false, length: 'single', delegate: { depthChart: true, gamePlan: true }, injuries: 'normal' };
 }
 
 export function newSeason(config: SeasonConfig, seed: number, year: number = CALENDAR.year, prev?: SeasonState): SeasonState {
@@ -66,6 +67,8 @@ interface WeekContext {
   plans: Map<string, GamePlan>;
   /** Each game's drives and the squads that played it, for the progress step. */
   played: Map<string, { drives: DriveLog[]; home: Squad; away: Squad; neutral: boolean }>;
+  /** Each game's grades, by game id, from the progress step: injuries read the snaps and hits. */
+  grades: Map<string, Map<string, GameGrade>>;
 }
 
 type WeekStep = (state: SeasonState, ctx: WeekContext) => void;
@@ -122,6 +125,7 @@ const progress: WeekStep = (state, ctx) => {
     const share: Record<string, number> = {};
     for (const sq of [home, away]) share[sq.team.id] = ctx.plans.get(sq.team.id)?.passShare ?? 0.5;
     const grades = gradeGame(home, away, drives, share, seasonRng(state, 'grade', id), neutral ? 0 : GAME_SIM.homeEdge);
+    ctx.grades.set(id, grades);
     for (const sq of [home, away]) {
       const t = sq.team.id;
       const rec = recs.get(t)!;
@@ -139,15 +143,34 @@ const progress: WeekStep = (state, ctx) => {
   for (const e of elsewhere.sort((a, b) => pts(b) - pts(a)).slice(0, BREAKTHROUGH_NEWS)) told(e);
 };
 
-/** Results: injuries heal. New injuries from games come later. */
-const results: WeekStep = (state) => {
-  for (const ts of Object.values(state.teamState)) {
-    if (!ts.injuries) continue;
-    for (const [id, w] of Object.entries(ts.injuries)) {
-      if (w <= 1) delete ts.injuries[id];
-      else ts.injuries[id] = w - 1;
-    }
+/** Injuries of 2+ weeks to real players elsewhere that make the news each week. */
+const INJURY_NEWS = 3;
+
+/**
+ * Results: last week's injuries heal and health recovers, then this week's games hand out knocks and
+ * injuries (season/injuries.ts). Every injury on the user's team makes the news, and the worst few to
+ * real players elsewhere.
+ */
+const results: WeekStep = (state, ctx) => {
+  const played = new Set<string>();
+  for (const grades of ctx.grades.values()) for (const [id, g] of grades) if (g.snaps) played.add(id);
+  healWeek(state, played);
+  const user = state.config.userTeamId;
+  const events: InjuryEvent[] = [];
+  for (const [id, { home, away }] of ctx.played) {
+    const grades = ctx.grades.get(id);
+    if (grades) events.push(...injureGame(state, id, ctx.week, [home, away], grades));
   }
+  if (!events.length) return;
+  (state.injuryLog ??= []).push(...events);
+  const told = (e: InjuryEvent) =>
+    state.news.push({
+      week: ctx.week, kind: 'injury', teams: [e.team],
+      text: `INJURY: ${e.name} (${teamById(e.team).abbr} ${e.pos}) ${outText(e).toLowerCase()}, ${e.type.toLowerCase()}`,
+    });
+  for (const e of events) if (e.team === user) told(e);
+  const worst = events.filter((e) => e.team !== user && e.real && e.weeks >= 2).sort((a, b) => b.weeks - a.weeks);
+  for (const e of worst.slice(0, INJURY_NEWS)) told(e);
 };
 
 /** Rankings: the AP poll every week; the committee's rankings from `cfpStartWeek` until selection. */
@@ -214,7 +237,7 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
  */
 export function advanceWeek(state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[]): void {
   if (seasonOver(state)) return;
-  const ctx: WeekContext = { week: state.week, userResult, userDrives, plans: new Map(), played: new Map() };
+  const ctx: WeekContext = { week: state.week, userResult, userDrives, plans: new Map(), played: new Map(), grades: new Map() };
   for (const step of WEEK_STEPS) step.run(state, ctx);
   if (!seasonOver(state)) state.week++;
 }

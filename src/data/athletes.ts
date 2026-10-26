@@ -25,9 +25,19 @@ export interface Athlete {
   dev: DevTrait;
   r: Ratings;
   skin: string;
-  injury: { weeks: number } | null;
+  /** Out for `weeks` more weeks (or the season), with what's wrong. */
+  injury: Injury | null;
+  /** 0..100; below 100 he's banged up and plays slower (`fitRatings` in depth.ts). Undefined is 100. */
+  health?: number;
   /** A real player from the team research (docs/ROSTERS.md). */
   real?: boolean;
+}
+
+export interface Injury {
+  weeks: number;
+  type: string;
+  /** Out for the rest of the season. */
+  season?: boolean;
 }
 
 export const CLASS_YEARS: ClassYear[] = ['FR', 'SO', 'JR', 'SR'];

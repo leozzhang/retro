@@ -747,13 +747,39 @@ These need a harness that targets by route (or by read), not "most open". The cu
 | FG, straight aim, calm | 20-29: 96%, 30-39: 88%, 40-49: 72%, 50-59: 35% |
 | FG, straight aim, wind | 20-29: 94%, 30-39: 78%, 40-49: 65%, 50-59: 41%. The auto-kicker doesn't allow for wind |
 
+## Done: health and injuries (2026-10-25)
+Design, research and targets: [INJURIES.md](INJURIES.md).
+- **Health from 0 to 100** (`TeamState.health`, `Athlete.health`). After each game, every snap and every hit can knock it down by 10–30 points. It recovers 12 a week, or 25 a week sitting out.
+  - A banged-up player plays at `fitRatings`: −0.2 per point lost on speed, acceleration, strength and stamina, and −0.08 on the rest. That reaches the live sim, team ratings, the game sim and the grades.
+  - He also runs more injury risk.
+- **Injuries** (`season/injuries.ts`) are rolled from each game's grades. `GameGrade` gains `hits`: carries, catches, tackles made, sacks taken and made.
+  - Severity runs from 1 week to season-ending, with a type label. Players come back at 85 health.
+  - Every injury goes into `SeasonState.injuryLog`, with news for the user's team and the worst injuries to real players elsewhere.
+  - Live and simulated games use the same model, after the game.
+- **Rest.** The staff chart (CPU teams and a delegated user chart) sits a starter below 80 health when the backup is within 4 overall. In the grades, a hurt starter's backup takes more of his snaps (`ROTATION_HURT`). The user's own chart is never reshuffled; they drag to rest players.
+- **Team page.** Banged-up players show health % in orange. The injured sit in an **INJURED: OUT** section below the depth list (`3W`, `SZN`): selectable, not draggable, and they keep their place for when they're back. The card shows `BANGED UP: 72% HEALTH` with the playing overall (healthy overall under it), or `OUT 3 WEEKS: HIGH ANKLE SPRAIN`.
+- **Setting:** `SeasonConfig.injuries` (OFF / LIGHT / NORMAL), cycled with I on the title screen for a new season.
+- **Season report:** a new INJURIES section, with `INJURIES=light|off`. NORMAL results: 10.4 starter-games lost per team-season (target 10–12; real is about 18–20). The starting QB plays every game in 82% of seasons. 0.58 season-ending injuries per team. 12% of starters are banged up on a given week. Position shares are within 2 points of the NCAA ISP. LIGHT: 5.2 starter-games lost, and the QB plays every game in 90% of seasons.
+- **Side effect:** starters' progression over a season is about 8% lower (1.58 → 1.45 mean), and backups' is higher. No position is newly flagged. `npm run balance` is byte-identical.
+- **Tests:** 8 in `src/injuries.test.ts`:
+  - OFF is clean;
+  - NORMAL is deterministic and survives a JSON round trip;
+  - an injured player sits, comes back banged up, then heals;
+  - `fitRatings` and team ratings drop;
+  - staff rest for a close backup but not a weak one;
+  - the user chart is untouched;
+  - QB risk is lower than RB risk;
+  - the OUT section and the drag index mapping.
+
+  145 tests pass in total.
+
 ## In progress
 - Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
 ## Known bugs and rough edges
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
-- **No injury mechanic yet:** `Athlete.injury`, the depth chart and the season's `teamState.injuries` (healed weekly) are ready for it.
+- **Injuries are rolled after games only.** The user's live games have no mid-game injuries; that waits for mid-game roster changes. Knocks have no body-part label. Real players listed as injured in the research (for example Sayin) start the season healthy. The QB missing 3+ games rate (5.7%) is a bit under the ~8% aim, on purpose.
 - **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season packs to about 2.6 MB, half the localStorage limit. Details in [PROGRESSION.md](PROGRESSION.md).
 - **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
@@ -788,7 +814,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; injuries from games; more on the team page (confidence, mentality, season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; more on the team page (confidence, mentality, season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

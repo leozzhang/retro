@@ -45,7 +45,7 @@ Every FBS team in 2026 (138) has a researched **profile** (`src/data/fbs/profile
 ## Depth chart and injuries
 - `buildDepth` lists, for each on-field slot, everyone who can play it, by overall at that slot's position. A player out of position (a safety at nickel, a guard at tackle) rates 4 lower there.
 - `starters` fills the slots in a fixed order (QB, RB, X, Z, SL, TE, line, ..., then defense), taking the first healthy player on each list who isn't already starting. So the best receiver is the X, the next the Z, and so on.
-- `Athlete.injury = { weeks }` takes a player off the field. His backup starts on the next snap, and `teamRatings` drops right away. There's no injury mechanic yet; this is the hook for it.
+- `Athlete.injury = { weeks, type, season? }` takes a player off the field. His backup starts on the next snap, and `teamRatings` drops right away. `Athlete.health` below 100 means he's banged up: he plays with `fitRatings` and the staff chart may rest him. Both come from the season's injury model ([INJURIES.md](INJURIES.md)).
 
 ## Research by conference
 

@@ -71,7 +71,7 @@ So a player exactly on his position's template at level L rates exactly L. A poc
 
 ## Team ratings
 
-Team ratings are computed from the current healthy starters by `teamRatings` (`src/data/depth.ts`); they're never stored. An injured starter's backup counts the moment the injury is set.
+Team ratings are computed from the current healthy starters by `teamRatings` (`src/data/depth.ts`); they're never stored. An injured starter's backup counts the moment the injury is set, and a banged-up starter counts at his health-adjusted ratings (`fitRatings`, [INJURIES.md](INJURIES.md)).
 - **Offense:** QB 30%, RB 8%, X/Z/SL 8/7/6%, TE 6%, line 35% (LT 8, LG 6.5, C 7, RG 6.5, RT 7). This is the 11-personnel lineup, the most common snap.
 - **Defense:** ends 10% each, tackles 8% each, WLB and MLB 8% each, CB1/CB2/NB 11/10/7%, safeties 10% each. This is the nickel, the defense's answer to 11 personnel.
 - **Special teams:** K 50%, P 35%, returners 15%. The returners are the Z and the back (see `specialTeams.ts`), rated 0.4·spd + 0.3·elu + 0.3·cth.

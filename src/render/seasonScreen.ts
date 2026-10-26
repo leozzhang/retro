@@ -239,7 +239,7 @@ function drawNews(g: CanvasRenderingContext2D, s: SeasonState, sub: number): voi
   const lines: { t: string; c: string }[] = [];
   const u = s.config.userTeamId;
   for (const n of [...s.news].reverse()) {
-    const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : '#ffffff';
+    const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : n.kind === 'injury' ? '#ff7a7a' : '#ffffff';
     wrap(`WK ${n.week}  ${n.text.toUpperCase()}`, 74).forEach((t) => lines.push({ t, c }));
   }
   const start = mod(sub, Math.max(1, Math.ceil(lines.length / ROWS))) * ROWS;

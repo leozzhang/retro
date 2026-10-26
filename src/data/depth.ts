@@ -1,5 +1,6 @@
 import type { Athlete } from './athletes';
 import { overall, POS_ROLE, SLOT_POS, type Position } from './positions';
+import type { RatingKey, Ratings } from './ratings';
 import { generateAthletes } from './rosterGen';
 import { SLOT_ROLE, type RosterPlayer, type Team } from './teams';
 
@@ -35,9 +36,34 @@ export interface Squad {
   depth: DepthChart;
 }
 
+/**
+ * Playing hurt. Below full health a player loses `phys` rating points per point of health on his
+ * physical ratings and `skill` on the rest (at 75: about -5 and -2). The staff sit a starter below
+ * `restBelow` when his backup is within `restPenalty` overall of his health-adjusted overall.
+ */
+export const HEALTH = { phys: 0.2, skill: 0.08, restBelow: 80, restPenalty: 4 };
+const PHYSICAL = new Set<RatingKey>(['spd', 'acc', 'str', 'sta']);
+
+export function healthOf(a: Athlete): number {
+  return a.health ?? 100;
+}
+
+/** The ratings he plays with: his own, less what playing hurt costs. */
+export function fitRatings(a: Athlete): Ratings {
+  const h = healthOf(a);
+  if (h >= 100) return a.r;
+  const out = { ...a.r };
+  for (const k of Object.keys(out) as RatingKey[]) {
+    out[k] = Math.max(1, Math.round(out[k] - (100 - h) * (PHYSICAL.has(k) ? HEALTH.phys : HEALTH.skill)));
+  }
+  return out;
+}
+
+/** His fit at a slot as the staff see it: health-adjusted, with a hurt player pushed down to rest. */
 export function slotScore(a: Athlete, slot: string): number {
   const pos = SLOT_POS[slot];
-  return overall(a.r, pos) - (a.pos === pos ? 0 : OUT_OF_POSITION);
+  const rest = healthOf(a) < HEALTH.restBelow ? HEALTH.restPenalty : 0;
+  return overall(fitRatings(a), pos) - (a.pos === pos ? 0 : OUT_OF_POSITION) - rest;
 }
 
 /** Auto depth chart: everyone who can play each slot, best fit first. */
@@ -93,6 +119,11 @@ export function healthy(a: Athlete): boolean {
   return !a.injury || a.injury.weeks <= 0;
 }
 
+/** Healthy enough to play but not at full health. */
+export function bangedUp(a: Athlete): boolean {
+  return healthy(a) && healthOf(a) < 100;
+}
+
 /** The player in each slot right now: the first healthy one on its depth list not already starting elsewhere. */
 export function starters(squad: Squad): Record<string, Athlete> {
   const byId = new Map(squad.athletes.map((a) => [a.id, a]));
@@ -118,7 +149,7 @@ export function athleteName(a: Athlete): string {
 export function onField(squad: Squad): Record<string, RosterPlayer> {
   const out: Record<string, RosterPlayer> = {};
   for (const [slot, a] of Object.entries(starters(squad))) {
-    out[slot] = { slot, role: SLOT_ROLE[slot] ?? POS_ROLE[a.pos], name: athleteName(a), num: a.num, r: a.r, skin: a.skin };
+    out[slot] = { slot, role: SLOT_ROLE[slot] ?? POS_ROLE[a.pos], name: athleteName(a), num: a.num, r: fitRatings(a), skin: a.skin };
   }
   return out;
 }
@@ -147,7 +178,7 @@ export interface TeamRatings {
   ovr: number;
 }
 
-/** Team overalls from whoever is healthy and starting now, so an injury shows up right away. */
+/** Team overalls from whoever is healthy and starting now, playing hurt included, so an injury shows up right away. */
 export function teamRatings(squad: Squad): TeamRatings {
   const s = starters(squad);
   const unit = (w: Record<string, number>) => {
@@ -156,7 +187,7 @@ export function teamRatings(squad: Squad): TeamRatings {
     for (const [slot, wt] of Object.entries(w)) {
       const a = s[slot];
       if (!a) continue;
-      sum += overall(a.r, SLOT_POS[slot]) * wt;
+      sum += overall(fitRatings(a), SLOT_POS[slot]) * wt;
       tot += wt;
     }
     return { sum, tot };
@@ -165,7 +196,7 @@ export function teamRatings(squad: Squad): TeamRatings {
   const d = unit(TEAM_WEIGHTS.def);
   const k = unit(TEAM_WEIGHTS.st);
   // Kick returners are the Z and the back (see `specialTeams.ts`).
-  const ret = [s.Z, s.RB].filter(Boolean).map(returnRating);
+  const ret = [s.Z, s.RB].filter(Boolean).map((a) => returnRating({ ...a, r: fitRatings(a) }));
   const retAvg = ret.length ? ret.reduce((a, b) => a + b, 0) / ret.length : 0;
   const off = o.sum / o.tot;
   const def = d.sum / d.tot;

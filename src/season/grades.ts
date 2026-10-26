@@ -1,5 +1,5 @@
 import type { Athlete } from '../data/athletes';
-import { healthy, starters, teamRatings, type Squad } from '../data/depth';
+import { fitRatings, healthOf, healthy, starters, teamRatings, type Squad } from '../data/depth';
 import { overall, POS_ROLE, SLOT_POS } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
 import type { Role } from '../data/teams';
@@ -31,6 +31,8 @@ export interface GameGrade {
   sum: number;
   /** Performance tags: weighted counts per rating they boost at his next level-up. */
   tags: RatingDelta;
+  /** Contact he took: carries, catches, tackles made, sacks taken (`HITS`). Injuries read it. */
+  hits: number;
 }
 
 /** The 11-personnel offense and the nickel defense every snap is graded with. */
@@ -48,6 +50,12 @@ export const ROTATION: Record<string, number> = {
  * tight ends (21/12 personnel) for the slot receiver, base defense's SAM for the nickel, dime for the MIKE.
  */
 export const PACKAGES: Record<string, [string, number][]> = { SL: [['TE2', 0.12], ['FB', 0.08]], NB: [['SAM', 0.2]], MLB: [['DIME', 0.05]] };
+
+/** Extra share of a banged-up starter's snaps his backup takes, per point of health lost (at 70: +15%). */
+export const ROTATION_HURT = 0.005;
+
+/** Contact per play, by what he did: carrying, catching (and being tackled), tackling, being sacked, sacking. */
+export const HITS = { carry: 1, catch: 0.8, tackle: 0.6, sacked: 1.5, sack: 0.3 };
 
 /** The man across from each slot, for the rating gap. */
 const MATCHUP: Record<string, string> = {
@@ -172,7 +180,7 @@ function cast(squad: Squad, passShare: number): Cast {
   const team = squad.team.id;
   const men: Man[] = [];
   const man = (a: Athlete, slot: string, unit: Unit, full: number): Man => {
-    const m: Man = { a, ovr: overall(a.r, SLOT_POS[slot]), g: { team, snaps: 0, share: 0, sum: 0, tags: {} }, unit, full };
+    const m: Man = { a, ovr: overall(fitRatings(a), SLOT_POS[slot]), g: { team, snaps: 0, share: 0, sum: 0, tags: {}, hits: 0 }, unit, full };
     men.push(m);
     return m;
   };
@@ -182,7 +190,7 @@ function cast(squad: Squad, passShare: number): Cast {
     const subs: [Man, number][] = [];
     for (const [ps, share] of PACKAGES[slot] ?? []) if (st[ps]) subs.push([man(st[ps], ps, unit, 1), share]);
     const pkg = subs.reduce((x, [, sh]) => x + sh, 0);
-    const rot = ROTATION[slot] ?? 0;
+    const rot = Math.min(0.5, (ROTATION[slot] ?? 0) + (100 - healthOf(a)) * ROTATION_HURT);
     // The backup is the next healthy man on the slot's list who isn't starting or backing up elsewhere.
     const bid = (squad.depth[slot] ?? []).find((id) => !used.has(id) && byId.get(id) && healthy(byId.get(id)!));
     if (bid) {
@@ -288,6 +296,7 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
       const depth = (p.gain >= 20 ? ['dac', TAG.deep] : p.gain >= 10 ? ['mac', TAG.medium] : ['sac', TAG.short]) as [RatingKey, number];
       RO[QB] = draw(gapO(QB), 1, GRADES.key, s > 0 && !sack ? [depth] : []);
       if (int) RO[QB].win = false;
+      if (sack) O[QB].g.hits += HITS.sacked;
     }
     const targets = sack ? [] : TARGET_IDX.filter(([i]) => O[i]).map(([i, w]) => [i, w * (O[i]!.ovr / 75) ** 2] as const);
     if (targets.length) {
@@ -297,6 +306,12 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
       if (int) rep.win = false;
       if (rep.win && rng() < GRADES.contested) tags.push(['cit', TAG.contested]);
       RO[t] = rep;
+      // A catch gets him tackled, usually by his cover man.
+      if (rep.win) {
+        O[t]!.g.hits += HITS.catch;
+        const cm = D[VS_OFF[t]];
+        if (cm) cm.g.hits += HITS.tackle;
+      }
       // His cover man wins when the ball isn't caught, and deep balls are the free safety's half the time.
       const covers = [VS_OFF[t], ...(p.gain >= 20 && D[FS] && rng() < 0.5 ? [FS] : [])];
       for (const c of covers) {
@@ -316,6 +331,7 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
         if (rng() < 0.5) tags.push(['str', TAG.broken]);
       }
       RO[carrier] = draw(gapO(carrier), 1, GRADES.key, tags);
+      O[carrier]!.g.hits += HITS.carry;
     }
     const tacklers = TACKLER_IDX.filter(([j]) => D[j]);
     if (tacklers.length) {
@@ -323,6 +339,7 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
       // The tackler is graded against the ball carrier.
       const gap = D[t]!.ovr - (O[carrier]?.ovr ?? D[t]!.ovr);
       if (!RD[t]) RD[t] = draw(gap, -1, GRADES.key, [['tkl', TAG.stop]]);
+      D[t]!.g.hits += HITS.tackle;
     }
   }
 
@@ -343,8 +360,10 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
   if (sack) {
     const beaten = OL.filter((i) => RO[i] && !RO[i]!.win && PAIR_OFF[i] >= 0 && D[PAIR_OFF[i]]);
     if (beaten.length) {
-      const rusher = RD[PAIR_OFF[beaten[Math.floor(rng() * beaten.length)]]]!;
+      const j = PAIR_OFF[beaten[Math.floor(rng() * beaten.length)]];
+      const rusher = RD[j]!;
       rusher.tags = [...rusher.tags, ['rsh', TAG.sack]];
+      D[j]!.g.hits += HITS.sack;
     }
   }
   for (let i = 0; i < O.length; i++) if (O[i]) credit(O[i]!, RO[i]!.win, RO[i]!.expected, RO[i]!.tags);

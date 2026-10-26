@@ -1,8 +1,9 @@
 import { archetypeLabel, classLabel, DEV_LABEL, heightLabel, type Athlete } from '../data/athletes';
-import { athleteName, healthy, positionOrder, starters, teamRatings, type Squad } from '../data/depth';
-import { overall, overallBreakdown, POSITIONS } from '../data/positions';
+import { athleteName, fitRatings, healthOf, healthy, positionOrder, starters, teamRatings, type Squad } from '../data/depth';
+import { overall, overallBreakdown, POSITIONS, type Position } from '../data/positions';
 import { RATING_INFO, RATING_KEYS, type RatingKey } from '../data/ratings';
 import { VIEW_W } from '../engine/constants';
+import { outText } from '../season/injuries';
 import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier } from '../season/progression';
 import { records, recordText } from '../season/standings';
 import type { Progress, SeasonState } from '../season/types';
@@ -11,9 +12,10 @@ import { ovrColor, shortName, stars } from './rosterScreen';
 import { text } from './text';
 
 /**
- * The team page: a depth chart per position on the left (player tabs you drag to reorder) and the
- * selected player's card on the right (bio, injury, level and XP, what makes up his overall and how
- * each rating has grown, what each rating does).
+ * The team page: a depth chart per position on the left (player tabs you drag to reorder, with the
+ * injured below them in their own OUT section) and the selected player's card on the right (bio,
+ * health or injury, level and XP, what makes up his overall and how each rating has grown, what each
+ * rating does).
  */
 
 export interface TeamView {
@@ -33,6 +35,7 @@ const ACCENT = '#9ad7ff';
 const GOLD = '#ffd23f';
 const RED = '#ff5a5a';
 const GREEN = '#7dff9a';
+const ORANGE = '#ff9a5a';
 
 // Layout, shared with the click handling in game.ts.
 const TAB_Y = 32;
@@ -42,6 +45,8 @@ export const LIST_X = 6;
 export const LIST_W = 250;
 export const LIST_TOP = 64;
 export const ROW_H = 20;
+/** Room for the OUT section's header between the available players and the injured. */
+const OUT_GAP = 14;
 const CARD_X = 264;
 const CARD_R = VIEW_W - 6;
 const CARD_TOP = 50;
@@ -60,17 +65,56 @@ export function tabAt(x: number, y: number): number {
   return Math.min(POSITIONS.length - 1, Math.floor(x / TAB_W));
 }
 
-/** The depth row under the mouse, or -1. */
-export function rowAt(x: number, y: number, rows: number): number {
-  if (x < LIST_X || x >= LIST_X + LIST_W || y < LIST_TOP) return -1;
-  const i = Math.floor((y - LIST_TOP) / ROW_H);
-  return i < rows ? i : -1;
+/**
+ * A position's list as the page shows it: everyone who can play, in depth order, then the injured.
+ * `full` maps each row to its index in `positionOrder`, which keeps the injured in their spots for
+ * when they come back.
+ */
+export interface DepthView {
+  rows: Athlete[];
+  /** Rows before the OUT section. */
+  avail: number;
+  full: number[];
 }
 
-/** Where a dragged tab lands: the row index it takes once it's lifted out of `from`. */
-export function dropIndex(y: number, from: number, rows: number): number {
-  const gap = Math.max(0, Math.min(rows, Math.round((y - LIST_TOP) / ROW_H)));
+export function depthView(squad: Squad, pos: Position): DepthView {
+  const order = positionOrder(squad, pos);
+  const idx = order.map((_, i) => i);
+  const up = idx.filter((i) => healthy(order[i]));
+  const full = [...up, ...idx.filter((i) => !healthy(order[i]))];
+  return { rows: full.map((i) => order[i]), avail: up.length, full };
+}
+
+/** The top of row `i`. */
+export function rowY(i: number, avail: number): number {
+  return LIST_TOP + i * ROW_H + (i >= avail ? OUT_GAP : 0);
+}
+
+/** The depth row under the mouse, or -1. */
+export function rowAt(x: number, y: number, view: DepthView): number {
+  if (x < LIST_X || x >= LIST_X + LIST_W || y < LIST_TOP) return -1;
+  for (let i = 0; i < view.rows.length; i++) {
+    const top = rowY(i, view.avail);
+    if (y >= top && y < top + ROW_H) return i;
+  }
+  return -1;
+}
+
+/** Where a dragged tab lands among the available players: the row it takes once lifted out of `from`. */
+export function dropIndex(y: number, from: number, avail: number): number {
+  const gap = Math.max(0, Math.min(avail, Math.round((y - LIST_TOP) / ROW_H)));
   return gap > from ? gap - 1 : gap;
+}
+
+/**
+ * A drag among the available rows as a move in the full position order (`reorderPosition`): the
+ * player goes just ahead of whoever he was dropped on, or just behind the last available player.
+ */
+export function fullMove(view: DepthView, from: number, to: number): [number, number] {
+  const f = view.full[from];
+  const ups = view.full.slice(0, view.avail).filter((i) => i !== f).map((i) => (i > f ? i - 1 : i));
+  const t = to < ups.length ? ups[to] : ups.length ? ups[ups.length - 1] + 1 : 0;
+  return [f, t];
 }
 
 export function inBox(b: { x: number; y: number; w: number; h: number }, x: number, y: number): boolean {
@@ -116,22 +160,22 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
       g.fillRect(i * TAB_W, TAB_Y, TAB_W, TAB_H);
     }
     const hurt = squad.athletes.some((a) => a.pos === p && !healthy(a));
-    text(g, p, i * TAB_W + TAB_W / 2, TAB_Y + 3, { align: 'center', color: on ? GOLD : hurt ? '#ff9a5a' : SOFT, shadow: false });
+    text(g, p, i * TAB_W + TAB_W / 2, TAB_Y + 3, { align: 'center', color: on ? GOLD : hurt ? ORANGE : SOFT, shadow: false });
   });
 
   const pos = POSITIONS[v.pos];
-  const order = positionOrder(squad, pos);
+  const view = depthView(squad, pos);
   const prog = s.teamState[t.id]?.progress ?? {};
-  const upped = new Set(order.filter((a) => upgradedLastWeek(s, prog[a.id])).map((a) => a.id));
-  drawDepth(g, order, slotOf, upped, v);
-  const sel = order[Math.min(v.sel, order.length - 1)];
+  const upped = new Set(view.rows.filter((a) => upgradedLastWeek(s, prog[a.id])).map((a) => a.id));
+  drawDepth(g, view, slotOf, upped, v);
+  const sel = view.rows[Math.min(v.sel, view.rows.length - 1)];
   const winPct = rec.w + rec.l ? rec.w / (rec.w + rec.l) : 0.5;
   if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), winPct, v);
 
   drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  ESC: BACK');
 }
 
-function drawDepth(g: CanvasRenderingContext2D, order: Athlete[], slotOf: Map<string, string>, upped: Set<string>, v: TeamView): void {
+function drawDepth(g: CanvasRenderingContext2D, view: DepthView, slotOf: Map<string, string>, upped: Set<string>, v: TeamView): void {
   const hy = LIST_TOP - 11;
   text(g, 'SLOT', LIST_X + 8, hy, { color: DIM, shadow: false });
   text(g, 'NO', LIST_X + 46, hy, { color: DIM, shadow: false });
@@ -139,23 +183,29 @@ function drawDepth(g: CanvasRenderingContext2D, order: Athlete[], slotOf: Map<st
   text(g, 'POS', LIST_X + 196, hy, { color: DIM, shadow: false });
   text(g, 'OVR', LIST_X + LIST_W - 6, hy, { align: 'right', color: DIM, shadow: false });
   const dragging = v.drag?.moved ? v.drag : null;
-  order.forEach((a, i) => {
-    const y = LIST_TOP + i * ROW_H;
-    drawPlayerTab(g, a, i, slotOf.get(a.id), LIST_X, y, {
+  const { rows, avail } = view;
+  rows.forEach((a, i) => {
+    drawPlayerTab(g, a, i, slotOf.get(a.id), LIST_X, rowY(i, avail), {
       up: upped.has(a.id),
       selected: i === v.sel,
       ghost: dragging?.from === i,
-      hover: !v.drag && rowAt(v.mx, v.my, order.length) === i,
+      hover: !v.drag && rowAt(v.mx, v.my, view) === i,
     });
   });
+  if (avail < rows.length) {
+    const y = rowY(avail, avail) - OUT_GAP + 3;
+    g.fillStyle = '#3a2228';
+    g.fillRect(LIST_X + 104, y + 3, LIST_W - 104, 1);
+    text(g, 'INJURED: OUT', LIST_X + 8, y, { color: RED, shadow: false });
+  }
   if (!dragging) return;
   // The insertion line, then the lifted tab under the mouse.
-  const to = dropIndex(v.my, dragging.from, order.length);
+  const to = dropIndex(v.my, dragging.from, avail);
   const gap = to >= dragging.from ? to + 1 : to;
   g.fillStyle = GOLD;
   g.fillRect(LIST_X, LIST_TOP + gap * ROW_H - 2, LIST_W, 2);
-  const y = Math.max(LIST_TOP - ROW_H / 2, Math.min(LIST_TOP + (order.length - 0.5) * ROW_H, v.my - ROW_H / 2));
-  drawPlayerTab(g, order[dragging.from], to, undefined, LIST_X + 4, y, { selected: true, ghost: false, hover: false, lifted: true });
+  const y = Math.max(LIST_TOP - ROW_H / 2, Math.min(LIST_TOP + (avail - 0.5) * ROW_H, v.my - ROW_H / 2));
+  drawPlayerTab(g, rows[dragging.from], to, undefined, LIST_X + 4, y, { selected: true, ghost: false, hover: false, lifted: true });
 }
 
 function drawPlayerTab(
@@ -187,13 +237,16 @@ function drawPlayerTab(
   }
   const ty = y + 5;
   const hurt = !healthy(a);
-  const label = hurt ? 'OUT' : slot ?? String(rank + 1);
+  const hp = healthOf(a);
+  const label = hurt ? (a.injury!.season ? 'SZN' : `${a.injury!.weeks}W`) : slot ?? String(rank + 1);
   text(g, label, x + 8, ty, { color: hurt ? RED : slot ? GOLD : DIM, shadow: false });
   text(g, `#${a.num}`, x + 46, ty, { color: SOFT, shadow: false });
   text(g, shortName(a, 14), x + 78, ty, { color: hurt ? RED : a.real ? GOLD : '#ffffff' });
-  text(g, a.pos, x + 196, ty, { color: SOFT, shadow: false });
+  // Banged up: his health where his position goes.
+  if (!hurt && hp < 100) text(g, `${hp}%`, x + 196, ty, { color: ORANGE, shadow: false });
+  else text(g, a.pos, x + 196, ty, { color: SOFT, shadow: false });
   const o2 = overall(a.r, a.pos);
-  text(g, String(o2), x + LIST_W - 6, ty, { align: 'right', color: ovrColor(o2) });
+  text(g, String(o2), x + LIST_W - 6, ty, { align: 'right', color: hurt ? DIM : ovrColor(o2) });
   // Leveled up last week.
   if (o.up) upArrow(g, x + LIST_W - 30, ty);
   g.globalAlpha = 1;
@@ -230,12 +283,17 @@ function drawCard(
   text(g, `${a.hometown.city}, ${a.hometown.state}`.toUpperCase().slice(0, 34), x, CARD_TOP + 42, { color: '#cfd6df' });
   text(g, stars(a.stars), x, CARD_TOP + 54, { color: GOLD, shadow: false });
   text(g, `POT ${a.potential}  DEV ${DEV_LABEL[a.dev].toUpperCase()}`, x + 48, CARD_TOP + 54, { color: '#cfd6df' });
-  const status = !healthy(a) ? `OUT ${a.injury!.weeks} WEEK${a.injury!.weeks === 1 ? '' : 'S'}` : slot ? `HEALTHY  STARTING ${slot}` : 'HEALTHY';
-  text(g, status, x, CARD_TOP + 66, { color: healthy(a) ? GREEN : RED });
+  const h = healthOf(a);
+  const sore = healthy(a) && h < 100;
+  const playing = overall(fitRatings(a), a.pos);
+  const start = slot ? `  STARTING ${slot}` : '';
+  // Kept short of the XP bar; a banged-up starter's slot is on his tab.
+  const status = !healthy(a) ? `${outText(a.injury!)}: ${a.injury!.type}` : sore ? `BANGED UP: ${h}% HEALTH` : `HEALTHY${start}`;
+  text(g, status.slice(0, 30), x, CARD_TOP + 66, { color: !healthy(a) ? RED : sore ? ORANGE : GREEN });
 
-  // The overall, big.
-  text(g, String(ovr), CARD_R - 10, CARD_TOP + 8, { size: 16, align: 'right', color: ovrColor(ovr) });
-  text(g, `${a.pos} OVR`, CARD_R - 10, CARD_TOP + 28, { align: 'right', color: DIM, shadow: false });
+  // The overall, big: what he plays at when he's banged up, with his healthy overall under it.
+  text(g, String(sore ? playing : ovr), CARD_R - 10, CARD_TOP + 8, { size: 16, align: 'right', color: sore ? ORANGE : ovrColor(ovr) });
+  text(g, sore ? `${a.pos} OVR (${ovr} HEALTHY)` : `${a.pos} OVR`, CARD_R - 10, CARD_TOP + 28, { align: 'right', color: DIM, shadow: false });
   if (a.real) text(g, 'REAL PLAYER', CARD_R - 10, CARD_TOP + 40, { align: 'right', color: GOLD, shadow: false });
 
   // Level, XP toward the next one, and the XP multiplier (hover for its parts).
