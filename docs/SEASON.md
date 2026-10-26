@@ -18,11 +18,11 @@ The season framework: every system in the week loop exists end to end, each behi
 
 ## State
 `SeasonState` (`season/types.ts`) is plain JSON. A test checks that a season saved mid-way and reloaded finishes identically.
-- **Rosters aren't stored.** They regenerate from the team id (`buildSquad`). `teamState` holds only this season's changes: injuries, a user depth chart, a user game plan. `squadFor(state, id)` lays them over the generated roster.
+- **Rosters aren't stored.** They regenerate from the team id (`buildSquad`). `teamState` holds only the changes: progression (rating changes, levels, XP), injuries, a user depth chart, a user game plan. `squadFor(state, id)` lays them over the generated roster, and rebuilds the staff depth chart once anyone has leveled.
 - **The user's depth chart** is edited on the team page (T in the hub) per position. `reorderPosition` (`data/depth.ts`) moves a player in his position's order and rebuilds every slot that position can fill, natural position first; `starters` then fills slots in `PICK_ORDER`, so WR #1-#4 play X, Z, SL and WR4 and an injured starter's backup steps in. The first edit calls `setUserDepth` (`season/staff.ts`), which turns off `delegate.depthChart` so `prep` keeps the chart; `useStaffDepth` hands it back. Live season games use `squadFor` for both teams, so the user's chart and both teams' injuries are on the field.
 - **Records, standings, season stats and award races are computed** from the game results whenever they're needed, never stored (like team ratings).
 - **Seeding:** every random draw comes from `seasonRng(state, ...parts)`, so a game's result depends only on the season seed and the game id, not on the order things are simulated in.
-- **Saves** (`season/save.ts`): localStorage, versioned key. Box-score lines leave out zero stats (a full season is about 2.8 MB raw and 1.6 MB packed, against a localStorage limit of about 5 MB). There's no save-slot UI yet: N on the title screen starts a new season (over the old one), and C continues.
+- **Saves** (`season/save.ts`): localStorage, versioned key. Box-score lines leave out zero stats. A full season is about 3.7 MB raw and 2.6 MB packed, about 0.9 MB of it progression, against a localStorage limit of about 5 MB. There's no save-slot UI yet: N on the title screen starts a new season (over the old one), and C continues.
 
 ## The week loop (`season/season.ts`)
 `advanceWeek(state, userResult?)` runs `WEEK_STEPS` in order. Each step is a plain function of the state and a week context:
@@ -30,13 +30,14 @@ The season framework: every system in the week loop exists end to end, each behi
 | Step | Now | Later |
 | --- | --- | --- |
 | `prep` | Game plans for every team playing (`autoGamePlan`: pass share from the program's scheme), the user's if not delegated. Delegated depth charts are reset to the staff chart | Game-plan screen; opponent-specific plans; fatigue |
-| `play` | The user's game takes the live result (a tie goes to simulated overtime with `settleTie`); every other game is `simGame` | Live box-score capture; a "watch" mode |
+| `play` | The user's game takes the live result (a tie goes to simulated overtime with `settleTie`); every other game is `simGame`. Both log their drives | Live box-score capture; a "watch" mode |
+| `progress` | Every game is graded from its drives; players earn XP and level up ([PROGRESSION.md](PROGRESSION.md)). Breakthroughs make the news | Practice focus; offseason growth |
 | `results` | Injuries count down | Injuries from games, suspensions |
 | `rankings` | AP poll every week; CFP rankings from `CALENDAR.cfpStartWeek` until selection | |
 | `news` | `weekNews`: user results, upsets, ranked matchups, big games, new No. 1, Heisman watch | More templates, coach quotes, recruiting news |
-| `transition` | Regular season → championship week → selection (bracket, bowls, awards) → playoff rounds → complete | Offseason: graduation, progression, recruiting, coaching carousel |
+| `transition` | Regular season → championship week → selection (bracket, bowls, awards) → playoff rounds → complete | Offseason: graduation, offseason growth, recruiting, coaching carousel |
 
-Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (week 16: bowls and the first playoff round, then one week per round) → `complete`. `nextSeason` rolls an open-ended season into the next year with the same rosters (the offseason isn't built).
+Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (week 16: bowls and the first playoff round, then one week per round) → `complete`. `nextSeason` rolls an open-ended season into the next year with the same rosters and their progression (the offseason isn't built).
 
 ## Systems
 - **Schedule** (`schedule.ts`): rivalries first (rivalry-week games in week 14), then conference games, then non-conference games to 12 each, one game a week per team, spread over 14 weeks. Pairing is "neediest team first" with restarts, and weeks are assigned most-constrained game first. Conference games lean late and non-conference games early (`nonConfWeeks`). Home and away are balanced per team. Odd conferences may leave a team one conference game short; it becomes a non-conference game. Divisions aren't modeled.

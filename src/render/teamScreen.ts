@@ -3,15 +3,17 @@ import { athleteName, healthy, positionOrder, starters, teamRatings, type Squad 
 import { overall, overallBreakdown, POSITIONS } from '../data/positions';
 import { RATING_INFO, RATING_KEYS, type RatingKey } from '../data/ratings';
 import { VIEW_W } from '../engine/constants';
+import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier } from '../season/progression';
 import { records, recordText } from '../season/standings';
-import type { SeasonState } from '../season/types';
+import type { Progress, SeasonState } from '../season/types';
 import { drawHint } from './hud';
 import { ovrColor, shortName, stars } from './rosterScreen';
 import { text } from './text';
 
 /**
  * The team page: a depth chart per position on the left (player tabs you drag to reorder) and the
- * selected player's card on the right (bio, injury, what makes up his overall, what each rating does).
+ * selected player's card on the right (bio, injury, level and XP, what makes up his overall and how
+ * each rating has grown, what each rating does).
  */
 
 export interface TeamView {
@@ -47,6 +49,8 @@ const CARD_BOTTOM = 342;
 const RATING_TOP = 142;
 const RATING_LINE = 11;
 const GRID_COLS = 5;
+/** The WK column: an up-arrow for a rating raised last week. */
+const WK_X = CARD_R - 50;
 const GRID_W = 72;
 /** The DEPTH: YOURS / STAFF toggle in the header. */
 export const DEPTH_BTN = { x: VIEW_W - 136, y: 17, w: 130, h: 11 };
@@ -117,14 +121,17 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
 
   const pos = POSITIONS[v.pos];
   const order = positionOrder(squad, pos);
-  drawDepth(g, order, slotOf, v);
+  const prog = s.teamState[t.id]?.progress ?? {};
+  const upped = new Set(order.filter((a) => upgradedLastWeek(s, prog[a.id])).map((a) => a.id));
+  drawDepth(g, order, slotOf, upped, v);
   const sel = order[Math.min(v.sel, order.length - 1)];
-  if (sel) drawCard(g, sel, slotOf.get(sel.id), v);
+  const winPct = rec.w + rec.l ? rec.w / (rec.w + rec.l) : 0.5;
+  if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), winPct, v);
 
   drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  ESC: BACK');
 }
 
-function drawDepth(g: CanvasRenderingContext2D, order: Athlete[], slotOf: Map<string, string>, v: TeamView): void {
+function drawDepth(g: CanvasRenderingContext2D, order: Athlete[], slotOf: Map<string, string>, upped: Set<string>, v: TeamView): void {
   const hy = LIST_TOP - 11;
   text(g, 'SLOT', LIST_X + 8, hy, { color: DIM, shadow: false });
   text(g, 'NO', LIST_X + 46, hy, { color: DIM, shadow: false });
@@ -135,6 +142,7 @@ function drawDepth(g: CanvasRenderingContext2D, order: Athlete[], slotOf: Map<st
   order.forEach((a, i) => {
     const y = LIST_TOP + i * ROW_H;
     drawPlayerTab(g, a, i, slotOf.get(a.id), LIST_X, y, {
+      up: upped.has(a.id),
       selected: i === v.sel,
       ghost: dragging?.from === i,
       hover: !v.drag && rowAt(v.mx, v.my, order.length) === i,
@@ -157,7 +165,7 @@ function drawPlayerTab(
   slot: string | undefined,
   x: number,
   y: number,
-  o: { selected: boolean; ghost: boolean; hover: boolean; lifted?: boolean },
+  o: { selected: boolean; ghost: boolean; hover: boolean; lifted?: boolean; up?: boolean },
 ): void {
   const h = ROW_H - 2;
   if (o.lifted) {
@@ -186,10 +194,30 @@ function drawPlayerTab(
   text(g, a.pos, x + 196, ty, { color: SOFT, shadow: false });
   const o2 = overall(a.r, a.pos);
   text(g, String(o2), x + LIST_W - 6, ty, { align: 'right', color: ovrColor(o2) });
+  // Leveled up last week.
+  if (o.up) upArrow(g, x + LIST_W - 30, ty);
   g.globalAlpha = 1;
 }
 
-function drawCard(g: CanvasRenderingContext2D, a: Athlete, slot: string | undefined, v: TeamView): void {
+/** A small green up-arrow, 7 px wide, its top-left at (x, y). */
+function upArrow(g: CanvasRenderingContext2D, x: number, y: number): void {
+  g.fillStyle = GREEN;
+  g.fillRect(x + 3, y, 1, 1);
+  g.fillRect(x + 2, y + 1, 3, 1);
+  g.fillRect(x + 1, y + 2, 5, 1);
+  g.fillRect(x, y + 3, 7, 1);
+  g.fillRect(x + 2, y + 4, 3, 4);
+}
+
+/** A dim flat line where an arrow would be: no change. */
+function flatLine(g: CanvasRenderingContext2D, x: number, y: number): void {
+  g.fillStyle = DIM;
+  g.fillRect(x, y + 3, 7, 2);
+}
+
+function drawCard(
+  g: CanvasRenderingContext2D, s: SeasonState, a: Athlete, p: Progress | undefined, slot: string | undefined, winPct: number, v: TeamView,
+): void {
   g.fillStyle = '#151d29';
   g.fillRect(CARD_X, CARD_TOP, CARD_R - CARD_X, CARD_BOTTOM - CARD_TOP);
   const x = CARD_X + 8;
@@ -210,6 +238,17 @@ function drawCard(g: CanvasRenderingContext2D, a: Athlete, slot: string | undefi
   text(g, `${a.pos} OVR`, CARD_R - 10, CARD_TOP + 28, { align: 'right', color: DIM, shadow: false });
   if (a.real) text(g, 'REAL PLAYER', CARD_R - 10, CARD_TOP + 40, { align: 'right', color: GOLD, shadow: false });
 
+  // Level, XP toward the next one, and the XP multiplier (hover for its parts).
+  const mult = xpMultiplier(a, p, winPct, slot !== undefined);
+  const lvlY = CARD_TOP + 54;
+  text(g, `LVL ${p?.lvl ?? 0}  XP x${mult.total.toFixed(2)}`, CARD_R - 10, lvlY, { align: 'right', color: upgradedLastWeek(s, p) ? GREEN : '#cfd6df' });
+  const barW = 96;
+  g.fillStyle = '#26324a';
+  g.fillRect(CARD_R - 10 - barW, lvlY + 12, barW, 5);
+  g.fillStyle = ACCENT;
+  g.fillRect(CARD_R - 10 - barW, lvlY + 12, Math.round((barW * Math.min(1, (p?.xp ?? 0) / LEVEL_XP[a.pos]))), 5);
+  const overLvl = v.mx >= CARD_R - 10 - barW && v.mx < CARD_R && v.my >= lvlY - 1 && v.my < lvlY + 18;
+
   g.fillStyle = '#2a3647';
   g.fillRect(x, RATING_TOP - 14, CARD_R - CARD_X - 16, 1);
 
@@ -218,26 +257,29 @@ function drawCard(g: CanvasRenderingContext2D, a: Athlete, slot: string | undefi
   text(g, 'OVR BREAKDOWN', x, RATING_TOP - 10, { color: DIM, shadow: false });
   text(g, 'RTG', x + 158, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
   text(g, 'WT', x + 288, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
-  text(g, '+/-', CARD_R - 10, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
+  text(g, 'WK', WK_X - 4, RATING_TOP - 10, { color: DIM, shadow: false });
+  text(g, 'ALL', CARD_R - 10, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
   let hovered: RatingKey | null = null;
-  parts.forEach((p, i) => {
+  parts.forEach((part, i) => {
     const y = RATING_TOP + i * RATING_LINE;
     const over = v.mx >= CARD_X && v.mx < CARD_R && v.my >= y - 1 && v.my < y + RATING_LINE - 1;
     if (over) {
-      hovered = p.key;
+      hovered = part.key;
       g.fillStyle = '#1f2a3a';
       g.fillRect(CARD_X + 2, y - 2, CARD_R - CARD_X - 4, RATING_LINE);
     }
-    text(g, RATING_INFO[p.key].label.toUpperCase(), x, y, { color: '#ffffff', shadow: false });
-    text(g, String(p.value), x + 158, y, { align: 'right', color: ovrColor(p.value), shadow: false });
+    text(g, RATING_INFO[part.key].label.toUpperCase(), x, y, { color: '#ffffff', shadow: false });
+    text(g, String(part.value), x + 158, y, { align: 'right', color: ovrColor(part.value), shadow: false });
     g.fillStyle = '#26324a';
     g.fillRect(x + 166, y + 1, 80, 6);
-    g.fillStyle = ovrColor(p.value);
-    g.fillRect(x + 166, y + 1, Math.round(80 * Math.min(99, p.value) / 99), 6);
-    text(g, `${Math.round(p.share * 100)}%`, x + 288, y, { align: 'right', color: SOFT, shadow: false });
-    const d = p.delta;
-    const ds = `${d >= 0 ? '+' : ''}${d.toFixed(1)}`;
-    text(g, ds, CARD_R - 10, y, { align: 'right', color: d >= 0.05 ? GREEN : d <= -0.05 ? '#ff7a7a' : SOFT, shadow: false });
+    g.fillStyle = ovrColor(part.value);
+    g.fillRect(x + 166, y + 1, Math.round(80 * Math.min(99, part.value) / 99), 6);
+    text(g, `${Math.round(part.share * 100)}%`, x + 288, y, { align: 'right', color: SOFT, shadow: false });
+    // Up last week, and the all-time change.
+    if (upgradedLastWeek(s, p, part.key)) upArrow(g, WK_X, y);
+    else flatLine(g, WK_X, y);
+    const all = ratingChange(p, part.key);
+    text(g, all ? `+${all}` : '-', CARD_R - 10, y, { align: 'right', color: all ? GREEN : DIM, shadow: false });
   });
 
   // Everything else, small: it's real on the field, just not part of this position's overall.
@@ -255,12 +297,15 @@ function drawCard(g: CanvasRenderingContext2D, a: Athlete, slot: string | undefi
       g.fillRect(cx - 2, y - 2, GRID_W - 4, RATING_LINE);
     }
     text(g, k.toUpperCase(), cx, y, { color: DIM, shadow: false });
-    text(g, String(a.r[k]), cx + 56, y, { align: 'right', color: SOFT, shadow: false });
+    text(g, String(a.r[k]), cx + 56, y, { align: 'right', color: ratingChange(p, k) ? GREEN : SOFT, shadow: false });
   });
 
-  // What the hovered (or the heaviest) rating does.
+  // What the hovered (or the heaviest) rating does, or what makes up the XP multiplier.
   const key: RatingKey = hovered ?? parts[0].key;
   const info = RATING_INFO[key];
-  const lines = wrap(`${info.label.toUpperCase()}: ${info.blurb.toUpperCase()}`, 44).slice(0, 2);
-  lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 24 + i * 11, { color: hovered ? '#ffffff' : SOFT, shadow: false }));
+  const blurb = overLvl
+    ? `XP x${mult.total.toFixed(2)}: ROOM ${mult.headroom.toFixed(2)}  DEV ${mult.dev.toFixed(2)}  CONF ${mult.confidence.toFixed(2)}  MORALE ${mult.morale.toFixed(2)}  CLASS ${mult.year.toFixed(2)}${mult.potential < 1 ? `  AT POT ${mult.potential.toFixed(2)}` : ''}`
+    : `${info.label.toUpperCase()}: ${info.blurb.toUpperCase()}`;
+  const lines = wrap(blurb, 44).slice(0, 2);
+  lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 24 + i * 11, { color: hovered || overLvl ? '#ffffff' : SOFT, shadow: false }));
 }

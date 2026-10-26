@@ -46,8 +46,9 @@ export function buildDepth(athletes: Athlete[]): DepthChart {
   for (const slot of PICK_ORDER) {
     depth[slot] = athletes
       .filter((a) => SLOT_CANDIDATES[slot].includes(a.pos))
-      .sort((a, b) => slotScore(b, slot) - slotScore(a, slot))
-      .map((a) => a.id);
+      .map((a) => [a.id, slotScore(a, slot)] as const)
+      .sort((a, b) => b[1] - a[1])
+      .map(([id]) => id);
   }
   return depth;
 }

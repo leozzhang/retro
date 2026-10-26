@@ -1,5 +1,6 @@
 import type { DepthChart } from '../data/depth';
 import type { Position } from '../data/positions';
+import type { RatingKey } from '../data/ratings';
 import type { GamePlan } from './staff';
 
 /**
@@ -100,7 +101,7 @@ export interface Poll {
 
 export interface NewsItem {
   week: number;
-  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach';
+  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress';
   text: string;
   teams: string[];
 }
@@ -122,6 +123,24 @@ export interface Award {
   finalists: { id: string; team: string; name: string; pos: Position; score: number }[];
 }
 
+export type RatingDelta = Partial<Record<RatingKey, number>>;
+
+/** One player's progression (season/progression.ts). Players who haven't earned XP have no entry. */
+export interface Progress {
+  /** XP toward the next level. */
+  xp: number;
+  /** Level-ups so far. */
+  lvl: number;
+  /** All-time rating changes, laid over the generated ratings. */
+  d: RatingDelta;
+  /** The most recent week he leveled up, and what it raised. `big` marks a breakthrough. */
+  up?: { week: number; d: RatingDelta; big?: boolean };
+  /** Performance tags since his last level-up: weighted counts per rating they boost. */
+  tags?: RatingDelta;
+  /** His last few game grades (average grade per snap), newest last. */
+  g?: number[];
+}
+
 /** What changed on a team's roster this season. */
 export interface TeamState {
   /** Weeks out, by athlete id. */
@@ -130,6 +149,33 @@ export interface TeamState {
   depth?: DepthChart;
   /** The user's game plan, when it isn't delegated. */
   plan?: GamePlan;
+  /** Progression by athlete id. */
+  progress?: Record<string, Progress>;
+}
+
+/**
+ * One snap as the progression grades see it (season/grades.ts). Logs are never saved: they live for
+ * one week's progress step. Simulated drives leave `pass` out; the grader draws it from the game plan.
+ */
+export interface LoggedPlay {
+  gain: number;
+  pass?: boolean;
+  sack?: boolean;
+  /** Interception (a turnover on a pass). */
+  int?: boolean;
+  turnover?: boolean;
+  explosive?: boolean;
+  /** Down and distance before the snap. */
+  down: number;
+  toGo: number;
+  /** A kick instead of a snap from scrimmage. `dist` for field goals. */
+  kick?: { unit: 'fg' | 'xp' | 'punt' | 'kickoff'; good: boolean; dist?: number };
+}
+
+/** One possession: the offense's snaps and kicks (the kickoff after a score belongs to the scoring team). */
+export interface DriveLog {
+  off: string;
+  plays: LoggedPlay[];
 }
 
 export interface CoachState {

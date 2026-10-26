@@ -200,7 +200,10 @@ describe('season', () => {
   it('saves drop zero stats and restore them', () => {
     const s = fullSeason();
     const packed = packSeason(s);
-    expect(packed.length).toBeLessThan(JSON.stringify(s).length * 0.6);
+    // Box scores shrink by about half; progression (about 0.9 MB) doesn't pack. localStorage holds about 5 MB.
+    const boxes = (x: unknown) => JSON.stringify((x as typeof s).games).length;
+    expect(boxes(JSON.parse(packed))).toBeLessThan(boxes(s) * 0.6);
+    expect(packed.length).toBeLessThan(4e6);
     expect(JSON.parse(JSON.stringify(unpackSeason(packed)))).toEqual(JSON.parse(JSON.stringify(s)));
   });
 });

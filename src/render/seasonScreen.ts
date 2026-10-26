@@ -5,6 +5,7 @@ import { heismanRace } from '../season/awards';
 import { teamLabel } from '../season/news';
 import { latestPoll, rankIn } from '../season/polls';
 import { phaseLabel, userGameThisWeek } from '../season/season';
+import { lastPlayedWeek, upgradedLastWeek } from '../season/progression';
 import { records, recordText, standings } from '../season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from '../season/stats';
 import type { SeasonGame, SeasonState } from '../season/types';
@@ -31,6 +32,7 @@ const DIM = '#5d6b80';
 const SOFT = '#8fa0b8';
 const ACCENT = '#9ad7ff';
 const GOLD = '#ffd23f';
+const GREEN = '#7dff9a';
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
@@ -125,8 +127,24 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
   g.fillStyle = team.colors.primary;
   g.fillRect(BOOK_BTN.x, BOOK_BTN.y, BOOK_BTN.w, BOOK_BTN.h);
   text(g, 'PLAYBOOK', BOOK_BTN.x + BOOK_BTN.w / 2, BOOK_BTN.y + 4, { align: 'center' });
+  drawProgressLine(g, s);
   const play = userGameThisWeek(s) ? 'SPACE: PLAY  X: SIM' : s.phase === 'complete' ? '' : 'SPACE: ADVANCE';
   drawHint(g, `${play}   A/D: TAB  W/S: PAGE  T: TEAM  P: PLAYBOOK  ESC: TITLE`);
+}
+
+/** Last week's level-ups on the user's team, and its breakthroughs, next to the buttons. */
+function drawProgressLine(g: CanvasRenderingContext2D, s: SeasonState): void {
+  const u = s.config.userTeamId;
+  const week = lastPlayedWeek(s);
+  const prog = Object.values(s.teamState[u]?.progress ?? {});
+  const ups = prog.filter((p) => upgradedLastWeek(s, p)).length;
+  if (!ups) return;
+  const big = s.news.filter((n) => n.kind === 'progress' && n.week === week && n.teams.includes(u));
+  // "BREAKTHROUGH: Name (UGA QB) +2 SAC +2 MAC" becomes "BREAKTHROUGH: NAME +4".
+  const last = big[big.length - 1]?.text;
+  const pts = last ? [...last.matchAll(/\+(\d+)/g)].reduce((x, m) => x + Number(m[1]), 0) : 0;
+  const tail = last ? `  ${last.split(' (')[0].toUpperCase()} +${pts}` : '';
+  text(g, `LAST WEEK: ${ups} LEVEL-UP${ups === 1 ? '' : 'S'}${tail}`.slice(0, 56), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
 }
 
 function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {

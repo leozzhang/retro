@@ -59,3 +59,14 @@ export function hashString(s: string): number {
 export function pick<T>(rng: Rng, arr: readonly T[]): T {
   return arr[Math.floor(rng() * arr.length)];
 }
+
+/** One item, drawn with odds proportional to its weight. */
+export function pickWeighted<T>(items: readonly (readonly [T, number])[], rng: Rng): T {
+  const tot = items.reduce((s, [, w]) => s + w, 0);
+  let x = rng() * tot;
+  for (const [it, w] of items) {
+    x -= w;
+    if (x <= 0) return it;
+  }
+  return items[items.length - 1][0];
+}

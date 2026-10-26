@@ -25,7 +25,8 @@ import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGame
 import { setUserDepth, useStaffDepth } from '../season/staff';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor } from '../season/world';
-import type { GameResult, SeasonGame, SeasonState } from '../season/types';
+import { driveLog } from '../season/simGame';
+import type { DriveLog, GameResult, SeasonGame, SeasonState } from '../season/types';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { getSprite, teamUniform } from '../render/sprites';
 import { text, textWidth } from '../render/text';
@@ -38,7 +39,7 @@ import { Play } from './playState';
 import { personnelOf } from './resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, userStartAfter,
-  type Applied, type Drive,
+  type Applied, type Drive, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
@@ -154,6 +155,8 @@ export class Game {
   /** The season in progress (the hub screen), and the season game being played on the field. */
   private season: SeasonState | null = null;
   private seasonGame: SeasonGame | null = null;
+  /** A season game's drives for the progression grades: the user's snaps and kicks first, then each CPU drive. */
+  private liveDrives: DriveLog[] | null = null;
   private seasonView: SeasonView = { tab: 0, sub: 0 };
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
@@ -323,6 +326,7 @@ export class Game {
     this.windQuarter = 1;
     this.kickSketch.clear();
     this.tab = 0;
+    this.liveDrives = this.seasonGame ? [{ off: user.id, plays: [] }] : null;
     this.toCall();
   }
 
@@ -510,7 +514,8 @@ export class Game {
     // TODO: record the live game's team and player stats from the plays.
     const result: GameResult = { home, away, ot: 0, box: { home: blank(home), away: blank(away), players: [] } };
     this.seasonGame = null;
-    advanceWeek(s, result);
+    advanceWeek(s, result, this.liveDrives ?? undefined);
+    this.liveDrives = null;
     saveSeason(s);
     this.toSeason();
   }
@@ -758,6 +763,7 @@ export class Game {
         if (this.drive.try) {
           this.applied = applyTry(this.drive, play.outcome);
         } else {
+          this.logSnap(play.playDef.kind !== 'run', play.outcome);
           this.applied = applyOutcome(this.drive, play.outcome);
           afterPlay(this.clock, play.outcome.type, this.applied.headline === 'FIRST DOWN');
           if (play.outcome.type === 'td') adminStop(this.clock); // a score stops the clock
@@ -798,6 +804,7 @@ export class Game {
 
     if (kp.phase === 'over' && kp.outcome) {
       if (!this.applied) {
+        this.logKick(kp.outcome);
         this.applied = applyKick(this.drive, kp.outcome);
         this.score.user += this.applied.userPoints;
         this.score.cpu += this.applied.cpuPoints;
@@ -908,15 +915,38 @@ export class Game {
     this.showNotices('kickoff');
   }
 
+  /** A season game logs the user's snaps for the progression grades: the gain, pass or run, and what ended it. */
+  private logSnap(pass: boolean, o: PlayOutcome): void {
+    if (!this.liveDrives) return;
+    const d = this.drive;
+    const gain = Math.round((o.type === 'td' ? OPP_GOAL : o.spot) - d.los);
+    const int = o.type === 'int' || o.type === 'pick6';
+    this.liveDrives[0].plays.push({
+      gain, pass, down: d.down, toGo: Math.round(d.firstDownX - d.los),
+      ...(o.type === 'sack' ? { sack: true } : {}),
+      ...(int ? { int: true, turnover: true } : {}),
+      ...(gain >= 20 ? { explosive: true } : {}),
+    });
+  }
+
+  private logKick(o: KickOutcome): void {
+    if (!this.liveDrives) return;
+    const good = o.unit === 'fg' ? o.result === 'fgGood' : o.unit === 'xp' ? o.result === 'xpGood' : true;
+    const kick = { unit: o.unit, good, ...(o.unit === 'fg' ? { dist: fgDistance(this.drive.los, OPP_GOAL) } : {}) };
+    this.liveDrives[0].plays.push({ gain: 0, down: 0, toGo: 0, kick });
+  }
+
   /** Simulate a CPU possession from `start` (yards from its own goal), burning game clock. */
   private cpuDrive(start: number): void {
     const c = this.clock;
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
     const late = (c.quarter === 4 && left < 300) || (c.quarter === 2 && left < 120);
+    const plays: SimPlay[] = [];
     const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, {
       timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
-    });
+    }, this.liveDrives ? (p) => plays.push(p) : undefined);
+    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += sim.points;
     const notice = this.notify({

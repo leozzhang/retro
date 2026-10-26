@@ -205,6 +205,19 @@ export interface DriveClock {
 
 const NO_CLOCK: DriveClock = { timeLeft: Infinity, hurry: false, milk: false };
 
+/** One simulated play, for whoever wants to grade it (progression). Reading it draws no random numbers. */
+export interface SimPlay {
+  gain: number;
+  explosive: boolean;
+  turnover: boolean;
+  /** The down and distance before the snap. */
+  down: number;
+  toGo: number;
+  /** A field goal try ends the drive: its distance and whether it was good. */
+  fg?: { dist: number; made: boolean };
+  punt?: boolean;
+}
+
 /** Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap. */
 function simPlaySecs(c: DriveClock, rng: Rng): number {
   const pace = c.pace ?? 1;
@@ -234,17 +247,19 @@ export const DRIVE_SIM = {
 };
 
 /** Yards on one simulated play. */
-function simGain(diff: number, rng: Rng): number {
+function simGain(diff: number, rng: Rng): [number, boolean] {
   const T = DRIVE_SIM;
-  if (rng() < T.explosive) return Math.round(T.explosiveMin - Math.log(1 - rng()) * T.explosiveTail);
-  return Math.max(-6, Math.round(T.base + diff * T.edgePerPoint + gauss(rng) * T.sd));
+  if (rng() < T.explosive) return [Math.round(T.explosiveMin - Math.log(1 - rng()) * T.explosiveTail), true];
+  return [Math.max(-6, Math.round(T.base + diff * T.edgePerPoint + gauss(rng) * T.sd)), false];
 }
 
 /**
  * Abstract simulation of an opponent possession (the user only plays offense for now).
  * `start` is in yards from the CPU's own goal line.
  */
-export function simulateDrive(offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK): DriveSim {
+export function simulateDrive(
+  offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK, onPlay?: (p: SimPlay) => void,
+): DriveSim {
   const diff = offOvr - defOvr;
   const edge = diff * DRIVE_SIM.edgePerPoint;
   let yard = start;
@@ -259,8 +274,12 @@ export function simulateDrive(offOvr: number, defOvr: number, start: number, rng
     if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
     plays++;
     secs += simPlaySecs(clock, rng);
-    if (rng() < DRIVE_SIM.turnover) return done(0, 'TURNOVER');
-    const gain = simGain(diff, rng);
+    if (rng() < DRIVE_SIM.turnover) {
+      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo });
+      return done(0, 'TURNOVER');
+    }
+    const [gain, explosive] = simGain(diff, rng);
+    onPlay?.({ gain, explosive, turnover: false, down, toGo });
     yard += gain;
     toGo -= gain;
     if (yard >= 100) return done(7, 'TOUCHDOWN', 100);
@@ -276,6 +295,7 @@ export function simulateDrive(offOvr: number, defOvr: number, start: number, rng
     if (down === 4 || lastPlay) {
       if (fgDist <= 52) {
         const made = rng() < clamp(0.97 - (fgDist - 20) * 0.017, 0.3, 0.97);
+        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, fg: { dist: fgDist, made } });
         return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
       }
       if (toGo <= 2 && yard > 45 && rng() < 0.5) {
@@ -288,9 +308,11 @@ export function simulateDrive(offOvr: number, defOvr: number, start: number, rng
         }
         return done(0, 'DOWNS');
       }
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true });
       return done(0, 'PUNT');
     }
   }
+  onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true });
   return done(0, 'PUNT');
 }
 

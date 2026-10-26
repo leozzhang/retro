@@ -1,10 +1,10 @@
 import type { Athlete } from '../data/athletes';
 import { athleteName, starters, teamRatings, type Squad } from '../data/depth';
 import { overall, SLOT_POS } from '../data/positions';
-import { clamp, gauss, type Rng } from '../engine/math';
-import { simulateDrive, userStartAfter, type DriveClock, type DriveSim } from '../game/rules';
+import { clamp, gauss, pickWeighted, type Rng } from '../engine/math';
+import { simulateDrive, userStartAfter, type DriveClock, type DriveSim, type SimPlay } from '../game/rules';
 import { autoGamePlan, type GamePlan } from './staff';
-import type { GameResult, PlayerLine, TeamLine } from './types';
+import type { DriveLog, GameResult, LoggedPlay, PlayerLine, TeamLine } from './types';
 
 /**
  * CPU-vs-CPU games: whole drives from `simulateDrive` (the same team ratings the field uses), with the
@@ -31,8 +31,8 @@ const COMPLETION = 0.62;
 /** Share of a team's turnovers that are interceptions (the rest are fumbles). */
 const INT_SHARE = 0.55;
 /** Base target share by slot, scaled by the receiver's overall. */
-const TARGETS: Record<string, number> = { X: 0.25, Z: 0.21, SL: 0.18, TE: 0.15, RB: 0.11 };
-const QB_RUN_SHARE: Record<string, number> = { pocket: 0.08, dual: 0.2, runner: 0.33 };
+export const TARGETS: Record<string, number> = { X: 0.25, Z: 0.21, SL: 0.18, TE: 0.15, RB: 0.11 };
+export const QB_RUN_SHARE: Record<string, number> = { pocket: 0.08, dual: 0.2, runner: 0.33 };
 
 interface Side {
   id: string;
@@ -67,16 +67,6 @@ function lineFor(s: Side, a: Athlete): PlayerLine {
     s.lines.set(a.id, l);
   }
   return l;
-}
-
-function pickWeighted<T>(items: [T, number][], rng: Rng): T {
-  const tot = items.reduce((s, [, w]) => s + w, 0);
-  let x = rng() * tot;
-  for (const [it, w] of items) {
-    x -= w;
-    if (x <= 0) return it;
-  }
-  return items[items.length - 1][0];
 }
 
 function receivers(s: Side): [Athlete, number][] {
@@ -171,13 +161,38 @@ function credit(s: Side, d: DriveSim, rng: Rng): void {
   }
 }
 
+/** A simulated drive's snaps as a progression log, with the try and kickoff after a score. */
+export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false): DriveLog {
+  const out: LoggedPlay[] = plays.map((p) => {
+    const l: LoggedPlay = { gain: p.gain, down: p.down, toGo: p.toGo };
+    if (p.explosive) l.explosive = true;
+    if (p.turnover) l.turnover = true;
+    if (p.fg) l.kick = { unit: 'fg', good: p.fg.made, dist: p.fg.dist };
+    if (p.punt) l.kick = { unit: 'punt', good: true };
+    return l;
+  });
+  // Overtime has no kickoffs.
+  if (d.result === 'TOUCHDOWN') out.push({ gain: 0, down: 0, toGo: 0, kick: { unit: 'xp', good: true } });
+  if (!ot && (d.result === 'TOUCHDOWN' || d.result === 'FIELD GOAL')) out.push({ gain: 0, down: 0, toGo: 0, kick: { unit: 'kickoff', good: true } });
+  return { off, plays: out };
+}
+
+/** `simulateDrive`, logging the drive into `logs` when there are any. */
+function drive(off: string, offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock | undefined, logs: DriveLog[] | undefined, ot = false): DriveSim {
+  if (!logs) return simulateDrive(offOvr, defOvr, start, rng, clock);
+  const plays: SimPlay[] = [];
+  const d = simulateDrive(offOvr, defOvr, start, rng, clock, (p) => plays.push(p));
+  logs.push(driveLog(off, plays, d, ot));
+  return d;
+}
+
 /** Untimed alternating possessions from the opponent's 25 until one side leads after a round. */
-function overtime(first: Side, second: Side, rng: Rng): number {
+function overtime(first: Side, second: Side, rng: Rng, logs?: DriveLog[]): number {
   let rounds = 0;
   while (first.tl.points === second.tl.points) {
     rounds++;
     for (const [o, dfn] of [[first, second], [second, first]] as const) {
-      const d = simulateDrive(o.off, dfn.def, OT_START, rng);
+      const d = drive(o.id, o.off, dfn.def, OT_START, rng, undefined, logs, true);
       credit(o, d, rng);
     }
     if (rounds >= OT_MAX_ROUNDS && first.tl.points === second.tl.points) {
@@ -191,6 +206,8 @@ function overtime(first: Side, second: Side, rng: Rng): number {
 export interface SimOptions {
   neutral?: boolean;
   plans?: { home: GamePlan; away: GamePlan };
+  /** Collects every drive for the progression grades. Logging draws no random numbers. */
+  drives?: DriveLog[];
 }
 
 export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {}): GameResult {
@@ -209,7 +226,7 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
       const late = left < (half === 1 ? 300 : 120);
       const clock: DriveClock = { timeLeft: left, hurry: lead < 0 && late, milk: lead > 0 && half === 1 && left < 600, pace };
       const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
-      const d = simulateDrive(off.off - script, dfn.def, start, rng, clock);
+      const d = drive(off.id, off.off - script, dfn.def, start, rng, clock, opts.drives);
       left -= d.secs;
       credit(off, d, rng);
       if (d.result === 'END OF HALF') break;
@@ -217,7 +234,7 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
       off = dfn;
     }
   }
-  const ot = h.tl.points === a.tl.points ? overtime(a, h, rng) : 0;
+  const ot = h.tl.points === a.tl.points ? overtime(a, h, rng, opts.drives) : 0;
   return {
     home: h.tl.points, away: a.tl.points, ot,
     box: { home: h.tl, away: a.tl, players: [...h.lines.values(), ...a.lines.values()] },
@@ -228,14 +245,14 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
  * A live game that ended tied (the field has no overtime yet): settle it with simulated overtime,
  * keeping the regulation box score.
  */
-export function settleTie(result: GameResult, home: Squad, away: Squad, rng: Rng, neutral = false): GameResult {
+export function settleTie(result: GameResult, home: Squad, away: Squad, rng: Rng, neutral = false, drives?: DriveLog[]): GameResult {
   if (result.home !== result.away) return result;
   const edge = neutral ? 0 : GAME_SIM.homeEdge;
   const h = side(home, autoGamePlan(home, away), edge);
   const a = side(away, autoGamePlan(away, home), 0);
   h.tl.points = result.home;
   a.tl.points = result.away;
-  const ot = overtime(a, h, rng);
+  const ot = overtime(a, h, rng, drives);
   return { ...result, home: h.tl.points, away: a.tl.points, ot, box: { ...result.box, players: [...result.box.players, ...h.lines.values(), ...a.lines.values()] } };
 }
 

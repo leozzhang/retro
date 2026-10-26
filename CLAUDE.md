@@ -37,6 +37,7 @@ Controls are listed in [README.md](README.md).
   - `wind.ts`: per-game wind and its quarterly drift
   - `game.ts`: screens (title with conference and team pickers, roster, season hub, play call with PAT and kickoff modes, play, kick, notices, final). A season game's final screen writes the score back with `advanceWeek`
 - `season/`: the season engine, headless and plain JSON (`types.ts`): the week loop (`season.ts`), schedule, CPU game sim with box scores (`simGame.ts`), standings and tiebreakers, AP and CFP polls, postseason, stats, awards, news, staff automation (`staff.ts`), coach career, saves. See [docs/SEASON.md](docs/SEASON.md)
+  - player progression: per-snap game grades from drive logs (`grades.ts`), then XP, levels and weighted attribute draws (`progression.ts`). See [docs/PROGRESSION.md](docs/PROGRESSION.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
 - `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports
@@ -64,8 +65,9 @@ Controls are listed in [README.md](README.md).
   - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `ST_SPEED_GAP`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)
   - sprint: `SPRINT_TIME`, `SPRINT_RECOVER` (`game/playState.ts`), scaled by `endurance` (`sim/player.ts`)
   - season: `DRIVE_SIM` (`game/rules.ts`, also the live game's CPU drives), `GAME_SIM`, `TARGETS`, `QB_RUN_SHARE` (`season/simGame.ts`), all fit to real FBS scores (SEASON.md); `AP_WEIGHTS`, `CFP_WEIGHTS` (`season/polls.ts`), `AWARDS` (`season/awards.ts`), `UPSET_GAP` (`season/news.ts`), scheme pass shares (`season/staff.ts`)
+  - progression: `GRADES` (including the fitted expected success rate), `TAG`, `ROTATION`, `PACKAGES`, `PAIRS` (`season/grades.ts`); `PROGRESSION` (including `atPotential`, the soft potential ceiling), `DEV_XP`, `YEAR_XP`, `GROWTH_RATE` (`season/progression.ts`); `BREAKTHROUGH_NEWS` (`season/season.ts`)
   - blocking anchor `ANCHOR_STR` (`data/ratings.ts`); overall weights `OVR_WEIGHTS` (`data/positions.ts`); rating templates and archetypes (`data/athletes.ts`); roster levels `CLASS_ADJ`, `LEVEL_SD`, `STANDOUT_LEVEL`, `UNIT_STEP`, `GROWTH` (`data/rosterGen.ts`); team weights `TEAM_WEIGHTS` (`data/depth.ts`)
-- **After changing the season sim or polls,** run `npm run season` and compare against the flags in SEASON.md.
+- **After changing the season sim, polls or progression,** run `npm run season` and compare against the flags in SEASON.md and the per-position growth table in PROGRESSION.md (the report flags any position more than 15% off the mean).
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.
 

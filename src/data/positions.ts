@@ -57,12 +57,25 @@ export const OVR_WEIGHTS: Record<Position, Partial<Record<RatingKey, number>>> =
 export function overallRaw(r: Ratings, pos: Position): number {
   let sum = 0;
   let wsum = 0;
-  for (const [k, w] of Object.entries(OVR_WEIGHTS[pos]) as [RatingKey, number][]) {
-    const [v75, slope] = TEMPLATES[pos][k] ?? [75, 1];
+  for (const [k, w, v75, slope] of ovrTerms(pos)) {
     sum += (r[k] - v75) * w;
     wsum += w * slope;
   }
   return 75 + sum / wsum;
+}
+
+/** Each position's overall terms, [rating, weight, template at 75, slope], built once (overalls are computed constantly). */
+const TERMS = new Map<Position, [RatingKey, number, number, number][]>();
+function ovrTerms(pos: Position): [RatingKey, number, number, number][] {
+  let t = TERMS.get(pos);
+  if (!t) {
+    t = (Object.entries(OVR_WEIGHTS[pos]) as [RatingKey, number][]).map(([k, w]) => {
+      const [v75, slope] = TEMPLATES[pos][k] ?? [75, 1];
+      return [k, w, v75, slope];
+    });
+    TERMS.set(pos, t);
+  }
+  return t;
 }
 
 /** One rating's part in an overall: its share of the weight, and the overall points it adds or costs against a 75. */

@@ -7,9 +7,13 @@ import { apPoll, cfpRankings } from './polls';
 import { bowlGames, bracketGames, bracketRoundDone, confChampGames, newBracket, recordBracket, selectPlayoff } from './postseason';
 import { SAVE_VERSION } from './save';
 import { generateSchedule } from './schedule';
-import { settleTie, simGame } from './simGame';
+import { athleteName, type Squad } from '../data/depth';
+import { gradeGame } from './grades';
+import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
+import { GAME_SIM, settleTie, simGame } from './simGame';
 import { autoGamePlan, type GamePlan } from './staff';
-import type { GameResult, SeasonConfig, SeasonGame, SeasonState } from './types';
+import { records } from './standings';
+import type { DriveLog, GameResult, SeasonConfig, SeasonGame, SeasonState } from './types';
 import { seasonRng, squadFor } from './world';
 
 /**
@@ -28,6 +32,13 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     coach: prev?.coach ?? (config.coachCareer ? newCoach(config.userTeamId) : undefined),
     history: prev?.history ?? [],
   };
+  // Progression carries over, without last season's week marks.
+  for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
+    if (!ts.progress) continue;
+    const progress = JSON.parse(JSON.stringify(ts.progress)) as NonNullable<typeof ts.progress>;
+    for (const p of Object.values(progress)) delete p.up;
+    state.teamState[id] = { progress };
+  }
   state.games = generateSchedule(TEAMS, year, seasonRng(state, 'schedule'));
   const pre = apPoll(state, 0).poll;
   state.polls.push(pre);
@@ -50,7 +61,11 @@ interface WeekContext {
   week: number;
   /** The user's game, played on the field (scores only so far). */
   userResult?: GameResult;
+  /** The user's live game as drive logs, for the progression grades. */
+  userDrives?: DriveLog[];
   plans: Map<string, GamePlan>;
+  /** Each game's drives and the squads that played it, for the progress step. */
+  played: Map<string, { drives: DriveLog[]; home: Squad; away: Squad; neutral: boolean }>;
 }
 
 type WeekStep = (state: SeasonState, ctx: WeekContext) => void;
@@ -75,12 +90,53 @@ const play: WeekStep = (state, ctx) => {
     const home = squadFor(state, g.home);
     const away = squadFor(state, g.away);
     const rng = seasonRng(state, 'game', g.id);
+    const drives: DriveLog[] = [];
     if (ctx.userResult && (g.home === user || g.away === user)) {
-      g.result = { ...settleTie(ctx.userResult, home, away, rng, g.neutral), live: true };
+      drives.push(...(ctx.userDrives ?? []));
+      g.result = { ...settleTie(ctx.userResult, home, away, rng, g.neutral, drives), live: true };
     } else {
-      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! } });
+      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives });
+    }
+    ctx.played.set(g.id, { drives, home, away, neutral: g.neutral });
+  }
+};
+
+/** Breakthroughs by real players on other teams that make the news each week. */
+const BREAKTHROUGH_NEWS = 2;
+
+/**
+ * Progress: every player who played earns XP from his game grades and may level up
+ * (season/progression.ts). Breakthroughs on the user's team make the news, and the biggest few by real players elsewhere.
+ */
+const progress: WeekStep = (state, ctx) => {
+  const recs = records(state);
+  const user = state.config.userTeamId;
+  const elsewhere: LevelUpEvent[] = [];
+  const told = (e: LevelUpEvent) =>
+    state.news.push({
+      week: ctx.week, kind: 'progress', teams: [e.team],
+      text: `BREAKTHROUGH: ${athleteName(e.athlete)} (${teamById(e.team).abbr} ${e.athlete.pos}) ${deltaText(e.d)}`,
+    });
+  for (const [id, { drives, home, away, neutral }] of ctx.played) {
+    if (!drives.length) continue;
+    const share: Record<string, number> = {};
+    for (const sq of [home, away]) share[sq.team.id] = ctx.plans.get(sq.team.id)?.passShare ?? 0.5;
+    const grades = gradeGame(home, away, drives, share, seasonRng(state, 'grade', id), neutral ? 0 : GAME_SIM.homeEdge);
+    for (const sq of [home, away]) {
+      const t = sq.team.id;
+      const rec = recs.get(t)!;
+      const winPct = rec.w + rec.l ? rec.w / (rec.w + rec.l) : 0.5;
+      const events = progressTeam((state.teamState[t] ??= {}), sq, grades, ctx.week, winPct, seasonRng(state, 'progress', t, ctx.week));
+      for (const e of events) {
+        if (!e.big) continue;
+        if (t === user) told(e);
+        else if (e.athlete.real) elsewhere.push(e);
+      }
     }
   }
+  // Biggest by overall, not raw points (a QB level-up spends more points than a tackle's).
+  const pts = (e: LevelUpEvent) => Object.values(e.d).reduce((a, b) => a + (b ?? 0), 0) / POS_POINTS[e.athlete.pos];
+  for (const e of elsewhere.sort((a, b) => pts(b) - pts(a)).slice(0, BREAKTHROUGH_NEWS)) told(e);
 };
 
 /** Results: injuries heal. New injuries from games come later. */
@@ -145,6 +201,7 @@ const transition: WeekStep = (state, ctx) => {
 export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
   { name: 'prep', run: prep },
   { name: 'play', run: play },
+  { name: 'progress', run: progress },
   { name: 'results', run: results },
   { name: 'rankings', run: rankings },
   { name: 'news', run: news },
@@ -152,12 +209,12 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
 ];
 
 /**
- * Play out the current week: the user's game with `userResult` if they played it on the field,
- * everything else simulated. Does nothing once the season is complete.
+ * Play out the current week: the user's game with `userResult` (and its drives, for progression) if
+ * they played it on the field, everything else simulated. Does nothing once the season is complete.
  */
-export function advanceWeek(state: SeasonState, userResult?: GameResult): void {
+export function advanceWeek(state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[]): void {
   if (seasonOver(state)) return;
-  const ctx: WeekContext = { week: state.week, userResult, plans: new Map() };
+  const ctx: WeekContext = { week: state.week, userResult, userDrives, plans: new Map(), played: new Map() };
   for (const step of WEEK_STEPS) step.run(state, ctx);
   if (!seasonOver(state)) state.week++;
 }
@@ -172,8 +229,8 @@ export function simSeason(state: SeasonState): void {
 }
 
 /**
- * An open-ended season rolls into the next year. Rosters don't change yet: graduation, progression
- * from `potential`/`dev`, and recruiting belong in the offseason here.
+ * An open-ended season rolls into the next year. Players keep their progression; class years don't
+ * change yet: graduation, offseason growth and recruiting belong in the offseason here.
  */
 export function nextSeason(state: SeasonState): SeasonState {
   return newSeason(state.config, state.seed, state.year + 1, state);

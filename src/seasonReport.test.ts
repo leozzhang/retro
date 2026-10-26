@@ -1,5 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
+import { buildSquad, starters } from './data/depth';
+import { overallRaw, POSITIONS } from './data/positions';
 import { teamById, TEAMS } from './data/teams';
 import { latestPoll, rankIn } from './season/polls';
 import { champions } from './season/postseason';
@@ -7,6 +9,8 @@ import { defaultConfig, newSeason, simSeason } from './season/season';
 import { records, recordText, winner } from './season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
 import type { SeasonState } from './season/types';
+import { squadFor } from './season/world';
+import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
 
 /** `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count. */
 
@@ -89,6 +93,52 @@ function aggregate(seasons: SeasonState[]): string[] {
   ];
 }
 
+/**
+ * Progression over a season: overall gained by position (starters on the generated depth chart, and
+ * everyone else), level-ups per starter and breakthroughs. Positions far off the mean are flagged.
+ */
+function progression(seasons: SeasonState[]): string[] {
+  const by = new Map<string, { st: number[]; bk: number[]; lv: number[] }>();
+  let breaks = 0;
+  const tiers = new Map<number, number[]>();
+  for (const s of seasons) {
+    for (const t of TEAMS) {
+      const base = buildSquad(t);
+      const now = new Map(squadFor(s, t.id).athletes.map((a) => [a.id, a]));
+      const st = starters(base);
+      const first = new Set([...OFF_SLOTS, ...DEF_SLOTS, 'K', 'P'].map((x) => st[x]?.id));
+      const prog = s.teamState[t.id]?.progress ?? {};
+      for (const a of base.athletes) {
+        const e = by.get(a.pos) ?? by.set(a.pos, { st: [], bk: [], lv: [] }).get(a.pos)!;
+        const gain = overallRaw(now.get(a.id)!.r, a.pos) - overallRaw(a.r, a.pos);
+        (first.has(a.id) ? e.st : e.bk).push(gain);
+        if (first.has(a.id)) (tiers.get(t.profile.tier) ?? tiers.set(t.profile.tier, []).get(t.profile.tier)!).push(gain);
+        if (first.has(a.id)) e.lv.push(prog[a.id]?.lvl ?? 0);
+      }
+    }
+    breaks += s.news.filter((n) => n.kind === 'progress').length;
+  }
+  const avg = (x: number[]) => (x.length ? x.reduce((a, b) => a + b, 0) / x.length : 0);
+  const all = POSITIONS.filter((p) => p !== 'FB').map((p) => avg(by.get(p)!.st));
+  const mean = avg(all);
+  const rows = [
+    '', 'PROGRESSION: overall gained over the season. Starters: the 11-personnel offense, nickel defense, K and P',
+    'of the generated depth chart. Everyone else (backups and package players) in the last column.', 'pos   starters  levels  others',
+  ];
+  for (const p of POSITIONS) {
+    const e = by.get(p)!;
+    const g = avg(e.st);
+    const flag = p !== 'FB' && Math.abs(g - mean) > 0.15 * mean ? '  <-- off the mean by more than 15%' : '';
+    rows.push(`${p.padEnd(5)} ${g.toFixed(2).padStart(8)} ${avg(e.lv).toFixed(1).padStart(7)} ${avg(e.bk).toFixed(2).padStart(8)}${flag}`);
+  }
+  rows.push(
+    'starter gain by program tier (grades are against the matchup, so this should follow dev traits and potential, not wins): ' +
+      [...tiers.entries()].sort((a, b) => a[0] - b[0]).map(([t, g]) => `T${t} ${avg(g).toFixed(2)}`).join('  '),
+  );
+  rows.push(`mean starter gain ${mean.toFixed(2)}; breakthrough news per season ${(breaks / seasons.length).toFixed(1)} (the user's team and real players)`);
+  return rows;
+}
+
 function detail(s: SeasonState): string[] {
   const rows: string[] = [];
   const recs = records(s);
@@ -137,6 +187,6 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
     simSeason(s);
     seasons.push(s);
   }
-  const rows = [...aggregate(seasons), `time per season ${((Date.now() - t0) / n / 1000).toFixed(2)} s`, ...detail(seasons[0])];
+  const rows = [...aggregate(seasons), `time per season ${((Date.now() - t0) / n / 1000).toFixed(2)} s`, ...progression(seasons), ...detail(seasons[0])];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

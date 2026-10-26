@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-24_
+_Last updated: 2026-10-25_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -622,6 +622,84 @@ Method and full tables are in [SEASON.md](SEASON.md) under "Score calibration".
 - **Checked in headless Chrome** (CDP canvas snapshots): the hub buttons, the grid, detail views (Mesh, Power O, PA Boot Flood, Speed Option, Curl Flat), starring by click, and the call screen's STARRED chip. A QB under center is drawn a chip behind the center so both numbers show.
 - **Rough edges:** long play names are cut at 16 characters on the grid cards ("I-FORM DEEP CROS"). The option QB's path down the line isn't drawn, only his mesh point. Deep routes run off the top of the field.
 
+## Done: player progression (2026-10-25)
+Players now improve automatically during the season; nobody picks attributes. Every team uses the same code. Design notes, the formulas and the calibration are in [PROGRESSION.md](PROGRESSION.md).
+- **Drive logs:** `simulateDrive` reports each play to an optional `onPlay` callback without drawing random numbers, so every score is unchanged (tested).
+  - `simGame` and `settleTie` collect each game's drives, with the try and kickoff after a score.
+  - Live season games log the user's real snaps (gain, pass or run, sack, INT) and kicks, plus the CPU's simulated drives. These go through `advanceWeek(state, result, drives)`.
+- **Game grades** (`season/grades.ts`): one grade per player per snap.
+  - A win or a loss at his job, less an even player's rate. The odds come from the play's success and his overall against the man across from him.
+  - Key players (passer, target and cover man, carrier, tackler) follow the play more closely. Sacks go on a lineman and his rusher, INTs on the cover man. Kicks are graded against make odds.
+  - Centered so the average snap grades 0 at every position at an even matchup (within ±0.01).
+  - Backups rotate in (`ROTATION`), and package players sub in (`PACKAGES`: TE2 and FB, SAM, DIME). Playing time is measured against a full-time player at the slot, so a rotating DT starter counts as full time.
+- **XP:** playing time × (base + grade bonus) × a multiplier clamped to 0.5–2: headroom to potential, dev trait, confidence (last 3 grades), morale (team win %, starting) and class.
+- **Level-ups:** 1–3 points at a typical position, scaled per position (`POS_POINTS`, `LEVEL_XP`) so a level-up is worth the same overall everywhere. A 4% breakthrough gives 4–6.
+  - Each point is a weighted draw: OVR weight × profile (grow into strengths) × performance tags (deep completions → `dac`, contested catches → `cit`, broken tackles → `elu`, sacks → `rsh`...) × growth rate (speed almost never) × headroom to a per-rating ceiling.
+- **State:** `TeamState.progress` (XP, level, all-time deltas, last level-up week, tags, recent grades). `squadFor` applies it and rebuilds the staff depth chart. `nextSeason` carries it over.
+- **Week loop:** a new `progress` step after `play`. Breakthroughs make the news: the user's team, plus the two biggest by real players elsewhere each week.
+- **Team page:**
+  - The OVR breakdown's `+/-` column is gone. **WK** shows a green arrow for a rating raised last week, or a flat line; **ALL** is the all-time change.
+  - Grown ratings in the other-ratings grid are green.
+  - The card shows `LVL n`, an XP bar and the XP multiplier (hover for its parts). The depth list shows an arrow next to OVR for last week's level-ups.
+  - The hub shows last week's level-ups and breakthroughs above the hint bar.
+- **Speed:** `squadFor` is cached per team state, `buildDepth` scores each candidate once, and `overallRaw` precomputes its terms. Without these, progression made a season 8.8 s; it's now 1.7 s (was 0.63 s).
+- **`npm run season`** has a progression section: overall gained by position for starters and others, levels, breakthroughs, and a flag for any position more than 15% off the mean. 5 seasons: the mean is +2.0 for starters, from 1.8 (DE) to 2.2 (C, P). Scores and polls didn't move outside noise.
+- **`npm run balance`:** byte-identical (checked against HEAD).
+- **Tests:** 11 new in `src/progression.test.ts`:
+  - fairness: XP per game by position within 10%, offense vs defense within 5%, overall per XP within 15%
+  - the multiplier clamp
+  - points per level-up and breakthroughs; ceilings
+  - speed under 2% of points
+  - a pocket passer keeps his identity
+  - tags steer draws
+  - `squadFor` applies deltas and re-sorts
+  - a week levels players and marks last week
+  - live games progress only through drives
+  The save test now checks box-score packing and a 4 MB budget. 132 in total.
+- **Checked in headless Chrome** (CDP: new season, sim 5 and 9 weeks, team page, hover, news): arrows, ALL, LVL and XP, the hub line and the breakthrough news all show. No console errors.
+- **Flags (not tuned):**
+  - Saves grew to about 2.6 MB packed (progression is about 0.9 MB of it).
+  - Backups barely grow (0–0.3 a season): they need the offseason.
+  - The WK arrows clear after a bye week, since they mean "the last week played".
+  - The AP preseason prior now reads the current roster, so it drifts slightly as players grow (it fades out by week 9 anyway).
+
+## Done: grades against the expected outcome (2026-10-25)
+**Bug:** game grades rewarded winning.
+- They were centered on the league-wide success rate (0.56) and on an even player matchup. So a strong team's offense, which succeeds more against a weak defense, and any player out-rated by his man's opponent graded well just for the matchup.
+- Template teams at 88 against 68: the strong team's starters graded +0.21 a snap and earned 162 XP a game; the weak team's graded −0.22 and earned 33. That's 5×, and it compounds as the strong team improves.
+
+**Fix** (`season/grades.ts`):
+- Every snap is graded against the win rate expected for that player in that matchup (`expectedWin`): his overall against the man across from him, and the success rate expected for this offense against this defense, home edge included.
+  - That success rate is `expectedSuccess`, a logistic fit on 3,000 simulated games between real rosters (`successBase` 0.254, `successPerPoint` 0.0365 per point of offense-minus-defense rating).
+  - A block held against an elite rusher is now worth more than against a weak one.
+- One-on-one reps (`PAIRS`: line, receivers and corners, TE and SS, back and WILL) are one draw, and the defender's grade mirrors it.
+- A sack now tags the rusher who beat his man instead of forcing a loss on a lineman.
+- Punts and kickoffs are graded against the kicker matchup's expectation, not a flat 0.5.
+
+**After:**
+- Strong and weak teams both average 0 per snap (±0.003) and earn 97–98 XP a game at 88 vs 68, 80 vs 80, and 68 vs 88.
+- In live games, the user beating the expected success rate still raises the offense's grades.
+- 5 real seasons: starters gain +1.95 (positions 1.80–2.18). By tier: T1 2.04, T2 2.08, T3 2.00, T4 1.90, T5 1.73. The remaining slope comes from the multiplier's morale (team win %, which you specified) and from better dev traits on better players, not from grades. `npm run season` now prints the tier line.
+- Scores are unchanged (grading draws on its own random stream).
+
+**Tests:** 3 new: a strong team beating a weak one earns the same XP (within 5%) and grades about 0; expectations by matchup (a held block is worth more against an elite rusher, and the defense's expectation mirrors the offense's); beating or missing the expected result grades above or below 0. 135 in total.
+
+## Done: soft potential ceiling, empty breakthroughs fixed (2026-10-25)
+- **Problem:** potential wasn't much of a ceiling.
+  - The XP multiplier bottomed out at 0.5, so players at potential kept leveling about as often as anyone.
+  - Only the per-rating ceilings held them, and those allow about +2 overall from `ceilMargin` plus whole-point steps.
+  - Measured over 4 open-ended seasons: up to 4.5 overall past potential, and 58% of leveled players over it by season 4.
+- **Fix:** potential stays a soft ceiling, not a hard cap. A new `potentialFactor` scales the XP multiplier after its 0.5–2 clamp:
+  - 1 with a point or more of room
+  - `atPotential` (0.15) at potential
+  - halving for every point past it
+  A full-time starter at potential gets about 0.08× XP, about one level-up a season, and each one can still be a breakthrough. The card's hover shows AT POT.
+  - **After:** at most 1.5 past potential in 4 seasons. Players starting a season at potential level 0.1–0.3 times in it.
+- **Bug fixed:** a level-up where every rating was already at its ceiling still counted as a level. If it rolled a breakthrough, it made the news with no points (8 times over seasons 3–4). Now such a level-up spends its XP but isn't a level, an arrow or a breakthrough.
+- **Season report:** starters gain +1.58 a season (was +1.95). Upperclassmen near potential now slow down sharply.
+  - **Flag:** the punter row is 17% over the mean (it was already the highest). Not tuned.
+- **Tests:** 2 new: the potential factor (1 with room, 0.15 at potential, halving past it, never 0, and the total under the floor); an all-at-ceiling level-up is no level, no event and no breakthrough. The clamp test now checks the floor for a player below potential. 137 in total.
+
 ## Balance baseline
 From `npm run balance` on the **reference matchup** (template players, offense 90 vs defense 88; `referenceMatchup` in `src/harness.ts`), after the ratings and roster work. The earlier baselines used the old generated Georgia and Alabama rosters, which had a lucky 99-elusiveness back; compare against this one from now on. The single-seed 120-rep rows below move a few points from run to run.
 - **Pass and PA rows:** the auto-QB throws to the most open receiver after a fixed hold time, aiming in bounds.
@@ -676,6 +754,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
 - **No injury mechanic yet:** `Athlete.injury`, the depth chart and the season's `teamState.injuries` (healed weekly) are ready for it.
+- **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season packs to about 2.6 MB, half the localStorage limit. Details in [PROGRESSION.md](PROGRESSION.md).
 - **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
@@ -709,7 +788,7 @@ These need a harness that targets by route (or by read), not "most open". The cu
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; injuries from games; more on the team page (confidence, mentality, season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, progression from `potential`/`dev`, recruiting from `stars`/hometowns, and the coaching carousel.
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; injuries from games; more on the team page (confidence, mentality, season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
