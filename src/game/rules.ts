@@ -1,4 +1,5 @@
 import { FIELD_W, HASH_BOT, HASH_TOP, OPP_GOAL, OWN_GOAL } from '../engine/constants';
+import { CONF, leverage, unitEdge, type UnitConf } from '../data/confidence';
 import { clamp, gauss, type Rng } from '../engine/math';
 
 /** 'fumble' = botched exchange or pitch, recovered by the offense (spotted like a tackle). */
@@ -216,6 +217,18 @@ export interface SimPlay {
   /** A field goal try ends the drive: its distance and whether it was good. */
   fg?: { dist: number; made: boolean };
   punt?: boolean;
+  /** How much the snap mattered, 0..1 (`leverage` in data/confidence.ts). */
+  lev: number;
+}
+
+/** Confidence for one drive: the offense's and defense's units and the kicker (`teamConf`), and whether it's late and close. */
+export interface DriveConf extends UnitConf {
+  late: boolean;
+}
+
+/** Drive-sim field goal odds by distance, plus the kicker's confidence edge (`kEdge`, rating points). */
+export function fgOdds(dist: number, kEdge = 0): number {
+  return clamp(0.97 - (dist - 20) * 0.017 + kEdge * CONF.fgPerPoint, 0.3, 0.97);
 }
 
 /** Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap. */
@@ -255,10 +268,11 @@ function simGain(diff: number, rng: Rng): [number, boolean] {
 
 /**
  * Abstract simulation of an opponent possession (the user only plays offense for now).
- * `start` is in yards from the CPU's own goal line.
+ * `start` is in yards from the CPU's own goal line. With `conf`, each snap's rating gap moves by the
+ * two units' confidence at that snap's leverage (it draws no extra random numbers).
  */
 export function simulateDrive(
-  offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK, onPlay?: (p: SimPlay) => void,
+  offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK, onPlay?: (p: SimPlay) => void, conf?: DriveConf,
 ): DriveSim {
   const diff = offOvr - defOvr;
   const edge = diff * DRIVE_SIM.edgePerPoint;
@@ -274,12 +288,13 @@ export function simulateDrive(
     if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
     plays++;
     secs += simPlaySecs(clock, rng);
+    const lev = leverage(down, 100 - yard, conf?.late ?? false);
     if (rng() < DRIVE_SIM.turnover) {
-      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo });
+      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, lev });
       return done(0, 'TURNOVER');
     }
-    const [gain, explosive] = simGain(diff, rng);
-    onPlay?.({ gain, explosive, turnover: false, down, toGo });
+    const [gain, explosive] = simGain(conf ? diff + unitEdge(conf.off - conf.def, lev) : diff, rng);
+    onPlay?.({ gain, explosive, turnover: false, down, toGo, lev });
     yard += gain;
     toGo -= gain;
     if (yard >= 100) return done(7, 'TOUCHDOWN', 100);
@@ -294,8 +309,9 @@ export function simulateDrive(
     const lastPlay = secs + 20 >= clock.timeLeft && fgDist <= 52;
     if (down === 4 || lastPlay) {
       if (fgDist <= 52) {
-        const made = rng() < clamp(0.97 - (fgDist - 20) * 0.017, 0.3, 0.97);
-        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, fg: { dist: fgDist, made } });
+        const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);
+        const made = rng() < fgOdds(fgDist, conf ? unitEdge(conf.k, fgLev) : 0);
+        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, fg: { dist: fgDist, made }, lev: fgLev });
         return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
       }
       if (toGo <= 2 && yard > 45 && rng() < 0.5) {
@@ -308,11 +324,11 @@ export function simulateDrive(
         }
         return done(0, 'DOWNS');
       }
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true });
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true, lev: 0 });
       return done(0, 'PUNT');
     }
   }
-  onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true });
+  onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true, lev: 0 });
   return done(0, 'PUNT');
 }
 

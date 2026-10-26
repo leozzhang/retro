@@ -52,11 +52,11 @@ Each snap, every player on the field gets one grade: his result at his job (a wi
 | Headroom | 0.6–1.4 | Potential minus overall: 0.6 at his ceiling, 1.4 with 10+ to go |
 | Potential factor | 1 down to near 0 | `potentialFactor`: 1 with a point or more of room, falling to `atPotential` (0.15) at his potential, then halving for every point past it (`overHalving`). Applied after the clamp |
 | Dev | 0.85–1.45 | `DEV_XP`: normal, impact, star, elite |
-| Confidence | 0.9–1.1 | His last 3 game grades (stored in `Progress.g`) |
+| Confidence | 0.9–1.1 | `1 + confXp × confidence`, his stored confidence (`Progress.c`, plus any spark, less any benching penalty; [CONFIDENCE.md](CONFIDENCE.md)) |
 | Morale | 0.9–1.1 | His team's win %, and whether he starts |
 | Class | 0.85–1.2 | `YEAR_XP`: FR 1.2 to SR 0.9; a redshirt year takes off 0.05 |
 
-Confidence and morale are computed from game results, not stored as ratings. The card shows the multiplier next to LVL; hover it for the parts (AT POT shows when the potential factor is under 1).
+Confidence is stored per player and moves after each game (CONFIDENCE.md); morale is computed from the team's record. The card shows the multiplier next to LVL; hover it for the parts (AT POT shows when the potential factor is under 1).
 
 **Potential is a soft ceiling, not a hard cap.**
 - A full-time starter at his potential earns about 0.08× XP: 0.5 × 0.15, about one level-up a season instead of five. A point past it, half that.
@@ -94,7 +94,8 @@ Confidence and morale are computed from game results, not stored as ratings. The
   - `d`: the all-time rating changes
   - `up`: the week of his last level-up and what it raised
   - `tags`: performance tags since his last level-up
-  - `g`: his last 3 grades
+  - confidence, sparks, breakouts and the dev and potential a breakout raised: see CONFIDENCE.md (`g`, the last 3 grades, is gone; old saves keep it harmlessly)
+- **Breakouts raise potential** (`Progress.pot`), and `progressTeam`'s ceilings use the raised potential.
 - **`squadFor`** adds `d` to the generated ratings. Once anyone has leveled, it rebuilds the staff depth chart, so a player who passes a teammate moves up. Squads are cached per team state and rebuilt only when levels, injuries or the user's chart change.
 - **`nextSeason`** carries progress into the next year, so ALL means all time.
 - **Save size:** progress adds about 0.9 MB, so a full season packs to about 2.6 MB (localStorage holds about 5 MB). `SAVE_VERSION` is unchanged: the field is optional, so old saves load.
@@ -119,5 +120,5 @@ Overall gained over a season by the generated depth chart's starters (11-personn
 ## Not built yet
 - Offseason growth, graduation and aging.
 - Practice focus.
-- Showing confidence and morale on their own, and per-game grades on the card.
+- Showing morale on its own, and per-game grades on the card. (Confidence has its own row on the card.)
 - A player who doesn't play still earns nothing, including a redshirting freshman.

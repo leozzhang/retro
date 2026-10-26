@@ -31,7 +31,7 @@ The season framework: every system in the week loop exists end to end, each behi
 | --- | --- | --- |
 | `prep` | Game plans for every team playing (`autoGamePlan`: pass share from the program's scheme), the user's if not delegated. Delegated depth charts are reset to the staff chart | Game-plan screen; opponent-specific plans; fatigue |
 | `play` | The user's game takes the live result (a tie goes to simulated overtime with `settleTie`); every other game is `simGame`. Both log their drives | Live box-score capture; a "watch" mode |
-| `progress` | Every game is graded from its drives; players earn XP and level up ([PROGRESSION.md](PROGRESSION.md)). Breakthroughs make the news | Practice focus; offseason growth |
+| `progress` | Every game is graded from its drives; players earn XP and level up ([PROGRESSION.md](PROGRESSION.md)), then confidence moves, new starters spark and breakouts land ([CONFIDENCE.md](CONFIDENCE.md)). Breakthroughs, breakouts and the user's next man up make the news | Practice focus; offseason growth; morale |
 | `results` | Injuries count down and health recovers, then each game's knocks and injuries from its grades (`season/injuries.ts`, [INJURIES.md](INJURIES.md)); injury news | Suspensions; mid-game injuries in live games |
 | `rankings` | AP poll every week; CFP rankings from `CALENDAR.cfpStartWeek` until selection | |
 | `news` | `weekNews`: user results, upsets, ranked matchups, big games, new No. 1, Heisman watch | More templates, coach quotes, recruiting news |

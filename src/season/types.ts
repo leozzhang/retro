@@ -1,4 +1,4 @@
-import type { Injury } from '../data/athletes';
+import type { DevTrait, Injury } from '../data/athletes';
 import type { DepthChart } from '../data/depth';
 import type { Position } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
@@ -142,8 +142,24 @@ export interface Progress {
   up?: { week: number; d: RatingDelta; big?: boolean };
   /** Performance tags since his last level-up: weighted counts per rating they boost. */
   tags?: RatingDelta;
-  /** His last few game grades (average grade per snap), newest last. */
-  g?: number[];
+  /** Confidence, -1 shaken .. +1 rolling (season/confidence.ts). Missing is 0. */
+  c?: number;
+  /** A benching penalty under `c` (the user sat him while in form for a weaker player); it fades. */
+  bh?: number;
+  /** A next-man-up spark on top of `c`, and the starts it has left. */
+  sp?: number;
+  spn?: number;
+  /** The season he last sparked (once a season). */
+  spy?: number;
+  /** His breakout window after a spark: team games so far, starts, and their summed performance. */
+  sw?: { t: number; n: number; z: number };
+  /** Team game number of his last start this season, and his starts this season. */
+  ls?: number;
+  gs?: number;
+  /** The season he broke out (once a career), and what it changed: dev trait and potential. */
+  bo?: number;
+  dev?: DevTrait;
+  pot?: number;
 }
 
 /** What changed on a team's roster this season. */
@@ -158,6 +174,10 @@ export interface TeamState {
   plan?: GamePlan;
   /** Progression by athlete id. */
   progress?: Record<string, Progress>;
+  /** Last game's starters by slot: the incumbents for the staff chart, and who a new starter replaced. */
+  st?: Record<string, string>;
+  /** Games played this season. */
+  gp?: number;
 }
 
 /**
@@ -177,12 +197,27 @@ export interface LoggedPlay {
   toGo: number;
   /** A kick instead of a snap from scrimmage. `dist` for field goals. */
   kick?: { unit: 'fg' | 'xp' | 'punt' | 'kickoff'; good: boolean; dist?: number };
+  /** How much the snap mattered, 0..1 (`leverage`, data/confidence.ts). Missing is 0. */
+  lev?: number;
 }
 
 /** One possession: the offense's snaps and kicks (the kickoff after a score belongs to the scoring team). */
 export interface DriveLog {
   off: string;
   plays: LoggedPlay[];
+}
+
+/**
+ * A confidence event: a spark (with why the starter lost the job), a benching of an in-form starter
+ * for a weaker one (`bench`, the benched player's id), or a breakout. For the season report.
+ */
+export interface ConfEvent {
+  week: number;
+  team: string;
+  id: string;
+  pos: Position;
+  kind: 'spark' | 'bench' | 'breakout';
+  reason?: 'injured' | 'slumping' | 'outplayed';
 }
 
 /** One injury, as it happened: for the news, the season report and starts lost. */
@@ -234,4 +269,6 @@ export interface SeasonState {
   history: SeasonSummary[];
   /** Every injury this season that cost a game, in order. */
   injuryLog?: InjuryEvent[];
+  /** Next man up this season (season/confidence.ts): sparks, benchings that earned nothing, and breakouts. */
+  confLog?: ConfEvent[];
 }

@@ -29,6 +29,8 @@ export interface Athlete {
   injury: Injury | null;
   /** 0..100; below 100 he's banged up and plays slower (`fitRatings` in depth.ts). Undefined is 100. */
   health?: number;
+  /** -1..1, laid on from the season (season/confidence.ts). Undefined is 0. */
+  conf?: number;
   /** A real player from the team research (docs/ROSTERS.md). */
   real?: boolean;
 }

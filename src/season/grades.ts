@@ -1,9 +1,11 @@
 import type { Athlete } from '../data/athletes';
-import { fitRatings, healthOf, healthy, starters, teamRatings, type Squad } from '../data/depth';
+import { NO_CONF, unitEdge, type UnitConf } from '../data/confidence';
+import { fitRatings, healthOf, healthy, starters, teamConf, teamRatings, type Squad } from '../data/depth';
 import { overall, POS_ROLE, SLOT_POS } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
 import type { Role } from '../data/teams';
 import { pickWeighted, type Rng } from '../engine/math';
+import { fgOdds } from '../game/rules';
 import { QB_RUN_SHARE, TARGETS } from './simGame';
 import type { DriveLog, LoggedPlay, RatingDelta } from './types';
 
@@ -33,6 +35,9 @@ export interface GameGrade {
   tags: RatingDelta;
   /** Contact he took: carries, catches, tackles made, sacks taken (`HITS`). Injuries read it. */
   hits: number;
+  /** Snap grades weighted by `1 + leverage`, and the weights: big moments count more for confidence. */
+  lsum: number;
+  lw: number;
 }
 
 /** The 11-personnel offense and the nickel defense every snap is graded with. */
@@ -135,11 +140,6 @@ export function successful(p: LoggedPlay): boolean {
   return p.gain >= need;
 }
 
-/** FG odds by distance, as the drive sim kicks them: the expectation a kick is graded against. */
-function fgOdds(dist: number): number {
-  return Math.max(0.3, Math.min(0.97, 0.97 - (dist - 20) * 0.017));
-}
-
 type Unit = 'off' | 'def' | 'k' | 'p';
 
 /** A player in a slot, with his grade for this game. */
@@ -167,8 +167,10 @@ interface Cast {
   p?: Man;
   passShare: number;
   qbRun: number;
-  /** Expected success rate of this team's offense against the other team's defense. */
-  pSucc: number;
+  /** This team's offense rating minus the other team's defense, home edge included. */
+  gap: number;
+  /** Each unit's confidence (`teamConf`): it moves the expected success rate on a snap by its leverage. */
+  conf: UnitConf;
   men: Man[];
   totals: Record<Unit, number>;
 }
@@ -180,7 +182,7 @@ function cast(squad: Squad, passShare: number): Cast {
   const team = squad.team.id;
   const men: Man[] = [];
   const man = (a: Athlete, slot: string, unit: Unit, full: number): Man => {
-    const m: Man = { a, ovr: overall(fitRatings(a), SLOT_POS[slot]), g: { team, snaps: 0, share: 0, sum: 0, tags: {}, hits: 0 }, unit, full };
+    const m: Man = { a, ovr: overall(fitRatings(a), SLOT_POS[slot]), g: { team, snaps: 0, share: 0, sum: 0, tags: {}, hits: 0, lsum: 0, lw: 0 }, unit, full };
     men.push(m);
     return m;
   };
@@ -200,7 +202,7 @@ function cast(squad: Squad, passShare: number): Cast {
     return { starter: man(a, slot, unit, 1 - rot - pkg), subs };
   };
   return {
-    team, passShare, men, pSucc: 0.5,
+    team, passShare, men, gap: 0, conf: NO_CONF,
     off: OFF_SLOTS.map((s) => seat(s, 'off')),
     def: DEF_SLOTS.map((s) => seat(s, 'def')),
     k: st.K ? man(st.K, 'K', 'k', 1) : undefined,
@@ -210,10 +212,13 @@ function cast(squad: Squad, passShare: number): Cast {
   };
 }
 
-function credit(m: Man, win: boolean, expected: number, tags: Tags): void {
+function credit(m: Man, win: boolean, expected: number, tags: Tags, lev: number): void {
   const g = m.g;
+  const x = (win ? 1 : 0) - expected;
   g.snaps++;
-  g.sum += (win ? 1 : 0) - expected;
+  g.sum += x;
+  g.lsum += x * (1 + lev);
+  g.lw += 1 + lev;
   if (!win) return;
   for (const [k, v] of tags) g.tags[k] = (g.tags[k] ?? 0) + v;
 }
@@ -271,7 +276,8 @@ const RD: (Rep | null)[] = new Array(DEF_SLOTS.length).fill(null);
 function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
   const pass = p.pass ?? rng() < off.passShare;
   const s = successful(p) ? 1 : -1;
-  const pSucc = off.pSucc;
+  const lev = p.lev ?? 0;
+  const pSucc = expectedSuccess(off.gap + unitEdge(off.conf.off - def.conf.def, lev));
   fill(O, off.off, rng);
   fill(D, def.def, rng);
   RO.fill(null);
@@ -366,27 +372,31 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
       D[j]!.g.hits += HITS.sack;
     }
   }
-  for (let i = 0; i < O.length; i++) if (O[i]) credit(O[i]!, RO[i]!.win, RO[i]!.expected, RO[i]!.tags);
-  for (let j = 0; j < D.length; j++) if (D[j]) credit(D[j]!, RD[j]!.win, RD[j]!.expected, RD[j]!.tags);
+  for (let i = 0; i < O.length; i++) if (O[i]) credit(O[i]!, RO[i]!.win, RO[i]!.expected, RO[i]!.tags, lev);
+  for (let j = 0; j < D.length; j++) if (D[j]) credit(D[j]!, RD[j]!.win, RD[j]!.expected, RD[j]!.tags, lev);
 }
 
-/** A kick: graded against the expectation (FG odds by distance, or the matchup with the other team's kicker). */
+/**
+ * A kick: graded against the expectation (the drive sim's FG odds by distance with the kicker's
+ * confidence at that kick's leverage, or the matchup with the other team's kicker).
+ */
 function kick(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
   const k = p.kick!;
   const punt = k.unit === 'punt';
   const m = punt ? off.p : off.k;
   if (!m) return;
+  const lev = p.lev ?? 0;
   off.totals[punt ? 'p' : 'k']++;
   if (k.unit === 'fg' || k.unit === 'xp') {
     const dist = k.dist ?? 20;
     const tags: [RatingKey, number][] = k.unit === 'fg' ? [['kac', TAG.fg]] : [['kac', TAG.kick]];
     if (k.unit === 'fg' && dist >= LONG_FG) tags.push(['kpw', TAG.longFg]);
-    credit(m, k.good, k.unit === 'xp' ? 0.97 : fgOdds(dist), tags);
+    credit(m, k.good, k.unit === 'xp' ? 0.97 : fgOdds(dist, unitEdge(off.conf.k, lev)), tags, lev);
     return;
   }
   const vs = punt ? def.p : def.k;
   const odds = sigmoid(GRADES.gapK * (m.ovr - (vs?.ovr ?? m.ovr)));
-  credit(m, rng() < odds, odds, [['kpw', TAG.kick], ['kac', TAG.kick]]);
+  credit(m, rng() < odds, odds, [['kpw', TAG.kick], ['kac', TAG.kick]], lev);
 }
 
 /**
@@ -401,8 +411,10 @@ export function gradeGame(
   const a = cast(away, passShare[away.team.id] ?? 0.5);
   const hr = teamRatings(home);
   const ar = teamRatings(away);
-  h.pSucc = expectedSuccess(hr.off + homeEdge - ar.def);
-  a.pSucc = expectedSuccess(ar.off - hr.def - homeEdge);
+  h.gap = hr.off + homeEdge - ar.def;
+  a.gap = ar.off - hr.def - homeEdge;
+  h.conf = teamConf(home);
+  a.conf = teamConf(away);
   const casts = new Map([[h.team, h], [a.team, a]]);
   for (const dr of drives) {
     const off = casts.get(dr.off);

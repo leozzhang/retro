@@ -1,7 +1,8 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
 import { FORMATIONS, PLAY_TABS, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
-import { buildSquad, onField, reorderPosition, teamRatings, type Squad } from '../data/depth';
+import { clutchRoster, confLabel, lateAndClose, leverage } from '../data/confidence';
+import { buildSquad, onField, reorderPosition, teamConf, teamRatings, type Squad } from '../data/depth';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
 import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
@@ -10,7 +11,7 @@ import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
 import type { Vec3 } from '../engine/math';
 import { drawField, makeCrowd } from '../render/field';
-import { drawBanner, drawHint, drawPlayClock, drawScorebug } from '../render/hud';
+import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
@@ -131,6 +132,8 @@ export class Game {
   private cpuSquad!: Squad;
   private userRoster!: Record<string, RosterPlayer>;
   private cpuRoster!: Record<string, RosterPlayer>;
+  /** The current snap's leverage (data/confidence.ts), logged with it for the grades. */
+  private snapLev = 0;
   private crowd: HTMLCanvasElement | null = null;
   private cam = new Camera();
   private rng = Math.random;
@@ -681,12 +684,21 @@ export class Game {
     this.cam.follow(this.spotX(), 0.4);
   }
 
+  /** How much the next snap matters: the down, the red zone, late and close; a field goal counts its distance. */
+  private snapLeverage(fg = false): number {
+    const d = this.drive;
+    const late = lateAndClose(this.clock.quarter, this.score.user - this.score.cpu);
+    return leverage(d.down, OPP_GOAL - d.los, late, fg ? fgDistance(d.los, OPP_GOAL) : undefined);
+  }
+
   private startPlay(def: PlayDef): void {
+    // Everyone plays this snap with his confidence at its leverage.
+    this.snapLev = this.snapLeverage();
     this.play = new Play({
       offTeam: this.user,
       defTeam: this.cpu,
-      offRoster: this.userRoster,
-      defRoster: this.cpuRoster,
+      offRoster: clutchRoster(this.userRoster, this.snapLev),
+      defRoster: clutchRoster(this.cpuRoster, this.snapLev),
       play: def,
       defCall: this.defCall!,
       press: this.press,
@@ -701,11 +713,13 @@ export class Game {
 
   private startKick(def: KickDef): void {
     const kickoff = def.unit === 'kickoff';
+    const place = def.unit === 'fg' || def.unit === 'xp';
+    this.snapLev = place ? this.snapLeverage(true) : 0;
     this.kick = new KickPlay({
       kickTeam: this.user,
       recvTeam: this.cpu,
-      kickRoster: this.userRoster,
-      recvRoster: this.cpuRoster,
+      kickRoster: clutchRoster(this.userRoster, this.snapLev),
+      recvRoster: clutchRoster(this.cpuRoster, this.snapLev),
       def,
       los: kickoff ? KICKOFF_LINE : this.drive.los,
       ballY: kickoff ? FIELD_W / 2 : this.drive.ballY,
@@ -936,6 +950,7 @@ export class Game {
       ...(o.type === 'sack' ? { sack: true } : {}),
       ...(int ? { int: true, turnover: true } : {}),
       ...(gain >= 20 ? { explosive: true } : {}),
+      ...(this.snapLev ? { lev: this.snapLev } : {}),
     });
   }
 
@@ -943,7 +958,7 @@ export class Game {
     if (!this.liveDrives) return;
     const good = o.unit === 'fg' ? o.result === 'fgGood' : o.unit === 'xp' ? o.result === 'xpGood' : true;
     const kick = { unit: o.unit, good, ...(o.unit === 'fg' ? { dist: fgDistance(this.drive.los, OPP_GOAL) } : {}) };
-    this.liveDrives[0].plays.push({ gain: 0, down: 0, toGo: 0, kick });
+    this.liveDrives[0].plays.push({ gain: 0, down: 0, toGo: 0, kick, ...(this.snapLev ? { lev: this.snapLev } : {}) });
   }
 
   /** Simulate a CPU possession from `start` (yards from its own goal), burning game clock. */
@@ -953,9 +968,11 @@ export class Game {
     const diff = this.score.cpu - this.score.user;
     const late = (c.quarter === 4 && left < 300) || (c.quarter === 2 && left < 120);
     const plays: SimPlay[] = [];
+    const cpuConf = teamConf(this.cpuSquad);
+    const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
     const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, {
       timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
-    }, this.liveDrives ? (p) => plays.push(p) : undefined);
+    }, this.liveDrives ? (p) => plays.push(p) : undefined, conf);
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += sim.points;
@@ -1042,6 +1059,13 @@ export class Game {
       (this.screen === 'kick' && this.kick?.phase === 'presnap');
     if (huddle && this.callMode !== 'kickoff') drawPlayClock(g, playClockText(this.clock), this.clock.play, this.t);
     const kicking = this.screen === 'kick' || (this.screen === 'call' && this.cards()[0]?.kind === 'kick');
+    if (huddle && this.callMode !== 'kickoff' && !this.drive.try) {
+      // A big snap: show the key man's nerve, the QB's or, lining up a kick, the kicker's.
+      const place = kicking && this.kick?.unit !== 'punt';
+      const lev = this.screen === 'call' ? this.snapLeverage(place) : this.snapLev;
+      const man = this.userRoster[place ? 'K' : 'QB'];
+      if (lev >= 0.5 && man) drawClutch(g, place ? 'K' : 'QB', confLabel(man.conf ?? 0), man.conf ?? 0);
+    }
     if (kicking) drawWind(g, this.wind, windLabel(this.wind));
 
     if (this.screen === 'call') this.renderCall(g);

@@ -155,13 +155,13 @@ describe('progression', () => {
 
   it('the XP multiplier is clamped, however the bonuses stack', () => {
     const hot = { ...prospect('WR', 50), potential: 99, dev: 'elite', year: 'FR' } as Athlete;
-    const hotProg: Progress = { xp: 0, lvl: 0, d: {}, g: [0.5, 0.5, 0.5] };
+    const hotProg: Progress = { xp: 0, lvl: 0, d: {}, c: 1 };
     const m = xpMultiplier(hot, hotProg, 1, true);
     expect(m.headroom * m.dev * m.confidence * m.morale * m.year).toBeGreaterThan(PROGRESSION.multMax);
     expect(m.total).toBe(PROGRESSION.multMax);
     // Below potential, the floor holds however the penalties stack.
     const cold = { ...prospect('WR', 80), potential: 82, dev: 'normal', year: 'SR', redshirt: true } as Athlete;
-    const coldProg: Progress = { xp: 0, lvl: 0, d: {}, g: [-0.5, -0.5, -0.5] };
+    const coldProg: Progress = { xp: 0, lvl: 0, d: {}, c: -1 };
     expect(xpMultiplier(cold, coldProg, 0, false).total).toBeCloseTo(PROGRESSION.multMin, 10);
   });
 
@@ -192,7 +192,7 @@ describe('progression', () => {
     const squad = buildSquad(teamById('georgia'));
     const grown = { ...squad, athletes: squad.athletes.map((x) => (x.id === base.id ? { ...x, r } : x)) };
     const ts: TeamState = { progress: { [base.id]: { xp: 10_000, lvl: 0, d: {} } } };
-    const g: GameGrade = { team: 'georgia', snaps: 70, share: 1, sum: 0, tags: {}, hits: 0 };
+    const g: GameGrade = { team: 'georgia', snaps: 70, share: 1, sum: 0, tags: {}, hits: 0, lsum: 0, lw: 70 };
     const events = progressTeam(ts, grown, new Map([[base.id, g]]), 3, 0.5, rng);
     expect(events.filter((e) => e.athlete.id === base.id)).toEqual([]);
     expect(ts.progress![base.id].lvl).toBe(0);

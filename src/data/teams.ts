@@ -14,6 +14,8 @@ export interface RosterPlayer {
   num: number;
   r: Ratings;
   skin: string;
+  /** Confidence, -1..1 (data/confidence.ts): shifts his ratings snap by snap. Missing is 0. */
+  conf?: number;
 }
 
 export interface TeamColors {

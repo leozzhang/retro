@@ -1,8 +1,9 @@
 import type { Athlete } from '../data/athletes';
-import { athleteName, starters, teamRatings, type Squad } from '../data/depth';
+import { lateAndClose, type UnitConf } from '../data/confidence';
+import { athleteName, starters, teamConf, teamRatings, type Squad } from '../data/depth';
 import { overall, SLOT_POS } from '../data/positions';
 import { clamp, gauss, pickWeighted, type Rng } from '../engine/math';
-import { simulateDrive, userStartAfter, type DriveClock, type DriveSim, type SimPlay } from '../game/rules';
+import { simulateDrive, userStartAfter, type DriveClock, type DriveConf, type DriveSim, type SimPlay } from '../game/rules';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { DriveLog, GameResult, LoggedPlay, PlayerLine, TeamLine } from './types';
 
@@ -42,6 +43,7 @@ interface Side {
   plan: GamePlan;
   qbRun: number;
   on: Record<string, Athlete>;
+  conf: UnitConf;
   tl: TeamLine;
   lines: Map<string, PlayerLine>;
 }
@@ -52,6 +54,7 @@ function side(squad: Squad, plan: GamePlan, edge: number): Side {
     id: squad.team.id, squad, off: r.off + edge, def: r.def + edge, plan,
     qbRun: QB_RUN_SHARE[squad.team.profile.offense.qbStyle] ?? 0.1,
     on: starters(squad),
+    conf: teamConf(squad),
     tl: { points: 0, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 },
     lines: new Map(),
   };
@@ -165,6 +168,7 @@ function credit(s: Side, d: DriveSim, rng: Rng): void {
 export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false): DriveLog {
   const out: LoggedPlay[] = plays.map((p) => {
     const l: LoggedPlay = { gain: p.gain, down: p.down, toGo: p.toGo };
+    if (p.lev) l.lev = p.lev;
     if (p.explosive) l.explosive = true;
     if (p.turnover) l.turnover = true;
     if (p.fg) l.kick = { unit: 'fg', good: p.fg.made, dist: p.fg.dist };
@@ -177,11 +181,18 @@ export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false)
   return { off, plays: out };
 }
 
+/** The confidence a drive is played with: the offense's unit and kicker against the defense's. */
+function driveConf(o: Side, dfn: Side, late: boolean): DriveConf {
+  return { off: o.conf.off, def: dfn.conf.def, k: o.conf.k, late };
+}
+
 /** `simulateDrive`, logging the drive into `logs` when there are any. */
-function drive(off: string, offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock | undefined, logs: DriveLog[] | undefined, ot = false): DriveSim {
-  if (!logs) return simulateDrive(offOvr, defOvr, start, rng, clock);
+function drive(
+  off: string, offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock | undefined, logs: DriveLog[] | undefined, conf: DriveConf, ot = false,
+): DriveSim {
+  if (!logs) return simulateDrive(offOvr, defOvr, start, rng, clock, undefined, conf);
   const plays: SimPlay[] = [];
-  const d = simulateDrive(offOvr, defOvr, start, rng, clock, (p) => plays.push(p));
+  const d = simulateDrive(offOvr, defOvr, start, rng, clock, (p) => plays.push(p), conf);
   logs.push(driveLog(off, plays, d, ot));
   return d;
 }
@@ -192,7 +203,7 @@ function overtime(first: Side, second: Side, rng: Rng, logs?: DriveLog[]): numbe
   while (first.tl.points === second.tl.points) {
     rounds++;
     for (const [o, dfn] of [[first, second], [second, first]] as const) {
-      const d = drive(o.id, o.off, dfn.def, OT_START, rng, undefined, logs, true);
+      const d = drive(o.id, o.off, dfn.def, OT_START, rng, undefined, logs, driveConf(o, dfn, true), true);
       credit(o, d, rng);
     }
     if (rounds >= OT_MAX_ROUNDS && first.tl.points === second.tl.points) {
@@ -226,7 +237,9 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
       const late = left < (half === 1 ? 300 : 120);
       const clock: DriveClock = { timeLeft: left, hurry: lead < 0 && late, milk: lead > 0 && half === 1 && left < 600, pace };
       const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
-      const d = drive(off.id, off.off - script, dfn.def, start, rng, clock, opts.drives);
+      // The fourth quarter is the last 900 seconds of the second half.
+      const close = half === 1 && left <= 900 && lateAndClose(4, lead);
+      const d = drive(off.id, off.off - script, dfn.def, start, rng, clock, opts.drives, driveConf(off, dfn, close));
       left -= d.secs;
       credit(off, d, rng);
       if (d.result === 'END OF HALF') break;

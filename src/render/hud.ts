@@ -1,6 +1,6 @@
 import type { Team } from '../data/teams';
 import { VIEW_W } from '../engine/constants';
-import { text } from './text';
+import { text, textWidth } from './text';
 
 function readable(bg: string, fg: string): string {
   return bg.toLowerCase() === fg.toLowerCase() ? '#ffffff' : fg;
@@ -59,4 +59,19 @@ export function drawPlayClock(g: CanvasRenderingContext2D, s: string, secs: numb
   g.fillStyle = urgent ? '#ff5a5a' : '#5d6b80';
   g.fillRect(x, 32, 40, 2);
   text(g, s, x + 20, 22, { align: 'center', color: flash ? '#ffffff' : urgent ? '#ff5a5a' : '#ffffff' });
+}
+
+/**
+ * A big snap (data/confidence.ts): a CLUTCH tag left of the play clock with the key man's confidence,
+ * green when he's confident, red when he's shaky.
+ */
+export function drawClutch(g: CanvasRenderingContext2D, who: string, label: string, conf: number): void {
+  const s = `CLUTCH  ${who} ${label}`;
+  const w = Math.ceil(textWidth(g, s, 8)) + 10;
+  const x = VIEW_W - 48 - w;
+  g.fillStyle = 'rgba(8,10,14,0.85)';
+  g.fillRect(x, 18, w, 16);
+  g.fillStyle = '#ffd23f';
+  g.fillRect(x, 32, w, 2);
+  text(g, s, x + 5, 22, { size: 8, color: conf >= 0.2 ? '#7dff9a' : conf <= -0.2 ? '#ff5a5a' : '#ffffff' });
 }

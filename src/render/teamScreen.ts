@@ -1,8 +1,10 @@
 import { archetypeLabel, classLabel, DEV_LABEL, heightLabel, type Athlete } from '../data/athletes';
+import { confLabel } from '../data/confidence';
 import { athleteName, fitRatings, healthOf, healthy, positionOrder, starters, teamRatings, type Squad } from '../data/depth';
 import { overall, overallBreakdown, POSITIONS, type Position } from '../data/positions';
 import { RATING_INFO, RATING_KEYS, type RatingKey } from '../data/ratings';
 import { VIEW_W } from '../engine/constants';
+import { CONFIDENCE, confOf } from '../season/confidence';
 import { outText } from '../season/injuries';
 import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier } from '../season/progression';
 import { records, recordText } from '../season/standings';
@@ -14,8 +16,8 @@ import { text } from './text';
 /**
  * The team page: a depth chart per position on the left (player tabs you drag to reorder, with the
  * injured below them in their own OUT section) and the selected player's card on the right (bio,
- * health or injury, level and XP, what makes up his overall and how each rating has grown, what each
- * rating does).
+ * health or injury, level and XP, confidence, what makes up his overall and how each rating has grown,
+ * what each rating does).
  */
 
 export interface TeamView {
@@ -51,7 +53,9 @@ const CARD_X = 264;
 const CARD_R = VIEW_W - 6;
 const CARD_TOP = 50;
 const CARD_BOTTOM = 342;
-const RATING_TOP = 142;
+const RATING_TOP = 153;
+/** The confidence row, between the status line and the breakdown. */
+const CONF_Y = CARD_TOP + 78;
 const RATING_LINE = 11;
 const GRID_COLS = 5;
 /** The WK column: an up-arrow for a rating raised last week. */
@@ -247,6 +251,9 @@ function drawPlayerTab(
   else text(g, a.pos, x + 196, ty, { color: SOFT, shadow: false });
   const o2 = overall(a.r, a.pos);
   text(g, String(o2), x + LIST_W - 6, ty, { align: 'right', color: hurt ? DIM : ovrColor(o2) });
+  // Confidence: a chevron up (green) or down (red) when it's strong either way.
+  const c = a.conf ?? 0;
+  if (!hurt && Math.abs(c) >= CHEVRON) chevron(g, x + 189, ty + 2, c > 0);
   // Leveled up last week.
   if (o.up) upArrow(g, x + LIST_W - 30, ty);
   g.globalAlpha = 1;
@@ -262,11 +269,52 @@ function upArrow(g: CanvasRenderingContext2D, x: number, y: number): void {
   g.fillRect(x + 2, y + 4, 3, 4);
 }
 
+/** Confidence that earns a chevron on the depth list. */
+const CHEVRON = 0.35;
+
+/** A 5 px chevron, its top-left at (x, y): green pointing up, or red pointing down. */
+function chevron(g: CanvasRenderingContext2D, x: number, y: number, up: boolean): void {
+  g.fillStyle = up ? GREEN : RED;
+  const rows = up ? [[2, 1], [1, 3], [0, 5]] : [[0, 5], [1, 3], [2, 1]];
+  rows.forEach(([dx, w], i) => g.fillRect(x + dx, y + i, w, 1));
+}
+
+/**
+ * The confidence row: a bar from -1 to +1 centered on 0, his label, and tags for a next-man-up spark
+ * (on the field until it fades or locks in) and a breakout.
+ */
+function drawConf(g: CanvasRenderingContext2D, a: Athlete, p: Progress | undefined, x: number, y: number): void {
+  const c = a.conf ?? 0;
+  const color = c >= 0.2 ? GREEN : c <= -0.2 ? RED : '#cfd6df';
+  text(g, 'CONF', x, y, { color: DIM, shadow: false });
+  const bx = x + 40;
+  const bw = 64;
+  g.fillStyle = '#26324a';
+  g.fillRect(bx, y + 1, bw, 6);
+  const mid = bx + bw / 2;
+  const len = Math.round((Math.abs(c) * bw) / 2);
+  g.fillStyle = color;
+  g.fillRect(c >= 0 ? mid : mid - len, y + 1, len, 6);
+  g.fillStyle = '#cfd6df';
+  g.fillRect(mid, y, 1, 8);
+  text(g, confLabel(c), bx + bw + 6, y, { color, shadow: false });
+  // A spark not yet in his stored confidence is the pending next-man-up spark for this game.
+  const spark = (p?.sp ?? 0) > 0 || c - confOf(p) >= CONFIDENCE.spark / 2;
+  let tx = bx + bw + 92;
+  if (spark) {
+    text(g, 'SPARK', tx, y, { color: GOLD, shadow: false });
+    tx += 48;
+  }
+  if (p?.bo) text(g, `BREAKOUT ${p.bo}`, tx, y, { color: GOLD, shadow: false });
+}
+
 /** A dim flat line where an arrow would be: no change. */
 function flatLine(g: CanvasRenderingContext2D, x: number, y: number): void {
   g.fillStyle = DIM;
   g.fillRect(x, y + 3, 7, 2);
 }
+
+const CONF_BLURB = 'CONFIDENCE: HIS PLAY VS EXPECTATION LATELY. A SMALL EDGE, A BIGGER ONE ON KEY SNAPS.';
 
 function drawCard(
   g: CanvasRenderingContext2D, s: SeasonState, a: Athlete, p: Progress | undefined, slot: string | undefined, winPct: number, v: TeamView,
@@ -290,6 +338,8 @@ function drawCard(
   // Kept short of the XP bar; a banged-up starter's slot is on his tab.
   const status = !healthy(a) ? `${outText(a.injury!)}: ${a.injury!.type}` : sore ? `BANGED UP: ${h}% HEALTH` : `HEALTHY${start}`;
   text(g, status.slice(0, 30), x, CARD_TOP + 66, { color: !healthy(a) ? RED : sore ? ORANGE : GREEN });
+  drawConf(g, a, p, x, CONF_Y);
+  const overConf = v.mx >= CARD_X && v.mx < CARD_R && v.my >= CONF_Y - 1 && v.my < CONF_Y + 10;
 
   // The overall, big: what he plays at when he's banged up, with his healthy overall under it.
   text(g, String(sore ? playing : ovr), CARD_R - 10, CARD_TOP + 8, { size: 16, align: 'right', color: sore ? ORANGE : ovrColor(ovr) });
@@ -343,11 +393,11 @@ function drawCard(
   // Everything else, small: it's real on the field, just not part of this position's overall.
   const inOvr = new Set(parts.map((p) => p.key));
   const rest = RATING_KEYS.filter((k) => !inOvr.has(k));
-  const gy = RATING_TOP + parts.length * RATING_LINE + 6;
+  const gy = RATING_TOP + parts.length * RATING_LINE + 3;
   text(g, 'OTHER RATINGS (NOT IN OVR)', x, gy, { color: DIM, shadow: false });
   rest.forEach((k, i) => {
     const cx = x + (i % GRID_COLS) * GRID_W;
-    const y = gy + 12 + Math.floor(i / GRID_COLS) * RATING_LINE;
+    const y = gy + 11 + Math.floor(i / GRID_COLS) * RATING_LINE;
     const over = v.mx >= cx - 2 && v.mx < cx + GRID_W - 4 && v.my >= y - 1 && v.my < y + RATING_LINE - 1;
     if (over) {
       hovered = k;
@@ -361,9 +411,11 @@ function drawCard(
   // What the hovered (or the heaviest) rating does, or what makes up the XP multiplier.
   const key: RatingKey = hovered ?? parts[0].key;
   const info = RATING_INFO[key];
-  const blurb = overLvl
+  const blurb = overConf
+    ? CONF_BLURB
+    : overLvl
     ? `XP x${mult.total.toFixed(2)}: ROOM ${mult.headroom.toFixed(2)}  DEV ${mult.dev.toFixed(2)}  CONF ${mult.confidence.toFixed(2)}  MORALE ${mult.morale.toFixed(2)}  CLASS ${mult.year.toFixed(2)}${mult.potential < 1 ? `  AT POT ${mult.potential.toFixed(2)}` : ''}`
     : `${info.label.toUpperCase()}: ${info.blurb.toUpperCase()}`;
   const lines = wrap(blurb, 44).slice(0, 2);
-  lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 24 + i * 11, { color: hovered || overLvl ? '#ffffff' : SOFT, shadow: false }));
+  lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 22 + i * 11, { color: hovered || overLvl || overConf ? '#ffffff' : SOFT, shadow: false }));
 }

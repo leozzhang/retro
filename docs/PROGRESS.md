@@ -773,6 +773,75 @@ Design, research and targets: [INJURIES.md](INJURIES.md).
 
   145 tests pass in total.
 
+## Done: confidence, next man up, breakouts (2026-10-25)
+Design, tuning and calibration: [CONFIDENCE.md](CONFIDENCE.md).
+
+**Confidence** is a per-player value from -1 to +1 (`Progress.c`). It replaces the XP multiplier's "last 3 grades".
+- **How it moves:** after each game it shifts toward how he played against expectation. That's an EMA of a z from his game grade, with big snaps weighted by `1 + leverage` (`GameGrade.lsum`/`lw`). Half of it carries into a new season.
+- **On the field (`data/confidence.ts`):** it shifts every rating but speed, acceleration, strength, stamina, arm and leg, scaled by the snap's **leverage**:
+  - leverage parts: third or fourth down, the red zone, late and close, long FGs
+  - size at ±1 confidence: about ±0.5 OVR on an ordinary snap and ±3 at full leverage
+  - the live game shifts both rosters per snap (`clutchRoster`), and the HUD shows `CLUTCH` with the QB's or kicker's label on big snaps
+  - the drive sim shifts each snap's rating gap by the units' confidence (`simulateDrive`'s `conf`, from `teamConf`) and the kicker's FG odds. It draws no extra random numbers.
+- **Grades expect it** (per-snap expected success and FG odds), so it can't feed itself. A confident team still grades about 0 (tested).
+- **Staff charts:** `slotScore` weighs confidence, so slumping starters can lose their job to a close backup. Last game's starters (`TeamState.st`) keep an incumbent edge, so the chart doesn't flip-flop.
+
+**Next man up:**
+- **Who sparks:** a new starter who was quiet (no start in the team's last 2 games, under 3 this season, no injury this season, no spark yet this season).
+- **Earned reasons only:** the man he replaced is injured, slumping (built-up confidence -0.35 or lower) or outplayed (overall no better than the new man's).
+- **What he gets:** +0.5 confidence on the field from his first start. `newStarters` is pure, so `squadFor` shows it before the game. Good starts lock half of what's left in; bad ones halve it. It lasts 3 starts.
+- **Rest days are neutral:** a banged-up starter sitting out gives no spark and no penalty.
+- **News** on the user's team.
+
+**Breakouts:** a sparked player who starts 3 of the next 4 games at a mean z of 0.55 or better gets:
+- a dev trait up (`Progress.dev`)
+- +2 potential (`Progress.pot`; ceilings follow)
+- a forced breakthrough level-up (`levelUp`'s `force`)
+- news: always for the user's team, the top two elsewhere
+
+Once a career.
+
+**Anti-farming:**
+- Benching a healthy, in-form, better starter fires nothing.
+- When the user's chart does it, the starter takes a fading benching penalty (`Progress.bh`). The staff never do it.
+- The slump test ignores that penalty, so benchings can't manufacture a slump.
+- The season report's **FARMING CHECK**: swapping Georgia's QBs every week fires 0 sparks, and an injury fires 1.
+
+**UI:**
+- **Card:** a CONF row (bar, label, SPARK, BREAKOUT year, hover explains it). The ratings block moved down a line and the grid tightened to fit.
+- **Depth list:** chevrons for strong confidence.
+- **Hub line:** breakouts and next man up.
+- **Checked in headless Chrome:** the card, the WR list, the hover, the hub and the CLUTCH tag. No console errors.
+
+**Season report, 5 seasons** (new CONFIDENCE and FARMING CHECK sections; `SeasonState.confLog` records sparks, user benchings and breakouts):
+- **Confidence spread:** starters' SD 0.31, 4.5% beyond ±0.6.
+- **Sparks:** 4.2 per team-season (injured 2.4, slumping 0.8, outplayed 1.0). 9.9% of them break out, 57 breakouts a season nationally.
+- **Slumping QBs:** benched in 8.8% of team-seasons.
+- **First tuning pass:** a rest-day reason gave 8.5 sparks a team-season by itself and was dropped.
+- **Scores** are unchanged within noise (26.2 points per team, 34.0% one-score games).
+- **Progression:** the mean starter gain fell from 1.45 to 1.40, because starters lose a few games to slump benchings and sparked backups. The punter row stays flagged (29% over; 28% before). The kicker sits at 14%, just under the line.
+
+**Checks:**
+- `npm run balance` is byte-identical against HEAD (checked in a scratch worktree).
+- **Tests:** 16 new in `src/confidence.test.ts`:
+  - leverage
+  - the shift spares physical ratings
+  - zero confidence leaves drives unchanged, and a confident offense scores more late
+  - no feedback in the grades
+  - the slump bench and the incumbent edge
+  - the EMA
+  - the injured backup's spark, before and after the game
+  - lock-in and fade
+  - benching an in-form starter
+  - repeated benchings never spark
+  - slump vs. rest day
+  - outplayed
+  - no spark after an injury or twice in a season
+  - breakouts
+  - a save mid-season continues identically
+
+  161 tests pass.
+
 ## In progress
 - Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
@@ -780,6 +849,8 @@ Design, research and targets: [INJURIES.md](INJURIES.md).
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
 - **Injuries are rolled after games only.** The user's live games have no mid-game injuries; that waits for mid-game roster changes. Knocks have no body-part label. Real players listed as injured in the research (for example Sayin) start the season healthy. The QB missing 3+ games rate (5.7%) is a bit under the ~8% aim, on purpose.
+- **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
+- **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
 - **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season packs to about 2.6 MB, half the localStorage limit. Details in [PROGRESSION.md](PROGRESSION.md).
 - **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
@@ -814,7 +885,7 @@ Design, research and targets: [INJURIES.md](INJURIES.md).
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; more on the team page (confidence, mentality, season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; **morale** (next, now that confidence is done: see CONFIDENCE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

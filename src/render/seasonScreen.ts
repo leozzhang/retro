@@ -132,19 +132,31 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
   drawHint(g, `${play}   A/D: TAB  W/S: PAGE  T: TEAM  P: PLAYBOOK  ESC: TITLE`);
 }
 
-/** Last week's level-ups on the user's team, and its breakthroughs, next to the buttons. */
+/**
+ * Last week on the user's team, next to the buttons: its level-ups, and the biggest story among a
+ * breakout, a breakthrough or a next man up.
+ */
 function drawProgressLine(g: CanvasRenderingContext2D, s: SeasonState): void {
   const u = s.config.userTeamId;
   const week = lastPlayedWeek(s);
   const prog = Object.values(s.teamState[u]?.progress ?? {});
   const ups = prog.filter((p) => upgradedLastWeek(s, p)).length;
-  if (!ups) return;
-  const big = s.news.filter((n) => n.kind === 'progress' && n.week === week && n.teams.includes(u));
-  // "BREAKTHROUGH: Name (UGA QB) +2 SAC +2 MAC" becomes "BREAKTHROUGH: NAME +4".
-  const last = big[big.length - 1]?.text;
-  const pts = last ? [...last.matchAll(/\+(\d+)/g)].reduce((x, m) => x + Number(m[1]), 0) : 0;
-  const tail = last ? `  ${last.split(' (')[0].toUpperCase()} +${pts}` : '';
-  text(g, `LAST WEEK: ${ups} LEVEL-UP${ups === 1 ? '' : 'S'}${tail}`.slice(0, 56), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
+  const items = s.news.filter((n) => n.kind === 'progress' && n.week === week && n.teams.includes(u)).map((n) => n.text);
+  const pick = (tag: string) => items.filter((t) => t.startsWith(tag)).pop();
+  const name = (t: string) => t.slice(t.indexOf(': ') + 2).split(' (')[0].toUpperCase();
+  let tail = '';
+  const bo = pick('BREAKOUT:');
+  const bt = pick('BREAKTHROUGH:');
+  const nm = pick('NEXT MAN UP:');
+  if (bo) tail = `BREAKOUT: ${name(bo)}`;
+  else if (bt) {
+    // "BREAKTHROUGH: Name (UGA QB) +2 SAC +2 MAC" becomes "BREAKTHROUGH: NAME +4".
+    const pts = [...bt.matchAll(/\+(\d+)/g)].reduce((x, m) => x + Number(m[1]), 0);
+    tail = `BREAKTHROUGH: ${name(bt)} +${pts}`;
+  } else if (nm) tail = `NEXT MAN UP: ${name(nm)}`;
+  if (!ups && !tail) return;
+  const head = ups ? `${ups} LEVEL-UP${ups === 1 ? '' : 'S'}` : '';
+  text(g, `LAST WEEK: ${[head, tail].filter(Boolean).join('  ')}`.slice(0, 56), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
 }
 
 function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {

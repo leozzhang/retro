@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
-import { buildSquad, healthOf, starters } from './data/depth';
+import { buildSquad, healthOf, healthy, HEALTH, positionOrder, reorderPosition, starters } from './data/depth';
 import { overallRaw, POS_ROLE, POSITIONS } from './data/positions';
 import { teamById, TEAMS } from './data/teams';
 import { latestPoll, rankIn } from './season/polls';
@@ -11,6 +11,8 @@ import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
 import type { InjuryLevel, SeasonState } from './season/types';
 import { squadFor } from './season/world';
 import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
+import { BREAKOUT, CONFIDENCE, confOf } from './season/confidence';
+import { setUserDepth } from './season/staff';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -119,7 +121,7 @@ function progression(seasons: SeasonState[]): string[] {
         if (first.has(a.id)) e.lv.push(prog[a.id]?.lvl ?? 0);
       }
     }
-    breaks += s.news.filter((n) => n.kind === 'progress').length;
+    breaks += s.news.filter((n) => n.kind === 'progress' && n.text.startsWith('BREAKTHROUGH')).length;
   }
   const avg = (x: number[]) => (x.length ? x.reduce((a, b) => a + b, 0) / x.length : 0);
   const all = POSITIONS.filter((p) => p !== 'FB').map((p) => avg(by.get(p)!.st));
@@ -202,6 +204,86 @@ function injuries(seasons: SeasonState[], level: string, banged: number[]): stri
   return rows;
 }
 
+/** What the confidence section samples each regular-season week. */
+interface ConfSample {
+  /** Every team's 22 starters' confidence. */
+  conf: number[];
+  /** Team-seasons whose starting QB lost the job while healthy and slumping. */
+  qbSlumps: number;
+}
+
+/** The 22 starters' confidence on every team now, and each team's QB (for slump benchings). */
+function confSnapshot(s: SeasonState, out: number[], qbs: Map<string, string>, slumped: Set<string>): void {
+  for (const t of TEAMS) {
+    const sq = squadFor(s, t.id);
+    const st = starters(sq);
+    const prog = s.teamState[t.id]?.progress ?? {};
+    for (const slot of [...OFF_SLOTS, ...DEF_SLOTS]) if (st[slot]) out.push(confOf(prog[st[slot].id]));
+    const qb = st.QB?.id;
+    const was = qbs.get(t.id);
+    if (qb && was && qb !== was) {
+      const old = sq.athletes.find((a) => a.id === was);
+      if (old && healthy(old) && healthOf(old) >= HEALTH.restBelow && (prog[was]?.c ?? 0) <= CONFIDENCE.slump) slumped.add(`${s.year}:${t.id}`);
+    }
+    if (qb) qbs.set(t.id, qb);
+  }
+}
+
+/**
+ * Confidence (docs/CONFIDENCE.md): how starters' confidence spreads, next-man-up sparks per
+ * team-season and why, breakouts, benchings, and the slumping QBs the staff sat.
+ */
+function confidence(seasons: SeasonState[], sample: ConfSample): string[] {
+  const c = sample.conf;
+  const mean = c.reduce((a, b) => a + b, 0) / c.length;
+  const sd = Math.sqrt(c.reduce((a, b) => a + (b - mean) ** 2, 0) / c.length);
+  const beyond = c.filter((x) => Math.abs(x) > 0.6).length / c.length;
+  const teamSeasons = seasons.length * TEAMS.length;
+  const log = seasons.flatMap((s) => s.confLog ?? []);
+  const sparks = log.filter((e) => e.kind === 'spark');
+  const by = (r: string) => sparks.filter((e) => e.reason === r).length / teamSeasons;
+  const outs = log.filter((e) => e.kind === 'breakout');
+  const sparkedOut = outs.length / Math.max(1, sparks.length);
+  return [
+    '', 'CONFIDENCE (docs/CONFIDENCE.md). Targets: starters SD about 0.3, about 5% beyond +/-0.6; 2-4 sparks per team-season (most after injuries);',
+    'about 1 in 10 sparks break out; a starting QB sat for a slump in 5-10% of team-seasons.',
+    `starters' confidence (every regular week): mean ${mean.toFixed(3)}, SD ${sd.toFixed(3)}, beyond +/-0.6 ${pctText(beyond)}`,
+    `sparks per team-season ${(sparks.length / teamSeasons).toFixed(2)}: injured ${by('injured').toFixed(2)}, ` +
+      `slumping ${by('slumping').toFixed(2)}, outplayed ${by('outplayed').toFixed(2)}`,
+    `breakouts per season ${(outs.length / seasons.length).toFixed(1)} (${pctText(sparkedOut)} of sparks; window ${BREAKOUT.games} games, z ${BREAKOUT.z})`,
+    `in-form starters the user benched for weaker players per season ${(log.filter((e) => e.kind === 'bench').length / seasons.length).toFixed(2)}`,
+    `team-seasons with a slumping QB benched ${pctText(sample.qbSlumps / teamSeasons)}`,
+  ];
+}
+
+/**
+ * The farming check: the user swaps QB1 and QB2 every week (a healthy, in-form starter benched for a
+ * weaker one) against the staff chart with QB1 hurt for three weeks. Swapping should never spark the
+ * backup and should cost QB1 confidence; the injury should spark him once.
+ */
+function farming(level: InjuryLevel): string[] {
+  const run = (swap: boolean) => {
+    const s = newSeason({ ...defaultConfig('georgia'), injuries: level }, 101);
+    const qb1 = positionOrder(squadFor(s, 'georgia'), 'QB')[0].id;
+    while (!seasonOver(s) && s.phase === 'regular') {
+      if (swap && s.week >= 2) {
+        // QB1 starts the odd weeks, QB2 the even ones.
+        const sq = squadFor(s, 'georgia');
+        const order = positionOrder(sq, 'QB');
+        const want = s.week % 2 ? qb1 : order.find((a) => a.id !== qb1)!.id;
+        if (order[0].id !== want) setUserDepth(s, reorderPosition(sq, 'QB', order.findIndex((a) => a.id === want), 0));
+      }
+      if (!swap && s.week === 4) (s.teamState.georgia ??= {}).injuries = { ...(s.teamState.georgia?.injuries ?? {}), [qb1]: { weeks: 3, type: 'TEST' } };
+      advanceWeek(s);
+    }
+    const log = (s.confLog ?? []).filter((e) => e.team === 'georgia' && e.pos === 'QB');
+    const sparks = log.filter((e) => e.kind === 'spark').map((e) => `wk${e.week} ${e.reason}`).join(', ') || 'none';
+    const p = s.teamState.georgia?.progress?.[qb1];
+    return `sparks: ${sparks}; benchings ${log.filter((e) => e.kind === 'bench').length}; QB1 built-up ${(p?.c ?? 0).toFixed(2)}, on the field ${confOf(p).toFixed(2)}`;
+  };
+  return ['', 'FARMING CHECK (Georgia QBs, regular season)', `  swap QB1/QB2 every week: ${run(true)}`, `  QB1 hurt weeks 4-6:      ${run(false)}`];
+}
+
 /** Share of the 22 starters on every team below 90 health right now. */
 function bangedShare(s: SeasonState): number {
   let n = 0;
@@ -262,18 +344,28 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
   const seasons: SeasonState[] = [];
   const banged: number[] = [];
+  const conf: ConfSample = { conf: [], qbSlumps: 0 };
+  const slumped = new Set<string>();
   const t0 = Date.now();
+  let simMs = 0;
   for (let i = 1; i <= n; i++) {
     const s = newSeason({ ...defaultConfig('georgia'), injuries: level }, i);
+    const qbs = new Map<string, string>();
     while (!seasonOver(s)) {
+      const w0 = Date.now();
       advanceWeek(s);
-      if (s.phase === 'regular') banged.push(bangedShare(s));
+      simMs += Date.now() - w0;
+      if (s.phase === 'regular') {
+        banged.push(bangedShare(s));
+        confSnapshot(s, conf.conf, qbs, slumped);
+      }
     }
     seasons.push(s);
   }
+  conf.qbSlumps = slumped.size;
   const rows = [
-    ...aggregate(seasons), `time per season ${((Date.now() - t0) / n / 1000).toFixed(2)} s`, ...progression(seasons),
-    ...injuries(seasons, level, banged), ...detail(seasons[0]),
+    ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
+    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

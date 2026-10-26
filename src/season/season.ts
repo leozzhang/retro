@@ -7,7 +7,9 @@ import { apPoll, cfpRankings } from './polls';
 import { bowlGames, bracketGames, bracketRoundDone, confChampGames, newBracket, recordBracket, selectPlayoff } from './postseason';
 import { SAVE_VERSION } from './save';
 import { generateSchedule } from './schedule';
-import { athleteName, type Squad } from '../data/depth';
+import { DEV_LABEL } from '../data/athletes';
+import { athleteName, buildSquad, type Squad } from '../data/depth';
+import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
 import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
 import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
@@ -37,7 +39,10 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
   for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
     if (!ts.progress) continue;
     const progress = JSON.parse(JSON.stringify(ts.progress)) as NonNullable<typeof ts.progress>;
-    for (const p of Object.values(progress)) delete p.up;
+    for (const p of Object.values(progress)) {
+      delete p.up;
+      carryConfidence(p);
+    }
     state.teamState[id] = { progress };
   }
   state.games = generateSchedule(TEAMS, year, seasonRng(state, 'schedule'));
@@ -107,18 +112,29 @@ const play: WeekStep = (state, ctx) => {
 /** Breakthroughs by real players on other teams that make the news each week. */
 const BREAKTHROUGH_NEWS = 2;
 
+/** How the news says why the next man is up. */
+const SPARK_TEXT: Record<SparkReason, string> = { injured: 'the injured', slumping: 'a slumping', outplayed: 'an outplayed' };
+
 /**
  * Progress: every player who played earns XP from his game grades and may level up
- * (season/progression.ts). Breakthroughs on the user's team make the news, and the biggest few by real players elsewhere.
+ * (season/progression.ts), then his confidence moves, new starters spark and breakouts land
+ * (season/confidence.ts). Breakthroughs and breakouts on the user's team make the news, and the
+ * biggest few by real players elsewhere; so does the user's next man up.
  */
 const progress: WeekStep = (state, ctx) => {
   const recs = records(state);
   const user = state.config.userTeamId;
   const elsewhere: LevelUpEvent[] = [];
+  const breakouts: BreakoutEvent[] = [];
   const told = (e: LevelUpEvent) =>
     state.news.push({
       week: ctx.week, kind: 'progress', teams: [e.team],
       text: `BREAKTHROUGH: ${athleteName(e.athlete)} (${teamById(e.team).abbr} ${e.athlete.pos}) ${deltaText(e.d)}`,
+    });
+  const toldBreakout = (e: BreakoutEvent) =>
+    state.news.push({
+      week: ctx.week, kind: 'progress', teams: [e.team],
+      text: `BREAKOUT: ${athleteName(e.athlete)} (${teamById(e.team).abbr} ${e.athlete.pos}) ${DEV_LABEL[e.from].toUpperCase()} TO ${DEV_LABEL[e.to].toUpperCase()} ${deltaText(e.d)}`.trim(),
     });
   for (const [id, { drives, home, away, neutral }] of ctx.played) {
     if (!drives.length) continue;
@@ -130,14 +146,31 @@ const progress: WeekStep = (state, ctx) => {
       const t = sq.team.id;
       const rec = recs.get(t)!;
       const winPct = rec.w + rec.l ? rec.w / (rec.w + rec.l) : 0.5;
-      const events = progressTeam((state.teamState[t] ??= {}), sq, grades, ctx.week, winPct, seasonRng(state, 'progress', t, ctx.week));
+      const ts = (state.teamState[t] ??= {});
+      const events = progressTeam(ts, sq, grades, ctx.week, winPct, seasonRng(state, 'progress', t, ctx.week));
       for (const e of events) {
         if (!e.big) continue;
         if (t === user) told(e);
         else if (e.athlete.real) elsewhere.push(e);
       }
+      const bases = new Map(buildSquad(sq.team).athletes.map((a) => [a.id, a]));
+      const conf = confidenceStep(state, ts, sq, grades, bases, ctx.week, seasonRng(state, 'confidence', t, ctx.week));
+      if (t === user) {
+        for (const e of conf.sparks) {
+          state.news.push({
+            week: ctx.week, kind: 'progress', teams: [t],
+            text: `NEXT MAN UP: ${athleteName(e.athlete)} (${e.athlete.pos}) starts for ${SPARK_TEXT[e.reason]} ${athleteName(e.replaced)}`,
+          });
+        }
+      }
+      for (const e of conf.breakouts) {
+        if (t === user) toldBreakout(e);
+        else breakouts.push(e);
+      }
     }
   }
+  // Real players first: breakouts are mostly backups, so they can't be the only ones told.
+  for (const e of breakouts.sort((a, b) => Number(!!b.athlete.real) - Number(!!a.athlete.real)).slice(0, BREAKTHROUGH_NEWS)) toldBreakout(e);
   // Biggest by overall, not raw points (a QB level-up spends more points than a tackle's).
   const pts = (e: LevelUpEvent) => Object.values(e.d).reduce((a, b) => a + (b ?? 0), 0) / POS_POINTS[e.athlete.pos];
   for (const e of elsewhere.sort((a, b) => pts(b) - pts(a)).slice(0, BREAKTHROUGH_NEWS)) told(e);

@@ -49,8 +49,8 @@ export const PROGRESSION = {
   perfCap: 1.5,
   headroomSoft: 4,
   ceilMargin: 2,
-  /** Game grades kept for confidence. */
-  confGames: 3,
+  /** XP multiplier per unit of confidence (season/confidence.ts): 0.9 shaken to 1.1 rolling. */
+  confXp: 0.1,
 };
 
 /** XP multiplier by development trait. */
@@ -136,7 +136,7 @@ export function potentialFactor(room: number): number {
 }
 
 /**
- * The XP multiplier and its parts: room to his potential, dev trait, confidence (his recent grades),
+ * The XP multiplier and its parts: room to his potential, dev trait, confidence (`confOf`),
  * morale (his team's record and whether he starts) and class. The product is clamped to
  * [`multMin`, `multMax`], then scaled by `potentialFactor`: a player at his potential grows very slowly.
  */
@@ -144,9 +144,7 @@ export function xpMultiplier(a: Athlete, p: Progress | undefined, winPct: number
   const room = a.potential - overallRaw(a.r, a.pos);
   const headroom = clamp(0.6 + room * 0.08, 0.6, 1.4);
   const dev = DEV_XP[a.dev];
-  const g = p?.g ?? [];
-  const avg = g.length ? g.reduce((s, x) => s + x, 0) / g.length : 0;
-  const confidence = clamp(1 + avg * 2, 0.9, 1.1);
+  const confidence = 1 + PROGRESSION.confXp * clamp((p?.c ?? 0) + (p?.sp ?? 0), -1, 1);
   const morale = clamp(0.94 + 0.12 * winPct + (starter ? 0.02 : -0.02), 0.9, 1.1);
   const year = YEAR_XP[a.year] - (a.redshirt ? REDSHIRT_XP : 0);
   const potential = potentialFactor(room);
@@ -178,10 +176,10 @@ export function pointWeight(r: Ratings, base: Athlete, k: RatingKey, tags: Ratin
 /**
  * One level-up: a few points (or a breakthrough's more), each drawn by `pointWeight` and re-weighted
  * after it lands. `r` is his current ratings and is raised in place; returns what changed. With every
- * rating at its ceiling nothing lands, and it's no breakthrough.
+ * rating at its ceiling nothing lands, and it's no breakthrough. `force` makes it a breakthrough (a breakout's).
  */
-export function levelUp(r: Ratings, base: Athlete, tags: RatingDelta, rng: Rng): { d: RatingDelta; big: boolean } {
-  const big = rng() < PROGRESSION.breakOdds;
+export function levelUp(r: Ratings, base: Athlete, tags: RatingDelta, rng: Rng, force = false): { d: RatingDelta; big: boolean } {
+  const big = force || rng() < PROGRESSION.breakOdds;
   const [lo, hi] = big ? PROGRESSION.breakPoints : PROGRESSION.points;
   const roll = lo + Math.floor(rng() * (hi - lo + 1));
   const n = scaledPoints(roll, base.pos, big ? 2 : 1, rng);
@@ -223,11 +221,13 @@ export function progressTeam(ts: TeamState, squad: Squad, grades: Map<string, Ga
     p.xp += Math.round(gameXp(g) * mult);
     const tags = (p.tags ??= {});
     for (const [k, v] of Object.entries(g.tags) as [RatingKey, number][]) tags[k] = round1((tags[k] ?? 0) + v);
-    p.g = [...(p.g ?? []), Math.round((g.sum / g.snaps) * 100) / 100].slice(-PROGRESSION.confGames);
     const r = { ...a.r };
+    // A breakout raised his potential, and his ceilings with it.
+    const b = base.get(a.id) ?? a;
+    const ceil = p.pot ? { ...b, potential: b.potential + p.pot } : b;
     while (p.xp >= LEVEL_XP[a.pos]) {
       p.xp -= LEVEL_XP[a.pos];
-      const up = levelUp(r, base.get(a.id) ?? a, p.tags ?? {}, rng);
+      const up = levelUp(r, ceil, p.tags ?? {}, rng);
       // Every rating at its ceiling: the XP is spent, but nothing grew, so it isn't a level.
       if (!Object.keys(up.d).length) continue;
       p.lvl++;

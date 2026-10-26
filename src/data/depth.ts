@@ -1,4 +1,5 @@
 import type { Athlete } from './athletes';
+import { CONF, CONF_OVR, type UnitConf } from './confidence';
 import { overall, POS_ROLE, SLOT_POS, type Position } from './positions';
 import type { RatingKey, Ratings } from './ratings';
 import { generateAthletes } from './rosterGen';
@@ -59,20 +60,26 @@ export function fitRatings(a: Athlete): Ratings {
   return out;
 }
 
-/** His fit at a slot as the staff see it: health-adjusted, with a hurt player pushed down to rest. */
-export function slotScore(a: Athlete, slot: string): number {
+/**
+ * His fit at a slot as the staff see it: health-adjusted, with a hurt player pushed down to rest, a
+ * slumping one down and a confident one up (`CONF.staff`), and last game's starter there (`incumbent`)
+ * keeping a small edge so the chart doesn't flip-flop.
+ */
+export function slotScore(a: Athlete, slot: string, incumbent = false): number {
   const pos = SLOT_POS[slot];
   const rest = healthOf(a) < HEALTH.restBelow ? HEALTH.restPenalty : 0;
-  return overall(fitRatings(a), pos) - (a.pos === pos ? 0 : OUT_OF_POSITION) - rest;
+  const form = (a.conf ?? 0) * CONF.staff + (incumbent ? CONF.incumbent : 0);
+  return overall(fitRatings(a), pos) - (a.pos === pos ? 0 : OUT_OF_POSITION) - rest + form;
 }
 
-/** Auto depth chart: everyone who can play each slot, best fit first. */
-export function buildDepth(athletes: Athlete[]): DepthChart {
+/** Auto depth chart: everyone who can play each slot, best fit first. `incumbents` are last game's starters by slot. */
+export function buildDepth(athletes: Athlete[], incumbents?: Record<string, string>): DepthChart {
   const depth: DepthChart = {};
   for (const slot of PICK_ORDER) {
+    const inc = incumbents?.[slot];
     depth[slot] = athletes
       .filter((a) => SLOT_CANDIDATES[slot].includes(a.pos))
-      .map((a) => [a.id, slotScore(a, slot)] as const)
+      .map((a) => [a.id, slotScore(a, slot, a.id === inc)] as const)
       .sort((a, b) => b[1] - a[1])
       .map(([id]) => id);
   }
@@ -150,6 +157,7 @@ export function onField(squad: Squad): Record<string, RosterPlayer> {
   const out: Record<string, RosterPlayer> = {};
   for (const [slot, a] of Object.entries(starters(squad))) {
     out[slot] = { slot, role: SLOT_ROLE[slot] ?? POS_ROLE[a.pos], name: athleteName(a), num: a.num, r: fitRatings(a), skin: a.skin };
+    if (a.conf) out[slot].conf = a.conf;
   }
   return out;
 }
@@ -207,6 +215,27 @@ export function teamRatings(squad: Squad): TeamRatings {
     st: Math.round(st),
     ovr: Math.round(off * 0.45 + def * 0.45 + st * 0.1),
   };
+}
+
+/**
+ * Each unit's confidence, as the drive sim and the grades use it: the starters' confidence weighted
+ * like the team overalls (`TEAM_WEIGHTS`, so the QB counts most), in overall points per rating point
+ * of shift (`CONF_OVR`). The kicker's is his own.
+ */
+export function teamConf(squad: Squad): UnitConf {
+  const s = starters(squad);
+  const unit = (w: Record<string, number>) => {
+    let sum = 0;
+    let tot = 0;
+    for (const [slot, wt] of Object.entries(w)) {
+      const a = s[slot];
+      if (!a) continue;
+      sum += (a.conf ?? 0) * CONF_OVR[SLOT_POS[slot]] * wt;
+      tot += wt;
+    }
+    return tot ? sum / tot : 0;
+  };
+  return { off: unit(TEAM_WEIGHTS.off), def: unit(TEAM_WEIGHTS.def), k: s.K?.conf ?? 0 };
 }
 
 const cache = new Map<string, Squad>();
