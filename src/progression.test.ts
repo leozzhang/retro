@@ -156,13 +156,13 @@ describe('progression', () => {
   it('the XP multiplier is clamped, however the bonuses stack', () => {
     const hot = { ...prospect('WR', 50), potential: 99, dev: 'elite', year: 'FR' } as Athlete;
     const hotProg: Progress = { xp: 0, lvl: 0, d: {}, c: 1 };
-    const m = xpMultiplier(hot, hotProg, 1, true);
+    const m = xpMultiplier(hot, hotProg, 1);
     expect(m.headroom * m.dev * m.confidence * m.morale * m.year).toBeGreaterThan(PROGRESSION.multMax);
     expect(m.total).toBe(PROGRESSION.multMax);
     // Below potential, the floor holds however the penalties stack.
     const cold = { ...prospect('WR', 80), potential: 82, dev: 'normal', year: 'SR', redshirt: true } as Athlete;
     const coldProg: Progress = { xp: 0, lvl: 0, d: {}, c: -1 };
-    expect(xpMultiplier(cold, coldProg, 0, false).total).toBeCloseTo(PROGRESSION.multMin, 10);
+    expect(xpMultiplier(cold, coldProg, -1).total).toBeCloseTo(PROGRESSION.multMin, 10);
   });
 
   it('at his potential a player grows very slowly, and past it slower still, but never stops', () => {
@@ -173,7 +173,7 @@ describe('progression', () => {
     expect(potentialFactor(-2)).toBeCloseTo(PROGRESSION.atPotential / 4, 10);
     expect(potentialFactor(-6)).toBeGreaterThan(0);
     const a = { ...prospect('WR', 80), potential: 80, dev: 'elite', year: 'FR' } as Athlete;
-    const m = xpMultiplier(a, undefined, 1, true);
+    const m = xpMultiplier(a, undefined, 1);
     expect(m.total).toBeLessThan(PROGRESSION.multMin);
     expect(m.total).toBeGreaterThan(0);
   });
@@ -193,7 +193,7 @@ describe('progression', () => {
     const grown = { ...squad, athletes: squad.athletes.map((x) => (x.id === base.id ? { ...x, r } : x)) };
     const ts: TeamState = { progress: { [base.id]: { xp: 10_000, lvl: 0, d: {} } } };
     const g: GameGrade = { team: 'georgia', snaps: 70, share: 1, sum: 0, tags: {}, hits: 0, lsum: 0, lw: 70 };
-    const events = progressTeam(ts, grown, new Map([[base.id, g]]), 3, 0.5, rng);
+    const events = progressTeam(ts, grown, new Map([[base.id, g]]), 3, rng);
     expect(events.filter((e) => e.athlete.id === base.id)).toEqual([]);
     expect(ts.progress![base.id].lvl).toBe(0);
     expect(ts.progress![base.id].up).toBeUndefined();

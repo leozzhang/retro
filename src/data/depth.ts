@@ -91,7 +91,18 @@ export function buildDepth(athletes: Athlete[], incumbents?: Record<string, stri
  * position in the order of the first slot it fills (X for WR, LT for OT, CB1 for CB).
  */
 export function positionOrder(squad: Squad, pos: Position): Athlete[] {
+  return orderOf(squad, pos, new Map(squad.athletes.map((a) => [a.id, a])));
+}
+
+/** Every position's depth order (`positionOrder`), from one pass over the roster. */
+export function positionOrders(squad: Squad): Map<Position, Athlete[]> {
   const byId = new Map(squad.athletes.map((a) => [a.id, a]));
+  const out = new Map<Position, Athlete[]>();
+  for (const a of squad.athletes) if (!out.has(a.pos)) out.set(a.pos, orderOf(squad, a.pos, byId));
+  return out;
+}
+
+function orderOf(squad: Squad, pos: Position, byId: Map<string, Athlete>): Athlete[] {
   const slot = PICK_ORDER.find((s) => SLOT_POS[s] === pos)!;
   const listed = (squad.depth[slot] ?? []).map((id) => byId.get(id)).filter((a): a is Athlete => a?.pos === pos);
   // Anyone missing from the list (a chart saved before a roster change) goes to the bottom.

@@ -6,6 +6,7 @@ import { RATING_INFO, RATING_KEYS, type RatingKey } from '../data/ratings';
 import { VIEW_W } from '../engine/constants';
 import { CONFIDENCE, confOf } from '../season/confidence';
 import { outText } from '../season/injuries';
+import { moodLabel, moraleContext, moraleOf, moraleReason, temperamentLabel, type MoraleContext } from '../season/morale';
 import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier } from '../season/progression';
 import { records, recordText } from '../season/standings';
 import type { Progress, SeasonState } from '../season/types';
@@ -16,7 +17,7 @@ import { text } from './text';
 /**
  * The team page: a depth chart per position on the left (player tabs you drag to reorder, with the
  * injured below them in their own OUT section) and the selected player's card on the right (bio,
- * health or injury, level and XP, confidence, what makes up his overall and how each rating has grown,
+ * health or injury, level and XP, confidence, morale, what makes up his overall and how each rating has grown,
  * what each rating does).
  */
 
@@ -38,6 +39,7 @@ const GOLD = '#ffd23f';
 const RED = '#ff5a5a';
 const GREEN = '#7dff9a';
 const ORANGE = '#ff9a5a';
+const BLUE = '#7f9cff';
 
 // Layout, shared with the click handling in game.ts.
 const TAB_Y = 32;
@@ -53,9 +55,10 @@ const CARD_X = 264;
 const CARD_R = VIEW_W - 6;
 const CARD_TOP = 50;
 const CARD_BOTTOM = 342;
-const RATING_TOP = 153;
-/** The confidence row, between the status line and the breakdown. */
+const RATING_TOP = 161;
+/** The confidence and morale rows, between the status line and the breakdown. */
 const CONF_Y = CARD_TOP + 78;
+const MORALE_Y = CONF_Y + 11;
 const RATING_LINE = 11;
 const GRID_COLS = 5;
 /** The WK column: an up-arrow for a rating raised last week. */
@@ -149,7 +152,10 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
   g.fillStyle = t.colors.primary;
   g.fillRect(0, 0, VIEW_W, 30);
   text(g, `${t.school.toUpperCase()} ${t.mascot.toUpperCase()}`, 10, 6, { size: 8 });
-  text(g, `${recordText(rec)}  ${t.conference.toUpperCase()}`, 10, 18, { color: '#e6e6e6' });
+  const mc = moraleContext(s, squad);
+  const ts = s.teamState[t.id];
+  const teamMorale = squad.athletes.reduce((sum, a) => sum + moraleOf(ts, a), 0) / squad.athletes.length;
+  text(g, `${recordText(rec)}  ${t.conference.toUpperCase()}  MOOD: ${moodLabel(teamMorale)}`, 10, 18, { color: '#e6e6e6' });
   text(g, `OVR ${tr.ovr}  OFF ${tr.off}  DEF ${tr.def}  ST ${tr.st}`, VIEW_W - 10, 6, { align: 'right', color: GOLD });
   const hover = inBox(DEPTH_BTN, v.mx, v.my);
   text(g, `DEPTH: ${userDepth ? 'YOURS' : 'STAFF'}`, VIEW_W - 10, 18, { align: 'right', color: hover ? '#ffffff' : userDepth ? GREEN : '#e6e6e6' });
@@ -171,15 +177,17 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
   const view = depthView(squad, pos);
   const prog = s.teamState[t.id]?.progress ?? {};
   const upped = new Set(view.rows.filter((a) => upgradedLastWeek(s, prog[a.id])).map((a) => a.id));
-  drawDepth(g, view, slotOf, upped, v);
+  const unhappy = new Set(view.rows.filter((a) => moraleOf(ts, a) <= UNHAPPY).map((a) => a.id));
+  drawDepth(g, view, slotOf, upped, unhappy, v);
   const sel = view.rows[Math.min(v.sel, view.rows.length - 1)];
-  const winPct = rec.w + rec.l ? rec.w / (rec.w + rec.l) : 0.5;
-  if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), winPct, v);
+  if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), mc, v);
 
   drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  ESC: BACK');
 }
 
-function drawDepth(g: CanvasRenderingContext2D, view: DepthView, slotOf: Map<string, string>, upped: Set<string>, v: TeamView): void {
+function drawDepth(
+  g: CanvasRenderingContext2D, view: DepthView, slotOf: Map<string, string>, upped: Set<string>, unhappy: Set<string>, v: TeamView,
+): void {
   const hy = LIST_TOP - 11;
   text(g, 'SLOT', LIST_X + 8, hy, { color: DIM, shadow: false });
   text(g, 'NO', LIST_X + 46, hy, { color: DIM, shadow: false });
@@ -191,6 +199,7 @@ function drawDepth(g: CanvasRenderingContext2D, view: DepthView, slotOf: Map<str
   rows.forEach((a, i) => {
     drawPlayerTab(g, a, i, slotOf.get(a.id), LIST_X, rowY(i, avail), {
       up: upped.has(a.id),
+      unhappy: unhappy.has(a.id),
       selected: i === v.sel,
       ghost: dragging?.from === i,
       hover: !v.drag && rowAt(v.mx, v.my, view) === i,
@@ -219,7 +228,7 @@ function drawPlayerTab(
   slot: string | undefined,
   x: number,
   y: number,
-  o: { selected: boolean; ghost: boolean; hover: boolean; lifted?: boolean; up?: boolean },
+  o: { selected: boolean; ghost: boolean; hover: boolean; lifted?: boolean; up?: boolean; unhappy?: boolean },
 ): void {
   const h = ROW_H - 2;
   if (o.lifted) {
@@ -245,6 +254,8 @@ function drawPlayerTab(
   const label = hurt ? (a.injury!.season ? 'SZN' : `${a.injury!.weeks}W`) : slot ?? String(rank + 1);
   text(g, label, x + 8, ty, { color: hurt ? RED : slot ? GOLD : DIM, shadow: false });
   text(g, `#${a.num}`, x + 46, ty, { color: SOFT, shadow: false });
+  // Unhappy: a small frown between his number and his name.
+  if (o.unhappy) face(g, x + 71, ty + 1, -1, 5);
   text(g, shortName(a, 14), x + 78, ty, { color: hurt ? RED : a.real ? GOLD : '#ffffff' });
   // Banged up: his health where his position goes.
   if (!hurt && hp < 100) text(g, `${hp}%`, x + 196, ty, { color: ORANGE, shadow: false });
@@ -267,6 +278,41 @@ function upArrow(g: CanvasRenderingContext2D, x: number, y: number): void {
   g.fillRect(x + 1, y + 2, 5, 1);
   g.fillRect(x, y + 3, 7, 1);
   g.fillRect(x + 2, y + 4, 3, 4);
+}
+
+/** Morale that earns a frown on the depth list. */
+const UNHAPPY = -0.4;
+
+/** Morale's colors: blue when down, gold when up, so they don't read as confidence's red and green. */
+function moraleColor(m: number): string {
+  return m <= -0.2 ? BLUE : m >= 0.2 ? GOLD : '#cfd6df';
+}
+
+/**
+ * A pixel face, `size` 5 or 7 px square, its top-left at (x, y): smiling for `mood` > 0, frowning
+ * below, flat at 0. Morale's icon, unlike confidence's bars and chevrons.
+ */
+function face(g: CanvasRenderingContext2D, x: number, y: number, mood: number, size: 5 | 7): void {
+  g.fillStyle = mood < 0 ? BLUE : mood > 0 ? GOLD : '#cfd6df';
+  const n = size - 1;
+  // The outline: a square with its corners cut.
+  g.fillRect(x + 1, y, n - 1, 1);
+  g.fillRect(x + 1, y + n, n - 1, 1);
+  g.fillRect(x, y + 1, 1, n - 1);
+  g.fillRect(x + n, y + 1, 1, n - 1);
+  if (size === 7) {
+    g.fillRect(x + 2, y + 2, 1, 1);
+    g.fillRect(x + 4, y + 2, 1, 1);
+  }
+  // The mouth: its corners up for a smile, down for a frown.
+  const my = y + n - 2;
+  if (mood === 0) {
+    g.fillRect(x + 2, my, n - 3, 1);
+    return;
+  }
+  g.fillRect(x + 2, mood > 0 ? my : my - 1, n - 3, 1);
+  g.fillRect(x + 1, mood > 0 ? my - 1 : my, 1, 1);
+  g.fillRect(x + n - 1, mood > 0 ? my - 1 : my, 1, 1);
 }
 
 /** Confidence that earns a chevron on the depth list. */
@@ -316,8 +362,30 @@ function flatLine(g: CanvasRenderingContext2D, x: number, y: number): void {
 
 const CONF_BLURB = 'CONFIDENCE: HIS PLAY VS EXPECTATION LATELY. A SMALL EDGE, A BIGGER ONE ON KEY SNAPS.';
 
+/**
+ * The morale row: a face, his mood and the biggest reason for it, and his temperament on the right.
+ * The longest mood and reason are 30 characters and the temperament 6, so they fit side by side.
+ */
+function drawMorale(g: CanvasRenderingContext2D, mc: MoraleContext, a: Athlete, x: number, y: number): void {
+  const m = moraleOf(mc.ts, a);
+  text(g, 'MOOD', x, y, { color: DIM, shadow: false });
+  face(g, x + 40, y, m <= -0.2 ? -1 : m >= 0.2 ? 1 : 0, 7);
+  text(g, `${moodLabel(m)}: ${moraleReason(mc, a, m).text}`, x + 52, y, { color: moraleColor(m), shadow: false });
+  text(g, temperamentLabel(a), CARD_R - 10, y, { align: 'right', color: SOFT, shadow: false });
+}
+
+/** Hovering the morale row: what morale is, then his temperament word. Each pair fits two lines. */
+const MORALE_BLURB = 'MORALE: ROLE, TEAM, COACH. SETS PRACTICE EFFORT.';
+const TEMPERAMENT_BLURB: Record<string, string> = {
+  LEADER: 'LEADER: THE ROOM FOLLOWS HIS MOOD.',
+  MOODY: 'MOODY: HIS MOOD SITS LOWER.',
+  PROUD: 'PROUD: TAKES HIS ROLE TO HEART.',
+  LOYAL: 'LOYAL: RIDES THE TEAM RESULTS.',
+  MELLOW: 'MELLOW: TAKES THINGS AS THEY COME.',
+};
+
 function drawCard(
-  g: CanvasRenderingContext2D, s: SeasonState, a: Athlete, p: Progress | undefined, slot: string | undefined, winPct: number, v: TeamView,
+  g: CanvasRenderingContext2D, s: SeasonState, a: Athlete, p: Progress | undefined, slot: string | undefined, mc: MoraleContext, v: TeamView,
 ): void {
   g.fillStyle = '#151d29';
   g.fillRect(CARD_X, CARD_TOP, CARD_R - CARD_X, CARD_BOTTOM - CARD_TOP);
@@ -340,6 +408,8 @@ function drawCard(
   text(g, status.slice(0, 30), x, CARD_TOP + 66, { color: !healthy(a) ? RED : sore ? ORANGE : GREEN });
   drawConf(g, a, p, x, CONF_Y);
   const overConf = v.mx >= CARD_X && v.mx < CARD_R && v.my >= CONF_Y - 1 && v.my < CONF_Y + 10;
+  drawMorale(g, mc, a, x, MORALE_Y);
+  const overMorale = v.mx >= CARD_X && v.mx < CARD_R && v.my >= MORALE_Y - 1 && v.my < MORALE_Y + 10;
 
   // The overall, big: what he plays at when he's banged up, with his healthy overall under it.
   text(g, String(sore ? playing : ovr), CARD_R - 10, CARD_TOP + 8, { size: 16, align: 'right', color: sore ? ORANGE : ovrColor(ovr) });
@@ -347,7 +417,7 @@ function drawCard(
   if (a.real) text(g, 'REAL PLAYER', CARD_R - 10, CARD_TOP + 40, { align: 'right', color: GOLD, shadow: false });
 
   // Level, XP toward the next one, and the XP multiplier (hover for its parts).
-  const mult = xpMultiplier(a, p, winPct, slot !== undefined);
+  const mult = xpMultiplier(a, p, moraleOf(mc.ts, a));
   const lvlY = CARD_TOP + 54;
   text(g, `LVL ${p?.lvl ?? 0}  XP x${mult.total.toFixed(2)}`, CARD_R - 10, lvlY, { align: 'right', color: upgradedLastWeek(s, p) ? GREEN : '#cfd6df' });
   const barW = 96;
@@ -358,15 +428,15 @@ function drawCard(
   const overLvl = v.mx >= CARD_R - 10 - barW && v.mx < CARD_R && v.my >= lvlY - 1 && v.my < lvlY + 18;
 
   g.fillStyle = '#2a3647';
-  g.fillRect(x, RATING_TOP - 14, CARD_R - CARD_X - 16, 1);
+  g.fillRect(x, RATING_TOP - 12, CARD_R - CARD_X - 16, 1);
 
   // What the overall is made of: rating, weight in the overall, overall points against a 75.
   const parts = overallBreakdown(a.r, a.pos);
-  text(g, 'OVR BREAKDOWN', x, RATING_TOP - 10, { color: DIM, shadow: false });
-  text(g, 'RTG', x + 158, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
-  text(g, 'WT', x + 288, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
-  text(g, 'WK', WK_X - 4, RATING_TOP - 10, { color: DIM, shadow: false });
-  text(g, 'ALL', CARD_R - 10, RATING_TOP - 10, { align: 'right', color: DIM, shadow: false });
+  text(g, 'OVR BREAKDOWN', x, RATING_TOP - 9, { color: DIM, shadow: false });
+  text(g, 'RTG', x + 158, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
+  text(g, 'WT', x + 288, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
+  text(g, 'WK', WK_X - 4, RATING_TOP - 9, { color: DIM, shadow: false });
+  text(g, 'ALL', CARD_R - 10, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
   let hovered: RatingKey | null = null;
   parts.forEach((part, i) => {
     const y = RATING_TOP + i * RATING_LINE;
@@ -390,14 +460,15 @@ function drawCard(
     text(g, all ? `+${all}` : '-', CARD_R - 10, y, { align: 'right', color: all ? GREEN : DIM, shadow: false });
   });
 
-  // Everything else, small: it's real on the field, just not part of this position's overall.
+  // Everything else, small, under a rule: it's real on the field, just not part of this position's overall.
   const inOvr = new Set(parts.map((p) => p.key));
   const rest = RATING_KEYS.filter((k) => !inOvr.has(k));
-  const gy = RATING_TOP + parts.length * RATING_LINE + 3;
-  text(g, 'OTHER RATINGS (NOT IN OVR)', x, gy, { color: DIM, shadow: false });
+  const gy = RATING_TOP + parts.length * RATING_LINE + 1;
+  g.fillStyle = '#2a3647';
+  g.fillRect(x, gy, CARD_R - CARD_X - 16, 1);
   rest.forEach((k, i) => {
     const cx = x + (i % GRID_COLS) * GRID_W;
-    const y = gy + 11 + Math.floor(i / GRID_COLS) * RATING_LINE;
+    const y = gy + 3 + Math.floor(i / GRID_COLS) * RATING_LINE;
     const over = v.mx >= cx - 2 && v.mx < cx + GRID_W - 4 && v.my >= y - 1 && v.my < y + RATING_LINE - 1;
     if (over) {
       hovered = k;
@@ -413,9 +484,11 @@ function drawCard(
   const info = RATING_INFO[key];
   const blurb = overConf
     ? CONF_BLURB
+    : overMorale
+    ? `${MORALE_BLURB} ${TEMPERAMENT_BLURB[temperamentLabel(a)]}`
     : overLvl
     ? `XP x${mult.total.toFixed(2)}: ROOM ${mult.headroom.toFixed(2)}  DEV ${mult.dev.toFixed(2)}  CONF ${mult.confidence.toFixed(2)}  MORALE ${mult.morale.toFixed(2)}  CLASS ${mult.year.toFixed(2)}${mult.potential < 1 ? `  AT POT ${mult.potential.toFixed(2)}` : ''}`
     : `${info.label.toUpperCase()}: ${info.blurb.toUpperCase()}`;
   const lines = wrap(blurb, 44).slice(0, 2);
-  lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 22 + i * 11, { color: hovered || overLvl || overConf ? '#ffffff' : SOFT, shadow: false }));
+  lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 22 + i * 11, { color: hovered || overLvl || overConf || overMorale ? '#ffffff' : SOFT, shadow: false }));
 }

@@ -10,13 +10,13 @@ import { generateSchedule } from './schedule';
 import { DEV_LABEL } from '../data/athletes';
 import { athleteName, buildSquad, type Squad } from '../data/depth';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
+import { carryMorale, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
 import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
 import { GAME_SIM, settleTie, simGame } from './simGame';
 import { autoGamePlan, type GamePlan } from './staff';
-import { records } from './standings';
-import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState } from './types';
+import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, TeamState } from './types';
 import { seasonRng, squadFor } from './world';
 
 /**
@@ -35,15 +35,16 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     coach: prev?.coach ?? (config.coachCareer ? newCoach(config.userTeamId) : undefined),
     history: prev?.history ?? [],
   };
-  // Progression carries over, without last season's week marks.
+  // Progression and morale carry over, without last season's week marks.
   for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
-    if (!ts.progress) continue;
-    const progress = JSON.parse(JSON.stringify(ts.progress)) as NonNullable<typeof ts.progress>;
-    for (const p of Object.values(progress)) {
+    if (!ts.progress && !ts.mo) continue;
+    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo })) as TeamState;
+    for (const p of Object.values(next.progress ?? {})) {
       delete p.up;
       carryConfidence(p);
     }
-    state.teamState[id] = { progress };
+    carryMorale(next, buildSquad(teamById(id)).athletes);
+    state.teamState[id] = next;
   }
   state.games = generateSchedule(TEAMS, year, seasonRng(state, 'schedule'));
   const pre = apPoll(state, 0).poll;
@@ -117,12 +118,11 @@ const SPARK_TEXT: Record<SparkReason, string> = { injured: 'the injured', slumpi
 
 /**
  * Progress: every player who played earns XP from his game grades and may level up
- * (season/progression.ts), then his confidence moves, new starters spark and breakouts land
+ * (season/progression.ts), then the whole roster's morale moves (season/morale.ts) and confidence moves, new starters spark and breakouts land
  * (season/confidence.ts). Breakthroughs and breakouts on the user's team make the news, and the
  * biggest few by real players elsewhere; so does the user's next man up.
  */
 const progress: WeekStep = (state, ctx) => {
-  const recs = records(state);
   const user = state.config.userTeamId;
   const elsewhere: LevelUpEvent[] = [];
   const breakouts: BreakoutEvent[] = [];
@@ -144,15 +144,15 @@ const progress: WeekStep = (state, ctx) => {
     ctx.grades.set(id, grades);
     for (const sq of [home, away]) {
       const t = sq.team.id;
-      const rec = recs.get(t)!;
-      const winPct = rec.w + rec.l ? rec.w / (rec.w + rec.l) : 0.5;
       const ts = (state.teamState[t] ??= {});
-      const events = progressTeam(ts, sq, grades, ctx.week, winPct, seasonRng(state, 'progress', t, ctx.week));
+      const events = progressTeam(ts, sq, grades, ctx.week, seasonRng(state, 'progress', t, ctx.week));
       for (const e of events) {
         if (!e.big) continue;
         if (t === user) told(e);
         else if (e.athlete.real) elsewhere.push(e);
       }
+      // Morale first: it reads last game's starters, which the confidence step moves on.
+      moraleStep(state, ts, sq, seasonRng(state, 'morale', t, ctx.week));
       const bases = new Map(buildSquad(sq.team).athletes.map((a) => [a.id, a]));
       const conf = confidenceStep(state, ts, sq, grades, bases, ctx.week, seasonRng(state, 'confidence', t, ctx.week));
       if (t === user) {

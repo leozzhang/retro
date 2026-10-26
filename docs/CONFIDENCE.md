@@ -97,6 +97,6 @@ The season report's FARMING CHECK runs it: Georgia swapping QB1 and QB2 every we
 - `npm run balance` is byte-identical: the reference matchup's template players carry no confidence.
 
 ## Not built yet
-- **Morale** (the team's mood: winning, playing time, the coach) is next. Its XP factor is unchanged.
+- Morale is done: see [MORALE.md](MORALE.md). It's the slow, situational half (role, team, coach, locker room) and never reads grades, so it doesn't track confidence.
 - **In-game swings** in live games: a pick shaking the QB for a few drives, a big catch lifting the receiver.
 - **Mid-game substitutions.** Next man up works week to week, because live games don't change personnel mid-game yet.

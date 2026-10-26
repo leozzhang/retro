@@ -53,10 +53,10 @@ Each snap, every player on the field gets one grade: his result at his job (a wi
 | Potential factor | 1 down to near 0 | `potentialFactor`: 1 with a point or more of room, falling to `atPotential` (0.15) at his potential, then halving for every point past it (`overHalving`). Applied after the clamp |
 | Dev | 0.85–1.45 | `DEV_XP`: normal, impact, star, elite |
 | Confidence | 0.9–1.1 | `1 + confXp × confidence`, his stored confidence (`Progress.c`, plus any spark, less any benching penalty; [CONFIDENCE.md](CONFIDENCE.md)) |
-| Morale | 0.9–1.1 | His team's win %, and whether he starts |
+| Morale | 0.9–1.1 | `1 + moraleXp × morale`: practice effort, from his stored morale (`TeamState.mo`; [MORALE.md](MORALE.md)) |
 | Class | 0.85–1.2 | `YEAR_XP`: FR 1.2 to SR 0.9; a redshirt year takes off 0.05 |
 
-Confidence is stored per player and moves after each game (CONFIDENCE.md); morale is computed from the team's record. The card shows the multiplier next to LVL; hover it for the parts (AT POT shows when the potential factor is under 1).
+Confidence and morale are both stored per player and move after each game (CONFIDENCE.md, MORALE.md). The card shows the multiplier next to LVL; hover it for the parts (AT POT shows when the potential factor is under 1).
 
 **Potential is a soft ceiling, not a hard cap.**
 - A full-time starter at his potential earns about 0.08× XP: 0.5 × 0.15, about one level-up a season instead of five. A point past it, half that.
@@ -111,7 +111,7 @@ Overall gained over a season by the generated depth chart's starters (11-personn
 - **Spread:** the mean is +1.58, down from +1.95 before the potential factor: most starters are upperclassmen with little room, and now slow down sharply at their potential. The lowest position is 1.41 (DE) and the highest 1.85 (P).
 - **Flag:** the punter row is 17% over the mean, past the report's 15% line. It was already the highest row before (2.2). A punter's overall is two ratings, so one level-up can land well past his potential before the factor slows him. Not tuned: 138 punters a season.
 - **By program tier:** T1 1.60, T2 1.69, T3 1.64, T4 1.54, T5 1.38. Grades don't cause the slope. Two factors in the XP multiplier do:
-  - **Morale** reads the team's win %, up to about 6% more XP for a winning team. It's the one place winning is rewarded on purpose.
+  - **Morale** read the team's win % then, up to about 6% more XP for a winning team. Morale is now its own system (MORALE.md): winning lifts it through team mood, but role and temperament matter more. The tier line is a little flatter since (T1 1.39 to T5 1.23).
   - **Dev traits** come out better for better players when rosters are generated.
 - **Backups and package players** gain 0–0.3, since they play little. Offseason growth belongs to the offseason, which isn't built yet.
 - **Scores and polls** didn't move outside noise: 26.3 points per team, 4.9 ranked losses a week.
@@ -120,5 +120,5 @@ Overall gained over a season by the generated depth chart's starters (11-personn
 ## Not built yet
 - Offseason growth, graduation and aging.
 - Practice focus.
-- Showing morale on its own, and per-game grades on the card. (Confidence has its own row on the card.)
+- Per-game grades on the card. (Confidence and morale have their own rows.)
 - A player who doesn't play still earns nothing, including a redshirting freshman.

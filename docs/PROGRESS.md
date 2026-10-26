@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-25_
+_Last updated: 2026-10-26_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -842,6 +842,58 @@ Once a career.
 
   161 tests pass.
 
+## Done: morale (2026-10-26)
+Design, tuning and calibration: [MORALE.md](MORALE.md).
+
+**Morale** is a per-player value from -1 to +1 (`TeamState.mo`). It's how a player feels about his situation, and it's separate from confidence (how he feels about his own play).
+- **Drivers:** each pulls toward a target, weighed by his temperament.
+  - **Role vs. expectation:** from the depth chart. Expectations come from class and stars (a 5★ freshman expects snaps, a walk-on doesn't), capped by what his talent earns. A backup within 2 OVR of the starter feels buried.
+  - **Team mood:** form, AP rank, losing streaks, rivalry results, bowl eligibility, the playoff and postseason wins. It's computed from results.
+  - **Coach decisions:** losing the job (any chart, scaled by pride) or winning it, fading.
+  - **Locker room:** teammates' morale weighted by voice (leadership × class × starting).
+- **Hidden temperament,** drawn from the player's id and never stored: baseline, pride, team-mindedness and leadership. The card shows one word: LEADER, MOODY, PROUD, LOYAL or MELLOW.
+- **Slow:** each team game moves it 15% of the way to its target, plus a small nudge from its own RNG stream. Half of the distance from baseline carries into a new season.
+- **Never reads grades,** so it doesn't track confidence (r = 0.006 across starters).
+- **Effect:** the XP multiplier's morale factor is now `1 + 0.1 × morale` (practice effort). It replaces the win % and starter placeholder.
+
+**UI (team page):**
+- **MOOD row on the card:** a pixel face in blue or gold, the mood plus the biggest reason (`FRUSTRATED: EXPECTS TO START`), and the temperament word. Hover explains morale and the word.
+- **Depth list:** a blue frown for players at −0.4 or lower.
+- **Header:** the team's mood.
+- **Layout:** to fit the row, the OTHER RATINGS grid lost its header line (a rule now), and the breakdown moved up 3 px.
+- **No news items,** by choice.
+
+**Season report** (new MORALE section, 5 seasons):
+- SD 0.21, with 0.6% beyond ±0.6 and none beyond ±0.9.
+- 4.0 unhappy players a team, spread out: the worst 10% of teams hold 22.6% of them (the first version had 60%).
+- Starters' morale vs. confidence: r = 0.006.
+- 84% of the unhappy are unhappy about their role.
+
+**Checks:**
+- **Side effects:**
+  - The mean starter gain is 1.39 (was 1.40), and the tier line is a little flatter.
+  - **Flag:** breakouts went from 57 to 65 a season (about 2 SD). This is probably the knock-on of different XP. Not tuned.
+  - Scores, injuries and confidence are otherwise within noise.
+  - A season sims in 2.60 s (was 2.32). A new `positionOrders` (`data/depth.ts`) builds every position's depth order in one pass.
+- `npm run balance` is byte-identical.
+- **Tests:** 13 new in `src/morale.test.ts`:
+  - temperament
+  - expectations: 5★ vs. walk-on, senior starter, close backup
+  - the role term
+  - a senior backup sours and a walk-on doesn't
+  - slow movement and settling
+  - team mood (winning, a losing streak, a rivalry win)
+  - benching hurts on any chart, the job lifts, and both fade
+  - no benching for an injury or rest day
+  - an unhappy leader drags the room
+  - confidence leaves morale alone
+  - the XP factor
+  - the reason is the biggest driver
+  - a save continues identically, and the offseason carry
+
+  The save test's two full seasons got a 20 s timeout: they were already near the 5 s default. 174 tests pass.
+- **Checked in headless Chrome:** the MOOD row, hover, header and depth-list frown on QB, MLB and WR cards (a 4★ freshman, eighth on the WR chart, reads `MISERABLE: WANTS MORE SNAPS`, MOODY). No console errors.
+
 ## In progress
 - Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
@@ -885,7 +937,7 @@ Once a career.
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; **morale** (next, now that confidence is done: see CONFIDENCE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

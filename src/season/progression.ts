@@ -4,6 +4,7 @@ import { OVR_WEIGHTS, overallRaw, POSITIONS, type Position } from '../data/posit
 import { RATING_KEYS, type RatingKey, type Ratings } from '../data/ratings';
 import { clamp, pickWeighted, type Rng } from '../engine/math';
 import type { GameGrade } from './grades';
+import { moraleOf } from './morale';
 import type { Progress, RatingDelta, SeasonState, TeamState } from './types';
 
 /**
@@ -51,6 +52,8 @@ export const PROGRESSION = {
   ceilMargin: 2,
   /** XP multiplier per unit of confidence (season/confidence.ts): 0.9 shaken to 1.1 rolling. */
   confXp: 0.1,
+  /** XP multiplier per unit of morale (season/morale.ts), as practice effort: 0.9 miserable to 1.1 fired up. */
+  moraleXp: 0.1,
 };
 
 /** XP multiplier by development trait. */
@@ -137,15 +140,15 @@ export function potentialFactor(room: number): number {
 
 /**
  * The XP multiplier and its parts: room to his potential, dev trait, confidence (`confOf`),
- * morale (his team's record and whether he starts) and class. The product is clamped to
+ * morale (`moraleOf`: practice effort) and class. The product is clamped to
  * [`multMin`, `multMax`], then scaled by `potentialFactor`: a player at his potential grows very slowly.
  */
-export function xpMultiplier(a: Athlete, p: Progress | undefined, winPct: number, starter: boolean): Multiplier {
+export function xpMultiplier(a: Athlete, p: Progress | undefined, mood: number): Multiplier {
   const room = a.potential - overallRaw(a.r, a.pos);
   const headroom = clamp(0.6 + room * 0.08, 0.6, 1.4);
   const dev = DEV_XP[a.dev];
   const confidence = 1 + PROGRESSION.confXp * clamp((p?.c ?? 0) + (p?.sp ?? 0), -1, 1);
-  const morale = clamp(0.94 + 0.12 * winPct + (starter ? 0.02 : -0.02), 0.9, 1.1);
+  const morale = 1 + PROGRESSION.moraleXp * clamp(mood, -1, 1);
   const year = YEAR_XP[a.year] - (a.redshirt ? REDSHIRT_XP : 0);
   const potential = potentialFactor(room);
   const total = clamp(headroom * dev * confidence * morale * year, PROGRESSION.multMin, PROGRESSION.multMax) * potential;
@@ -209,7 +212,7 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
  * Apply one game to a team: XP from each player's grade, then any level-ups. `squad` is the team as it
  * took the field (progress applied); the generated roster gives each player's ceilings.
  */
-export function progressTeam(ts: TeamState, squad: Squad, grades: Map<string, GameGrade>, week: number, winPct: number, rng: Rng): LevelUpEvent[] {
+export function progressTeam(ts: TeamState, squad: Squad, grades: Map<string, GameGrade>, week: number, rng: Rng): LevelUpEvent[] {
   const base = new Map(buildSquad(squad.team).athletes.map((a) => [a.id, a]));
   const prog = (ts.progress ??= {});
   const events: LevelUpEvent[] = [];
@@ -217,7 +220,7 @@ export function progressTeam(ts: TeamState, squad: Squad, grades: Map<string, Ga
     const g = grades.get(a.id);
     if (!g || g.team !== squad.team.id || !g.snaps) continue;
     const p = (prog[a.id] ??= { xp: 0, lvl: 0, d: {} });
-    const mult = xpMultiplier(a, p, winPct, g.share >= 0.5).total;
+    const mult = xpMultiplier(a, p, moraleOf(ts, a)).total;
     p.xp += Math.round(gameXp(g) * mult);
     const tags = (p.tags ??= {});
     for (const [k, v] of Object.entries(g.tags) as [RatingKey, number][]) tags[k] = round1((tags[k] ?? 0) + v);

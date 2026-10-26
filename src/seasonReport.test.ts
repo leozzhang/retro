@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
 import { buildSquad, healthOf, healthy, HEALTH, positionOrder, reorderPosition, starters } from './data/depth';
 import { overallRaw, POS_ROLE, POSITIONS } from './data/positions';
+import { CALENDAR } from './data/season/calendar';
 import { teamById, TEAMS } from './data/teams';
 import { latestPoll, rankIn } from './season/polls';
 import { champions } from './season/postseason';
@@ -13,6 +14,7 @@ import { squadFor } from './season/world';
 import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
 import { BREAKOUT, CONFIDENCE, confOf } from './season/confidence';
 import { setUserDepth } from './season/staff';
+import { actualRole, moraleContext, moraleOf, moraleReason, type MoraleDriver } from './season/morale';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -284,6 +286,98 @@ function farming(level: InjuryLevel): string[] {
   return ['', 'FARMING CHECK (Georgia QBs, regular season)', `  swap QB1/QB2 every week: ${run(true)}`, `  QB1 hurt weeks 4-6:      ${run(false)}`];
 }
 
+interface MoraleSample {
+  all: number[];
+  starters: number[];
+  /** Starters' morale and confidence, paired: they shouldn't track each other. */
+  pairs: [number, number][];
+  /** Each team-week's unhappy players, and each week's total and the part of it on its worst 10% of teams. */
+  unhappy: number[];
+  worst: number;
+  total: number;
+  tiers: Map<number, number[]>;
+  roles: Map<string, number[]>;
+  /** Why the unhappy are unhappy, at the end of each regular season. */
+  why: Map<string, number>;
+}
+
+/** Morale at or under this counts as unhappy (the team page's frown). */
+const UNHAPPY = -0.4;
+
+/** Every player's morale on every team now. `why` also tallies the unhappy players' reasons. */
+function moraleSnapshot(s: SeasonState, out: MoraleSample, why: boolean): void {
+  const counts: number[] = [];
+  for (const t of TEAMS) {
+    const sq = squadFor(s, t.id);
+    const ts = s.teamState[t.id];
+    const ctx = moraleContext(s, sq);
+    const st = starters(sq);
+    const first = new Set([...OFF_SLOTS, ...DEF_SLOTS].map((x) => st[x]?.id));
+    const tier = out.tiers.get(t.profile.tier) ?? out.tiers.set(t.profile.tier, []).get(t.profile.tier)!;
+    let unhappy = 0;
+    for (const a of sq.athletes) {
+      const m = moraleOf(ts, a);
+      out.all.push(m);
+      tier.push(m);
+      const r = actualRole(ctx, a);
+      const role = r === null ? 'hurt' : r >= 1 ? 'starting' : r >= 0.7 ? 'package' : r > 0 ? 'backup' : 'buried';
+      (out.roles.get(role) ?? out.roles.set(role, []).get(role)!).push(m);
+      if (first.has(a.id)) {
+        out.starters.push(m);
+        out.pairs.push([m, confOf(ts?.progress?.[a.id])]);
+      }
+      if (m > UNHAPPY) continue;
+      unhappy++;
+      if (why) {
+        const k: MoraleDriver | 'none' = moraleReason(ctx, a, m).driver ?? 'none';
+        out.why.set(k, (out.why.get(k) ?? 0) + 1);
+      }
+    }
+    counts.push(unhappy);
+  }
+  out.unhappy.push(...counts);
+  const total = counts.reduce((a, b) => a + b, 0);
+  const worst = counts.sort((a, b) => b - a).slice(0, Math.ceil(TEAMS.length / 10)).reduce((a, b) => a + b, 0);
+  out.worst += worst;
+  out.total += total;
+}
+
+/**
+ * Morale (docs/MORALE.md): its spread (it shouldn't sit at the extremes), unhappy players per team
+ * and how spread out they are, morale by tier and role, why the unhappy are unhappy, and how little it
+ * tracks confidence.
+ */
+function morale(sample: MoraleSample): string[] {
+  const avg = (x: number[]) => (x.length ? x.reduce((a, b) => a + b, 0) / x.length : 0);
+  const sd = (x: number[]) => {
+    const m = avg(x);
+    return Math.sqrt(avg(x.map((v) => (v - m) ** 2)));
+  };
+  const share = (x: number[], f: (v: number) => boolean) => x.filter(f).length / Math.max(1, x.length);
+  const xs = sample.pairs.map(([m]) => m);
+  const ys = sample.pairs.map(([, c]) => c);
+  const mx = avg(xs);
+  const my = avg(ys);
+  const r = avg(sample.pairs.map(([m, c]) => (m - mx) * (c - my))) / (sd(xs) * sd(ys) || 1);
+  const worst = sample.worst / Math.max(1, sample.total);
+  const whyTotal = [...sample.why.values()].reduce((a, b) => a + b, 0) || 1;
+  return [
+    '', 'MORALE (docs/MORALE.md). Targets: SD about 0.25, under 5% beyond +/-0.6 and about 0 at the extremes (beyond +/-0.9);',
+    `about 3-8 unhappy (<= ${UNHAPPY}) a team, spread out: the worst 10% of teams hold under 30% of them; |r| with confidence under 0.3.`,
+    `everyone (every regular week): mean ${avg(sample.all).toFixed(3)}, SD ${sd(sample.all).toFixed(3)}, ` +
+      `beyond +/-0.6 ${pctText(share(sample.all, (v) => Math.abs(v) > 0.6))}, beyond +/-0.9 ${pctText(share(sample.all, (v) => Math.abs(v) > 0.9))}`,
+    `starters: mean ${avg(sample.starters).toFixed(3)}, SD ${sd(sample.starters).toFixed(3)}`,
+    `unhappy per team: mean ${avg(sample.unhappy).toFixed(1)}, max ${Math.max(...sample.unhappy)}, ` +
+      `teams with none ${pctText(share(sample.unhappy, (v) => v === 0))}; worst 10% of teams hold ${pctText(worst)} of them` +
+      (worst > 0.3 ? '  <-- clustered' : ''),
+    'by role: ' + ['starting', 'package', 'backup', 'buried', 'hurt'].map((k) => `${k} ${avg(sample.roles.get(k) ?? []).toFixed(2)}`).join('  '),
+    'by program tier: ' + [...sample.tiers.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => `T${t} ${avg(v).toFixed(2)}`).join('  '),
+    'why the unhappy are unhappy (end of the regular season): ' +
+      [...sample.why.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${pctText(n / whyTotal)}`).join('  '),
+    `starters' morale vs confidence: r = ${r.toFixed(3)}` + (Math.abs(r) > 0.3 ? '  <-- tracking each other' : ''),
+  ];
+}
+
 /** Share of the 22 starters on every team below 90 health right now. */
 function bangedShare(s: SeasonState): number {
   let n = 0;
@@ -346,6 +440,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const banged: number[] = [];
   const conf: ConfSample = { conf: [], qbSlumps: 0 };
   const slumped = new Set<string>();
+  const mor: MoraleSample = { all: [], starters: [], pairs: [], unhappy: [], worst: 0, total: 0, tiers: new Map(), roles: new Map(), why: new Map() };
   const t0 = Date.now();
   let simMs = 0;
   for (let i = 1; i <= n; i++) {
@@ -358,6 +453,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
       if (s.phase === 'regular') {
         banged.push(bangedShare(s));
         confSnapshot(s, conf.conf, qbs, slumped);
+        moraleSnapshot(s, mor, s.week === CALENDAR.regularWeeks);
       }
     }
     seasons.push(s);
@@ -365,7 +461,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   conf.qbSlumps = slumped.size;
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
-    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...detail(seasons[0]),
+    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

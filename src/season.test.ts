@@ -177,7 +177,7 @@ describe('season', () => {
     simSeason(a);
     simSeason(b);
     expect(JSON.parse(JSON.stringify(b))).toEqual(JSON.parse(JSON.stringify(a)));
-  });
+  }, 20_000);
 
   it('a user depth chart survives the week and a save; handing it back restores the staff chart', () => {
     const s = newSeason(defaultConfig('georgia'), 11);

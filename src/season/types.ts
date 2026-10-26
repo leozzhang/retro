@@ -160,6 +160,9 @@ export interface Progress {
   bo?: number;
   dev?: DevTrait;
   pot?: number;
+  /** A coach decision under his morale (season/morale.ts): signed, and what it was. It fades. */
+  me?: number;
+  mk?: 'bench' | 'job';
 }
 
 /** What changed on a team's roster this season. */
@@ -178,6 +181,8 @@ export interface TeamState {
   st?: Record<string, string>;
   /** Games played this season. */
   gp?: number;
+  /** Morale by athlete id, -1 miserable .. +1 fired up (season/morale.ts). Missing is his baseline. */
+  mo?: Record<string, number>;
 }
 
 /**
