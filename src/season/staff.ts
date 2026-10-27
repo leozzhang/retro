@@ -12,7 +12,8 @@ export interface GamePlan {
   passShare: number;
 }
 
-const SCHEME_PASS: Record<string, number> = { 'air-raid': 0.62, spread: 0.54, pro: 0.5, 'power-run': 0.4, option: 0.3 };
+/** Pass share by offensive scheme (the scouting report quotes it too). */
+export const SCHEME_PASS: Record<string, number> = { 'air-raid': 0.62, spread: 0.54, pro: 0.5, 'power-run': 0.4, option: 0.3 };
 
 /** The coordinators' plan: the program's scheme. Opponent-specific adjustments go here later. */
 export function autoGamePlan(squad: Squad, _opponent: Squad): GamePlan {

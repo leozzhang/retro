@@ -316,10 +316,10 @@ function face(g: CanvasRenderingContext2D, x: number, y: number, mood: number, s
 }
 
 /** Confidence that earns a chevron on the depth list. */
-const CHEVRON = 0.35;
+export const CHEVRON = 0.35;
 
 /** A 5 px chevron, its top-left at (x, y): green pointing up, or red pointing down. */
-function chevron(g: CanvasRenderingContext2D, x: number, y: number, up: boolean): void {
+export function chevron(g: CanvasRenderingContext2D, x: number, y: number, up: boolean): void {
   g.fillStyle = up ? GREEN : RED;
   const rows = up ? [[2, 1], [1, 3], [0, 5]] : [[0, 5], [1, 3], [2, 1]];
   rows.forEach(([dx, w], i) => g.fillRect(x + dx, y + i, w, 1));

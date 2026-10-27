@@ -25,7 +25,7 @@ Controls are listed in [README.md](README.md).
   - `ratings.ts` (every rating and what it does), `positions.ts` (positions, overall formulas), `athletes.ts` (player schema, rating templates, archetypes, builds)
   - `fbs/` (the 138 researched team profiles, home states and hometowns), `rosterGen.ts` (85-man rosters from a profile), `depth.ts` (depth chart, starters, injuries, computed team ratings), `teams.ts` (`TEAMS`, uniforms, slots)
   - `season/`: world data for seasons: conference rules, rivalries, the calendar, the playoff format and bowls. See [docs/SEASON.md](docs/SEASON.md)
-  - formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), defensive calls (`defenses.ts`), kick types and special-teams units (`specialTeams.ts`)
+  - formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), defensive calls (`defenses.ts`), each defense's identity: style, call mix, press and third-and-long blitz (`identity.ts`; see [docs/SCOUTING.md](docs/SCOUTING.md)), kick types and special-teams units (`specialTeams.ts`)
 - `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, pass pro, pursuit), run blocking by scheme (`runBlocking.ts`: zone/stretch/gap/trap/draw, combos, pulls, leverage, the auto-runner's lane read), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
 - `game/`:
   - `resolvePlay.ts`: lays a play out for the snap (mirroring, personnel, concepts to slot routes). See [docs/PLAYBOOK.md](docs/PLAYBOOK.md)
@@ -41,8 +41,9 @@ Controls are listed in [README.md](README.md).
   - health and injuries after each game from the grades' snaps and hits (`injuries.ts`). See [docs/INJURIES.md](docs/INJURIES.md)
   - confidence from the grades, next-man-up sparks and breakouts (`confidence.ts`; the on-field shift by leverage is `data/confidence.ts`). See [docs/CONFIDENCE.md](docs/CONFIDENCE.md)
   - morale from role vs. expectations, team results, coach decisions and the locker room, weighed by a hidden temperament; never from grades (`morale.ts`). See [docs/MORALE.md](docs/MORALE.md)
+  - the weekly scouting report on the next opponent, with tiered items by coach and staff play picks (`scouting.ts`). See [docs/SCOUTING.md](docs/SCOUTING.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
-- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
+- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports
 
 ## Conventions
@@ -72,6 +73,7 @@ Controls are listed in [README.md](README.md).
   - injuries: `INJURY` (`season/injuries.ts`), `HITS`, `ROTATION_HURT` (`season/grades.ts`), `HEALTH` (playing hurt and staff rest, `data/depth.ts`), `INJURY_NEWS` (`season/season.ts`)
   - confidence: `CONF` (leverage, the clutch shift, the staff's slump and incumbent weights, `data/confidence.ts`); `CONFIDENCE`, `BREAKOUT` (`season/confidence.ts`)
   - morale: `MORALE` (`season/morale.ts`); its XP factor `moraleXp` (`PROGRESSION`)
+  - defensive identity: `IDENTITY` (`data/identity.ts`); the staff picks' rules in `suggest` (`season/scouting.ts`)
   - blocking anchor `ANCHOR_STR` (`data/ratings.ts`); overall weights `OVR_WEIGHTS` (`data/positions.ts`); rating templates and archetypes (`data/athletes.ts`); roster levels `CLASS_ADJ`, `LEVEL_SD`, `STANDOUT_LEVEL`, `UNIT_STEP`, `GROWTH` (`data/rosterGen.ts`); team weights `TEAM_WEIGHTS` (`data/depth.ts`)
 - **After changing the season sim, polls, progression, injuries, confidence or morale,** run `npm run season` and compare against the flags in SEASON.md, the per-position growth table in PROGRESSION.md (the report flags any position more than 15% off the mean), the injury targets in INJURIES.md (`INJURIES=light` checks the light setting), the confidence targets and farming check in CONFIDENCE.md, and the morale targets in MORALE.md (spread, unhappy players spread across teams, no tracking with confidence).
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.

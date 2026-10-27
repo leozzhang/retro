@@ -63,11 +63,13 @@ export const DEF_CALLS: DefCall[] = [
   },
 ];
 
-export function pickDefCall(rng: () => number): DefCall {
-  const total = DEF_CALLS.reduce((s, c) => s + c.weight, 0);
+/** One call, by the default weights or a defense's own mix (by call id; see `data/identity.ts`). One random draw either way. */
+export function pickDefCall(rng: () => number, mix?: Record<string, number>): DefCall {
+  const w = (c: DefCall) => (mix ? mix[c.id] ?? 0 : c.weight);
+  const total = DEF_CALLS.reduce((s, c) => s + w(c), 0);
   let r = rng() * total;
   for (const c of DEF_CALLS) {
-    r -= c.weight;
+    r -= w(c);
     if (r <= 0) return c;
   }
   return DEF_CALLS[0];

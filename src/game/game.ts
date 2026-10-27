@@ -1,4 +1,5 @@
 import { pickDefCall, type DefCall } from '../data/defenses';
+import { defIdentity, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage } from '../data/confidence';
@@ -19,7 +20,9 @@ import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
-import { BOOK_BTN, drawSeason, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { BOOK_BTN, drawSeason, PREP_BTN, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, type PrepView } from '../render/prepScreen';
+import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
@@ -45,7 +48,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'playbook' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'playbook' | 'prep' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -168,6 +171,7 @@ export class Game {
   private seasonView: SeasonView = { tab: 0, sub: 0 };
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
+  private prepView: PrepView = { tab: 0, scroll: 0, page: 0, mx: 0, my: 0, report: null };
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
@@ -202,6 +206,9 @@ export class Game {
         break;
       case 'playbook':
         this.updateBook(input);
+        break;
+      case 'prep':
+        this.updatePrep(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -368,6 +375,10 @@ export class Game {
       this.toBook();
       return;
     }
+    if (input.hit('KeyO') || (input.mouse.pressed && inBox(PREP_BTN, input.mouse.x, input.mouse.y))) {
+      this.toPrep();
+      return;
+    }
     const sim = input.hit('KeyX');
     if (!input.hit('Space', 'Enter') && !sim) return;
     if (seasonOver(s)) {
@@ -516,6 +527,45 @@ export class Game {
     }
   }
 
+  // ------------------------------------------------------------ weekly prep
+
+  private toPrep(): void {
+    const s = this.season!;
+    const game = userGameThisWeek(s);
+    this.screen = 'prep';
+    this.prepView = { tab: 0, scroll: 0, page: 0, mx: 0, my: 0, report: game ? scoutReport(s, game, this.starred) : null };
+  }
+
+  /** The next opponent, their two-deep, and the scouting report; click a staff pick's star to save it. */
+  private updatePrep(input: Input): void {
+    const v = this.prepView;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace', 'KeyO')) {
+      this.screen = 'season';
+      return;
+    }
+    const r = v.report;
+    if (!r) return;
+    const n = PREP_TABS.length;
+    const tabWas = v.tab;
+    if (input.hit('KeyA', 'ArrowLeft')) v.tab = (v.tab + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight')) v.tab = (v.tab + 1) % n;
+    if (input.mouse.pressed && prepTabAt(x, y) >= 0) v.tab = prepTabAt(x, y);
+    if (v.tab !== tabWas) Object.assign(v, { scroll: 0, page: 0 });
+    const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0) + Math.sign(input.mouse.wheel);
+    if (PREP_TABS[v.tab] === 'ROSTER') {
+      if (step) v.page = 1 - v.page;
+    } else if (PREP_TABS[v.tab] === 'SCOUTING') {
+      v.scroll = Math.max(0, Math.min(maxScroll(r), v.scroll + step * 3));
+      if (input.mouse.pressed) {
+        const i = r.suggestions.findIndex((_, k) => inBox(starRect(prepCardRect(k)), x, y));
+        if (i >= 0) toggleStar(this.starred, r.suggestions[i].id);
+      }
+    }
+  }
+
   /** The live game is over: hand the score to the season (box score to come) and go back to the hub. */
   private finishSeasonGame(): void {
     const g = this.seasonGame!;
@@ -541,8 +591,11 @@ export class Game {
     this.play = null;
     this.kick = null;
     this.applied = null;
-    this.defCall = pickDefCall(this.rng);
-    this.press = { CB1: this.rng() < 0.35, CB2: this.rng() < 0.35, NB: this.rng() < 0.2 };
+    // The CPU defense's identity: its own call mix (more zero blitz on third and long if that's who it is) and press rates.
+    const ident = defIdentity(this.cpu);
+    this.defCall = pickDefCall(this.rng, situationMix(ident, this.drive.down, this.drive.firstDownX - this.drive.los));
+    const pr = ident.press;
+    this.press = { CB1: this.rng() < pr.CB1, CB2: this.rng() < pr.CB2, NB: this.rng() < pr.NB };
     if (mode === 'pat' || mode === 'try') this.tab = Math.min(this.tab, 2);
     readyForPlay(this.clock);
     this.cam.follow(this.spotX(), 0.4);
@@ -1041,6 +1094,12 @@ export class Game {
     if (this.screen === 'playbook') {
       const s = this.season!;
       drawPlaybook(g, squadFor(s, s.config.userTeamId), this.bookView, this.starred);
+      return;
+    }
+    if (this.screen === 'prep') {
+      const s = this.season!;
+      const r = this.prepView.report;
+      drawPrep(g, s, r ? squadFor(s, r.opp) : null, this.prepView, this.starred);
       return;
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);

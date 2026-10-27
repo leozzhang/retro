@@ -894,6 +894,31 @@ Design, tuning and calibration: [MORALE.md](MORALE.md).
   The save test's two full seasons got a 20 s timeout: they were already near the 5 s default. 174 tests pass.
 - **Checked in headless Chrome:** the MOOD row, hover, header and depth-list frown on QB, MLB and WR cards (a 4★ freshman, eighth on the WR chart, reads `MISERABLE: WANTS MORE SNAPS`, MOODY). No console errors.
 
+## Done: weekly prep page, scouting and defensive identity (2026-10-26)
+Design, every report item and the hooks for coaches: [SCOUTING.md](SCOUTING.md).
+- **Defensive identity** (`data/identity.ts`): each program gets a style (aggressive, balanced or soft), seeded per team until DCs exist. The roster shades it: a strong DL blitzes less, strong CBs play more Cover 1 and press more.
+  - The style sets the call mix: Cover 0 at about 30% / 20% / 10%.
+  - It sets press rates, and a third-and-7+ blitz multiplier (1.6 / 1.2 / 0.7).
+  - Every call keeps an 8% floor, and the FBS mean is 40.8 / 39.6 / 19.6, against the old fixed 40/40/20.
+- **Live game:** `toCall` picks the CPU defense's call and press from its identity and the down and distance. Same random draws per snap. Sampled in the browser: a balanced opponent called 2 Man 38%, Cover 1 40%, Cover 0 22% over 400 snaps.
+- **Scouting report** (`season/scouting.ts`, pure). Every item has a coach and a tier for hiding by staff quality later; all tiers show for now.
+  - **OC:** shells, third-and-long zero, press, players to watch, the weak link.
+  - **DC:** scheme, QB, go-to target, hot and cold players. Information only for now.
+  - **Position coaches:** the WR, OL and QB coaches' one-on-one matchups and run side.
+  - **Trainer and ST coach:** injuries and banged-up starters; kicker and returner.
+  - **Staff picks:** 3–5 plays from `playTraits` (read off the play data) and rules on the tendencies.
+- **Prep page** (`render/prepScreen.ts`): PREP or O in the hub. It has three tabs:
+  - **OPPONENT:** you vs. them OVR/OFF/DEF/ST, identity tags, per-game averages, the last 5 results.
+  - **ROSTER:** their starters or backups (W/S), offense and defense: real players in gold, health %, confidence chevrons, OUT list.
+  - **SCOUTING:** the report (W/S or wheel to scroll) and the staff picks as mini play cards. Clicking a star saves the play to the call screen's STARRED chip.
+- **Hub:** the PREP button sits left of PLAYBOOK. The hint bar now reads `O: PREP ... P: BOOK`, and the LAST WEEK line is cut at 48 characters to clear the button.
+- **Checks:**
+  - `npm run balance` is byte-identical against HEAD (scratch worktree).
+  - `npm run season` is identical apart from timings.
+  - 9 new tests in `src/scouting.test.ts`: floors and determinism; the league mean; style and third-and-long ordering; `pickDefCall` draws unchanged; play traits; the report for all 138 teams (with a JSON round trip, and real starters quoted); an injured starter listed; quick or screen picks against a blitz-heavy defense; starred plays first. 183 tests pass.
+  - Checked in headless Chrome (CDP canvas snapshots): the hub button, all three tabs, scrolling, starring a pick, and starting a live game. No console errors.
+- **Not built, by design:** the DC report has no on-field effect yet, since you don't play defense. Weekly emphases with coaches will give it one.
+
 ## In progress
 - Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
@@ -937,7 +962,7 @@ Design, tuning and calibration: [MORALE.md](MORALE.md).
 
 ## Next up (rough priority)
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaching staff: a DC/OC who own the defensive style (`defStyle`), weekly emphases that make the DC report count, and staff quality hiding report tiers (SCOUTING.md); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
