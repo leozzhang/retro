@@ -1,8 +1,10 @@
 {
   "name": "saturday-gridiron",
+  "productName": "Saturday Gridiron",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,10 +13,41 @@
     "typecheck": "tsc --noEmit",
     "balance": "vitest run src/balance.test.ts",
     "ratings": "vitest run src/ratings.test.ts",
-    "season": "vitest run src/seasonReport.test.ts"
+    "season": "vitest run src/seasonReport.test.ts",
+    "app": "node scripts/app-dev.mjs",
+    "app:build": "tsc --noEmit && vite build && electron-builder --win portable && electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.leo.saturdaygridiron",
+    "productName": "Saturday Gridiron",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-setup.${ext}"
+    },
+    "electronLanguages": [
+      "en-US"
+    ]
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
+    "electron": "44.9.3",
+    "electron-builder": "26.17.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"

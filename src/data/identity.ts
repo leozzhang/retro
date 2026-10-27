@@ -1,4 +1,5 @@
 import { clamp, hashString } from '../engine/math';
+import { buildStaff } from './coaches';
 import { DEF_CALLS } from './defenses';
 import type { Team } from './teams';
 
@@ -45,7 +46,7 @@ export const IDENTITY = {
   longToGo: 7,
 };
 
-/** The coordinator's style, seeded by the program. TODO: from the DC once coaches exist. */
+/** The style a program's DC is generated with (data/coaches.ts), seeded by the program. */
 export function defStyle(teamId: string): DefStyle {
   const r = (hashString(`def-style:${teamId}`) % 10000) / 10000;
   const S = IDENTITY.styles;
@@ -75,7 +76,8 @@ const cache = new Map<string, DefIdentity>();
 export function defIdentity(team: Team): DefIdentity {
   const hit = cache.get(team.id);
   if (hit) return hit;
-  const style = defStyle(team.id);
+  // The DC owns the style.
+  const style = buildStaff(team).DC.style ?? defStyle(team.id);
   const S = IDENTITY.styles[style];
   const dl = team.profile.units.DL ?? 0;
   const cb = team.profile.units.CB ?? 0;

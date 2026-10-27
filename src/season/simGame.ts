@@ -4,6 +4,7 @@ import { athleteName, starters, teamConf, teamRatings, type Squad } from '../dat
 import { overall, SLOT_POS } from '../data/positions';
 import { clamp, gauss, pickWeighted, type Rng } from '../engine/math';
 import { simulateDrive, userStartAfter, type DriveClock, type DriveConf, type DriveSim, type SimPlay } from '../game/rules';
+import { driveMods, type TeamMods } from './emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { DriveLog, GameResult, LoggedPlay, PlayerLine, TeamLine } from './types';
 
@@ -44,14 +45,16 @@ interface Side {
   qbRun: number;
   on: Record<string, Athlete>;
   conf: UnitConf;
+  /** This week's emphases (season/emphasis.ts), if any group isn't on standard. */
+  mods?: TeamMods;
   tl: TeamLine;
   lines: Map<string, PlayerLine>;
 }
 
-function side(squad: Squad, plan: GamePlan, edge: number): Side {
+function side(squad: Squad, plan: GamePlan, edge: number, mods?: TeamMods): Side {
   const r = teamRatings(squad);
   return {
-    id: squad.team.id, squad, off: r.off + edge, def: r.def + edge, plan,
+    id: squad.team.id, squad, off: r.off + edge, def: r.def + edge, plan, mods,
     qbRun: QB_RUN_SHARE[squad.team.profile.offense.qbStyle] ?? 0.1,
     on: starters(squad),
     conf: teamConf(squad),
@@ -169,6 +172,7 @@ export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false)
   const out: LoggedPlay[] = plays.map((p) => {
     const l: LoggedPlay = { gain: p.gain, down: p.down, toGo: p.toGo };
     if (p.lev) l.lev = p.lev;
+    if (p.em) l.em = p.em;
     if (p.explosive) l.explosive = true;
     if (p.turnover) l.turnover = true;
     if (p.fg) l.kick = { unit: 'fg', good: p.fg.made, dist: p.fg.dist };
@@ -186,14 +190,15 @@ function driveConf(o: Side, dfn: Side, late: boolean): DriveConf {
   return { off: o.conf.off, def: dfn.conf.def, k: o.conf.k, late };
 }
 
-/** `simulateDrive`, logging the drive into `logs` when there are any. */
+/** `simulateDrive` for `o` against `dfn`, logging the drive into `logs` when there are any. */
 function drive(
-  off: string, offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock | undefined, logs: DriveLog[] | undefined, conf: DriveConf, ot = false,
+  o: Side, dfn: Side, offOvr: number, start: number, rng: Rng, clock: DriveClock | undefined, logs: DriveLog[] | undefined, conf: DriveConf, ot = false,
 ): DriveSim {
-  if (!logs) return simulateDrive(offOvr, defOvr, start, rng, clock, undefined, conf);
+  const mods = driveMods(o.mods, dfn.mods, o.plan.passShare);
+  if (!logs) return simulateDrive(offOvr, dfn.def, start, rng, clock, undefined, conf, mods);
   const plays: SimPlay[] = [];
-  const d = simulateDrive(offOvr, defOvr, start, rng, clock, (p) => plays.push(p), conf);
-  logs.push(driveLog(off, plays, d, ot));
+  const d = simulateDrive(offOvr, dfn.def, start, rng, clock, (p) => plays.push(p), conf, mods);
+  logs.push(driveLog(o.id, plays, d, ot));
   return d;
 }
 
@@ -203,7 +208,7 @@ function overtime(first: Side, second: Side, rng: Rng, logs?: DriveLog[]): numbe
   while (first.tl.points === second.tl.points) {
     rounds++;
     for (const [o, dfn] of [[first, second], [second, first]] as const) {
-      const d = drive(o.id, o.off, dfn.def, OT_START, rng, undefined, logs, driveConf(o, dfn, true), true);
+      const d = drive(o, dfn, o.off, OT_START, rng, undefined, logs, driveConf(o, dfn, true), true);
       credit(o, d, rng);
     }
     if (rounds >= OT_MAX_ROUNDS && first.tl.points === second.tl.points) {
@@ -219,13 +224,15 @@ export interface SimOptions {
   plans?: { home: GamePlan; away: GamePlan };
   /** Collects every drive for the progression grades. Logging draws no random numbers. */
   drives?: DriveLog[];
+  /** Each side's weekly emphases (season/emphasis.ts). Missing is standard. */
+  emph?: { home?: TeamMods; away?: TeamMods };
 }
 
 export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {}): GameResult {
   const edge = opts.neutral ? 0 : GAME_SIM.homeEdge;
   const pace = clamp(1 + gauss(rng) * GAME_SIM.paceSd, 0.7, 1.3);
-  const h = side(home, opts.plans?.home ?? autoGamePlan(home, away), edge);
-  const a = side(away, opts.plans?.away ?? autoGamePlan(away, home), 0);
+  const h = side(home, opts.plans?.home ?? autoGamePlan(home, away), edge, opts.emph?.home);
+  const a = side(away, opts.plans?.away ?? autoGamePlan(away, home), 0, opts.emph?.away);
   const firstHalf = rng() < 0.5 ? h : a;
   for (let half = 0; half < 2; half++) {
     let off = half === 0 ? firstHalf : firstHalf === h ? a : h;
@@ -239,7 +246,7 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
       const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
       // The fourth quarter is the last 900 seconds of the second half.
       const close = half === 1 && left <= 900 && lateAndClose(4, lead);
-      const d = drive(off.id, off.off - script, dfn.def, start, rng, clock, opts.drives, driveConf(off, dfn, close));
+      const d = drive(off, dfn, off.off - script, start, rng, clock, opts.drives, driveConf(off, dfn, close));
       left -= d.secs;
       credit(off, d, rng);
       if (d.result === 'END OF HALF') break;
@@ -258,11 +265,13 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
  * A live game that ended tied (the field has no overtime yet): settle it with simulated overtime,
  * keeping the regulation box score.
  */
-export function settleTie(result: GameResult, home: Squad, away: Squad, rng: Rng, neutral = false, drives?: DriveLog[]): GameResult {
+export function settleTie(
+  result: GameResult, home: Squad, away: Squad, rng: Rng, neutral = false, drives?: DriveLog[], emph?: SimOptions['emph'],
+): GameResult {
   if (result.home !== result.away) return result;
   const edge = neutral ? 0 : GAME_SIM.homeEdge;
-  const h = side(home, autoGamePlan(home, away), edge);
-  const a = side(away, autoGamePlan(away, home), 0);
+  const h = side(home, autoGamePlan(home, away), edge, emph?.home);
+  const a = side(away, autoGamePlan(away, home), 0, emph?.away);
   h.tl.points = result.home;
   a.tl.points = result.away;
   const ot = overtime(a, h, rng, drives);

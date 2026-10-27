@@ -1,11 +1,11 @@
 # Saturday Gridiron
 
-A PC football game inspired by Retro Bowl, set in FBS college football, with more realism: real teams and conferences, deeper playbooks, defensive schemes, and reading the defense. It's a personal project. Current status and the roadmap are in [docs/PROGRESS.md](docs/PROGRESS.md); read it first.
+A PC football game inspired by Retro Bowl, set in FBS college football, with more realism: real teams and conferences, deeper playbooks, defensive schemes, and reading the defense. It's a personal project. Current status and the roadmap are in [docs/PROGRESS.md](docs/PROGRESS.md); read it first. The next system, the transfer portal, has an agreed design in [docs/TRANSFER_PORTAL_PLAN.md](docs/TRANSFER_PORTAL_PLAN.md).
 
 ## Stack
 - TypeScript, HTML5 Canvas 2D, and Vite. No framework or game engine.
 - Vitest for tests. The pixel font comes from `@fontsource/press-start-2p`.
-- Planned later: package as a Windows .exe with Electron or Tauri.
+- The desktop app is Electron (`electron/`: the main process and a preload that gives the game file storage for saves). The browser build still runs on its own.
 
 ## Run
 ```
@@ -15,13 +15,16 @@ npm test            # unit tests (src/logic.test.ts)
 npm run balance     # headless AI balance report -> balance.txt (BAL_ONLY=id,kind limits the per-play rows)
 npm run ratings     # what each rating is worth per position -> ratings.txt (~10 min; RAT_ONLY=QB,WR limits groups)
 npm run season      # headless full-season sims -> season.txt (SEASONS=n, default 5)
+npm run app         # the desktop app on the Vite dev server (hot reload); `-- --remote-debugging-port=9222` for CDP
+npm run app:build   # release/: portable .exe, installer, and win-unpacked/ (the folder Steam would take)
 python scripts/build_profiles.py   # rebuild src/data/fbs/profiles.ts from docs/research/*.json
 ```
 Controls are listed in [README.md](README.md).
 
 ## Code layout (src/)
-- `engine/`: constants, camera projection, input, math and seeded RNG
+- `engine/`: constants, camera projection, input, math and seeded RNG, and saved data (`storage.ts`: gzipped, preloaded at boot, written in the background; files in the desktop app, IndexedDB in a browser, memory in Node)
 - `data/`: players and teams. See [docs/RATINGS.md](docs/RATINGS.md) and [docs/ROSTERS.md](docs/ROSTERS.md)
+  - `coaches.ts` (coaching staffs, generated per team; see [docs/COACHES.md](docs/COACHES.md)), `emphasis.ts` (the position coaches' weekly emphases)
   - `ratings.ts` (every rating and what it does), `positions.ts` (positions, overall formulas), `athletes.ts` (player schema, rating templates, archetypes, builds)
   - `fbs/` (the 138 researched team profiles, home states and hometowns), `rosterGen.ts` (85-man rosters from a profile), `depth.ts` (depth chart, starters, injuries, computed team ratings), `teams.ts` (`TEAMS`, uniforms, slots)
   - `season/`: world data for seasons: conference rules, rivalries, the calendar, the playoff format and bowls. See [docs/SEASON.md](docs/SEASON.md)
@@ -41,7 +44,8 @@ Controls are listed in [README.md](README.md).
   - health and injuries after each game from the grades' snaps and hits (`injuries.ts`). See [docs/INJURIES.md](docs/INJURIES.md)
   - confidence from the grades, next-man-up sparks and breakouts (`confidence.ts`; the on-field shift by leverage is `data/confidence.ts`). See [docs/CONFIDENCE.md](docs/CONFIDENCE.md)
   - morale from role vs. expectations, team results, coach decisions and the locker room, weighed by a hidden temperament; never from grades (`morale.ts`). See [docs/MORALE.md](docs/MORALE.md)
-  - the weekly scouting report on the next opponent, with tiered items by coach and staff play picks (`scouting.ts`). See [docs/SCOUTING.md](docs/SCOUTING.md)
+  - the weekly scouting report on the next opponent, with tiered items found by each coach's scouting, and staff play picks (`scouting.ts`). See [docs/SCOUTING.md](docs/SCOUTING.md)
+  - weekly emphases: practice tags and the simulated game-day edge (`emphasis.ts`). See [docs/COACHES.md](docs/COACHES.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
 - `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports
@@ -74,8 +78,9 @@ Controls are listed in [README.md](README.md).
   - confidence: `CONF` (leverage, the clutch shift, the staff's slump and incumbent weights, `data/confidence.ts`); `CONFIDENCE`, `BREAKOUT` (`season/confidence.ts`)
   - morale: `MORALE` (`season/morale.ts`); its XP factor `moraleXp` (`PROGRESSION`)
   - defensive identity: `IDENTITY` (`data/identity.ts`); the staff picks' rules in `suggest` (`season/scouting.ts`)
+  - coaches: `STAFF` (`data/coaches.ts`), `SCOUT_TIERS` and `pctAt` (`season/scouting.ts`), `EMPHASIS` (`season/emphasis.ts`)
   - blocking anchor `ANCHOR_STR` (`data/ratings.ts`); overall weights `OVR_WEIGHTS` (`data/positions.ts`); rating templates and archetypes (`data/athletes.ts`); roster levels `CLASS_ADJ`, `LEVEL_SD`, `STANDOUT_LEVEL`, `UNIT_STEP`, `GROWTH` (`data/rosterGen.ts`); team weights `TEAM_WEIGHTS` (`data/depth.ts`)
-- **After changing the season sim, polls, progression, injuries, confidence or morale,** run `npm run season` and compare against the flags in SEASON.md, the per-position growth table in PROGRESSION.md (the report flags any position more than 15% off the mean), the injury targets in INJURIES.md (`INJURIES=light` checks the light setting), the confidence targets and farming check in CONFIDENCE.md, and the morale targets in MORALE.md (spread, unhappy players spread across teams, no tracking with confidence).
+- **After changing the season sim, polls, progression, injuries, confidence or morale,** run `npm run season` and compare against the flags in SEASON.md, the per-position growth table in PROGRESSION.md (the report flags any position more than 15% off the mean), the injury targets in INJURIES.md (`INJURIES=light` checks the light setting), the confidence targets and farming check in CONFIDENCE.md, and the morale targets in MORALE.md (spread, unhappy players spread across teams, no tracking with confidence), and the emphasis targets in COACHES.md.
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.
 

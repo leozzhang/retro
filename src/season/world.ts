@@ -1,3 +1,4 @@
+import { buildStaff, type Staff } from '../data/coaches';
 import { buildDepth, buildSquad, type Squad } from '../data/depth';
 import { teamById } from '../data/teams';
 import { clamp, hashString, mulberry32, type Rng } from '../engine/math';
@@ -64,6 +65,14 @@ export function squadFor(state: SeasonState, teamId: string): Squad {
   const squad = { team: base.team, athletes, depth };
   cache.set(ts, { key, depth: ts.depth, squad });
   return squad;
+}
+
+/**
+ * A team's coaching staff this season: the generated staff (data/coaches.ts). Hires, firings and the
+ * coaching carousel will lay their changes over it here, the way `squadFor` does for rosters.
+ */
+export function staffFor(_state: SeasonState, teamId: string): Staff {
+  return buildStaff(teamById(teamId));
 }
 
 /**

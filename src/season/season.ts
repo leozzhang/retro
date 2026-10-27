@@ -15,9 +15,10 @@ import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
 import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
 import { GAME_SIM, settleTie, simGame } from './simGame';
+import { emphasisMods, type TeamMods } from './emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, TeamState } from './types';
-import { seasonRng, squadFor } from './world';
+import { seasonRng, squadFor, staffFor } from './world';
 
 /**
  * The season loop. `advanceWeek` runs one week as an ordered list of steps; each step is a plain
@@ -71,6 +72,8 @@ interface WeekContext {
   /** The user's live game as drive logs, for the progression grades. */
   userDrives?: DriveLog[];
   plans: Map<string, GamePlan>;
+  /** Weekly emphases by team: only the user's staff picks any so far (CPU staffs stay on standard). */
+  emph: Map<string, TeamMods>;
   /** Each game's drives and the squads that played it, for the progress step. */
   played: Map<string, { drives: DriveLog[]; home: Squad; away: Squad; neutral: boolean }>;
   /** Each game's grades, by game id, from the progress step: injuries read the snaps and hits. */
@@ -89,6 +92,8 @@ const prep: WeekStep = (state, ctx) => {
       ctx.plans.set(id, own ?? autoGamePlan(squadFor(state, id), squadFor(state, opp)));
     }
   }
+  const mods = emphasisMods(staffFor(state, user), state.teamState[user]?.emph);
+  if (mods) ctx.emph.set(user, mods);
 };
 
 /** Play: the user's game takes its live result; every other game is simulated. */
@@ -100,11 +105,12 @@ const play: WeekStep = (state, ctx) => {
     const away = squadFor(state, g.away);
     const rng = seasonRng(state, 'game', g.id);
     const drives: DriveLog[] = [];
+    const emph = { home: ctx.emph.get(g.home), away: ctx.emph.get(g.away) };
     if (ctx.userResult && (g.home === user || g.away === user)) {
       drives.push(...(ctx.userDrives ?? []));
-      g.result = { ...settleTie(ctx.userResult, home, away, rng, g.neutral, drives), live: true };
+      g.result = { ...settleTie(ctx.userResult, home, away, rng, g.neutral, drives, emph), live: true };
     } else {
-      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives });
+      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives, emph });
     }
     ctx.played.set(g.id, { drives, home, away, neutral: g.neutral });
   }
@@ -145,7 +151,8 @@ const progress: WeekStep = (state, ctx) => {
     for (const sq of [home, away]) {
       const t = sq.team.id;
       const ts = (state.teamState[t] ??= {});
-      const events = progressTeam(ts, sq, grades, ctx.week, seasonRng(state, 'progress', t, ctx.week));
+      const focus = t === user && ts.emph ? { staff: staffFor(state, t), picks: ts.emph } : undefined;
+      const events = progressTeam(ts, sq, grades, ctx.week, seasonRng(state, 'progress', t, ctx.week), focus);
       for (const e of events) {
         if (!e.big) continue;
         if (t === user) told(e);
@@ -267,11 +274,13 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
 /**
  * Play out the current week: the user's game with `userResult` (and its drives, for progression) if
  * they played it on the field, everything else simulated. Does nothing once the season is complete.
+ * The user's weekly emphases are spent: every week starts on standard.
  */
 export function advanceWeek(state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[]): void {
   if (seasonOver(state)) return;
-  const ctx: WeekContext = { week: state.week, userResult, userDrives, plans: new Map(), played: new Map(), grades: new Map() };
+  const ctx: WeekContext = { week: state.week, userResult, userDrives, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map() };
   for (const step of WEEK_STEPS) step.run(state, ctx);
+  delete state.teamState[state.config.userTeamId]?.emph;
   if (!seasonOver(state)) state.week++;
 }
 

@@ -1,10 +1,11 @@
 import { PLAYBOOK } from '../data/plays';
+import { getItem, setItem } from '../engine/storage';
 
 /**
  * The user's starred plays (play ids). A coaching preference, not season state: it's stored on its
- * own in this browser and applies to every game, season or exhibition.
+ * own and applies to every game, season or exhibition.
  */
-const KEY = 'saturday-gridiron-starred';
+export const STARRED_KEY = 'starred';
 
 /** Starred ids from a stored string; unknown ids (plays since removed) and junk are dropped. */
 export function parseStarred(raw: string | null): Set<string> {
@@ -20,20 +21,12 @@ export function parseStarred(raw: string | null): Set<string> {
 }
 
 export function loadStarred(): Set<string> {
-  try {
-    return parseStarred(localStorage.getItem(KEY));
-  } catch {
-    return new Set();
-  }
+  return parseStarred(getItem(STARRED_KEY));
 }
 
-/** Star or unstar a play and save. Fails quietly: the game works without storage. */
+/** Star or unstar a play and save. */
 export function toggleStar(starred: Set<string>, id: string): void {
   if (starred.has(id)) starred.delete(id);
   else starred.add(id);
-  try {
-    localStorage.setItem(KEY, JSON.stringify([...starred]));
-  } catch {
-    // not saved
-  }
+  setItem(STARRED_KEY, JSON.stringify([...starred]));
 }

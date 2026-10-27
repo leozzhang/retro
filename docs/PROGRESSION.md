@@ -71,16 +71,15 @@ Confidence and morale are both stored per player and move after each game (CONFI
   - The 4% is flat per level-up, so a player's breakthroughs scale with how often he levels: about 1 in 5 starters a season, far fewer for players at their potential.
   - A level-up where no point can land (every rating at its ceiling) isn't counted: its XP is spent, but there's no level, no WK arrow and no breakthrough. Before this fix, such a level-up could make the news as an empty breakthrough.
 - **Every point is a separate weighted draw,** re-weighted after it lands:
-  `weight = position weight × profile × performance × growth rate × headroom × practice focus`
+  `weight = position weight × profile × performance × growth rate × headroom` (practice rides on performance)
 
 | Factor | What it does |
 | --- | --- |
 | Position weight | `OVR_WEIGHTS`. Ratings outside the position's overall never grow |
 | Profile | `1 + (rating − template at his overall) / profileScale`, clamped to 0.5–1.8. A player grows into his strengths, so a pocket passer stays a pocket passer |
-| Performance | `1 + min(perfCap, tags × perfBoost)`. Tags come from his games since his last level-up: deep completions → `dac`, contested catches → `cit`, broken tackles → `elu`/`str`, sacks → `rsh`, pass breakups → `mcv`/`zcv`, interceptions → `cth`, long field goals → `kpw`, and a small tag for every won rep (`pbk`, `rbk`, `rte`, `bsh`, `tkl`) |
+| Performance | `1 + min(perfCap, tags × perfBoost)`. Tags come from his games since his last level-up: deep completions → `dac`, contested catches → `cit`, broken tackles → `elu`/`str`, sacks → `rsh`, pass breakups → `mcv`/`zcv`, interceptions → `cth`, long field goals → `kpw`, and a small tag for every won rep (`pbk`, `rbk`, `rte`, `bsh`, `tkl`). A weekly emphasis adds practice tags to its ratings (`practiceTags`; [COACHES.md](COACHES.md)) |
 | Growth rate | `GROWTH_RATE`: speed 0.04, acceleration 0.12, strength 0.35, stamina 0.4, skills 1, reads and poise 1.1 |
 | Headroom | Slows each rating over its last `headroomSoft` points below its ceiling: his generated shape around the template, carried up to his potential, plus `ceilMargin`, at most 99 |
-| Practice focus | Always 1; the hook for practice later |
 
 **Equal overall growth across positions.** A tackle's overall is mostly two ratings, so a point moves it about twice as much as a QB's point; a kicker's about 2.7 times.
 - `POS_POINTS` scales the points per level-up so a level-up is worth about the same overall everywhere: a QB gets 1–4 points and a tackle 1–2.
@@ -119,6 +118,6 @@ Overall gained over a season by the generated depth chart's starters (11-personn
 
 ## Not built yet
 - Offseason growth, graduation and aging.
-- Practice focus.
+- Practice focus is built as weekly emphases ([COACHES.md](COACHES.md)), for the user's team only so far.
 - Per-game grades on the card. (Confidence and morale have their own rows.)
 - A player who doesn't play still earns nothing, including a redshirting freshman.

@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-26_
+_Last updated: 2026-10-27_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -919,16 +919,106 @@ Design, every report item and the hooks for coaches: [SCOUTING.md](SCOUTING.md).
   - Checked in headless Chrome (CDP canvas snapshots): the hub button, all three tabs, scrolling, starring a pick, and starting a live game. No console errors.
 - **Not built, by design:** the DC report has no on-field effect yet, since you don't play defense. Weekly emphases with coaches will give it one.
 
+## Done: coaching staffs, scouting by staff quality, weekly emphases (2026-10-26)
+Design, tuning and calibration: [COACHES.md](COACHES.md).
+- **Staffs** (`data/coaches.ts`): every program has an OC, a DC, nine position coaches (QB, RB, WR, TE, OL, DL, LB, DB, ST) and a head trainer.
+  - Generated from the team id and never stored, like rosters. The level follows prestige.
+  - **SCOUT** for everyone; **TEACH** and **GAME** for position coaches.
+  - The DC carries the defensive style. He's generated with the same seeded style the program had, so identities are unchanged (tested for every team).
+  - `staffFor` (`season/world.ts`) is where the carousel will lay changes over the staff.
+- **Scouting by staff quality** (`season/scouting.ts`):
+  - Each section's coach finds the items his scout reaches (tier 2 at 60, tier 3 at 78). The rest are counted: `+2 MORE: A SHARPER EYE WOULD FIND THEM`.
+  - Tendencies blur under 75 scout (`~30%`), and turn into words under 55 (`SOMETIMES`).
+  - Staff play picks only use reads that were found.
+  - T1 staffs find every tier-2 read and 55% of tier-3; T5 staffs find 18% of tier-2.
+- **Weekly emphases** (`data/emphasis.ts`, `season/emphasis.ts`): 22 emphases over the nine groups, plus STANDARD, the default.
+  - The user can set them on the prep page's new **STAFF** tab. They reset to standard every week, and nothing forces the user to touch them.
+  - **Practice:** tags on the emphasis's ratings steer the group's level-ups (about ×1.7 for one week at teach 50). Total XP is unchanged.
+  - **Game day,** simulated play only: a small situational edge in `simulateDrive`, both units in the user's sim games and the user's defense in live games. +0.1 to +1.0 points a game at an average coach, at most 1.42 at game-day 95. Pass and run effects scale with how likely a snap is a pass, so pass rush is worth more against passing teams, and so on.
+  - Grades expect the edge (`LoggedPlay.em`), so emphases don't inflate XP.
+  - **CPU staffs stay on standard,** so the league is unchanged.
+- **UI:**
+  - **STAFF tab:** the coach list with ratings and this week's pick. The selected coach's options, what each practices and does, and his suggestion from the scouting reads (only at tier-2 scouting).
+  - **Scouting tab:** coach names and SCOUT on the section headers, the hidden-item lines, and the DC's emphasis ideas.
+  - **Team page card:** the XP hover shows `PRACTICING RSH`.
+- **`npm run season`:** a new COACHES section with staff by tier and paired per-drive rows for every emphasis (margin at game-day 50 and 95, defense against pass-heavy and run-heavy offenses, and practice odds).
+  - The first version paired whole games, which swung ±0.6 points from reshuffled draws. Per-drive pairs fixed it.
+  - First tuning pass:
+    - Plain group shares made DB press man worth +2.25 a game and TE receiving +0.04. A square-root group weight and per-situation scales fixed both.
+    - DB tackling became a run-phase effect, so press man no longer beats it against every opponent.
+- **Checks:**
+  - `npm run balance` is byte-identical against HEAD.
+  - `npm run season` is identical outside the new section, apart from timings.
+  - **Tests:** 14 new in `src/coaches.test.ts`:
+    - staffs complete, deterministic and JSON-safe
+    - tiers ordered, and the DC keeps the style
+    - a weak staff sees only tier 1 and gets no suggestions, while an elite one sees everything
+    - `pctAt`
+    - standard plays exactly as before
+    - pass rush only on passing downs, and more against passing teams
+    - groups scaled by their share
+    - tackling and the deep ball
+    - an emphasized team grades about 0
+    - practice steers, and a better teacher steers harder
+    - picks change the user's sim game and nothing else, and are cleared after the week
+    - a mid-week save plays the same
+
+    197 tests pass.
+  - **Checked in headless Chrome** (CDP screenshots) for Georgia and Eastern Michigan (the weakest staff):
+    - the STAFF tab, with picks by keyboard
+    - the suggestions and `NO READ ON THIS ONE`
+    - the scouting headers, vague tendencies and hidden lines
+    - a live game launching with the user's defensive mods
+    - no console errors
+- **Flags (not tuned):**
+  - **Offensive emphases don't depend on the opponent:** the drive sim doesn't model defensive calls. For a given team, QB accuracy always edges out pocket poise.
+  - TE receiving (0.13) and the ST emphases (0.10–0.18) are mostly about practice.
+  - Kickers' practice odds run ×2.3–3.0, since they level less often.
+- **Small deviations from the plan:** emphases cycle with Q/E (A/D already switch tabs), and a bye week's prep page has no STAFF tab (no game, so no XP and no game day).
+
+## Done: desktop app and saves (2026-10-27)
+The game now runs as a Windows desktop app (Electron), and saves no longer live in `localStorage`. The old store allowed about 5 MB, a season packed to about 2.6 MB, and a failed save was dropped silently.
+- **Storage** (`src/engine/storage.ts`):
+  - Values are gzipped. A week-5 season is 1.6 MB of JSON and 294 KB on disk.
+  - Saves are preloaded at boot (`initStore` in `main.ts`), so `loadSeason`/`hasSavedSeason` stay synchronous.
+  - Writes are queued in the background.
+  - A failed read or write shows a `SAVE FAILED: PROGRESS NOT SAVED` strip for 5 s.
+  - Backends: files in the app, IndexedDB in a browser, memory in Node.
+  - A browser save from an older build (`saturday-gridiron-<key>` in `localStorage`) moves to IndexedDB on first load.
+  - Keys: `season-v1` (`SEASON_KEY`, `save.ts`) and `starred` (`STARRED_KEY`, `starred.ts`).
+- **The app** (`electron/main.cjs`, `preload.cjs`):
+  - One window: 1280×720, minimum 640×360, no menu, F11 for fullscreen. Context isolation and the sandbox are on.
+  - The preload exposes only `gridironStore` (read, write, remove).
+  - Saves go to `%APPDATA%/Saturday Gridiron/saves/<key>.bin`, written atomically (temp file, then rename). The last good save is kept as `.bak`.
+- **Scripts:**
+  - `npm run app` (`scripts/app-dev.mjs`) starts Vite, then opens the app at it, so hot reload works as in the browser. It clears `ELECTRON_RUN_AS_NODE`, which VS Code terminals can leave set, and passes extra arguments to Electron.
+  - `npm run app:build` builds the portable .exe and then the installer. Built together, the two collided (NSIS: "Can't open output file"), so they run in sequence. `win-unpacked/` comes out of either one.
+  - `vite.config.ts` sets `base: './'` so `dist/` loads from disk. `electronLanguages: ['en-US']` trims 49 MB of Chromium locales.
+- **Versions:** Electron 44.9.3, the oldest release with the fix for a high-severity advisory (GHSA-jr5w-w6x2-84p9, which affects 44.7.0). electron-builder 26.17.0.
+- **Sizes:** the app bundle is 583 KB. The portable .exe is 102 MB, the installer 112 MB, and `win-unpacked` 322 MB, nearly all of it Electron.
+- **Checks:**
+  - `npm run typecheck`; `npm test` (197 pass); `npm run balance` byte-identical.
+  - Driven over CDP in the built app:
+    - a new season writes its file
+    - restarting the app and pressing C continues it
+    - the portable .exe run from another folder finds the same save
+    - F11 fills the screen
+    - a read-only save file shows SAVE FAILED, and the old save stays intact
+  - In the dev app, an edited source file reloads the window.
+  - In headless Chrome on the dev server: an old `localStorage` season and starred plays moved into IndexedDB, and the continued season survived a reload.
+- **Steam, later:** a depot takes `win-unpacked/`, Steam Auto-Cloud can take the saves folder, and `steamworks.js` adds achievements and cloud. A commercial release with real schools and players would need licensing (README).
+
 ## In progress
 - Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
 ## Known bugs and rough edges
+- **Desktop app:** no app icon (Electron's default), no code signing (SmartScreen warns on first launch), one save slot, and no auto-update. A failed write leaves a stray `.tmp` beside the save; it's overwritten on the next save.
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
 - **Injuries are rolled after games only.** The user's live games have no mid-game injuries; that waits for mid-game roster changes. Knocks have no body-part label. Real players listed as injured in the research (for example Sayin) start the season healthy. The QB missing 3+ games rate (5.7%) is a bit under the ~8% aim, on purpose.
 - **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
 - **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
-- **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season packs to about 2.6 MB, half the localStorage limit. Details in [PROGRESSION.md](PROGRESSION.md).
+- **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season is about 2.6 MB of JSON; gzipped saves are about a sixth of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
 - **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season rolls over without an offseason.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
@@ -961,8 +1051,9 @@ Design, every report item and the hooks for coaches: [SCOUTING.md](SCOUTING.md).
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 
 ## Next up (rough priority)
+1. **Transfer portal:** the design is agreed in [TRANSFER_PORTAL_PLAN.md](TRANSFER_PORTAL_PLAN.md). Start with its step 1 (roster deltas, a no-op refactor).
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaching staff: a DC/OC who own the defensive style (`defStyle`), weekly emphases that make the DC report count, and staff quality hiding report tiers (SCOUTING.md); then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns, and the coaching carousel. Practice focus can plug into the progression draw (`focus` in `pointWeight`).
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns with the coaches' pitch, and the coaching carousel through `staffFor`.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

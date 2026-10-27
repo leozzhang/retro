@@ -2,6 +2,7 @@ import type { DevTrait, Injury } from '../data/athletes';
 import type { DepthChart } from '../data/depth';
 import type { Position } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
+import type { Picks } from './emphasis';
 import type { GamePlan } from './staff';
 
 /**
@@ -183,6 +184,8 @@ export interface TeamState {
   gp?: number;
   /** Morale by athlete id, -1 miserable .. +1 fired up (season/morale.ts). Missing is his baseline. */
   mo?: Record<string, number>;
+  /** The user's weekly emphases by position group (season/emphasis.ts); cleared after each week, so missing is `standard`. */
+  emph?: Picks;
 }
 
 /**
@@ -204,6 +207,8 @@ export interface LoggedPlay {
   kick?: { unit: 'fg' | 'xp' | 'punt' | 'kickoff'; good: boolean; dist?: number };
   /** How much the snap mattered, 0..1 (`leverage`, data/confidence.ts). Missing is 0. */
   lev?: number;
+  /** The weekly emphases' edge the drive sim gave this snap or kick (season/emphasis.ts). Missing is 0. */
+  em?: number;
 }
 
 /** One possession: the offense's snaps and kicks (the kickoff after a score belongs to the scoring team). */

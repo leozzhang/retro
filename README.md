@@ -10,7 +10,29 @@ npm run dev        # open http://localhost:5173
 npm test           # unit tests for rules, ball flight, catching, tackling, camera
 npm run balance    # AI balance report -> balance.txt
 npm run season     # headless full seasons -> season.txt
+npm run app        # the desktop app (Electron), hot-reloading like the browser
+npm run app:build  # build the Windows app into release/
 ```
+
+## Desktop app
+
+`npm run app` opens the game in its own window on the same dev server as `npm run dev`, so edits reload live. F11 toggles fullscreen.
+
+`npm run app:build` makes three things in `release/`:
+- `Saturday Gridiron-<version>-portable.exe`: one file that runs from anywhere
+- `Saturday Gridiron-<version>-setup.exe`: an installer with a Start menu shortcut and an uninstaller
+- `win-unpacked/`: the app as a plain folder
+
+The .exe isn't code-signed, so Windows SmartScreen warns on first launch: click **More info**, then **Run anyway**.
+
+**Saves.** In the app, saves are gzipped files in `%APPDATA%\Saturday Gridiron\saves`. The previous save is kept as `.bak`, and writes are atomic. In a browser they go to IndexedDB, and a season saved by an older build (in `localStorage`) moves over on first load. If a save fails, the game says so (SAVE FAILED) instead of losing it quietly.
+
+**Steam later.** Nothing in the current setup blocks it:
+- A Steam depot takes the `win-unpacked/` folder.
+- Steam Auto-Cloud can sync the saves folder.
+- `steamworks.js` adds achievements and cloud when needed.
+- The Steam overlay is known to be finicky with Electron.
+- A commercial release with real schools and players would need licensing (the schools' trademarks and the players' NIL rights). The likely route is fictional default data, with real data loadable from editable files.
 
 ## Controls
 
@@ -42,7 +64,8 @@ npm run season     # headless full seasons -> season.txt
 
 ## Layout
 
-- `src/engine/`: fixed-timestep loop helpers, camera projection (yards to pixels), input
+- `src/engine/`: fixed-timestep loop helpers, camera projection (yards to pixels), input, saved data (`storage.ts`)
+- `electron/`: the desktop app's main process and preload
 - `src/data/`: ratings and positions, the 138 FBS team profiles, roster generation and depth charts, playbook (formations and route trees), defensive calls. See [docs/RATINGS.md](docs/RATINGS.md) and [docs/ROSTERS.md](docs/ROSTERS.md)
 - `src/sim/`: player physics, ball flight, AI (routes, man and zone coverage, blocking, pursuit), catch and tackle resolution
 - `src/game/`: play state machine (`playState.ts`), down/distance rules and CPU drive sim (`rules.ts`), game and play clocks (`clock.ts`), screens (`game.ts`)

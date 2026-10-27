@@ -21,15 +21,18 @@ import {
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
 import { BOOK_BTN, drawSeason, PREP_BTN, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
-import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, type PrepView } from '../render/prepScreen';
+import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
+import { groupEmphases, STANDARD } from '../data/emphasis';
+import { GROUPS, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
 import type { InjuryLevel } from '../season/types';
-import { setUserDepth, useStaffDepth } from '../season/staff';
+import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
+import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
-import { squadFor } from '../season/world';
+import { squadFor, staffFor } from '../season/world';
 import { driveLog } from '../season/simGame';
 import type { DriveLog, GameResult, SeasonGame, SeasonState } from '../season/types';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
@@ -168,10 +171,12 @@ export class Game {
   private seasonGame: SeasonGame | null = null;
   /** A season game's drives for the progression grades: the user's snaps and kicks first, then each CPU drive. */
   private liveDrives: DriveLog[] | null = null;
+  /** A season game's weekly emphases for the user's team: the user's defense plays them in the CPU's simulated drives. */
+  private userEmph: TeamMods | undefined;
   private seasonView: SeasonView = { tab: 0, sub: 0 };
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
-  private prepView: PrepView = { tab: 0, scroll: 0, page: 0, mx: 0, my: 0, report: null };
+  private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
@@ -344,6 +349,8 @@ export class Game {
     this.kickSketch.clear();
     this.tab = 0;
     this.liveDrives = this.seasonGame ? [{ off: user.id, plays: [] }] : null;
+    const s = this.season;
+    this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
     this.toCall();
   }
 
@@ -533,10 +540,13 @@ export class Game {
     const s = this.season!;
     const game = userGameThisWeek(s);
     this.screen = 'prep';
-    this.prepView = { tab: 0, scroll: 0, page: 0, mx: 0, my: 0, report: game ? scoutReport(s, game, this.starred) : null };
+    this.prepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: game ? scoutReport(s, game, this.starred) : null };
   }
 
-  /** The next opponent, their two-deep, and the scouting report; click a staff pick's star to save it. */
+  /**
+   * The next opponent, their two-deep, the scouting report (click a staff pick's star to save it) and
+   * the staff, where a position coach's weekly emphasis is picked (season/emphasis.ts).
+   */
   private updatePrep(input: Input): void {
     const v = this.prepView;
     const { x, y } = input.mouse;
@@ -553,7 +563,7 @@ export class Game {
     if (input.hit('KeyA', 'ArrowLeft')) v.tab = (v.tab + n - 1) % n;
     if (input.hit('KeyD', 'ArrowRight')) v.tab = (v.tab + 1) % n;
     if (input.mouse.pressed && prepTabAt(x, y) >= 0) v.tab = prepTabAt(x, y);
-    if (v.tab !== tabWas) Object.assign(v, { scroll: 0, page: 0 });
+    if (v.tab !== tabWas) Object.assign(v, { scroll: 0, page: 0, sel: 0 });
     const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0) + Math.sign(input.mouse.wheel);
     if (PREP_TABS[v.tab] === 'ROSTER') {
       if (step) v.page = 1 - v.page;
@@ -563,7 +573,50 @@ export class Game {
         const i = r.suggestions.findIndex((_, k) => inBox(starRect(prepCardRect(k)), x, y));
         if (i >= 0) toggleStar(this.starred, r.suggestions[i].id);
       }
+    } else if (PREP_TABS[v.tab] === 'STAFF') {
+      this.updateStaff(input, step);
     }
+  }
+
+  /** STAFF: W/S picks a coach, Q/E or a click picks his emphasis, R puts every group back on standard. */
+  private updateStaff(input: Input, step: number): void {
+    const v = this.prepView;
+    const s = this.season!;
+    const ts = (s.teamState[s.config.userTeamId] ??= {});
+    const n = STAFF_ROLES.length;
+    if (step) v.sel = (v.sel + n + Math.sign(step)) % n;
+    const { x, y, pressed } = input.mouse;
+    if (pressed) {
+      const i = STAFF_ROLES.findIndex((_, k) => inBox(staffRowRect(k), x, y));
+      if (i >= 0) v.sel = i;
+    }
+    let changed = false;
+    if (input.hit('KeyR') && ts.emph) {
+      delete ts.emph;
+      changed = true;
+    }
+    const role = STAFF_ROLES[v.sel];
+    if ((GROUPS as string[]).includes(role)) {
+      const g = role as Group;
+      const ids = groupEmphases(g);
+      const cur = Math.max(0, ids.indexOf(ts.emph?.[g] ?? STANDARD));
+      let next = cur;
+      if (input.hit('KeyE')) next = (cur + 1) % ids.length;
+      if (input.hit('KeyQ')) next = (cur + ids.length - 1) % ids.length;
+      if (pressed) {
+        const j = ids.findIndex((_, k) => inBox(staffOptionRect(k), x, y));
+        if (j >= 0) next = j;
+      }
+      if (next !== cur) {
+        const emph = { ...ts.emph };
+        if (ids[next] === STANDARD) delete emph[g];
+        else emph[g] = ids[next];
+        if (Object.keys(emph).length) ts.emph = emph;
+        else delete ts.emph;
+        changed = true;
+      }
+    }
+    if (changed) saveSeason(s);
   }
 
   /** The live game is over: hand the score to the season (box score to come) and go back to the hub. */
@@ -1025,7 +1078,7 @@ export class Game {
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
     const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, {
       timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
-    }, this.liveDrives ? (p) => plays.push(p) : undefined, conf);
+    }, this.liveDrives ? (p) => plays.push(p) : undefined, conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += sim.points;
@@ -1099,7 +1152,7 @@ export class Game {
     if (this.screen === 'prep') {
       const s = this.season!;
       const r = this.prepView.report;
-      drawPrep(g, s, r ? squadFor(s, r.opp) : null, this.prepView, this.starred);
+      drawPrep(g, s, r ? squadFor(s, r.opp) : null, this.prepView, this.starred, staffFor(s, s.config.userTeamId));
       return;
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);

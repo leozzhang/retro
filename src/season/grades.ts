@@ -277,7 +277,8 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
   const pass = p.pass ?? rng() < off.passShare;
   const s = successful(p) ? 1 : -1;
   const lev = p.lev ?? 0;
-  const pSucc = expectedSuccess(off.gap + unitEdge(off.conf.off - def.conf.def, lev));
+  // The weekly emphases' edge is expected too, so an emphasis steers XP only through practice (season/emphasis.ts).
+  const pSucc = expectedSuccess(off.gap + unitEdge(off.conf.off - def.conf.def, lev) + (p.em ?? 0));
   fill(O, off.off, rng);
   fill(D, def.def, rng);
   RO.fill(null);
@@ -378,7 +379,7 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
 
 /**
  * A kick: graded against the expectation (the drive sim's FG odds by distance with the kicker's
- * confidence at that kick's leverage, or the matchup with the other team's kicker).
+ * confidence at that kick's leverage and any emphasis edge, or the matchup with the other team's kicker).
  */
 function kick(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
   const k = p.kick!;
@@ -391,7 +392,7 @@ function kick(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
     const dist = k.dist ?? 20;
     const tags: [RatingKey, number][] = k.unit === 'fg' ? [['kac', TAG.fg]] : [['kac', TAG.kick]];
     if (k.unit === 'fg' && dist >= LONG_FG) tags.push(['kpw', TAG.longFg]);
-    credit(m, k.good, k.unit === 'xp' ? 0.97 : fgOdds(dist, unitEdge(off.conf.k, lev)), tags, lev);
+    credit(m, k.good, k.unit === 'xp' ? 0.97 : fgOdds(dist, unitEdge(off.conf.k, lev) + (p.em ?? 0)), tags, lev);
     return;
   }
   const vs = punt ? def.p : def.k;

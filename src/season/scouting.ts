@@ -1,9 +1,11 @@
 import type { Athlete } from '../data/athletes';
+import { coachName, type CoachRole, type Group, type Staff } from '../data/coaches';
 import { fitRatings, healthOf, healthy, returnRating, starters, teamRatings, type Squad, type TeamRatings } from '../data/depth';
 import { defIdentity, defLabel, shellShares, situationMix, type DefIdentity } from '../data/identity';
 import { PLAYBOOK, ROUTES, type PlayDef, type RouteName } from '../data/plays';
 import { overall, SLOT_POS } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
+import { emphasisById } from '../data/emphasis';
 import { DEF_SLOTS, OFF_SLOTS, TEAMS, teamById } from '../data/teams';
 import { FIELD_W } from '../engine/constants';
 import { resolvePlay } from '../game/resolvePlay';
@@ -12,16 +14,28 @@ import { QB_RUN_SHARE, TARGETS } from './simGame';
 import { SCHEME_PASS } from './staff';
 import { records, recordText } from './standings';
 import type { SeasonGame, SeasonState } from './types';
-import { squadFor } from './world';
+import { squadFor, staffFor } from './world';
 
 /**
  * The weekly scouting report on the user's next opponent: what each coach on the staff tells you.
  * A pure function of the season (identity, rosters, results), built when the prep page opens.
- * Every item has a `tier`: how good a staff has to be to find it. Everything shows for now; once
- * coaches exist, staff quality hides the higher tiers (docs/SCOUTING.md).
+ * Every item has a `tier`: how good a scout its section's coach has to be to find it (`SCOUT_TIERS`);
+ * the rest are hidden, and the staff picks only use what was found (docs/SCOUTING.md, docs/COACHES.md).
  */
 
 export type Tier = 1 | 2 | 3;
+
+/** The coach's scouting rating each tier needs. */
+export const SCOUT_TIERS: Record<Tier, number> = { 1: 0, 2: 60, 3: 78 };
+
+const finds = (staff: Staff, role: CoachRole, tier: Tier) => staff[role].r.scout >= SCOUT_TIERS[tier];
+
+/** A tendency as a coach can tell it: exact at 75+ scouting, to the nearest 10% at 55+, and in words below. */
+export function pctAt(x: number, scout: number): string {
+  if (scout >= 75) return pct(x);
+  if (scout >= 55) return `~${Math.round(x * 10) * 10}%`;
+  return x < 0.15 ? 'RARELY' : x < 0.35 ? 'SOMETIMES' : x < 0.55 ? 'OFTEN' : 'MOSTLY';
+}
 
 export interface ScoutItem {
   text: string;
@@ -32,10 +46,16 @@ export interface ScoutItem {
 
 export interface ScoutSection {
   coach: string;
+  /** Whose section it is; his name and scouting rating are filled in when the report is built. */
+  role: CoachRole;
+  name?: string;
+  scout?: number;
   title: string;
   items: ScoutItem[];
   /** A dim line under the section. */
   note?: string;
+  /** Items the coach didn't find. */
+  hidden?: number;
 }
 
 export interface Suggestion {
@@ -66,6 +86,8 @@ export interface ScoutReport {
   averages: { games: number; ppg: number; papg: number; ypg: number; passYpg: number; rushYpg: number } | null;
   sections: ScoutSection[];
   suggestions: Suggestion[];
+  /** Each position coach's suggested emphasis this week, when his scouting finds a reason. */
+  emphasis: Partial<Record<Group, Suggestion>>;
 }
 
 const OFF_TAG: Record<string, string> = {
@@ -158,18 +180,18 @@ function averages(s: SeasonState, team: string): ScoutReport['averages'] {
 }
 
 /** The OC on their defense: what they call, when they bring it, and who to account for. */
-function ocSection(opp: Squad, id: DefIdentity): ScoutSection {
+function ocSection(opp: Squad, id: DefIdentity, scout: number): ScoutSection {
   const N = (norms ??= leagueNorms());
   const sh = shellShares(id.mix);
   const longC0 = situationMix(id, 3, 8)['c0-blitz'];
   const press = (id.press.CB1 + id.press.CB2) / 2;
   const items: ScoutItem[] = [
-    { tier: 1, text: `SHELLS: TWO-HIGH ${pct(sh['two-high'])}, SINGLE-HIGH ${pct(sh['one-high'])}, ZERO BLITZ ${pct(sh.zero)} (FBS ~${pct(N.c0)} ZERO).` },
+    { tier: 1, text: `SHELLS: TWO-HIGH ${pctAt(sh['two-high'], scout)}, SINGLE-HIGH ${pctAt(sh['one-high'], scout)}, ZERO BLITZ ${pctAt(sh.zero, scout)} (FBS ~${pct(N.c0)} ZERO).` },
     {
       tier: 2, warn: longC0 > N.c0Long + 0.04,
-      text: `3RD AND 7+: ZERO BLITZ ${pct(longC0)} OF THE TIME (FBS ~${pct(N.c0Long)}).${longC0 > N.c0Long + 0.04 ? ' HAVE A HOT THROW READY.' : ''}`,
+      text: `3RD AND 7+: ZERO BLITZ ${pctAt(longC0, scout)} (FBS ~${pct(N.c0Long)}).${longC0 > N.c0Long + 0.04 ? ' HAVE A HOT THROW READY.' : ''}`,
     },
-    { tier: 2, text: `CORNERS PRESS ${pct(press)} OF SNAPS (FBS ~${pct(N.press)}).${press >= 0.42 ? ' EXPECT JAMS: QUICK BREAKS AND RUBS.' : press <= 0.25 ? ' SOFT CUSHIONS: THE QUICK GAME IS THERE.' : ''}` },
+    { tier: 2, text: `CORNERS PRESS: ${pctAt(press, scout)} (FBS ~${pct(N.press)}).${press >= 0.42 ? ' EXPECT JAMS: QUICK BREAKS AND RUBS.' : press <= 0.25 ? ' SOFT CUSHIONS: THE QUICK GAME IS THERE.' : ''}` },
   ];
   const on = starters(opp);
   const defSlots = DEF_SLOTS.filter((sl) => on[sl]);
@@ -184,16 +206,16 @@ function ocSection(opp: Squad, id: DefIdentity): ScoutSection {
     const weak = cover.reduce((m, sl) => (ovrAt(on[sl], sl) < ovrAt(on[m], m) ? sl : m));
     items.push({ tier: 2, text: `WEAK LINK IN COVERAGE: ${who(on[weak], weak)}. TEST HIM.` });
   }
-  return { coach: 'OC', title: 'THEIR DEFENSE', items };
+  return { coach: 'OC', role: 'OC', title: 'THEIR DEFENSE', items };
 }
 
-/** The DC on their offense. Information only until weekly emphases exist. */
-function dcSection(opp: Squad): ScoutSection {
+/** The DC on their offense: what the defensive coaches' emphases answer. */
+function dcSection(opp: Squad, scout: number): ScoutSection {
   const prof = opp.team.profile.offense;
   const passShare = SCHEME_PASS[prof.scheme] ?? 0.5;
   const on = starters(opp);
-  const items: ScoutItem[] = [{ tier: 1, text: `${OFF_TAG[prof.scheme] ?? 'BALANCED'} OFFENSE: ABOUT ${pct(passShare)} PASSES.` }];
-  if (on.QB) items.push({ tier: 1, text: `QB ${short(on.QB)} (${ovrAt(on.QB, 'QB')}) ${QB_TAG[prof.qbStyle]}: ~${pct(QB_RUN_SHARE[prof.qbStyle] ?? 0.1)} OF THEIR CARRIES.` });
+  const items: ScoutItem[] = [{ tier: 1, text: `${OFF_TAG[prof.scheme] ?? 'BALANCED'} OFFENSE: THEY PASS ${pctAt(passShare, scout)}.` }];
+  if (on.QB) items.push({ tier: 1, text: `QB ${short(on.QB)} (${ovrAt(on.QB, 'QB')}) ${QB_TAG[prof.qbStyle]}: HE RUNS ${pctAt(QB_RUN_SHARE[prof.qbStyle] ?? 0.1, scout)} OF THEIR CARRIES.` });
   const targets = Object.entries(TARGETS).filter(([sl]) => on[sl]);
   if (targets.length) {
     const [sl] = targets.reduce((m, t) => (t[1] * (ovrAt(on[t[0]], t[0]) / 75) ** 2 > m[1] * (ovrAt(on[m[0]], m[0]) / 75) ** 2 ? t : m));
@@ -205,7 +227,7 @@ function dcSection(opp: Squad): ScoutSection {
     const c = a?.conf ?? 0;
     if (a && Math.abs(c) >= 0.4) items.push({ tier: 2, text: `${sl} ${short(a)} IS ${c > 0 ? 'ROLLING' : 'SHAKY'} RIGHT NOW.` });
   }
-  return { coach: 'DC', title: 'THEIR OFFENSE', items, note: 'FOR NOW THIS IS INFORMATION ONLY: WEEKLY DEFENSIVE EMPHASES COME WITH THE STAFF.' };
+  return { coach: 'DC', role: 'DC', title: 'THEIR OFFENSE', items };
 }
 
 interface Edge {
@@ -266,17 +288,17 @@ function positionSections(user: Squad, opp: Squad, m: Matchups, id: DefIdentity)
   const ol = byScore(m.ol);
   const out: ScoutSection[] = [];
   const pick = (xs: Edge[]) => (xs.length <= 3 ? xs : [...xs.slice(0, 2), xs[xs.length - 1]]);
-  out.push({ coach: 'WR COACH', title: 'OUTSIDE MATCHUPS', items: pick(wr).map((e) => ({ tier: 2 as Tier, text: e.text, warn: e.score < -4 })) });
+  out.push({ coach: 'WR COACH', role: 'WR', title: 'OUTSIDE MATCHUPS', items: pick(wr).map((e) => ({ tier: 2 as Tier, text: e.text, warn: e.score < -4 })) });
   const olItems: ScoutItem[] = [ol[ol.length - 1], ol[0]].filter(Boolean).map((e) => ({ tier: 2 as Tier, text: e.text, warn: e.score < -4 }));
   if (m.runSide) olItems.push({ tier: 3, text: `RUN BLOCKING: OUR ${m.runSide.side} SIDE HAS THE EDGE (${signed(m.runSide.edge)} BLOCK VS SHED). RUN TO IT.` });
-  out.push({ coach: 'OL COACH', title: 'IN THE TRENCHES', items: olItems });
+  out.push({ coach: 'OL COACH', role: 'OL', title: 'IN THE TRENCHES', items: olItems });
   const us = starters(user);
   if (us.QB) {
     const pac = fitRatings(us.QB).pac;
     const blitzy = id.mix['c0-blitz'] >= 0.25;
     const quiet = id.mix['c0-blitz'] <= 0.12;
     out.push({
-      coach: 'QB COACH', title: 'UNDER CENTER',
+      coach: 'QB COACH', role: 'QB', title: 'UNDER CENTER',
       items: [{
         tier: 2, warn: blitzy && pac < 75,
         text: blitzy
@@ -311,7 +333,7 @@ function medicalSection(opp: Squad): ScoutSection {
     if (MAIN_SLOTS.includes(slot) && healthOf(a) < 90) items.push({ tier: 2, text: `BANGED UP: ${slot} ${short(a)} AT ${Math.round(healthOf(a))}% HEALTH.` });
   }
   if (!items.length) items.push({ tier: 1, text: 'NO STARTERS ON THE INJURY REPORT.' });
-  return { coach: 'TRAINER', title: 'THEIR INJURY REPORT', items: items.slice(0, 6) };
+  return { coach: 'TRAINER', role: 'TRAINER', title: 'THEIR INJURY REPORT', items: items.slice(0, 6) };
 }
 
 function stSection(opp: Squad): ScoutSection {
@@ -326,29 +348,32 @@ function stSection(opp: Squad): ScoutSection {
     const spd = fitRatings(ret).spd;
     items.push({ tier: 2, warn: spd >= 92, text: `RETURNER ${short(ret)}: SPEED ${spd}${spd >= 92 ? '. DANGEROUS: KICK AWAY FROM HIM OR OUT OF THE END ZONE.' : '.'}` });
   }
-  return { coach: 'ST COACH', title: 'SPECIAL TEAMS', items };
+  return { coach: 'ST COACH', role: 'ST', title: 'SPECIAL TEAMS', items };
 }
 
 /**
- * Plays the staff likes this week, from their tendencies and our matchups. Starred plays come first
- * among equals, and no trait fills the whole list.
+ * Plays the staff likes this week, from their tendencies and our matchups. A rule only fires when the
+ * coach whose read it is found it (its item's tier). Starred plays come first among equals, and no
+ * trait fills the whole list.
  */
-function suggest(id: DefIdentity, m: Matchups, starred: Set<string>): Suggestion[] {
+function suggest(id: DefIdentity, m: Matchups, starred: Set<string>, staff: Staff): Suggestion[] {
   const sh = shellShares(id.mix);
   const press = (id.press.CB1 + id.press.CB2) / 2;
   const rules: { trait: Trait; w: number; why: string }[] = [];
+  const oc2 = finds(staff, 'OC', 2);
+  const wr2 = finds(staff, 'WR', 2);
   if (sh.zero >= 0.25) {
     rules.push({ trait: 'quick', w: 2, why: 'BEATS THEIR BLITZ' });
     rules.push({ trait: 'screen', w: 2, why: 'SCREEN VS THE BLITZ' });
   }
   if (sh['two-high'] >= 0.45) rules.push({ trait: 'runInside', w: 2, why: 'LIGHT BOX VS TWO-HIGH' });
   if (sh['one-high'] >= 0.42) rules.push({ trait: 'deep', w: 1.5, why: 'SEAMS VS SINGLE-HIGH' });
-  if (press >= 0.42) rules.push({ trait: 'manBeater', w: 2, why: 'BEATS PRESS MAN' });
+  if (oc2 && press >= 0.42) rules.push({ trait: 'manBeater', w: 2, why: 'BEATS PRESS MAN' });
   if (sh.zero <= 0.12) rules.push({ trait: 'pa', w: 1.5, why: 'SELL RUN, THEY SIT BACK' });
-  if (m.deep) rules.push({ trait: 'deep', w: 2, why: `${m.deep.slot} HAS THE SPEED EDGE` });
-  if (m.runSide) rules.push({ trait: 'runInside', w: 1, why: `RUN BEHIND OUR ${m.runSide.side} SIDE` });
-  if (press <= 0.25) rules.push({ trait: 'quick', w: 1.5, why: 'SOFT CUSHIONS: GO QUICK' });
-  if (m.routes) rules.push({ trait: 'manBeater', w: 1, why: `${m.routes.slot} WINS HIS ROUTES` });
+  if (wr2 && m.deep) rules.push({ trait: 'deep', w: 2, why: `${m.deep.slot} HAS THE SPEED EDGE` });
+  if (finds(staff, 'OL', 3) && m.runSide) rules.push({ trait: 'runInside', w: 1, why: `RUN BEHIND OUR ${m.runSide.side} SIDE` });
+  if (oc2 && press <= 0.25) rules.push({ trait: 'quick', w: 1.5, why: 'SOFT CUSHIONS: GO QUICK' });
+  if (wr2 && m.routes) rules.push({ trait: 'manBeater', w: 1, why: `${m.routes.slot} WINS HIS ROUTES` });
   // Low-weight staples, so a quiet week still fills the list.
   rules.push({ trait: 'quick', w: 0.4, why: 'STAY ON SCHEDULE' }, { trait: 'runInside', w: 0.3, why: 'KEEP THEM HONEST' });
   const scored = PLAYBOOK.filter((p) => p.kind !== 'st' && !p.short).map((p, i) => {
@@ -375,14 +400,76 @@ function suggest(id: DefIdentity, m: Matchups, starred: Set<string>): Suggestion
   return out;
 }
 
-export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<string> = new Set()): ScoutReport {
+/**
+ * Each position coach's emphasis idea for the week (shown on the staff tab, never applied), from the
+ * same reads as the report. A coach under tier-2 scouting has none.
+ */
+function suggestEmphasis(user: Squad, opp: Squad, id: DefIdentity, m: Matchups, staff: Staff): Partial<Record<Group, Suggestion>> {
+  const out: Partial<Record<Group, Suggestion>> = {};
+  const set = (g: Group, sid: string, why: string) => {
+    if (finds(staff, g, 2)) out[g] = { id: sid, why };
+  };
+  const zero = shellShares(id.mix).zero;
+  const press = (id.press.CB1 + id.press.CB2) / 2;
+  const ourPass = SCHEME_PASS[user.team.profile.offense.scheme] ?? 0.5;
+  const prof = opp.team.profile.offense;
+  const theirPass = SCHEME_PASS[prof.scheme] ?? 0.5;
+  const worstOl = m.ol.reduce<Edge | null>((w, e) => (!w || e.score < w.score ? e : w), null);
+  if (zero >= 0.25) set('QB', 'qb-poise', `THEY BRING ZERO ${pct(zero)}`);
+  else if (m.deep) set('QB', 'qb-deep', `${m.deep.slot} HAS THE SPEED EDGE`);
+  else set('QB', 'qb-accuracy', 'TAKE WHAT THEY GIVE');
+  if (zero >= 0.25) set('RB', 'rb-protect', 'PICK UP THEIR BLITZ');
+  else set('RB', 'rb-tackles', 'WIN AFTER CONTACT');
+  if (press >= 0.42) set('WR', 'wr-routes', `THEY PRESS ${pct(press)}`);
+  else if (m.routes) set('WR', 'wr-routes', `${m.routes.slot} WINS HIS ROUTES`);
+  else if (ourPass < 0.45) set('WR', 'wr-blocking', 'WE RUN IT: BLOCK FOR IT');
+  else set('WR', 'wr-contested', 'WIN THE TOUGH ONES');
+  if (ourPass < 0.5) set('TE', 'te-blocking', 'WE RUN IT: SEAL THE EDGE');
+  else set('TE', 'te-receiving', 'A RED ZONE TARGET');
+  if (worstOl && worstOl.score <= -8) set('OL', 'ol-pass', 'A RUSHER BEATS US UP FRONT');
+  else if (m.runSide) set('OL', 'ol-run', `WE WIN ON THE ${m.runSide.side}`);
+  else set('OL', ourPass < 0.5 ? 'ol-run' : 'ol-pass', ourPass < 0.5 ? 'WE RUN IT' : 'WE THROW IT');
+  if (theirPass >= 0.55) set('DL', 'dl-rush', `THEY THROW ${pct(theirPass)}`);
+  else set('DL', 'dl-run', `THEY RUN ${pct(1 - theirPass)}`);
+  if (prof.qbStyle === 'runner') set('LB', 'lb-fits', 'THEIR QB RUNS');
+  else if (prof.qbStyle === 'dual' || theirPass <= 0.45) set('LB', 'lb-fits', 'THEY RUN IT');
+  else set('LB', 'lb-coverage', 'THEY THROW IT');
+  if (theirPass >= 0.55) set('DB', 'db-ball', 'THEY THROW: TAKE IT AWAY');
+  else if (theirPass >= 0.5) set('DB', 'db-press', 'JAM THEIR RECEIVERS');
+  else set('DB', 'db-tackling', 'KEEP THE RUN IN FRONT');
+  const k = starters(user).K;
+  if (k) {
+    const r = fitRatings(k);
+    if (r.kpw < r.kac) set('ST', 'st-leg', 'BUILD HIS RANGE');
+    else set('ST', 'st-accuracy', 'SHORE UP HIS ACCURACY');
+  }
+  return out;
+}
+
+/** Each section keeps what its coach found; the rest are counted, not shown. */
+function scouted(sections: ScoutSection[], staff: Staff): ScoutSection[] {
+  return sections.map((sec) => {
+    const c = staff[sec.role];
+    const items = sec.items.filter((it) => c.r.scout >= SCOUT_TIERS[it.tier]);
+    const hidden = sec.items.length - items.length;
+    return { ...sec, name: coachName(c), scout: c.r.scout, items, ...(hidden ? { hidden } : {}) };
+  });
+}
+
+/** The report as the user's staff sees it; pass `staff` to read it with another one. */
+export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<string> = new Set(), staff?: Staff): ScoutReport {
   const u = s.config.userTeamId;
+  const st = staff ?? staffFor(s, u);
   const oppId = game.home === u ? game.away : game.home;
   const user = squadFor(s, u);
   const opp = squadFor(s, oppId);
   const id = defIdentity(teamById(oppId));
   const m = matchups(user, opp);
   const prof = opp.team.profile.offense;
+  const emphasis = suggestEmphasis(user, opp, id, m, st);
+  const dc = dcSection(opp, st.DC.r.scout);
+  const ideas = (['DL', 'LB', 'DB'] as Group[]).filter((g) => emphasis[g]).map((g) => `${g} ${emphasisById(emphasis[g]!.id)!.label}`);
+  dc.note = ideas.length ? `EMPHASIS IDEAS (STAFF TAB): ${ideas.join(', ')}.` : 'SET THE WEEK\'S EMPHASES ON THE STAFF TAB.';
   return {
     opp: oppId,
     game,
@@ -393,7 +480,8 @@ export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<strin
     offTag: `${OFF_TAG[prof.scheme] ?? 'BALANCED'}, ${prof.qbStyle.toUpperCase()} QB`,
     recent: recentGames(s, oppId),
     averages: averages(s, oppId),
-    sections: [ocSection(opp, id), dcSection(opp), ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)],
-    suggestions: suggest(id, m, starred),
+    sections: scouted([ocSection(opp, id, st.OC.r.scout), dc, ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)], st),
+    suggestions: suggest(id, m, starred, st),
+    emphasis,
   };
 }

@@ -1,9 +1,11 @@
+import { getItem, removeItem, setItem } from '../engine/storage';
 import { STAT_KEYS } from './stats';
 import type { PlayerLine, SeasonState } from './types';
 
 /** Bump when `SeasonState` changes shape; older saves are ignored. */
 export const SAVE_VERSION = 1;
-const KEY = `saturday-gridiron-season-v${SAVE_VERSION}`;
+/** The storage key (engine/storage.ts); `initStore` must load it at boot. */
+export const SEASON_KEY = `season-v${SAVE_VERSION}`;
 
 /** Box-score lines are mostly zeros; saves leave them out (a full season is about 2.8 MB with them). */
 function mapLines(state: SeasonState, f: (l: PlayerLine) => PlayerLine): SeasonState {
@@ -29,20 +31,15 @@ export function unpackSeason(raw: string): SeasonState {
   });
 }
 
-/** Store the season in this browser. Fails quietly: the game works without storage. */
-export function saveSeason(state: SeasonState): boolean {
-  try {
-    localStorage.setItem(KEY, packSeason(state));
-    return true;
-  } catch {
-    return false;
-  }
+/** Store the season. The write happens in the background; a failure is reported by `onStoreError`. */
+export function saveSeason(state: SeasonState): void {
+  setItem(SEASON_KEY, packSeason(state));
 }
 
 export function loadSeason(): SeasonState | null {
+  const raw = getItem(SEASON_KEY);
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return null;
     const s = unpackSeason(raw);
     return s.version === SAVE_VERSION ? s : null;
   } catch {
@@ -51,17 +48,9 @@ export function loadSeason(): SeasonState | null {
 }
 
 export function hasSavedSeason(): boolean {
-  try {
-    return localStorage.getItem(KEY) !== null;
-  } catch {
-    return false;
-  }
+  return getItem(SEASON_KEY) !== null;
 }
 
 export function clearSeason(): void {
-  try {
-    localStorage.removeItem(KEY);
-  } catch {
-    // nothing stored
-  }
+  removeItem(SEASON_KEY);
 }

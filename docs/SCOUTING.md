@@ -7,7 +7,7 @@ Design goal: scouting should pay off without being mandatory. Identity tilts how
 ## Defensive identity (`src/data/identity.ts`)
 `defIdentity(team)` is computed from the program and never stored (cached per team id).
 
-- **Style:** `aggressive`, `balanced` or `soft`, a hash-seeded pick per team id (30/40/30 by `IDENTITY.styles[].share`; the 138 teams land 35/67/36). It's a placeholder for the defensive coordinator: when coaches exist, the DC carries the style.
+- **Style:** `aggressive`, `balanced` or `soft`, carried by the program's DC (`buildStaff(team).DC.style`, [COACHES.md](COACHES.md)). He's generated with a hash-seeded pick per team id (`defStyle`; 30/40/30 by `IDENTITY.styles[].share`; the 138 teams land 35/67/36).
 - **Call mix:** weights for each `DEF_CALLS` id.
 
   | Style | 2 Man Under | Cover 1 Robber | Cover 0 Blitz | Press × | 3rd & 7+ Cover 0 × |
@@ -30,12 +30,12 @@ Design goal: scouting should pay off without being mandatory. Identity tilts how
 ## The report (`src/season/scouting.ts`)
 `scoutReport(state, game, starred)` is a pure function of the season: identity, `squadFor` rosters (injuries, health, confidence), and results. The page builds it once when it opens.
 
-Every item has a **tier**, which says how good a staff must be to find it:
-- 1: basic film
-- 2: a good staff
-- 3: an elite staff
+Every item has a **tier**, which says how good a scout its section's coach must be to find it (`SCOUT_TIERS`):
+- 1: basic film, always found
+- 2: a good staff, scout 60+
+- 3: an elite staff, scout 78+
 
-All tiers show for now.
+Items a coach misses are counted (`+2 MORE: A SHARPER EYE WOULD FIND THEM`). The OC's and DC's tendency numbers get vaguer under 75 scout (`pctAt`). Details and the tier coverage by program are in [COACHES.md](COACHES.md).
 
 | Coach | Items (tier) |
 | --- | --- |
@@ -47,7 +47,7 @@ All tiers show for now.
 | Trainer | their starters out (and who replaces them) (1); starters under 90% health (2) |
 | ST coach | the kicker's power and accuracy (1); the returner's speed, flagged at 92+ (2) |
 
-**The DC report is information only for now.** You don't play defense live. It will matter once weekly emphases exist (below).
+**The DC report counts through weekly emphases.** You don't play defense live, but the defensive coaches' emphases play in the CPU's simulated drives, and pass rush or stop the run is worth more against the right offense ([COACHES.md](COACHES.md)). The DC section's note lists their ideas.
 
 ### Staff picks
 `playTraits(play)` reads each play's data with no hand tags:
@@ -75,8 +75,9 @@ Rules weight traits from the tendencies and matchups:
 
 Picks are the top five, with starred plays +0.5 among equals, short-yardage plays left out, and at most two per reason. Clicking a pick's star adds it to the call screen's STARRED chip.
 
+**A rule fires only if its read was found:** press and cushions need the OC's tier 2, the speed and route edges the WR coach's tier 2, and the run side the OL coach's tier 3.
+
 ## Hooks for later
-- **Staff quality:** hide items above the staff's tier, or add noise to the percentages (scouting a team that changed its plan).
-- **Weekly emphases:** the DC or OC picks a focus for the week (tight coverage, stop the run). It trains those ratings harder through progression's `focus` in `pointWeight`, and gives a small in-game edge in that area. That's what will make the DC's report count.
-- **The DC owns the style:** a coaching hire changes a program's defensive identity.
+- **Built** ([COACHES.md](COACHES.md)): staff quality hides tiers and blurs percentages, position coaches' weekly emphases, and the DC owns the style.
+- **A coaching hire changes a program's defensive identity** (the carousel; `defIdentity` will need the season state).
 - **Self-scouting:** observed tendencies from live games (the calls you actually saw) next to the staff's read.

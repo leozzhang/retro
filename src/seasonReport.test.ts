@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
-import { buildSquad, healthOf, healthy, HEALTH, positionOrder, reorderPosition, starters } from './data/depth';
+import { buildSquad, healthOf, healthy, HEALTH, positionOrder, reorderPosition, starters, teamRatings } from './data/depth';
 import { overallRaw, POS_ROLE, POSITIONS } from './data/positions';
 import { CALENDAR } from './data/season/calendar';
 import { teamById, TEAMS } from './data/teams';
@@ -9,12 +9,21 @@ import { champions } from './season/postseason';
 import { advanceWeek, defaultConfig, newSeason, seasonOver } from './season/season';
 import { records, recordText, winner } from './season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
-import type { InjuryLevel, SeasonState } from './season/types';
+import type { DriveLog, InjuryLevel, SeasonState, TeamState } from './season/types';
 import { squadFor } from './season/world';
 import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
 import { BREAKOUT, CONFIDENCE, confOf } from './season/confidence';
 import { setUserDepth } from './season/staff';
 import { actualRole, moraleContext, moraleOf, moraleReason, type MoraleDriver } from './season/morale';
+import { buildStaff, COACH_ROLES, type CoachRole, type Staff } from './data/coaches';
+import { EMPHASES, GROUP_POS, GROUP_SLOTS } from './data/emphasis';
+import { hashString, mulberry32 } from './engine/math';
+import { driveMods, emphasisMods, type DriveMods } from './season/emphasis';
+import { simulateDrive } from './game/rules';
+import { progressTeam } from './season/progression';
+import { SCOUT_TIERS } from './season/scouting';
+import { simGame } from './season/simGame';
+import { SCHEME_PASS } from './season/staff';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -394,6 +403,124 @@ function bangedShare(s: SeasonState): number {
   return hurt / n;
 }
 
+/** A copy of a team's staff with every coach's ratings set to `n`. */
+function staffAt(teamId: string, n: number): Staff {
+  const st = structuredClone(buildStaff(teamById(teamId)));
+  for (const c of Object.values(st)) c.r = { scout: n, ...(c.r.teach !== undefined ? { teach: n, game: n } : {}) };
+  return st;
+}
+
+/**
+ * Coaching staffs (docs/COACHES.md): staff level and report coverage by program tier, then each
+ * emphasis in paired sims (a mid-table team against every FBS team on a neutral field, the same seeds
+ * with and without it), and how hard a season of practice steers level-ups toward its ratings.
+ */
+function coaches(): string[] {
+  const rows = ['', '== COACHES ==', '', 'STAFF BY TIER: mean scout, share of section coaches who find tier-2 / tier-3 reads'];
+  const sectionRoles: CoachRole[] = ['OC', 'DC', 'WR', 'OL', 'QB', 'TRAINER', 'ST'];
+  for (let tier = 1; tier <= 5; tier++) {
+    const ts = TEAMS.filter((t) => t.profile.tier === tier);
+    let scout = 0;
+    let t2 = 0;
+    let t3 = 0;
+    for (const t of ts) {
+      const st = buildStaff(t);
+      scout += Object.values(st).reduce((a, c) => a + c.r.scout, 0) / COACH_ROLES.length;
+      t2 += sectionRoles.filter((r) => st[r].r.scout >= SCOUT_TIERS[2]).length / sectionRoles.length;
+      t3 += sectionRoles.filter((r) => st[r].r.scout >= SCOUT_TIERS[3]).length / sectionRoles.length;
+    }
+    rows.push(`  T${tier} (${String(ts.length).padStart(2)} teams)  scout ${(scout / ts.length).toFixed(1)}  tier 2 ${pctText(t2 / ts.length)}  tier 3 ${pctText(t3 / ts.length)}`);
+  }
+
+  // The median team by overall, against everyone. Whole games are too noisy to pair (a changed gain
+  // reshuffles the rest of the game's draws), so each emphasis is measured per drive on the same seeds:
+  // the team's offensive drives for offense and kicking emphases, the opponents' drives for defense.
+  const byOvr = [...TEAMS].sort((a, b) => teamRatings(buildSquad(a)).ovr - teamRatings(buildSquad(b)).ovr);
+  const team = byOvr[Math.floor(byOvr.length / 2)];
+  const us = teamRatings(buildSquad(team));
+  const opps = TEAMS.filter((t) => t.id !== team.id).map((t) => ({ t, r: teamRatings(buildSquad(t)), pass: SCHEME_PASS[t.profile.offense.scheme] ?? 0.5 }));
+  const ourPass = SCHEME_PASS[team.profile.offense.scheme] ?? 0.5;
+  const reps = Number(process.env.EMPH_DRIVES ?? 300);
+  let drives = 0;
+  for (let k = 0; k < 200; k++) {
+    const log: DriveLog[] = [];
+    simGame(buildSquad(team), buildSquad(opps[k % opps.length].t), mulberry32(k), { neutral: true, drives: log });
+    drives += log.length / 2;
+  }
+  const perGame = drives / 200;
+  rows.push('', `EMPHASES: ${team.school} (OVR ${us.ovr}) vs all ${opps.length} FBS teams, ${reps} paired drives each, x ${perGame.toFixed(1)} drives a game`);
+  rows.push('  margin change per game at game-day 50 (95); for defense, against pass-heavy (55%+) and run-heavy (45%-) offenses at 50.');
+  rows.push('  practice: odds of a level-up point landing on the focused ratings over a season of it, against the standard week (target 1.5-2.2; K/P run higher)');
+  rows.push('  emphasis              margin @50    @95    vs pass  vs run   practice');
+  const points = (off: number, def: number, seed: number, mods?: DriveMods) => simulateDrive(off, def, 25, mulberry32(seed), undefined, undefined, undefined, mods).points;
+  const flags: string[] = [];
+  for (const e of EMPHASES) {
+    const defense = GROUP_SLOTS[e.group].unit === 'def';
+    const delta = (n: number, keep: (pass: number) => boolean = () => true) => {
+      const mods = emphasisMods(staffAt(team.id, n), { [e.group]: e.id });
+      let sum = 0;
+      let cnt = 0;
+      for (const o of opps) {
+        if (!keep(o.pass)) continue;
+        for (let k = 0; k < reps; k++) {
+          const seed = hashString(`emph:${o.t.id}:${k}`);
+          const d = defense
+            ? points(o.r.off, us.def, seed) - points(o.r.off, us.def, seed, driveMods(undefined, mods, o.pass))
+            : points(us.off, o.r.def, seed, driveMods(mods, undefined, ourPass)) - points(us.off, o.r.def, seed);
+          sum += d;
+          cnt++;
+        }
+      }
+      return cnt ? (sum / cnt) * perGame : 0;
+    };
+    const d50 = delta(50);
+    const d95 = delta(95);
+    const steer = practiceSteer(team.id, e.id);
+    // The split is by the opponent's offense, so it only means something for a defensive emphasis.
+    const split = defense ? `${delta(50, (p) => p >= 0.55).toFixed(2).padStart(9)} ${delta(50, (p) => p <= 0.45).toFixed(2).padStart(7)}` : `${'-'.padStart(9)} ${'-'.padStart(7)}`;
+    rows.push(`  ${e.id.padEnd(20)} ${d50.toFixed(2).padStart(8)} ${d95.toFixed(2).padStart(6)} ${split}   x${steer.toFixed(2)}`);
+    if (d95 > 1.5) flags.push(`${e.id}: ${d95.toFixed(2)} at game-day 95, over the 1.5 cap`);
+    if (d50 < 0.1) flags.push(`${e.id}: ${d50.toFixed(2)} at game-day 50, barely felt`);
+    // Kickers level about half as often, so a season of the same practice piles up toward `perfCap`.
+    if (e.group !== 'ST' && (steer < 1.5 || steer > 2.2)) flags.push(`${e.id}: practice x${steer.toFixed(2)}, outside 1.5-2.2`);
+  }
+  rows.push(flags.length ? `  FLAGS: ${flags.join('; ')}` : '  no flags');
+  return rows;
+}
+
+/**
+ * A 12-week season of one emphasis for a team's players at its positions who have room to grow (full
+ * time, average grades, teach 50): the odds of a level-up point landing on the focused ratings, over the
+ * standard week's. Odds, not shares, because a group whose focus already takes most of its points (an
+ * OL's pbk and str) can't double its share.
+ */
+function practiceSteer(teamId: string, emphasisId: string): number {
+  const em = EMPHASES.find((x) => x.id === emphasisId)!;
+  const team = teamById(teamId);
+  const squad = buildSquad(team);
+  const staff = staffAt(teamId, 50);
+  const players = squad.athletes.filter((a) => GROUP_POS[em.group].includes(a.pos) && a.potential - overallRaw(a.r, a.pos) >= 4);
+  const share = (focus: boolean) => {
+    let hit = 0;
+    let all = 0;
+    for (let rep = 0; rep < 20; rep++) {
+      const ts: TeamState = {};
+      const grades = new Map(players.map((a) => [a.id, { team: team.id, snaps: 60, share: 1, sum: 0, tags: {}, hits: 0, lsum: 0, lw: 0 }]));
+      for (let w = 1; w <= 12; w++) progressTeam(ts, squad, grades, w, mulberry32(rep * 100 + w), focus ? { staff, picks: { [em.group]: em.id } } : undefined);
+      for (const p of Object.values(ts.progress ?? {})) {
+        for (const [k, v] of Object.entries(p.d)) {
+          all += v ?? 0;
+          if ((em.ratings as string[]).includes(k)) hit += v ?? 0;
+        }
+      }
+    }
+    return all ? hit / all : 0;
+  };
+  const odds = (x: number) => x / Math.max(1e-9, 1 - x);
+  const before = share(false);
+  return before ? odds(share(true)) / odds(before) : 0;
+}
+
 function detail(s: SeasonState): string[] {
   const rows: string[] = [];
   const recs = records(s);
@@ -461,7 +588,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   conf.qbSlumps = slumped.size;
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
-    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor), ...detail(seasons[0]),
+    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor), ...coaches(), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

@@ -1,6 +1,7 @@
 import { FIELD_W, HASH_BOT, HASH_TOP, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import { CONF, leverage, unitEdge, type UnitConf } from '../data/confidence';
 import { clamp, gauss, type Rng } from '../engine/math';
+import { explosiveFactor, kickEdge, snapEdge, turnoverFactor, type DriveMods } from '../season/emphasis';
 
 /** 'fumble' = botched exchange or pitch, recovered by the offense (spotted like a tackle). */
 export type OutcomeType = 'tackle' | 'oob' | 'incomplete' | 'td' | 'int' | 'pick6' | 'sack' | 'safety' | 'fumble';
@@ -219,6 +220,8 @@ export interface SimPlay {
   punt?: boolean;
   /** How much the snap mattered, 0..1 (`leverage` in data/confidence.ts). */
   lev: number;
+  /** The weekly emphases' edge on this snap or kick, in rating points (season/emphasis.ts). */
+  em?: number;
 }
 
 /** Confidence for one drive: the offense's and defense's units and the kicker (`teamConf`), and whether it's late and close. */
@@ -259,20 +262,23 @@ export const DRIVE_SIM = {
   turnover: 0.022,
 };
 
-/** Yards on one simulated play. */
-function simGain(diff: number, rng: Rng): [number, boolean] {
+/** Yards on one simulated play; `xf` scales the big-play odds (weekly emphases). */
+function simGain(diff: number, rng: Rng, xf = 1): [number, boolean] {
   const T = DRIVE_SIM;
-  if (rng() < T.explosive) return [Math.round(T.explosiveMin - Math.log(1 - rng()) * T.explosiveTail), true];
+  if (rng() < T.explosive * xf) return [Math.round(T.explosiveMin - Math.log(1 - rng()) * T.explosiveTail), true];
   return [Math.max(-6, Math.round(T.base + diff * T.edgePerPoint + gauss(rng) * T.sd)), false];
 }
 
 /**
  * Abstract simulation of an opponent possession (the user only plays offense for now).
  * `start` is in yards from the CPU's own goal line. With `conf`, each snap's rating gap moves by the
- * two units' confidence at that snap's leverage (it draws no extra random numbers).
+ * two units' confidence at that snap's leverage. With `mods`, the two teams' weekly emphases move
+ * the gain, big-play and takeaway odds and field goals in their situations (season/emphasis.ts).
+ * Neither draws extra random numbers, so without them a drive plays exactly as before.
  */
 export function simulateDrive(
   offOvr: number, defOvr: number, start: number, rng: Rng, clock: DriveClock = NO_CLOCK, onPlay?: (p: SimPlay) => void, conf?: DriveConf,
+  mods?: DriveMods,
 ): DriveSim {
   const diff = offOvr - defOvr;
   const edge = diff * DRIVE_SIM.edgePerPoint;
@@ -289,12 +295,14 @@ export function simulateDrive(
     plays++;
     secs += simPlaySecs(clock, rng);
     const lev = leverage(down, 100 - yard, conf?.late ?? false);
-    if (rng() < DRIVE_SIM.turnover) {
-      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, lev });
+    const em = mods ? snapEdge(mods, down, toGo, yard) : 0;
+    const emp = em ? { em } : {};
+    if (rng() < DRIVE_SIM.turnover * (mods ? turnoverFactor(mods, down, toGo, yard) : 1)) {
+      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, lev, ...emp });
       return done(0, 'TURNOVER');
     }
-    const [gain, explosive] = simGain(conf ? diff + unitEdge(conf.off - conf.def, lev) : diff, rng);
-    onPlay?.({ gain, explosive, turnover: false, down, toGo, lev });
+    const [gain, explosive] = simGain((conf ? diff + unitEdge(conf.off - conf.def, lev) : diff) + em, rng, mods ? explosiveFactor(mods, down, toGo, yard) : 1);
+    onPlay?.({ gain, explosive, turnover: false, down, toGo, lev, ...emp });
     yard += gain;
     toGo -= gain;
     if (yard >= 100) return done(7, 'TOUCHDOWN', 100);
@@ -310,8 +318,9 @@ export function simulateDrive(
     if (down === 4 || lastPlay) {
       if (fgDist <= 52) {
         const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);
-        const made = rng() < fgOdds(fgDist, conf ? unitEdge(conf.k, fgLev) : 0);
-        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, fg: { dist: fgDist, made }, lev: fgLev });
+        const kEm = mods ? kickEdge(mods, fgDist) : 0;
+        const made = rng() < fgOdds(fgDist, (conf ? unitEdge(conf.k, fgLev) : 0) + kEm);
+        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
         return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
       }
       if (toGo <= 2 && yard > 45 && rng() < 0.5) {

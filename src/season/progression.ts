@@ -4,6 +4,8 @@ import { OVR_WEIGHTS, overallRaw, POSITIONS, type Position } from '../data/posit
 import { RATING_KEYS, type RatingKey, type Ratings } from '../data/ratings';
 import { clamp, pickWeighted, type Rng } from '../engine/math';
 import type { GameGrade } from './grades';
+import type { Staff } from '../data/coaches';
+import { practiceTags, type Picks } from './emphasis';
 import { moraleOf } from './morale';
 import type { Progress, RatingDelta, SeasonState, TeamState } from './types';
 
@@ -162,8 +164,9 @@ export function gameXp(g: GameGrade): number {
 }
 
 /**
- * One rating point's draw weight: position weight × profile × performance × growth rate × headroom
- * × practice focus (always 1 until practice exists).
+ * One rating point's draw weight: position weight × profile × performance × growth rate × headroom.
+ * Performance tags include practice: a weekly emphasis adds tags to the ratings it works on
+ * (`practiceTags`, season/emphasis.ts).
  */
 export function pointWeight(r: Ratings, base: Athlete, k: RatingKey, tags: RatingDelta, ovr: number): number {
   const w = OVR_WEIGHTS[base.pos][k] ?? 0;
@@ -172,8 +175,7 @@ export function pointWeight(r: Ratings, base: Athlete, k: RatingKey, tags: Ratin
   const profile = clamp(1 + (r[k] - templateValue(base.pos, k, ovr)) / PROGRESSION.profileScale, lo, hi);
   const perf = 1 + Math.min(PROGRESSION.perfCap, (tags[k] ?? 0) * PROGRESSION.perfBoost);
   const headroom = clamp((ceiling(base, k) - r[k]) / PROGRESSION.headroomSoft, 0, 1);
-  const focus = 1;
-  return w * profile * perf * growthRate(k) * headroom * focus;
+  return w * profile * perf * growthRate(k) * headroom;
 }
 
 /**
@@ -210,9 +212,12 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 
 /**
  * Apply one game to a team: XP from each player's grade, then any level-ups. `squad` is the team as it
- * took the field (progress applied); the generated roster gives each player's ceilings.
+ * took the field (progress applied); the generated roster gives each player's ceilings. `focus` is the
+ * week's emphases: each player's practice tags land before his level-ups, so they steer this week's.
  */
-export function progressTeam(ts: TeamState, squad: Squad, grades: Map<string, GameGrade>, week: number, rng: Rng): LevelUpEvent[] {
+export function progressTeam(
+  ts: TeamState, squad: Squad, grades: Map<string, GameGrade>, week: number, rng: Rng, focus?: { staff: Staff; picks?: Picks },
+): LevelUpEvent[] {
   const base = new Map(buildSquad(squad.team).athletes.map((a) => [a.id, a]));
   const prog = (ts.progress ??= {});
   const events: LevelUpEvent[] = [];
@@ -224,6 +229,7 @@ export function progressTeam(ts: TeamState, squad: Squad, grades: Map<string, Ga
     p.xp += Math.round(gameXp(g) * mult);
     const tags = (p.tags ??= {});
     for (const [k, v] of Object.entries(g.tags) as [RatingKey, number][]) tags[k] = round1((tags[k] ?? 0) + v);
+    if (focus) for (const [k, v] of practiceTags(a.pos, g.share, focus.staff, focus.picks)) tags[k] = round1((tags[k] ?? 0) + v);
     const r = { ...a.r };
     // A breakout raised his potential, and his ceilings with it.
     const b = base.get(a.id) ?? a;

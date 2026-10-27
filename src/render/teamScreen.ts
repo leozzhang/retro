@@ -1,13 +1,15 @@
 import { archetypeLabel, classLabel, DEV_LABEL, heightLabel, type Athlete } from '../data/athletes';
 import { confLabel } from '../data/confidence';
 import { athleteName, fitRatings, healthOf, healthy, positionOrder, starters, teamRatings, type Squad } from '../data/depth';
-import { overall, overallBreakdown, POSITIONS, type Position } from '../data/positions';
+import { emphasisById } from '../data/emphasis';
+import { overall, overallBreakdown, OVR_WEIGHTS, POSITIONS, type Position } from '../data/positions';
 import { RATING_INFO, RATING_KEYS, type RatingKey } from '../data/ratings';
 import { VIEW_W } from '../engine/constants';
 import { CONFIDENCE, confOf } from '../season/confidence';
 import { outText } from '../season/injuries';
 import { moodLabel, moraleContext, moraleOf, moraleReason, temperamentLabel, type MoraleContext } from '../season/morale';
-import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier } from '../season/progression';
+import { groupOf } from '../season/emphasis';
+import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier, type Multiplier } from '../season/progression';
 import { records, recordText } from '../season/standings';
 import type { Progress, SeasonState } from '../season/types';
 import { drawHint } from './hud';
@@ -384,6 +386,25 @@ const TEMPERAMENT_BLURB: Record<string, string> = {
   MELLOW: 'MELLOW: TAKES THINGS AS THEY COME.',
 };
 
+/** What his position coach has him practicing this week (season/emphasis.ts), if not the standard week. */
+function practiceText(s: SeasonState, a: Athlete): string {
+  const em = emphasisById(s.teamState[s.config.userTeamId]?.emph?.[groupOf(a.pos)]);
+  const ks = em?.ratings.filter((k) => OVR_WEIGHTS[a.pos][k]) ?? [];
+  return ks.length ? `PRACTICING ${ks.map((k) => k.toUpperCase()).join(' ')}` : '';
+}
+
+/** The XP multiplier's parts, and this week's practice; single-spaced when there's practice, to fit two lines. */
+function xpBlurb(m: Multiplier, practice: string): string {
+  const sp = practice ? ' ' : '  ';
+  const parts = [
+    `XP x${m.total.toFixed(2)}: ROOM ${m.headroom.toFixed(2)}`, `DEV ${m.dev.toFixed(2)}`, `CONF ${m.confidence.toFixed(2)}`,
+    `MORALE ${m.morale.toFixed(2)}`, `CLASS ${m.year.toFixed(2)}`,
+  ];
+  if (m.potential < 1) parts.push(`AT POT ${m.potential.toFixed(2)}`);
+  if (practice) parts.push(practice);
+  return parts.join(sp);
+}
+
 function drawCard(
   g: CanvasRenderingContext2D, s: SeasonState, a: Athlete, p: Progress | undefined, slot: string | undefined, mc: MoraleContext, v: TeamView,
 ): void {
@@ -487,7 +508,7 @@ function drawCard(
     : overMorale
     ? `${MORALE_BLURB} ${TEMPERAMENT_BLURB[temperamentLabel(a)]}`
     : overLvl
-    ? `XP x${mult.total.toFixed(2)}: ROOM ${mult.headroom.toFixed(2)}  DEV ${mult.dev.toFixed(2)}  CONF ${mult.confidence.toFixed(2)}  MORALE ${mult.morale.toFixed(2)}  CLASS ${mult.year.toFixed(2)}${mult.potential < 1 ? `  AT POT ${mult.potential.toFixed(2)}` : ''}`
+    ? xpBlurb(mult, practiceText(s, a))
     : `${info.label.toUpperCase()}: ${info.blurb.toUpperCase()}`;
   const lines = wrap(blurb, 44).slice(0, 2);
   lines.forEach((l, i) => text(g, l, x, CARD_BOTTOM - 22 + i * 11, { color: hovered || overLvl || overConf || overMorale ? '#ffffff' : SOFT, shadow: false }));
