@@ -1,6 +1,6 @@
 # Transfer portal: plan
 
-_Agreed design, not built yet (2026-10-27). Build order at the bottom._
+_Agreed design (2026-10-27), now built: see [PORTAL.md](PORTAL.md) for the system as built, its results and where it differs from this plan._
 
 ## Goal
 - The portal is the first offseason system. It should feel realistic: stars at weak programs move up, buried players at top programs move to mid-tier programs for snaps, and so on.

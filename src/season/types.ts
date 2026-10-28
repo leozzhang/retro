@@ -14,6 +14,8 @@ import type { GamePlan } from './staff';
 export interface Delegation {
   depthChart: boolean;
   gamePlan: boolean;
+  /** The transfer portal board and the leaving list (season/portal.ts `autoPortal`). Missing means the user runs it. */
+  portal?: boolean;
 }
 
 export interface SeasonConfig {
@@ -107,7 +109,7 @@ export interface Poll {
 
 export interface NewsItem {
   week: number;
-  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury';
+  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal';
   text: string;
   teams: string[];
 }
@@ -164,6 +166,19 @@ export interface Progress {
   /** A coach decision under his morale (season/morale.ts): signed, and what it was. It fades. */
   me?: number;
   mk?: 'bench' | 'job';
+  /** He transferred in: from where, and the offseason of which year (season/portal.ts). */
+  tr?: { from: string; year: number };
+  /** A coach's promise (season/portal.ts): a starting job or more snaps in season `year`, judged after it. */
+  pr?: CoachPromise;
+  /** The year a promise to him was broken: it pushes him toward the portal that offseason. */
+  pb?: number;
+}
+
+export interface CoachPromise {
+  kind: 'start' | 'snaps';
+  year: number;
+  /** The team that made it. */
+  to: string;
 }
 
 /** What changed on a team's roster this season. */
@@ -186,6 +201,19 @@ export interface TeamState {
   mo?: Record<string, number>;
   /** The user's weekly emphases by position group (season/emphasis.ts); cleared after each week, so missing is `standard`. */
   emph?: Picks;
+  /** Level-ups this season, for the program's development record. */
+  lu?: number;
+  /** Roster changes laid over the generated roster: who left, and who joined (transfers and walk-ons). */
+  roster?: RosterDelta;
+}
+
+/**
+ * A team's roster as a change to its generated one (season/world.ts `baseRoster`). An arrival keeps his
+ * id, which names the roster he was generated on, so he's rebuilt from it; `num` is his new jersey.
+ */
+export interface RosterDelta {
+  out?: string[];
+  in?: { id: string; num: number }[];
 }
 
 /**
@@ -252,13 +280,76 @@ export interface CoachState {
   seasons: number;
 }
 
-export type Phase = 'regular' | 'confChamp' | 'postseason' | 'complete';
+export type Phase = 'regular' | 'confChamp' | 'postseason' | 'complete' | 'offseason';
 
 /** A finished year, kept when an open-ended season rolls over. */
 export interface SeasonSummary {
   year: number;
   champion: string;
   heisman?: string;
+  /** The final AP top 25, best first. */
+  ap?: string[];
+  /** Win share by team, postseason included. */
+  wp?: Record<string, number>;
+  /** Level-ups per player by team: the development record. */
+  dev?: Record<string, number>;
+}
+
+/** Offseason stages, in order (season/offseason.ts). Graduation, the draft and signing day go before the portal. */
+export type OffseasonStage = 'portal';
+
+export interface OffseasonState {
+  stage: OffseasonStage;
+  /** Portal round: 0 the leaving list, before anyone enters; 1 and 2 the head coaches' rounds. */
+  round: number;
+  /** Last season's promises, judged when the offseason opened. */
+  promises?: { kept: number; broken: number };
+}
+
+/** A player in the portal: where from, and his overall and position when he entered. */
+export interface PortalEntrant {
+  id: string;
+  from: string;
+  pos: Position;
+  ovr: number;
+  /** How it ended: committed (to `commits`), back to his old school, or out of FBS. */
+  out?: 'commit' | 'return' | 'gone';
+}
+
+/** One of the user's players considering the portal, and what the user did about it. */
+export interface LeavingEntry {
+  /** His odds of entering before anything is done, and why he's thinking about it. */
+  p: number;
+  reason: PortalReason;
+  act?: 'meet' | 'promise' | 'go' | 'encourage';
+  /** A meeting's result; a promise's kind. */
+  ok?: boolean;
+  kind?: CoachPromise['kind'];
+}
+
+export type PortalReason = 'buried' | 'contender' | 'home' | 'develop' | 'morale';
+
+export interface PortalState {
+  entrants: PortalEntrant[];
+  /** Interest by player, then school. */
+  interest: Record<string, Record<string, number>>;
+  /** Open offers by school. */
+  offers: Record<string, string[]>;
+  /** Player to the school he signed with. */
+  commits: Record<string, string>;
+  /** Promises made with offers, keyed `school:player`. One becomes `Progress.pr` if he signs there. */
+  promises: Record<string, CoachPromise['kind']>;
+  /** Logit shifts on entering from meetings and promises (every team), and players encouraged to go. */
+  adj: Record<string, number>;
+  forced: string[];
+  /** The user's leaving list. */
+  leaving: Record<string, LeavingEntry>;
+  meets: number;
+  /** What the user has spent this round, by school (CPU staffs spend the same budgets). */
+  spent: Record<string, { calls: string[]; visits: string[] }>;
+  /** The user's coaches' focus and dropped targets. */
+  focus: string[];
+  drop: string[];
 }
 
 export interface SeasonState {
@@ -281,4 +372,7 @@ export interface SeasonState {
   injuryLog?: InjuryEvent[];
   /** Next man up this season (season/confidence.ts): sparks, benchings that earned nothing, and breakouts. */
   confLog?: ConfEvent[];
+  /** The offseason after this season (open-ended seasons only), and its transfer portal. */
+  offseason?: OffseasonState;
+  portal?: PortalState;
 }

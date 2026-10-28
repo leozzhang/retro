@@ -27,8 +27,14 @@ import { GROUPS, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
-import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, userGameThisWeek } from '../season/season';
-import type { InjuryLevel } from '../season/types';
+import { advanceWeek, defaultConfig, newSeason, seasonOver, userGameThisWeek } from '../season/season';
+import type { InjuryLevel, SeasonConfig } from '../season/types';
+import { advanceOffseason, startOffseason } from '../season/offseason';
+import { actOnLeaving, offer, pursue, setTarget, withdraw } from '../season/portal';
+import {
+  actionRect, ADVANCE_BTN, BOARD_ROWS, boardRows, chipRect, drawPortal, LEAVING_ROWS, leavingRows, newPortalView, PORTAL_TABS, portalTabAt, POS_CHIPS,
+  rowRect, type PortalView,
+} from '../render/portalScreen';
 import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
@@ -51,7 +57,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'playbook' | 'prep' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'playbook' | 'prep' | 'portal' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -67,6 +73,8 @@ const KICKOFF_LINE = OWN_GOAL + 35;
 const FG_RANGE_HINT = 55;
 /** Injury settings for a new season, as I cycles them. */
 const INJURY_OPTIONS: InjuryLevel[] = ['normal', 'light', 'off'];
+const LENGTH_OPTIONS: SeasonConfig['length'][] = ['single', 'open'];
+const LENGTH_LABEL: Record<SeasonConfig['length'], string> = { single: 'ONE SEASON', open: 'DYNASTY' };
 
 interface Notice {
   title: string;
@@ -131,6 +139,7 @@ export class Game {
   private qIdx = QUARTER_OPTIONS.indexOf(8);
   /** The injury setting a new season starts with (I on the title screen). */
   private injuryIdx = INJURY_OPTIONS.indexOf('normal');
+  private lengthIdx = 0;
   private user!: Team;
   private cpu!: Team;
   /** The two squads in this game: the season's (injuries, the user's depth chart) in a season game. */
@@ -177,6 +186,7 @@ export class Game {
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
   private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
+  private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
@@ -214,6 +224,9 @@ export class Game {
         break;
       case 'prep':
         this.updatePrep(input);
+        break;
+      case 'portal':
+        this.updatePortal(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -261,8 +274,9 @@ export class Game {
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
     if (input.hit('KeyI')) this.injuryIdx = (this.injuryIdx + 1) % INJURY_OPTIONS.length;
+    if (input.hit('KeyL')) this.lengthIdx = (this.lengthIdx + 1) % LENGTH_OPTIONS.length;
     if (input.hit('KeyN')) {
-      const config = { ...defaultConfig(TEAMS[this.userIdx].id), injuries: INJURY_OPTIONS[this.injuryIdx] };
+      const config = { ...defaultConfig(TEAMS[this.userIdx].id), injuries: INJURY_OPTIONS[this.injuryIdx], length: LENGTH_OPTIONS[this.lengthIdx] };
       this.season = newSeason(config, (Math.random() * 2 ** 31) >>> 0);
       saveSeason(this.season);
       this.toSeason();
@@ -382,27 +396,37 @@ export class Game {
       this.toBook();
       return;
     }
-    if (input.hit('KeyO') || (input.mouse.pressed && inBox(PREP_BTN, input.mouse.x, input.mouse.y))) {
+    // In the offseason the PREP button is the portal's.
+    const prepBtn = input.mouse.pressed && inBox(PREP_BTN, input.mouse.x, input.mouse.y);
+    if (s.phase === 'offseason') {
+      if (input.hit('KeyO', 'Space', 'Enter') || prepBtn) this.toPortal();
+      return;
+    }
+    if (input.hit('KeyO') || prepBtn) {
       this.toPrep();
       return;
     }
     const sim = input.hit('KeyX');
     if (!input.hit('Space', 'Enter') && !sim) return;
     if (seasonOver(s)) {
-      if (s.config.length === 'open') this.season = nextSeason(s);
-    } else {
-      const game = userGameThisWeek(s);
-      if (game && !sim) {
-        // Play it on the field; the final screen writes the result back.
-        const u = s.config.userTeamId;
-        const opp = game.home === u ? game.away : game.home;
-        this.seasonGame = game;
-        this.startGame(teamById(u), teamById(opp), { user: squadFor(s, u), cpu: squadFor(s, opp) });
-        return;
-      }
-      advanceWeek(s);
+      // An open-ended season goes into its offseason, starting with the portal.
+      if (s.config.length !== 'open') return;
+      startOffseason(s);
+      saveSeason(s);
+      this.toPortal();
+      return;
     }
-    saveSeason(this.season!);
+    const game = userGameThisWeek(s);
+    if (game && !sim) {
+      // Play it on the field; the final screen writes the result back.
+      const u = s.config.userTeamId;
+      const opp = game.home === u ? game.away : game.home;
+      this.seasonGame = game;
+      this.startGame(teamById(u), teamById(opp), { user: squadFor(s, u), cpu: squadFor(s, opp) });
+      return;
+    }
+    advanceWeek(s);
+    saveSeason(s);
   }
 
   // ------------------------------------------------------------ team page
@@ -531,6 +555,130 @@ export class Game {
     else {
       v.open = shown[i].id;
       v.flip = false;
+    }
+  }
+
+  // ------------------------------------------------------------ transfer portal
+
+  private toPortal(): void {
+    this.screen = 'portal';
+    this.portalView = newPortalView(this.season!);
+  }
+
+  /**
+   * The portal (season/portal.ts): tabs, the position chips and rows, the card's actions (number keys
+   * or clicks), F to hand it to staff, and Space to advance a round. The last round's advance starts
+   * next season and goes back to the hub. Every change is saved.
+   */
+  private updatePortal(input: Input): void {
+    const s = this.season!;
+    const v = this.portalView;
+    const { x, y, pressed } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'season';
+      return;
+    }
+    const n = PORTAL_TABS.length;
+    let tab = v.tab;
+    if (input.hit('KeyA', 'ArrowLeft')) tab = (tab + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight')) tab = (tab + 1) % n;
+    if (pressed && portalTabAt(x, y) >= 0) tab = portalTabAt(x, y);
+    if (tab !== v.tab) {
+      Object.assign(v, { tab, sel: 0, top: 0, note: '' });
+      return;
+    }
+    if (input.hit('KeyF')) {
+      s.config.delegate.portal = !s.config.delegate.portal;
+      v.note = s.config.delegate.portal ? 'YOUR STAFF RUNS THE PORTAL (F: TAKE IT BACK)' : 'YOU RUN THE PORTAL';
+      saveSeason(s);
+      return;
+    }
+    if (input.hit('Space', 'Enter') || (pressed && inBox(ADVANCE_BTN, x, y))) {
+      const next = advanceOffseason(s);
+      if (next !== s) {
+        this.season = next;
+        saveSeason(next);
+        this.toSeason();
+        return;
+      }
+      saveSeason(s);
+      this.portalView = { ...newPortalView(s), tab: PORTAL_TABS[v.tab] === 'LEAVING' ? 0 : v.tab, chip: v.chip };
+      return;
+    }
+    const which = PORTAL_TABS[v.tab];
+    if (which === 'MY ROOM') return;
+    if (which === 'BOARD') {
+      let chip = v.chip;
+      const k = POS_CHIPS.length;
+      chip = (chip + (input.hit('KeyE') ? 1 : 0) - (input.hit('KeyQ') ? 1 : 0) + k) % k;
+      if (pressed) POS_CHIPS.forEach((_, i) => inBox(chipRect(i), x, y) && (chip = i));
+      if (chip !== v.chip) {
+        Object.assign(v, { chip, sel: 0, top: 0 });
+        return;
+      }
+    }
+    const rows = which === 'BOARD' ? boardRows(s, v.chip).map((e) => e.id) : leavingRows(s);
+    const shown = which === 'BOARD' ? BOARD_ROWS : LEAVING_ROWS;
+    const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0) + Math.sign(input.mouse.wheel);
+    if (step && rows.length) v.sel = Math.max(0, Math.min(rows.length - 1, v.sel + step));
+    if (pressed) for (let i = 0; i < shown; i++) if (inBox(rowRect(i), x, y) && v.top + i < rows.length) v.sel = v.top + i;
+    if (v.sel < v.top) v.top = v.sel;
+    if (v.sel >= v.top + shown) v.top = v.sel - shown + 1;
+    const id = rows[v.sel];
+    if (!id || s.config.delegate.portal) return;
+    let act = -1;
+    for (let i = 0; i < 5; i++) if (input.hit(`Digit${i + 1}`) || (pressed && inBox(actionRect(i), x, y))) act = i;
+    if (act < 0) return;
+    v.note = which === 'BOARD' ? this.boardAction(s, id, act) : this.leavingAction(s, id, act);
+    saveSeason(s);
+  }
+
+  private boardAction(s: SeasonState, id: string, act: number): string {
+    const u = s.config.userTeamId;
+    const p = s.portal!;
+    const key = `${u}:${id}`;
+    switch (act) {
+      case 0:
+        if (p.offers[u]?.includes(id)) {
+          withdraw(s, u, id);
+          return 'OFFER WITHDRAWN';
+        }
+        return offer(s, u, id) ? 'OFFER MADE' : 'NO SPOT TO OFFER: AT THE CAP, OR SPOTS ARE NEEDED AT OTHER POSITIONS';
+      case 1: {
+        const next = p.promises[key] === undefined ? 'snaps' : p.promises[key] === 'snaps' ? 'start' : undefined;
+        if (!next) {
+          delete p.promises[key];
+          return 'PROMISE WITHDRAWN (THE OFFER STANDS)';
+        }
+        return offer(s, u, id, next) ? `OFFER WITH A PROMISE OF ${next === 'start' ? 'A STARTING SHOT' : 'MORE SNAPS'}` : 'NO SPOT TO OFFER';
+      }
+      case 2:
+        return pursue(s, u, id, 'call') ? 'YOU CALLED HIM' : 'NO CALLS LEFT THIS ROUND, OR ALREADY CALLED';
+      case 3:
+        return pursue(s, u, id, 'visit') ? 'HE VISITED CAMPUS' : 'NO VISITS LEFT THIS ROUND, OR ALREADY VISITED';
+      default: {
+        const how = p.focus.includes(id) ? 'drop' : p.drop.includes(id) ? 'none' : 'focus';
+        setTarget(s, id, how);
+        return how === 'focus' ? 'YOUR POSITION COACH WILL FOCUS ON HIM' : how === 'drop' ? 'YOUR POSITION COACH WILL DROP HIM' : 'BACK ON THE NORMAL BOARD';
+      }
+    }
+  }
+
+  private leavingAction(s: SeasonState, id: string, act: number): string {
+    const acts = ['meet', 'promise', 'promise', 'go', 'encourage'] as const;
+    if (!actOnLeaving(s, id, acts[act], act === 1 ? 'start' : 'snaps')) return 'NOT NOW: ALREADY DECIDED, OR NO MEETINGS LEFT';
+    const e = s.portal!.leaving[id];
+    switch (acts[act]) {
+      case 'meet':
+        return e.ok ? 'GOOD TALK: HE IS LEANING TOWARD STAYING' : 'HE IS STILL THINKING ABOUT LEAVING';
+      case 'promise':
+        return `PROMISED ${act === 1 ? 'A STARTING SHOT' : 'MORE SNAPS'} NEXT SEASON. KEEP IT`;
+      case 'go':
+        return 'HIS CALL';
+      default:
+        return 'HE WILL ENTER THE PORTAL';
     }
   }
 
@@ -1149,6 +1297,11 @@ export class Game {
       drawPlaybook(g, squadFor(s, s.config.userTeamId), this.bookView, this.starred);
       return;
     }
+    if (this.screen === 'portal') {
+      const s = this.season!;
+      drawPortal(g, s, this.portalView, staffFor(s, s.config.userTeamId));
+      return;
+    }
     if (this.screen === 'prep') {
       const s = this.season!;
       const r = this.prepView.report;
@@ -1437,7 +1590,9 @@ export class Game {
     this.drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
     text(g, 'VS', VIEW_W / 2, 196, { size: 16, align: 'center', color: '#ffffff' });
     text(g, `<  QUARTERS: ${QUARTER_OPTIONS[this.qIdx]} MIN  >   (Q / E)`, VIEW_W / 2, 270, { align: 'center', color: '#9ad7ff' });
-    text(g, `NEW SEASON INJURIES: ${INJURY_OPTIONS[this.injuryIdx].toUpperCase()}   (I)`, VIEW_W / 2, 283, { align: 'center', color: '#8fa0b8', shadow: false });
+    text(g, `NEW SEASON: ${LENGTH_LABEL[LENGTH_OPTIONS[this.lengthIdx]]} (L)   INJURIES: ${INJURY_OPTIONS[this.injuryIdx].toUpperCase()} (I)`, VIEW_W / 2, 283, {
+      align: 'center', color: '#8fa0b8', shadow: false,
+    });
 
     if (Math.floor(this.titleTime * 2) % 2 === 0) {
       text(g, 'PRESS ENTER TO KICK OFF', VIEW_W / 2, 300, { size: 8, align: 'center', color: '#ffffff' });

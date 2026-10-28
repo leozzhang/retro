@@ -6,7 +6,7 @@ import { CALENDAR } from './data/season/calendar';
 import { teamById, TEAMS } from './data/teams';
 import { latestPoll, rankIn } from './season/polls';
 import { champions } from './season/postseason';
-import { advanceWeek, defaultConfig, newSeason, seasonOver } from './season/season';
+import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, simSeason } from './season/season';
 import { records, recordText, winner } from './season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
 import type { DriveLog, InjuryLevel, SeasonState, TeamState } from './season/types';
@@ -24,6 +24,11 @@ import { progressTeam } from './season/progression';
 import { SCOUT_TIERS } from './season/scouting';
 import { simGame } from './season/simGame';
 import { SCHEME_PASS } from './season/staff';
+import { START_SLOTS } from './season/confidence';
+import { actOnLeaving, leavingList, MIN_COUNT, PORTAL } from './season/portal';
+import { advanceOffseason, startOffseason } from './season/offseason';
+import { baseRoster } from './season/world';
+import { overall } from './data/positions';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -387,6 +392,125 @@ function morale(sample: MoraleSample): string[] {
   ];
 }
 
+/** Mean starter overall (the 11-personnel and nickel lineups, K and P) by program tier. */
+function tierStarters(s: SeasonState): number[] {
+  return [1, 2, 3, 4, 5].map((tier) => {
+    let sum = 0;
+    let n = 0;
+    for (const t of TEAMS.filter((x) => x.profile.tier === tier)) {
+      const st = starters(squadFor(s, t.id));
+      for (const slot of START_SLOTS) {
+        const a = st[slot];
+        if (!a) continue;
+        sum += overall(a.r, a.pos);
+        n++;
+      }
+    }
+    return sum / n;
+  });
+}
+
+/**
+ * The transfer portal (docs/PORTAL.md): an open-ended career of `n` seasons with every portal side
+ * automated, paired with a control on the same seeds that skips the offseason. Volume and who enters,
+ * where they go, net talent by tier, starter talent by tier against the control, and promises (the
+ * user's staff promises a start to every starter and snaps to every backup on the leaving list, so the
+ * spam is measured).
+ */
+function portalReport(n: number): string[] {
+  const cfg = { ...defaultConfig('georgia'), length: 'open' as const, delegate: { depthChart: true, gamePlan: true, portal: true } };
+  let s = newSeason(cfg, 1);
+  let c = newSeason(cfg, 1);
+  const tierOf = (id: string) => teamById(id).profile.tier;
+  const per: number[] = [];
+  const roles = { starter: 0, backup: 0 };
+  const outs = { commit: 0, return: 0, gone: 0 };
+  const flows = new Map<string, number>();
+  const net = [0, 0, 0, 0, 0];
+  const promises = { kept: 0, broken: 0, made: 0 };
+  let walkOns = 0;
+  let maxRoster = 0;
+  let minPos = Infinity;
+  const talent: string[] = [];
+  const fmt = (x: number[]) => x.map((v) => v.toFixed(2)).join(' ');
+  const t0 = Date.now();
+  let gapDrift = 0;
+  for (let y = 1; y <= n; y++) {
+    simSeason(s);
+    simSeason(c);
+    startOffseason(s);
+    if (y > 1) {
+      promises.kept += s.offseason!.promises!.kept;
+      promises.broken += s.offseason!.promises!.broken;
+    }
+    const user = s.config.userTeamId;
+    const startersNow = new Set<string>();
+    for (const t of TEAMS) for (const a of Object.values(starters(squadFor(s, t.id)))) startersNow.add(a.id);
+    // The user's leaving list, as the staff would see it, then promise spam.
+    s.portal!.leaving = leavingList(s, user);
+    for (const id of Object.keys(s.portal!.leaving)) {
+      if (actOnLeaving(s, id, 'promise', startersNow.has(id) ? 'start' : 'snaps')) promises.made++;
+    }
+    const old = s;
+    while (s.phase === 'offseason') s = advanceOffseason(s);
+    const portal = old.portal!;
+    const count = new Map<string, number>();
+    for (const e of portal.entrants) {
+      count.set(e.from, (count.get(e.from) ?? 0) + 1);
+      roles[startersNow.has(e.id) ? 'starter' : 'backup']++;
+      outs[e.out as keyof typeof outs]++;
+      if (e.out === 'commit') {
+        const to = portal.commits[e.id];
+        if (to === e.from) continue;
+        const d = tierOf(to) - tierOf(e.from);
+        const band = e.ovr >= 85 ? '85+' : e.ovr >= 75 ? '75-84' : e.ovr >= 65 ? '65-74' : '<65';
+        const k = `${band} ${d < 0 ? 'up' : d > 0 ? 'down' : 'same'}`;
+        flows.set(k, (flows.get(k) ?? 0) + 1);
+        net[tierOf(to) - 1] += e.ovr;
+        net[tierOf(e.from) - 1] -= e.ovr;
+      } else if (e.out === 'gone') net[tierOf(e.from) - 1] -= e.ovr;
+    }
+    for (const t of TEAMS) {
+      per.push(count.get(t.id) ?? 0);
+      const r = baseRoster(s, t.id);
+      maxRoster = Math.max(maxRoster, r.length);
+      walkOns += (s.teamState[t.id]?.roster?.in ?? []).filter((e) => e.id.includes(`-w${old.year + 1}.`)).length;
+      const byPos = new Map<string, number>();
+      for (const a of r) byPos.set(a.pos, (byPos.get(a.pos) ?? 0) + 1);
+      for (const [pos, min] of Object.entries(MIN_COUNT)) minPos = Math.min(minPos, (byPos.get(pos) ?? 0) - min);
+    }
+    c = nextSeason(c);
+    const a = tierStarters(s);
+    const b = tierStarters(c);
+    const diff = a.map((v, i) => v - b[i]);
+    gapDrift = diff[0] - diff[4];
+    talent.push(`  year ${y}: portal ${fmt(a)}  control ${fmt(b)}  diff ${fmt(diff)}` + (Math.max(...diff.map(Math.abs)) > 1 ? '  <-- drift' : ''));
+  }
+  const avg = per.reduce((x, y) => x + y, 0) / per.length;
+  const sd = Math.sqrt(per.reduce((x, y) => x + (y - avg) ** 2, 0) / per.length);
+  const total = roles.starter + roles.backup;
+  const tierTeams = [1, 2, 3, 4, 5].map((t) => TEAMS.filter((x) => x.profile.tier === t).length);
+  const judged = promises.kept + promises.broken;
+  const bands = ['85+', '75-84', '65-74', '<65'];
+  return [
+    '', `PORTAL (docs/PORTAL.md), ${n} offseasons of one career, every side automated. Targets: about 10-15 entrants a team`,
+    'with real spread, mostly backups; starter overall by tier within about 1 of a no-portal control over 5 seasons.',
+    `time per offseason ${((Date.now() - t0) / n / 1000).toFixed(2)} s (with the paired seasons)`,
+    `entrants per team: mean ${avg.toFixed(1)}, SD ${sd.toFixed(1)}, min ${Math.min(...per)}, max ${Math.max(...per)}` + (avg < 10 || avg > 15 ? '  <-- off target' : ''),
+    `who enters: starters ${pctText(roles.starter / total)}, backups ${pctText(roles.backup / total)}`,
+    `outcomes: signed ${pctText(outs.commit / total)}, back home ${pctText(outs.return / total)} (placeholder), out of FBS ${pctText(outs.gone / total)}`,
+    'flows by overall band (tier up/same/down): ' + bands.map((b) => `${b} ${flows.get(`${b} up`) ?? 0}/${flows.get(`${b} same`) ?? 0}/${flows.get(`${b} down`) ?? 0}`).join('  '),
+    'net talent per team-offseason by tier (overall points in less out): ' + net.map((v, i) => `T${i + 1} ${(v / tierTeams[i] / n).toFixed(0)}`).join('  '),
+    `walk-ons per team-offseason ${(walkOns / TEAMS.length / n).toFixed(1)} (placeholder); largest roster ${maxRoster}` +
+      (maxRoster > PORTAL.rosterMax ? '  <-- over the cap' : '') +
+      `; tightest position ${minPos >= 0 ? `+${minPos}` : minPos} over its minimum` + (minPos < 0 ? '  <-- under' : ''),
+    'starter overall by tier (T1..T5), after each offseason:', ...talent,
+    `  T1-T5 gap change vs control after ${n}: ${gapDrift.toFixed(2)}` + (Math.abs(gapDrift) > 1 ? '  <-- gap drift' : ''),
+    `promises (the user's staff promises everyone on the leaving list): ${promises.made} made, ${judged} judged, ` +
+      `kept ${pctText(promises.kept / Math.max(1, judged))}, broken ${pctText(promises.broken / Math.max(1, judged))}`,
+  ];
+}
+
 /** Share of the 22 starters on every team below 90 health right now. */
 function bangedShare(s: SeasonState): number {
   let n = 0;
@@ -588,7 +712,8 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   conf.qbSlumps = slumped.size;
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
-    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor), ...coaches(), ...detail(seasons[0]),
+    ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
+    ...portalReport(n), ...coaches(), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

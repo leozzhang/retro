@@ -3,12 +3,12 @@ import { TEAMS, teamById } from '../data/teams';
 import { seasonAwards } from './awards';
 import { evaluateCoach, newCoach } from './coach';
 import { weekNews } from './news';
-import { apPoll, cfpRankings } from './polls';
+import { apPoll, cfpRankings, latestPoll } from './polls';
 import { bowlGames, bracketGames, bracketRoundDone, confChampGames, newBracket, recordBracket, selectPlayoff } from './postseason';
 import { SAVE_VERSION } from './save';
 import { generateSchedule } from './schedule';
 import { DEV_LABEL } from '../data/athletes';
-import { athleteName, buildSquad, type Squad } from '../data/depth';
+import { athleteName, generatedAthlete, type Squad } from '../data/depth';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
 import { carryMorale, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
@@ -17,8 +17,8 @@ import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progre
 import { GAME_SIM, settleTie, simGame } from './simGame';
 import { emphasisMods, type TeamMods } from './emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
-import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, TeamState } from './types';
-import { seasonRng, squadFor, staffFor } from './world';
+import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, SeasonSummary, TeamState } from './types';
+import { baseRoster, seasonRng, squadFor, staffFor } from './world';
 
 /**
  * The season loop. `advanceWeek` runs one week as an ordered list of steps; each step is a plain
@@ -38,13 +38,13 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
   };
   // Progression and morale carry over, without last season's week marks.
   for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
-    if (!ts.progress && !ts.mo) continue;
-    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo })) as TeamState;
+    if (!ts.progress && !ts.mo && !ts.roster) continue;
+    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo, roster: ts.roster })) as TeamState;
     for (const p of Object.values(next.progress ?? {})) {
       delete p.up;
       carryConfidence(p);
     }
-    carryMorale(next, buildSquad(teamById(id)).athletes);
+    carryMorale(next, baseRoster(prev!, id));
     state.teamState[id] = next;
   }
   state.games = generateSchedule(TEAMS, year, seasonRng(state, 'schedule'));
@@ -153,6 +153,7 @@ const progress: WeekStep = (state, ctx) => {
       const ts = (state.teamState[t] ??= {});
       const focus = t === user && ts.emph ? { staff: staffFor(state, t), picks: ts.emph } : undefined;
       const events = progressTeam(ts, sq, grades, ctx.week, seasonRng(state, 'progress', t, ctx.week), focus);
+      if (events.length) ts.lu = (ts.lu ?? 0) + events.length;
       for (const e of events) {
         if (!e.big) continue;
         if (t === user) told(e);
@@ -160,7 +161,7 @@ const progress: WeekStep = (state, ctx) => {
       }
       // Morale first: it reads last game's starters, which the confidence step moves on.
       moraleStep(state, ts, sq, seasonRng(state, 'morale', t, ctx.week));
-      const bases = new Map(buildSquad(sq.team).athletes.map((a) => [a.id, a]));
+      const bases = new Map(baseRoster(state, t).map((a) => [a.id, generatedAthlete(a.id) ?? a]));
       const conf = confidenceStep(state, ts, sq, grades, bases, ctx.week, seasonRng(state, 'confidence', t, ctx.week));
       if (t === user) {
         for (const e of conf.sparks) {
@@ -253,13 +254,39 @@ const transition: WeekStep = (state, ctx) => {
     if (champ) {
       state.phase = 'complete';
       state.news.push({ week, kind: 'postseason', teams: [champ], text: `${teamById(champ).school} wins the ${state.year} national championship` });
-      state.history.push({ year: state.year, champion: champ, heisman: state.awards.find((a) => a.id === 'heisman')?.finalists[0]?.name });
+      state.history.push({
+        year: state.year, champion: champ, heisman: state.awards.find((a) => a.id === 'heisman')?.finalists[0]?.name,
+        ...yearRecord(state),
+      });
       if (state.config.coachCareer) state.news.push(...evaluateCoach(state));
     } else if (bracketRoundDone(state)) {
       state.games.push(...bracketGames(state, week + 1));
     }
   }
 };
+
+/** The year's final AP top 25, win shares and development records, for next years' reputations. */
+function yearRecord(state: SeasonState): Pick<SeasonSummary, 'ap' | 'wp' | 'dev'> {
+  const ap = latestPoll(state, 'ap')?.ranks.map((r) => r.team) ?? [];
+  const w: Record<string, [number, number]> = {};
+  for (const g of state.games) {
+    if (!g.result) continue;
+    const homeWon = g.result.home > g.result.away;
+    for (const [id, won] of [[g.home, homeWon], [g.away, !homeWon]] as const) {
+      const x = (w[id] ??= [0, 0]);
+      x[0] += won ? 1 : 0;
+      x[1]++;
+    }
+  }
+  const wp: Record<string, number> = {};
+  const dev: Record<string, number> = {};
+  for (const t of TEAMS) {
+    const x = w[t.id];
+    if (x) wp[t.id] = Math.round((x[0] / x[1]) * 1000) / 1000;
+    dev[t.id] = Math.round(((state.teamState[t.id]?.lu ?? 0) / baseRoster(state, t.id).length) * 1000) / 1000;
+  }
+  return { ap, wp, dev };
+}
 
 export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
   { name: 'prep', run: prep },
@@ -284,8 +311,9 @@ export function advanceWeek(state: SeasonState, userResult?: GameResult, userDri
   if (!seasonOver(state)) state.week++;
 }
 
+/** The season is played out: complete, or into its offseason. */
 export function seasonOver(state: SeasonState): boolean {
-  return state.phase === 'complete';
+  return state.phase === 'complete' || state.phase === 'offseason';
 }
 
 /** Sim to the end of the season. */
@@ -309,6 +337,8 @@ export function phaseLabel(state: SeasonState): string {
       return 'CHAMPIONSHIP WEEK';
     case 'postseason':
       return 'BOWLS AND PLAYOFF';
+    case 'offseason':
+      return 'OFFSEASON: PORTAL';
     default:
       return 'SEASON OVER';
   }

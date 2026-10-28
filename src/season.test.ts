@@ -167,7 +167,8 @@ describe('season', () => {
     expect(leaders(s, 'passYds', 1)[0].passYds).toBeGreaterThan(1500);
     expect(heismanRace(s).finalists.length).toBe(5);
     expect(s.awards.find((a) => a.id === 'heisman')?.finalists.length).toBe(5);
-    expect(s.history).toEqual([{ year: 2026, champion: b.champion, heisman: s.awards[0].finalists[0].name }]);
+    expect(s.history).toMatchObject([{ year: 2026, champion: b.champion, heisman: s.awards[0].finalists[0].name }]);
+    expect(s.history[0].ap).toHaveLength(25);
   });
 
   it('state is plain JSON: a saved season continues identically', () => {

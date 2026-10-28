@@ -30,6 +30,7 @@ Staffs are generated from the team id and never stored, like rosters (`buildStaf
 | SCOUT | everyone | Which report items his section finds (`SCOUT_TIERS`), and how precise his tendencies are (`pctAt`). Position coaches also need it for their emphasis suggestion |
 | TEACH | position coaches | How hard his emphasis steers his players' level-ups (`coachFactor`: 0.8 at 30, 1 at 50, 1.45 at 95) |
 | GAME | position coaches | How much his emphasis shows up in simulated play (same factor) |
+| RECRUIT | position coaches | How much interest he builds with a transfer-portal target each round ([PORTAL.md](PORTAL.md)). Drawn on its own stream (`staff-recruit:<team>`), so every other rating is unchanged |
 
 **The DC owns the style.** `defIdentity` reads `buildStaff(team).DC.style`. The DC is generated with the same seeded style the program had before (`defStyle`, tested for every team), so identities, live calls and `balance.txt` are unchanged.
 
@@ -149,7 +150,7 @@ A pick does two things:
 - **Scouting tab:** the DC section's note lists the defensive coaches' ideas.
 
 ## Later
-- **Recruiting and transfers:** a coach's pitch, with recruiting as a specialization.
+- **HS recruiting:** a coach's pitch, with RECRUIT (used by the portal) and recruiting as a specialization.
 - **Coaching carousel:**
   - firings and retirements, CPU schools included
   - assistants poached for other jobs, or for head coach elsewhere

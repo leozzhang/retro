@@ -93,10 +93,12 @@ His **target** is his baseline plus four signed terms (`moraleDrivers`, `moraleT
 - Scores, injuries and confidence are otherwise within noise. `npm run balance` is byte-identical.
 - **Speed:** a season takes 2.60 s (was 2.32 s). `positionOrders` (`data/depth.ts`) builds every position's order in one pass for the context.
 
+## Built on morale
+- **Transfer portal** ([PORTAL.md](PORTAL.md)): low morale pushes a player toward entering, the room's mood is a small term in a school's appeal, a transfer's morale resets to his baseline plus a fresh-start bump, and a player who comes back unplaced takes a hit.
+
 ## Not built yet (morale is designed to feed these)
-- **Transfer portal:** unhappy players, especially proud ones with a big role gap, ask to leave.
 - **Recruiting:** a happy roster recruits better.
-- **Talking to players:** promises (more touches, a shot at the job). A kept promise lifts morale; a broken one drops it. The coach decision term (`Progress.me`/`mk`) is the place for it.
+- **Talking to players** in season. The portal's leaving list has meetings and promises (a start or snaps, judged after the season: kept lifts morale, broken drops it; [PORTAL.md](PORTAL.md)), but there's no in-season talk yet.
 - **Captains:** naming one lifts him, and a captain's voice counts more in the room.
 - **Position changes** offered for playing time. A move to a new position is also a coach decision.
 - **Redshirts:** a happier player accepts one more readily.

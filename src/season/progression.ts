@@ -1,5 +1,5 @@
 import { templateValue, TEMPLATES, type Athlete, type ClassYear, type DevTrait } from '../data/athletes';
-import { buildSquad, type Squad } from '../data/depth';
+import { buildSquad, generatedAthlete, type Squad } from '../data/depth';
 import { OVR_WEIGHTS, overallRaw, POSITIONS, type Position } from '../data/positions';
 import { RATING_KEYS, type RatingKey, type Ratings } from '../data/ratings';
 import { clamp, pickWeighted, type Rng } from '../engine/math';
@@ -232,7 +232,8 @@ export function progressTeam(
     if (focus) for (const [k, v] of practiceTags(a.pos, g.share, focus.staff, focus.picks)) tags[k] = round1((tags[k] ?? 0) + v);
     const r = { ...a.r };
     // A breakout raised his potential, and his ceilings with it.
-    const b = base.get(a.id) ?? a;
+    // A transfer's ceilings come from the roster he was generated on.
+    const b = base.get(a.id) ?? generatedAthlete(a.id) ?? a;
     const ceil = p.pot ? { ...b, potential: b.potential + p.pot } : b;
     while (p.xp >= LEVEL_XP[a.pos]) {
       p.xp -= LEVEL_XP[a.pos];
@@ -255,7 +256,7 @@ export function progressTeam(
 
 /** The last week that's been played: the week before the current one, or the last one once the season is over. */
 export function lastPlayedWeek(state: SeasonState): number {
-  return state.phase === 'complete' ? state.week : state.week - 1;
+  return state.phase === 'complete' || state.phase === 'offseason' ? state.week : state.week - 1;
 }
 
 /** A player's progress this season, if any. */

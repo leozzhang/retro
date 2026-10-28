@@ -43,6 +43,8 @@ The .exe isn't code-signed, so Windows SmartScreen warns on first launch: click 
 | View a roster | R (yours) or T (opponent's); A/D pages, Esc back |
 | Start the game | Enter |
 | Season | N on the title screen starts a season with your team; C continues the saved one. In the hub: A/D tabs, W/S pages within a tab, Space plays this week's game, X simulates it, Esc goes back to the title. See [docs/SEASON.md](docs/SEASON.md) |
+| Season length | L on the title screen: ONE SEASON or DYNASTY (open-ended, with an offseason) |
+| Transfer portal | In a dynasty, Space on the finished season opens the offseason. A/D or click a tab (Board, My Room, Leaving). Board: Q/E or click a position chip, W/S or click a player, then 1 offer, 2 promise (snaps, then a start), 3 call, 4 visit, 5 focus or drop. Leaving: 1 meet, 2 promise a start, 3 promise snaps, 4 let go, 5 encourage. F hands the portal to your staff, Space advances a round, Esc returns to the hub (its PORTAL button comes back). See [docs/PORTAL.md](docs/PORTAL.md) |
 | Team page | T (or the TEAM button) in the season hub. A/D or click a tab to pick a position, click a player for his card, drag a player up or down the depth chart to reorder it. G hands the depth chart to your staff or takes it back. Esc returns to the hub |
 | Playbook page | P (or the PLAYBOOK button) in the season hub. A/D or click a tab (Starred, Pass, Run, Play Action), W/S pages. Click a card to see it drawn with your starters; click a card's star to save the play. In a play: A/D previous/next, Space star, F flip, Esc back |
 | Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |

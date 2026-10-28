@@ -29,6 +29,8 @@ export interface CoachRatings {
   scout: number;
   teach?: number;
   game?: number;
+  /** Position coaches: how much interest he builds with a portal target each round (season/portal.ts). */
+  recruit?: number;
 }
 
 export interface Coach {
@@ -77,6 +79,9 @@ export function buildStaff(team: Team): Staff {
     if (role === 'DC') c.style = defStyle(team.id);
     staff[role] = c;
   }
+  // Recruiting is drawn on its own stream, so the ratings above are the same as before it existed.
+  const rr = mulberry32(hashString(`staff-recruit:${team.id}`));
+  for (const g of GROUPS) staff[g].r.recruit = Math.round(clamp(level + gauss(rr) * STAFF.ratingSd, STAFF.min, STAFF.max));
   cache.set(team.id, staff);
   return staff;
 }

@@ -14,7 +14,7 @@ export const COMPOSITION: [Position, number][] = [
 ];
 
 /** How many play on a typical snap: the unit target is the average of these. */
-const STARTERS: Record<Position, number> = {
+export const STARTERS: Record<Position, number> = {
   QB: 1, HB: 1, FB: 1, WR: 3, TE: 1, OT: 2, OG: 2, C: 1, DE: 2, DT: 2, OLB: 2, MLB: 1, CB: 3, FS: 1, SS: 1, K: 1, P: 1,
 };
 
@@ -316,5 +316,60 @@ export function generateAthletes(p: TeamProfile): Athlete[] {
     a.stars = starsFor(a.potential, a.dev);
   });
   return athletes;
+}
+
+/** Walk-ons start this far under the position's unit target, give or take `WALK_ON.sd`. */
+export const WALK_ON = { under: 16, sd: 3, min: 35 };
+
+/** A walk-on's id: his team, the year he joined, his position and a count. It's all he needs to be rebuilt. */
+export function walkOnId(teamId: string, year: number, pos: Position, n: number): string {
+  return `${teamId}-w${year}.${pos}.${n}`;
+}
+
+/** Parses a walk-on id; undefined for a generated player's id. */
+export function parseWalkOn(id: string): { team: string; pos: Position } | undefined {
+  const m = /^(.*)-w\d+\.([A-Z]+)\.\d+$/.exec(id);
+  return m ? { team: m[1], pos: m[2] as Position } : undefined;
+}
+
+/**
+ * A walk-on freshman (a placeholder for HS recruiting): seeded by his id on his own stream, so
+ * generated rosters are untouched. His jersey is picked when he joins.
+ */
+export function makeWalkOn(p: TeamProfile, id: string, pos: Position): Athlete {
+  const rng = mulberry32(hashString(`walkon:${id}`));
+  const level = clamp(unitTargets(p)[POS_UNIT[pos]] - WALK_ON.under + gauss(rng) * WALK_ON.sd, WALK_ON.min, 99);
+  const archetype = weighted(rng, archetypeOdds(pos, p));
+  const b = BUILD[pos];
+  const hz = clamp(gauss(rng), -2.2, 2.2);
+  const wz = clamp(gauss(rng) * 0.8 + hz * 0.45, -2.5, 2.5);
+  const r = rollRatings(rng, pos, archetype, level, wz, hz);
+  const dev = devTrait(rng, level);
+  const ovr = overallRaw(r, pos);
+  const growth = Math.max(0, GROWTH.FR * DEV_MULT[dev] + gauss(rng) * 3);
+  return {
+    id,
+    first: pick(rng, FIRST_NAMES),
+    last: pick(rng, LAST_NAMES),
+    num: 0,
+    pos,
+    archetype,
+    year: 'FR',
+    redshirt: false,
+    heightIn: Math.round(b.h[0] + hz * b.h[1]),
+    weightLb: Math.round(b.w[0] + wz * b.w[1]),
+    hometown: hometown(rng, p),
+    stars: 1,
+    potential: Math.round(clamp(ovr + growth, ovr, 99)),
+    dev,
+    r,
+    skin: pick(rng, SKINS),
+    injury: null,
+  };
+}
+
+/** A free jersey for a player joining a roster, seeded so the pick is repeatable. */
+export function freeNumber(rng: Rng, pos: Position, taken: Iterable<number>): number {
+  return pickNumber(rng, POS_ROLE[pos], new Set(taken));
 }
 

@@ -1,6 +1,6 @@
 # Saturday Gridiron
 
-A PC football game inspired by Retro Bowl, set in FBS college football, with more realism: real teams and conferences, deeper playbooks, defensive schemes, and reading the defense. It's a personal project. Current status and the roadmap are in [docs/PROGRESS.md](docs/PROGRESS.md); read it first. The next system, the transfer portal, has an agreed design in [docs/TRANSFER_PORTAL_PLAN.md](docs/TRANSFER_PORTAL_PLAN.md).
+A PC football game inspired by Retro Bowl, set in FBS college football, with more realism: real teams and conferences, deeper playbooks, defensive schemes, and reading the defense. It's a personal project. Current status and the roadmap are in [docs/PROGRESS.md](docs/PROGRESS.md); read it first. The transfer portal, the first offseason system, is in [docs/PORTAL.md](docs/PORTAL.md).
 
 ## Stack
 - TypeScript, HTML5 Canvas 2D, and Vite. No framework or game engine.
@@ -26,7 +26,7 @@ Controls are listed in [README.md](README.md).
 - `data/`: players and teams. See [docs/RATINGS.md](docs/RATINGS.md) and [docs/ROSTERS.md](docs/ROSTERS.md)
   - `coaches.ts` (coaching staffs, generated per team; see [docs/COACHES.md](docs/COACHES.md)), `emphasis.ts` (the position coaches' weekly emphases)
   - `ratings.ts` (every rating and what it does), `positions.ts` (positions, overall formulas), `athletes.ts` (player schema, rating templates, archetypes, builds)
-  - `fbs/` (the 138 researched team profiles, home states and hometowns), `rosterGen.ts` (85-man rosters from a profile), `depth.ts` (depth chart, starters, injuries, computed team ratings), `teams.ts` (`TEAMS`, uniforms, slots)
+  - `fbs/` (the 138 researched team profiles, home states and hometowns), `rosterGen.ts` (85-man rosters from a profile, walk-ons), `depth.ts` (depth chart, starters, injuries, computed team ratings, `generatedAthlete` by id), `teams.ts` (`TEAMS`, uniforms, slots)
   - `season/`: world data for seasons: conference rules, rivalries, the calendar, the playoff format and bowls. See [docs/SEASON.md](docs/SEASON.md)
   - formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), defensive calls (`defenses.ts`), each defense's identity: style, call mix, press and third-and-long blitz (`identity.ts`; see [docs/SCOUTING.md](docs/SCOUTING.md)), kick types and special-teams units (`specialTeams.ts`)
 - `sim/`: player physics (`player.ts`), ball flight, AI (`ai.ts`: routes, coverage, pass pro, pursuit), run blocking by scheme (`runBlocking.ts`: zone/stretch/gap/trap/draw, combos, pulls, leverage, the auto-runner's lane read), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
@@ -46,8 +46,9 @@ Controls are listed in [README.md](README.md).
   - morale from role vs. expectations, team results, coach decisions and the locker room, weighed by a hidden temperament; never from grades (`morale.ts`). See [docs/MORALE.md](docs/MORALE.md)
   - the weekly scouting report on the next opponent, with tiered items found by each coach's scouting, and staff play picks (`scouting.ts`). See [docs/SCOUTING.md](docs/SCOUTING.md)
   - weekly emphases: practice tags and the simulated game-day edge (`emphasis.ts`). See [docs/COACHES.md](docs/COACHES.md)
+  - the offseason's stages (`offseason.ts`) and the transfer portal (`portal.ts`: motives, appeal, entries, rounds, the CPU staffs, placement, promises). Rosters change through `TeamState.roster`, laid over the generated roster by `baseRoster` (`world.ts`). See [docs/PORTAL.md](docs/PORTAL.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
-- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
+- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`), the portal (`portalScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports
 
 ## Conventions
@@ -79,8 +80,9 @@ Controls are listed in [README.md](README.md).
   - morale: `MORALE` (`season/morale.ts`); its XP factor `moraleXp` (`PROGRESSION`)
   - defensive identity: `IDENTITY` (`data/identity.ts`); the staff picks' rules in `suggest` (`season/scouting.ts`)
   - coaches: `STAFF` (`data/coaches.ts`), `SCOUT_TIERS` and `pctAt` (`season/scouting.ts`), `EMPHASIS` (`season/emphasis.ts`)
+  - transfer portal: `PORTAL`, `MIN_COUNT` (`season/portal.ts`); walk-ons `WALK_ON` (`data/rosterGen.ts`)
   - blocking anchor `ANCHOR_STR` (`data/ratings.ts`); overall weights `OVR_WEIGHTS` (`data/positions.ts`); rating templates and archetypes (`data/athletes.ts`); roster levels `CLASS_ADJ`, `LEVEL_SD`, `STANDOUT_LEVEL`, `UNIT_STEP`, `GROWTH` (`data/rosterGen.ts`); team weights `TEAM_WEIGHTS` (`data/depth.ts`)
-- **After changing the season sim, polls, progression, injuries, confidence or morale,** run `npm run season` and compare against the flags in SEASON.md, the per-position growth table in PROGRESSION.md (the report flags any position more than 15% off the mean), the injury targets in INJURIES.md (`INJURIES=light` checks the light setting), the confidence targets and farming check in CONFIDENCE.md, and the morale targets in MORALE.md (spread, unhappy players spread across teams, no tracking with confidence), and the emphasis targets in COACHES.md.
+- **After changing the season sim, polls, progression, injuries, confidence or morale,** run `npm run season` and compare against the flags in SEASON.md, the per-position growth table in PROGRESSION.md (the report flags any position more than 15% off the mean), the injury targets in INJURIES.md (`INJURIES=light` checks the light setting), the confidence targets and farming check in CONFIDENCE.md, and the morale targets in MORALE.md (spread, unhappy players spread across teams, no tracking with confidence), the emphasis targets in COACHES.md, and the PORTAL section against PORTAL.md (entrants a team, flows, starter talent by tier against the control).
 - **After changing AI or gameplay,** run `npm run balance` and compare against the baseline in PROGRESS.md and the real-world targets in [docs/TARGETS.md](docs/TARGETS.md) (FBS rushing, NFL route shapes, splits and completion rates). Flag plays that look overpowered or useless instead of quietly tuning them.
 - **Browser debugging:** in dev builds, `window.game` exposes the `Game` instance, and F1 toggles the debug overlay.
 

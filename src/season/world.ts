@@ -1,5 +1,6 @@
 import { buildStaff, type Staff } from '../data/coaches';
-import { buildDepth, buildSquad, type Squad } from '../data/depth';
+import type { Athlete } from '../data/athletes';
+import { buildDepth, buildSquad, generatedAthlete, type Squad } from '../data/depth';
 import { teamById } from '../data/teams';
 import { clamp, hashString, mulberry32, type Rng } from '../engine/math';
 import { CONFIDENCE, confOf, newStarters } from './confidence';
@@ -19,7 +20,7 @@ export function seasonRng(state: Pick<SeasonState, 'seed' | 'year'>, ...parts: (
  * starter who earned the job carries his next-man-up spark (season/confidence.ts) into the game.
  */
 export function squadFor(state: SeasonState, teamId: string): Squad {
-  const base = buildSquad(teamById(teamId));
+  const base = baseSquad(state, teamId);
   const ts = state.teamState[teamId];
   if (!ts) return base;
   const inj = ts.injuries ?? {};
@@ -31,7 +32,7 @@ export function squadFor(state: SeasonState, teamId: string): Squad {
     levels += p.lvl;
     if (p.c || p.sp || p.bh || p.dev || p.pot) form += `${id}:${p.c ?? 0}:${p.sp ?? 0}:${p.bh ?? 0}:${p.dev ?? ''}:${p.pot ?? 0},`;
   }
-  const key = `${levels}|${JSON.stringify(inj)}|${JSON.stringify(hp)}|${form}|${JSON.stringify(ts.st ?? null)}|${ts.gp ?? 0}|${(state.injuryLog ?? []).length}`;
+  const key = `${levels}|${JSON.stringify(inj)}|${JSON.stringify(hp)}|${form}|${JSON.stringify(ts.st ?? null)}|${ts.gp ?? 0}|${(state.injuryLog ?? []).length}|${rosterKey(ts)}`;
   const hit = cache.get(ts);
   if (hit && hit.key === key && hit.depth === ts.depth) return hit.squad;
   const hurt = Object.keys(hp).length > 0;
@@ -66,6 +67,40 @@ export function squadFor(state: SeasonState, teamId: string): Squad {
   cache.set(ts, { key, depth: ts.depth, squad });
   return squad;
 }
+
+/**
+ * A team's roster this season before anything is laid over it: the generated roster, less the players
+ * who left, plus the ones who joined (each rebuilt from the roster he was generated on, in his new
+ * jersey). With no changes it's the generated roster itself.
+ */
+export function baseRoster(state: SeasonState, teamId: string): Athlete[] {
+  return baseSquad(state, teamId).athletes;
+}
+
+/** `baseRoster` as a squad, with the staff chart built for it. */
+export function baseSquad(state: SeasonState, teamId: string): Squad {
+  const gen = buildSquad(teamById(teamId));
+  const r = state.teamState[teamId]?.roster;
+  if (!r || (!r.out?.length && !r.in?.length)) return gen;
+  const key = rosterKey(state.teamState[teamId]);
+  const hit = rosterCache.get(r);
+  if (hit?.key === key) return hit.squad;
+  const out = new Set(r.out);
+  const athletes = gen.athletes.filter((a) => !out.has(a.id));
+  for (const e of r.in ?? []) {
+    const a = generatedAthlete(e.id);
+    if (a) athletes.push({ ...a, num: e.num });
+  }
+  const squad = { team: gen.team, athletes, depth: buildDepth(athletes) };
+  rosterCache.set(r, { key, squad });
+  return squad;
+}
+
+function rosterKey(ts: { roster?: unknown } | undefined): string {
+  return ts?.roster ? JSON.stringify(ts.roster) : '';
+}
+
+const rosterCache = new WeakMap<object, { key: string; squad: Squad }>();
 
 /**
  * A team's coaching staff this season: the generated staff (data/coaches.ts). Hires, firings and the

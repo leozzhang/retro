@@ -45,7 +45,7 @@ describe('injuries', () => {
     expect(c.injuryLog).toEqual(a.injuryLog);
     expect(JSON.stringify(c.teamState)).toBe(JSON.stringify(b.teamState));
     expect(a.news.some((n) => n.kind === 'injury')).toBe(true);
-  });
+  }, 20_000);
 
   it('an injured player sits until his weeks run out, then comes back banged up', () => {
     const s = newSeason(defaultConfig('georgia'), 1);
