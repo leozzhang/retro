@@ -9,7 +9,8 @@ import { CONFIDENCE, confOf } from '../season/confidence';
 import { outText } from '../season/injuries';
 import { moodLabel, moraleContext, moraleOf, moraleReason, temperamentLabel, type MoraleContext } from '../season/morale';
 import { groupOf } from '../season/emphasis';
-import { LEVEL_XP, ratingChange, upgradedLastWeek, xpMultiplier, type Multiplier } from '../season/progression';
+import { seasonGain } from '../season/career';
+import { LEVEL_XP, upgradedLastWeek, xpMultiplier, type Multiplier } from '../season/progression';
 import { records, recordText } from '../season/standings';
 import type { Progress, SeasonState } from '../season/types';
 import { drawHint } from './hud';
@@ -184,7 +185,7 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
   const sel = view.rows[Math.min(v.sel, view.rows.length - 1)];
   if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), mc, v);
 
-  drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  ESC: BACK');
+  drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  C: CAREER  ESC: BACK');
 }
 
 function drawDepth(
@@ -457,7 +458,7 @@ function drawCard(
   text(g, 'RTG', x + 158, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
   text(g, 'WT', x + 288, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
   text(g, 'WK', WK_X - 4, RATING_TOP - 9, { color: DIM, shadow: false });
-  text(g, 'ALL', CARD_R - 10, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
+  text(g, 'SZN', CARD_R - 10, RATING_TOP - 9, { align: 'right', color: DIM, shadow: false });
   let hovered: RatingKey | null = null;
   parts.forEach((part, i) => {
     const y = RATING_TOP + i * RATING_LINE;
@@ -474,11 +475,11 @@ function drawCard(
     g.fillStyle = ovrColor(part.value);
     g.fillRect(x + 166, y + 1, Math.round(80 * Math.min(99, part.value) / 99), 6);
     text(g, `${Math.round(part.share * 100)}%`, x + 288, y, { align: 'right', color: SOFT, shadow: false });
-    // Up last week, and the all-time change.
+    // Up last week, and the change this season (all-time growth is on the career page).
     if (upgradedLastWeek(s, p, part.key)) upArrow(g, WK_X, y);
     else flatLine(g, WK_X, y);
-    const all = ratingChange(p, part.key);
-    text(g, all ? `+${all}` : '-', CARD_R - 10, y, { align: 'right', color: all ? GREEN : DIM, shadow: false });
+    const szn = seasonGain(s, a.id, p, part.key);
+    text(g, szn ? `+${szn}` : '-', CARD_R - 10, y, { align: 'right', color: szn ? GREEN : DIM, shadow: false });
   });
 
   // Everything else, small, under a rule: it's real on the field, just not part of this position's overall.
@@ -497,7 +498,7 @@ function drawCard(
       g.fillRect(cx - 2, y - 2, GRID_W - 4, RATING_LINE);
     }
     text(g, k.toUpperCase(), cx, y, { color: DIM, shadow: false });
-    text(g, String(a.r[k]), cx + 56, y, { align: 'right', color: ratingChange(p, k) ? GREEN : SOFT, shadow: false });
+    text(g, String(a.r[k]), cx + 56, y, { align: 'right', color: seasonGain(s, a.id, p, k) ? GREEN : SOFT, shadow: false });
   });
 
   // What the hovered (or the heaviest) rating does, or what makes up the XP multiplier.

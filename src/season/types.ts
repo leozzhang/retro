@@ -256,6 +256,8 @@ export interface ConfEvent {
   pos: Position;
   kind: 'spark' | 'bench' | 'breakout';
   reason?: 'injured' | 'slumping' | 'outplayed';
+  /** A spark's starter who lost the job. */
+  rep?: string;
 }
 
 /** One injury, as it happened: for the news, the season report and starts lost. */
@@ -271,6 +273,52 @@ export interface InjuryEvent {
   /** He was starting when he got hurt. */
   starter: boolean;
   real?: boolean;
+}
+
+/**
+ * A player's history (season/career.ts): what he did, not what he is. Gameplay state (`Progress`,
+ * morale, health) never reads it. Kept across seasons and transfers; see docs/CAREERS.md.
+ */
+export interface Career {
+  /** Finished seasons, oldest first. */
+  seasons: CareerSeason[];
+  /** The story so far, oldest first, the current season's included. */
+  story: StoryEvent[];
+  /** This season so far: games he took a snap in, and starts. Cleared when the season is archived. */
+  now?: { gp: number; gs: number };
+}
+
+export type CareerRole = 'starter' | 'rotation' | 'reserve' | 'dnp';
+
+/** One finished season. Zero counts and empty deltas are left out. */
+export interface CareerSeason {
+  year: number;
+  team: string;
+  /** His class that season, as `classLabel` prints it ('RS SO'). */
+  cls: string;
+  role: CareerRole;
+  gp?: number;
+  gs?: number;
+  /** His overall at the start and end of the season. */
+  ovr0: number;
+  ovr1: number;
+  /** The season's rating gains and level-ups. */
+  d?: RatingDelta;
+  lvl?: number;
+  /** Stat totals from the box scores. */
+  st?: Partial<Record<Exclude<keyof PlayerLine, 'id' | 'team' | 'name' | 'pos'>, number>>;
+}
+
+/** One line of a player's story. Its text is written when it happens, since names and rosters change later. */
+export interface StoryEvent {
+  year: number;
+  /** The week it happened; missing means the offseason after `year`'s season. */
+  week?: number;
+  team: string;
+  kind: 'start' | 'spark' | 'bench' | 'breakout' | 'breakthrough' | 'injury' | 'award' | 'portal' | 'transfer' | 'left';
+  text: string;
+  /** A transfer's old school (`team` is the new one). */
+  from?: string;
 }
 
 export interface CoachState {
@@ -372,6 +420,8 @@ export interface SeasonState {
   injuryLog?: InjuryEvent[];
   /** Next man up this season (season/confidence.ts): sparks, benchings that earned nothing, and breakouts. */
   confLog?: ConfEvent[];
+  /** Every player's history by athlete id (season/career.ts). Kept across seasons; nothing in the sim reads it. */
+  careers?: Record<string, Career>;
   /** The offseason after this season (open-ended seasons only), and its transfer portal. */
   offseason?: OffseasonState;
   portal?: PortalState;

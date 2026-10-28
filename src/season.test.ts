@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { buildSquad, positionOrder, reorderPosition, starters, teamRatings } from './data/depth';
 import { CALENDAR } from './data/season/calendar';
@@ -201,10 +202,11 @@ describe('season', () => {
   it('saves drop zero stats and restore them', () => {
     const s = fullSeason();
     const packed = packSeason(s);
-    // Box scores shrink by about half; progression (about 0.9 MB) doesn't pack. localStorage holds about 5 MB.
+    // Box scores shrink by about half; progression (about 0.9 MB) and careers (about 2.4 MB a season)
+    // don't pack. Saves are stored gzipped (engine/storage.ts): about 0.9 MB for a season.
     const boxes = (x: unknown) => JSON.stringify((x as typeof s).games).length;
     expect(boxes(JSON.parse(packed))).toBeLessThan(boxes(s) * 0.6);
-    expect(packed.length).toBeLessThan(4e6);
+    expect(gzipSync(packed).length).toBeLessThan(1.5e6);
     expect(JSON.parse(JSON.stringify(unpackSeason(packed)))).toEqual(JSON.parse(JSON.stringify(s)));
   });
 });

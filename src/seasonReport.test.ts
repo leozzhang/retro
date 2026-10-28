@@ -491,6 +491,12 @@ function portalReport(n: number): string[] {
   const total = roles.starter + roles.backup;
   const tierTeams = [1, 2, 3, 4, 5].map((t) => TEAMS.filter((x) => x.profile.tier === t).length);
   const judged = promises.kept + promises.broken;
+  const careers = Object.values(s.careers ?? {});
+  const rostered = TEAMS.flatMap((t) => baseRoster(s, t.id));
+  const withRows = rostered.filter((a) => s.careers?.[a.id]?.seasons.length).length;
+  const story = new Map<string, number>();
+  for (const c of careers) for (const e of c.story) story.set(e.kind, (story.get(e.kind) ?? 0) + 1);
+  const perTeam = (k: string) => ((story.get(k) ?? 0) / TEAMS.length / n).toFixed(1);
   const bands = ['85+', '75-84', '65-74', '<65'];
   return [
     '', `PORTAL (docs/PORTAL.md), ${n} offseasons of one career, every side automated. Targets: about 10-15 entrants a team`,
@@ -508,6 +514,10 @@ function portalReport(n: number): string[] {
     `  T1-T5 gap change vs control after ${n}: ${gapDrift.toFixed(2)}` + (Math.abs(gapDrift) > 1 ? '  <-- gap drift' : ''),
     `promises (the user's staff promises everyone on the leaving list): ${promises.made} made, ${judged} judged, ` +
       `kept ${pctText(promises.kept / Math.max(1, judged))}, broken ${pctText(promises.broken / Math.max(1, judged))}`,
+    '', `CAREERS (docs/CAREERS.md), the same career after ${n} seasons. History only: nothing in the sim reads it.`,
+    `${careers.length} players, ${(JSON.stringify(s.careers ?? {}).length / n / 1e6).toFixed(2)} MB of JSON per season; ` +
+      `rostered players with a past season ${pctText(withRows / rostered.length)}`,
+    'story lines per team-season: ' + [...story.keys()].sort().map((k) => `${k} ${perTeam(k)}`).join('  '),
   ];
 }
 

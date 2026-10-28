@@ -239,7 +239,7 @@ export function confidenceStep(
       pd.bh = round3((pd.bh ?? 0) + CONFIDENCE.benchHit);
       log.push({ week, team, id: f.replaced.id, pos: f.replaced.pos, kind: 'bench' });
     } else if (f.reason && f.spark) {
-      log.push({ week, team, id: f.athlete.id, pos: f.athlete.pos, kind: 'spark', reason: f.reason });
+      log.push({ week, team, id: f.athlete.id, pos: f.athlete.pos, kind: 'spark', reason: f.reason, rep: f.replaced.id });
       const p = entry(f.athlete.id);
       p.sp = CONFIDENCE.spark;
       p.spn = CONFIDENCE.sparkStarts;

@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-27_
+_Last updated: 2026-10-28_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -1065,6 +1065,19 @@ The first offseason system, built from [TRANSFER_PORTAL_PLAN.md](TRANSFER_PORTAL
   - Snaps promises are judged by starts.
   - Real portal rates weren't checked against a table: recent cycles probably run 15–20 entrants a team, above this target.
 
+## Done: careers, the STATS page, season gains on the card (2026-10-28)
+Design notes are in [CAREERS.md](CAREERS.md).
+- **Careers kept apart from gameplay** (`season/career.ts`, `SeasonState.careers`). Every FBS player gets a row for each finished season: team, class, role, games and starts, overall from start to end, rating gains, level-ups and stats. He also gets a story: first start or winning the job, next man up (naming who he replaced), benched, breakout, breakthrough, injuries, awards, and the portal (entered, transferred, returned, left FBS). Nothing in the sim reads it: `npm run season` is byte-identical apart from timings.
+  - A new week step, `story`, runs after `results`. `archiveSeason` runs when the season completes. `ConfEvent` gained `rep` (who a spark replaced).
+- **Player card:** the ALL column is now **SZN** (gains this season, `seasonGain`), and the green tint in the small ratings grid follows it. C opens the player's career.
+- **STATS page** (`render/careerScreen.ts`), opened from the hub's STATS button or H, or with C from the team page:
+  - left: the roster by position, with class, seasons and overall, and TR marking a transfer
+  - right: the player's headline (for example `BENCH TO BREAKOUT` or `2-YEAR STARTER`), career totals, and either SEASONS (a row per season, with this season's row live, then his story, newest first, scrolled with the wheel) or GROWTH (all-time and per-season gains at each rating in his overall)
+- **Hub:** a STATS button, and a shorter hint line. The LAST WEEK line now cuts off at 40 characters to make room for the button.
+- **Saves:** careers add about 2 MB of JSON a season, about 230 KB gzipped. The save test now checks the gzipped size (under 1.5 MB for a season), since localStorage's 5 MB limit no longer applies.
+- **Tests:** `src/career.test.ts` (7 tests): a row per rostered player matching `Progress.gs` and the box scores, season gains against all-time, overall carrying into the next season, a transfer's history and headline, the story matching the confidence log (with the replaced starter named), totals, and save and continue. The new CAREERS section in `npm run season` reports about 1.9 MB a season, 99% of rostered players with a past season (the rest are new walk-ons), and per team-season about 10.5 start lines, 3.8 sparks, 3.6 injuries, 3.4 breakthroughs and 2.1 transfers.
+- **Checked in headless Chrome:** the hub, the card's SZN column, and the STATS page in both modes, after one season, an offseason and 5 weeks.
+
 ## In progress
 - Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
@@ -1076,7 +1089,7 @@ The first offseason system, built from [TRANSFER_PORTAL_PLAN.md](TRANSFER_PORTAL
 - **Injuries are rolled after games only.** The user's live games have no mid-game injuries; that waits for mid-game roster changes. Knocks have no body-part label. Real players listed as injured in the research (for example Sayin) start the season healthy. The QB missing 3+ games rate (5.7%) is a bit under the ~8% aim, on purpose.
 - **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
 - **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
-- **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season is about 2.6 MB of JSON; gzipped saves are about a sixth of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
+- **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season is about 2.6 MB of JSON, plus about 2 MB of careers a season (CAREERS.md); gzipped saves are about a seventh of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
 - **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season's offseason has only the transfer portal (no graduation, draft or recruiting yet, so class years stay frozen).
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
@@ -1109,6 +1122,7 @@ The first offseason system, built from [TRANSFER_PORTAL_PLAN.md](TRANSFER_PORTAL
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 
 ## Next up (rough priority)
+1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
 1. **Graduation and class years** as an offseason stage before the portal (`OFFSEASON_STAGES`): seniors leave, classes advance, and walk-ons stop standing in for a recruiting class. This fixes the portal's compounding tier drift (PORTAL.md flags). Then HS recruiting from `stars`/hometowns with the coaches' RECRUIT, replacing the portal's §7 placeholder.
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
 1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns with the coaches' pitch, and the coaching carousel through `staffFor`.

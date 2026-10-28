@@ -42,6 +42,8 @@ export const TEAM_BTN = { x: VIEW_W - 76, y: 328, w: 70, h: 15 };
 export const BOOK_BTN = { x: VIEW_W - 172, y: 328, w: 90, h: 15 };
 /** The button to the weekly prep page (the next opponent and the scouting report), left of PLAYBOOK. */
 export const PREP_BTN = { x: VIEW_W - 238, y: 328, w: 60, h: 15 };
+/** The button to the STATS page (careers and stories), left of PREP. */
+export const STATS_BTN = { x: VIEW_W - 304, y: 328, w: 60, h: 15 };
 
 function resultText(g: SeasonGame, team: string): string {
   const r = g.result;
@@ -133,9 +135,12 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
   g.fillStyle = team.colors.primary;
   g.fillRect(PREP_BTN.x, PREP_BTN.y, PREP_BTN.w, PREP_BTN.h);
   text(g, s.phase === 'offseason' ? 'PORTAL' : 'PREP', PREP_BTN.x + PREP_BTN.w / 2, PREP_BTN.y + 4, { align: 'center' });
+  g.fillStyle = team.colors.primary;
+  g.fillRect(STATS_BTN.x, STATS_BTN.y, STATS_BTN.w, STATS_BTN.h);
+  text(g, 'STATS', STATS_BTN.x + STATS_BTN.w / 2, STATS_BTN.y + 4, { align: 'center' });
   drawProgressLine(g, s);
   const play = userGameThisWeek(s) ? 'SPACE: PLAY  X: SIM' : s.phase === 'offseason' ? 'SPACE: PORTAL' : s.phase === 'complete' ? '' : 'SPACE: ADVANCE';
-  drawHint(g, `${play}  A/D: TAB  W/S: PAGE  O: ${s.phase === 'offseason' ? 'PORTAL' : 'PREP'}  T: TEAM  P: BOOK  ESC: TITLE`);
+  drawHint(g, `${play}  A/D/W/S: BROWSE  O: ${s.phase === 'offseason' ? 'PORTAL' : 'PREP'}  T: TEAM  P: BOOK  H: STATS  ESC`);
 }
 
 /**
@@ -162,7 +167,7 @@ function drawProgressLine(g: CanvasRenderingContext2D, s: SeasonState): void {
   } else if (nm) tail = `NEXT MAN UP: ${name(nm)}`;
   if (!ups && !tail) return;
   const head = ups ? `${ups} LEVEL-UP${ups === 1 ? '' : 'S'}` : '';
-  text(g, `LAST WEEK: ${[head, tail].filter(Boolean).join('  ')}`.slice(0, 48), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
+  text(g, `LAST WEEK: ${[head, tail].filter(Boolean).join('  ')}`.slice(0, 40), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
 }
 
 function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {

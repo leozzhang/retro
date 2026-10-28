@@ -9,6 +9,7 @@ import { SAVE_VERSION } from './save';
 import { generateSchedule } from './schedule';
 import { DEV_LABEL } from '../data/athletes';
 import { athleteName, generatedAthlete, type Squad } from '../data/depth';
+import { archiveSeason, storyWeek } from './career';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
 import { carryMorale, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
@@ -35,6 +36,7 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     games: [], polls: [], news: [], teamState: {}, awards: [],
     coach: prev?.coach ?? (config.coachCareer ? newCoach(config.userTeamId) : undefined),
     history: prev?.history ?? [],
+    careers: prev?.careers ?? {},
   };
   // Progression and morale carry over, without last season's week marks.
   for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
@@ -215,6 +217,11 @@ const results: WeekStep = (state, ctx) => {
 };
 
 /** Rankings: the AP poll every week; the committee's rankings from `cfpStartWeek` until selection. */
+/** Story: games, starts and this week's moments go into each player's career (season/career.ts). */
+const story: WeekStep = (state, ctx) => {
+  storyWeek(state, ctx.week, ctx.grades.values());
+};
+
 const rankings: WeekStep = (state, ctx) => {
   state.polls.push(apPoll(state, ctx.week).poll);
   if (state.phase !== 'postseason' && ctx.week >= CALENDAR.cfpStartWeek) state.polls.push(cfpRankings(state, ctx.week).poll);
@@ -258,6 +265,7 @@ const transition: WeekStep = (state, ctx) => {
         year: state.year, champion: champ, heisman: state.awards.find((a) => a.id === 'heisman')?.finalists[0]?.name,
         ...yearRecord(state),
       });
+      archiveSeason(state);
       if (state.config.coachCareer) state.news.push(...evaluateCoach(state));
     } else if (bracketRoundDone(state)) {
       state.games.push(...bracketGames(state, week + 1));
@@ -293,6 +301,7 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
   { name: 'play', run: play },
   { name: 'progress', run: progress },
   { name: 'results', run: results },
+  { name: 'story', run: story },
   { name: 'rankings', run: rankings },
   { name: 'news', run: news },
   { name: 'transition', run: transition },

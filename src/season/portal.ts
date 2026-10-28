@@ -6,6 +6,7 @@ import { overall, POSITIONS, type Position } from '../data/positions';
 import { COMPOSITION, freeNumber, parseWalkOn, STARTERS, walkOnId } from '../data/rosterGen';
 import { TEAMS, teamById } from '../data/teams';
 import { clamp, gauss, hashString, mulberry32 } from '../engine/math';
+import { tell } from './career';
 import { CONFIDENCE } from './confidence';
 import { groupOf } from './emphasis';
 import { moraleOf, temperament } from './morale';
@@ -691,6 +692,7 @@ function moveAthlete(state: SeasonState, id: string, from: string, to: string): 
   delete fr.mo?.[id];
   (tt.mo ??= {})[id] = Math.round(clamp(temperament(a).base + PORTAL.freshStart, -1, 1) * 1000) / 1000;
   delete tt.depth;
+  tell(state, id, { team: to, from, kind: 'transfer', text: `Transfers from ${teamById(from).school} to ${teamById(to).school}` });
 }
 
 /** Take him off a roster (and its week marks and the user's chart). */
@@ -710,12 +712,14 @@ function leaveFbs(state: SeasonState, id: string, from: string): void {
   delete ts.mo?.[id];
   delete ts.health?.[id];
   delete ts.injuries?.[id];
+  tell(state, id, { team: from, kind: 'left', text: 'Leaves FBS' });
 }
 
 function sign(state: SeasonState, board: Board, e: PortalEntrant, team: string): void {
   const portal = state.portal!;
   const user = state.config.userTeamId;
   if (team !== e.from) moveAthlete(state, e.id, e.from, team);
+  else tell(state, e.id, { team, kind: 'portal', text: `Returns to ${teamById(team).school}` });
   e.out = 'commit';
   onChart(state, board, e.id, team);
   portal.commits[e.id] = team;
@@ -765,6 +769,7 @@ export function rollEntries(state: SeasonState): void {
     const p = sigmoid(o.logit + (portal.adj[id] ?? 0));
     if (forced.has(id) || seasonRng(state, 'portal', 'enter', id)() < p) {
       portal.entrants.push({ id, from: pl.team, pos: pl.a.pos, ovr: pl.ovr });
+      tell(state, id, { team: pl.team, kind: 'portal', text: 'Enters the transfer portal' });
     }
   }
   const top = [...portal.entrants].sort((a, b) => b.ovr - a.ovr);
@@ -789,6 +794,7 @@ export function closePortal(state: SeasonState): void {
   for (const e of pendingEntrants(portal).sort((a, b) => b.ovr - a.ovr)) {
     if (rosterRoom(board, e.from) - 1 >= needAfter(board, e.from, e.pos)) {
       e.out = 'return';
+      tell(state, e.id, { team: e.from, kind: 'portal', text: `No offer to his liking: back to ${teamById(e.from).school}` });
       onChart(state, board, e.id, e.from);
       const ts = (state.teamState[e.from] ??= {});
       const a = board.players.get(e.id)!.a;

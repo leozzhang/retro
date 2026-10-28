@@ -20,7 +20,8 @@ import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
-import { BOOK_BTN, drawSeason, PREP_BTN, SEASON_TABS, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { BOOK_BTN, drawSeason, PREP_BTN, SEASON_TABS, STATS_BTN, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { careerList, careerRowAt, careerTabAt, drawCareer, modeAt, newCareerView, type CareerView } from '../render/careerScreen';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
 import { GROUPS, type Group } from '../data/coaches';
@@ -57,7 +58,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'playbook' | 'prep' | 'portal' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -184,6 +185,7 @@ export class Game {
   private userEmph: TeamMods | undefined;
   private seasonView: SeasonView = { tab: 0, sub: 0 };
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
+  private careerView: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, back: 'season', mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
   private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
   private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
@@ -218,6 +220,9 @@ export class Game {
         break;
       case 'team':
         this.updateTeam(input);
+        break;
+      case 'career':
+        this.updateCareer(input);
         break;
       case 'playbook':
         this.updateBook(input);
@@ -396,6 +401,10 @@ export class Game {
       this.toBook();
       return;
     }
+    if (input.hit('KeyH') || (input.mouse.pressed && inBox(STATS_BTN, input.mouse.x, input.mouse.y))) {
+      this.toCareer('season');
+      return;
+    }
     // In the offseason the PREP button is the portal's.
     const prepBtn = input.mouse.pressed && inBox(PREP_BTN, input.mouse.x, input.mouse.y);
     if (s.phase === 'offseason') {
@@ -466,6 +475,10 @@ export class Game {
     const squad = squadFor(s, s.config.userTeamId);
     const pos = POSITIONS[v.pos];
     const view = depthView(squad, pos);
+    if (input.hit('KeyC') && view.rows.length) {
+      this.toCareer('team', view.rows[Math.min(v.sel, view.rows.length - 1)].id);
+      return;
+    }
     const rows = view.rows.length;
     if (input.hit('KeyW', 'ArrowUp')) v.sel = (v.sel + rows - 1) % rows;
     if (input.hit('KeyS', 'ArrowDown')) v.sel = (v.sel + 1) % rows;
@@ -495,6 +508,46 @@ export class Game {
     const [from, at] = fullMove(view, d.from, to);
     setUserDepth(s, reorderPosition(squad, pos, from, at));
     saveSeason(s);
+  }
+
+  // ------------------------------------------------------------ stats page
+
+  /** The STATS page, on a player if one is given; Esc goes back to `back`. */
+  private toCareer(back: CareerView['back'], id?: string): void {
+    const s = this.season!;
+    this.screen = 'career';
+    this.careerView = newCareerView(squadFor(s, s.config.userTeamId), back, id);
+  }
+
+  /** Careers: position tabs and rows pick a player; G or the toggles switch SEASONS and GROWTH; the wheel scrolls his story. */
+  private updateCareer(input: Input): void {
+    const s = this.season!;
+    const v = this.careerView;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace', 'KeyH')) {
+      this.screen = v.back;
+      return;
+    }
+    const setPos = (i: number) => Object.assign(v, { pos: i, sel: 0, scroll: 0 });
+    const n = POSITIONS.length;
+    if (input.hit('KeyA', 'ArrowLeft')) setPos((v.pos + n - 1) % n);
+    if (input.hit('KeyD', 'ArrowRight')) setPos((v.pos + 1) % n);
+    const rows = Math.max(1, careerList(squadFor(s, s.config.userTeamId), POSITIONS[v.pos]).length);
+    const pick = (i: number) => Object.assign(v, { sel: i, scroll: 0 });
+    if (input.hit('KeyW', 'ArrowUp')) pick((v.sel + rows - 1) % rows);
+    if (input.hit('KeyS', 'ArrowDown')) pick((v.sel + 1) % rows);
+    if (input.hit('KeyG')) v.mode = 1 - v.mode;
+    // Clamped to the story's length when it's drawn.
+    if (input.mouse.wheel) v.scroll = Math.max(0, v.scroll + input.mouse.wheel);
+    if (!input.mouse.pressed) return;
+    const tab = careerTabAt(x, y);
+    const row = careerRowAt(x, y, rows);
+    const mode = modeAt(x, y);
+    if (tab >= 0) setPos(tab);
+    else if (row >= 0) pick(row);
+    else if (mode >= 0) v.mode = mode;
   }
 
   // ------------------------------------------------------------ playbook page
@@ -1290,6 +1343,11 @@ export class Game {
     if (this.screen === 'team') {
       const s = this.season!;
       drawTeam(g, s, squadFor(s, s.config.userTeamId), this.teamView);
+      return;
+    }
+    if (this.screen === 'career') {
+      const s = this.season!;
+      drawCareer(g, s, squadFor(s, s.config.userTeamId), this.careerView);
       return;
     }
     if (this.screen === 'playbook') {
