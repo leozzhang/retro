@@ -13,7 +13,7 @@ A player keeps his id for life, and the id names the roster he was generated on.
 
 ## The offseason
 - `Phase` gains `'offseason'`. An open-ended season goes `complete` → `startOffseason` → the portal → `nextSeason`. A one-season game has no offseason.
-- `OFFSEASON_STAGES` is `['portal']` for now. Graduation, the draft, signing day and offseason growth go before it later.
+- `OFFSEASON_STAGES` is `['carousel', 'portal']`: the coaching carousel ([COACHES.md](COACHES.md)) runs first, so players can react to coaches leaving. Graduation, the draft, signing day and offseason growth go before the portal later.
 - `SeasonSummary` now keeps the final AP top 25 (`ap`), win shares (`wp`) and level-ups per player (`dev`, from `TeamState.lu`). The portal reads the last two seasons from these for "recent results" and the development record.
 
 ## The player's side
@@ -38,7 +38,8 @@ A player keeps his id for life, and the id names the roster he was generated on.
 - `market` is the 85th percentile of his appeal over the schools whose chart he'd crack.
 - Low morale pushes him out. Loyalty (the team trait), a past transfer and class hold him. A promise broken last season pushes him out (`broken`).
 - Walk-ons can't enter (placeholder).
-- The biggest weighted gap gives his reason: BURIED ON THE DEPTH CHART, WANTS A CONTENDER, WANTS TO DEVELOP or CLOSER TO HOME. When morale is the bigger push, the reason is UNHAPPY HERE.
+- **A coach of his left in the carousel** (`Progress.cl`, `REACT` in `season/carousel.ts`): his morale already took the hit at the close, and his odds get +0.9 per unit of bond (seasons together, 1 to 3, over 3). The school the coach went to gets +0.15 × bond on its appeal, both in his market and when he decides. He follows his coach.
+- The biggest weighted gap gives his reason: BURIED ON THE DEPTH CHART, WANTS A CONTENDER, WANTS TO DEVELOP or CLOSER TO HOME. When morale is the bigger push, the reason is UNHAPPY HERE; when the coach leaving is, HIS COACH LEFT. The BOARD card says which coach left and for where.
 
 ## Rounds
 Round 0 is the leaving list (below). Advancing it does three things:
@@ -105,7 +106,8 @@ The agreed target here is 10–15 a team, with real spread.
 
 | Measure | Result |
 | --- | --- |
-| Entrants per team | mean 10.2, SD 4.8, range 0–27 |
+| Entrants per team | mean 12.8, SD 6.8, range 0–35 (10.2 before players reacted to the carousel) |
+| Coach departures | 32% of players had a coach leave; they're 43% of entrants; 13 a year follow their coach to his new school |
 | Who enters | 81% backups |
 | Outcomes | 26% sign, 64% go home (placeholder), 10% leave FBS |
 | Flows by entrant overall (tier up / same / down) | 85+: 51/41/40 · 75–84: 83/135/389 · 65–74: 84/182/377 |

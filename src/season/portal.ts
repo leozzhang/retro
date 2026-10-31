@@ -1,4 +1,6 @@
 import type { Athlete } from '../data/athletes';
+import { headRecruit } from './coaching';
+import { REACT } from './carousel';
 import { GROUPS, type Group } from '../data/coaches';
 import { athleteName, generatedAthlete, originTeam } from '../data/depth';
 import { REGION, TEAM_STATE } from '../data/fbs/geo';
@@ -63,7 +65,7 @@ export const PORTAL = {
   entry: { base: -2.4, k: 5, morale: -1.5, loyal: -1.2, again: -1.0, broken: 1.2, cls: { FR: 0, SO: 0.2, JR: 0.1, SR: -0.3 } },
   considering: 0.2,
   leaningOut: 0.5,
-  meet: { n: 4, base: 0.55, loyal: 0.5, gap: 1.5, lift: 1.5, reason: { buried: -0.15, contender: 0, home: -0.1, develop: 0, morale: 0.05 } as Record<PortalReason, number> },
+  meet: { n: 4, base: 0.55, loyal: 0.5, gap: 1.5, lift: 1.5, reason: { buried: -0.15, contender: 0, home: -0.1, develop: 0, morale: 0.05, coach: 0 } as Record<PortalReason, number> },
   promise: { start: 2.5, snaps: 1.5, pt: { start: 0.9, snaps: 0.65 }, kept: 0.15, broken: 0.4, startShare: 0.6, snapsShare: 0.2 },
   freshStart: 0.15,
   returnHit: 0.25,
@@ -95,6 +97,7 @@ export const MOTIVES: Motive[] = ['PT', 'WIN', 'DEV', 'HOME'];
 export const MOTIVE_LABEL: Record<Motive, string> = { PT: 'PLAYING TIME', WIN: 'A CONTENDER', DEV: 'DEVELOPMENT', HOME: 'CLOSE TO HOME' };
 export const REASON_LABEL: Record<PortalReason, string> = {
   buried: 'BURIED ON THE DEPTH CHART', contender: 'WANTS A CONTENDER', home: 'CLOSER TO HOME', develop: 'WANTS TO DEVELOP', morale: 'UNHAPPY HERE',
+  coach: 'HIS COACH LEFT',
 };
 const MOTIVE_REASON: Record<Motive, PortalReason> = { PT: 'buried', WIN: 'contender', DEV: 'develop', HOME: 'home' };
 
@@ -324,30 +327,32 @@ export function entryOdds(state: SeasonState, board: Board, id: string): EntryOd
   const stay = m.PT * fs.PT + m.WIN * fs.WIN + m.DEV * fs.DEV + m.HOME * fs.HOME + own.room + own.extra;
   const all: { v: number; f: Record<Motive, number> }[] = [];
   const crack: typeof all = [];
+  const ts = state.teamState[team];
+  const prog = ts?.progress?.[id];
+  const left = prog?.cl?.year === state.year ? prog.cl : undefined;
   for (const s of board.schools.values()) {
     if (s.id === team) continue;
     const f = factors(s, a, ovr, undefined, undefined, own.win);
-    const x = { v: m.PT * f.PT + m.WIN * f.WIN + m.DEV * f.DEV + m.HOME * f.HOME + s.room + s.extra, f };
+    const follow = left?.to === s.id ? REACT.follow * left.bond : 0;
+    const x = { v: m.PT * f.PT + m.WIN * f.WIN + m.DEV * f.DEV + m.HOME * f.HOME + s.room + s.extra + follow, f };
     all.push(x);
     if (f.PT >= PORTAL.crackPt) crack.push(x);
   }
   const pool = (crack.length >= PORTAL.marketMin ? crack : all).sort((x, y) => y.v - x.v);
   const pick = pool[Math.floor((1 - PORTAL.marketPct) * (pool.length - 1))];
   const market = pick.v;
-  const ts = state.teamState[team];
-  const prog = ts?.progress?.[id];
   const t = temperament(a);
   const mo = moraleOf(ts, a);
   const E = PORTAL.entry;
   const logit = E.base + E.k * (market - stay) + E.morale * mo + E.loyal * (t.team - 1)
-    + (prog?.tr ? E.again : 0) + (prog?.pb === state.year ? E.broken : 0) + E.cls[a.year];
+    + (prog?.tr ? E.again : 0) + (prog?.pb === state.year ? E.broken : 0) + E.cls[a.year] + (left ? REACT.entry * left.bond : 0);
   let best: Motive = 'PT';
   let gap = -Infinity;
   for (const k of MOTIVES) {
     const d = m[k] * (pick.f[k] - fs[k]);
     if (d > gap) [best, gap] = [k, d];
   }
-  const reason = mo < -0.3 && E.morale * mo > E.k * gap ? 'morale' : MOTIVE_REASON[best];
+  const reason = mo < -0.3 && E.morale * mo > E.k * gap ? 'morale' : left && REACT.entry * left.bond > E.k * gap ? 'coach' : MOTIVE_REASON[best];
   return { p: walkOn(id) ? 0 : sigmoid(logit), logit, stay, market, reason };
 }
 
@@ -498,7 +503,10 @@ export function score(state: SeasonState, board: Board, id: string, team: string
   const s = board.schools.get(team)!;
   const from = entrant(portal, id)?.from;
   const ref = from ? board.schools.get(from)!.win : undefined;
-  return appeal(s, pl.a, pl.ovr, { promise: portal.promises[`${team}:${id}`], familiar: from === team, ref }) + (portal.interest[id]?.[team] ?? 0);
+  // Following his coach: the school a coach of his left for this offseason pulls him.
+  const left = from ? state.teamState[from]?.progress?.[id]?.cl : undefined;
+  const follow = left?.year === state.year && left.to === team ? REACT.follow * left.bond : 0;
+  return appeal(s, pl.a, pl.ovr, { promise: portal.promises[`${team}:${id}`], familiar: from === team, ref }) + (portal.interest[id]?.[team] ?? 0) + follow;
 }
 
 export type Standing = 'high' | 'list' | 'luke' | 'not';
@@ -563,7 +571,7 @@ export function withdraw(state: SeasonState, team: string, id: string): void {
   delete portal.promises[`${team}:${id}`];
 }
 
-/** A head coach's call (small) or visit (big): interest scaled by his school's appeal. Limited per round. */
+/** A head coach's call (small) or visit (big): interest scaled by his school's appeal and his recruit (`headRecruit`). Limited per round. */
 export function pursue(state: SeasonState, team: string, id: string, kind: 'call' | 'visit'): boolean {
   const portal = state.portal;
   const round = state.offseason?.round ?? 0;
@@ -577,7 +585,7 @@ export function pursue(state: SeasonState, team: string, id: string, kind: 'call
   const pl = board.players.get(id)!;
   const ap = appeal(board.schools.get(team)!, pl.a, pl.ovr, { familiar: e.from === team, ref: board.schools.get(e.from)!.win });
   const r = seasonRng(state, 'portal', kind, round, team, id)();
-  addInterest(portal, id, team, PORTAL[kind] * (0.5 + ap) * (0.75 + 0.5 * r));
+  addInterest(portal, id, team, PORTAL[kind] * (0.5 + ap) * (0.75 + 0.5 * r) * headRecruit(state, team));
   return true;
 }
 

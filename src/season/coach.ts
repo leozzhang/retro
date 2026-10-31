@@ -10,7 +10,7 @@ import type { CoachState, NewsItem, SeasonState } from './types';
 
 export const START_SECURITY = 60;
 /** Security per win above or below expectations. */
-const SECURITY_PER_WIN = 6;
+export const SECURITY_PER_WIN = 6;
 export const HOT_SEAT = 25;
 
 /** Wins a program expects in a 12-game season, from its prestige. */

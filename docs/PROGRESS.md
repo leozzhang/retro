@@ -1078,8 +1078,134 @@ Design notes are in [CAREERS.md](CAREERS.md).
 - **Tests:** `src/career.test.ts` (7 tests): a row per rostered player matching `Progress.gs` and the box scores, season gains against all-time, overall carrying into the next season, a transfer's history and headline, the story matching the confidence log (with the replaced starter named), totals, and save and continue. The new CAREERS section in `npm run season` reports about 1.9 MB a season, 99% of rostered players with a past season (the rest are new walk-ons), and per team-season about 10.5 start lines, 3.8 sparks, 3.6 injuries, 3.4 breakthroughs and 2.1 transfers.
 - **Checked in headless Chrome:** the hub, the card's SZN column, and the STATS page in both modes, after one season, an offseason and 5 weeks.
 
+## Done: coaches over time, step 1 of the carousel (2026-10-30)
+Plan: [CAROUSEL_PLAN.md](CAROUSEL_PLAN.md) (progression by hidden arc × age × work, CPU head coaches with DEVELOP/RECRUIT/EVAL, a zero-mean development multiplier, reputation and motives, a carousel stage before the portal, hiring with fog and interviews, trees and GAs). This step is the foundation, with no gameplay change. As built: [COACHES.md](COACHES.md), "Coaches over time".
+- **Ids for life:** `<team>-<role>`. `generatedCoach(id)` rebuilds a coach from his id (`data/coaches.ts`).
+- **Overlay:**
+  - `TeamState.staff` seats a coach in a chair.
+  - `SeasonState.coaches[id].d` holds his rating changes (`applyCoachDelta`, 1–99).
+  - `staffFor` lays both over the generated staff, and coaches age a year a season.
+  - `newSeason` carries chairs, changes and careers.
+- **Coach careers** (`season/coaching.ts`): at season end, a row per coach with team, chair, ratings and record. History only.
+- **Checks:**
+  - `npm run typecheck`.
+  - `npm test`: 222 pass, 4 new in `src/coaching.test.ts` (rebuilt from the id, delta range, a seat and a delta surviving a save, archive and carry-over).
+  - `npm run balance` is byte-identical to HEAD.
+  - `npm run season` is identical apart from timings.
+- **Not yet:** `defIdentity` still reads the generated DC. It needs the season's staff once DCs can change.
+
+## Done: coach progression, step 2 of the carousel (2026-10-30)
+Every seated coach's ratings change each offseason (`progressCoaches`, `season/coaching.ts`, run by `newSeason` on the season before). As built: [COACHES.md](COACHES.md), "Coaches over time".
+- **Arc × age × work:**
+  - a hidden arc seeded from the id (riser, steady, plateau, late bloomer, fading; age-weighted)
+  - a peak window per rating (recruit young, game mid-career, scout late)
+  - the season's work as league z-scores: group level-ups for TEACH, wins over the pregame odds for SCOUT, portal signings less misses for RECRUIT, emphasis games for GAME (the user's staff only)
+- **Comfort and mentors:** growth halves after 5 seasons in a chair (seeded starting tenure). A move restarts it with a bump. Coordinators speed or slow their position coaches. `CoachProgress.under` starts each coach's tree.
+- **Work counters** (`TeamState.lug`, `eg`, `xw`) are filled in the week loop and dropped at the new season. With growth off, the season report is identical to step 1.
+- **Pure:** it returns the next season's changes and leaves the old state alone.
+- **Checks:**
+  - `npm run typecheck`.
+  - `npm test`: 224 pass, 2 new (arcs order as intended over 8 offseasons, ratings whole and in range, lineage; a move restarts tenure), plus checks that work counters add up and `nextSeason` applies growth. One full run failed once and passed on 3 reruns; it was probably a timeout under load, and the failing test wasn't captured.
+  - `npm run balance` is byte-identical.
+  - `npm run season`: a new STAFF section. League drift is under 0.5 a year, and the T1–T5 staff gap moves +0.9. Only the PORTAL section moves (RECRUIT changes who signs where), within its noise. The user's promise count changed from 5 to 0 because Georgia's roster diverged.
+- **Tuning caveat:** nobody retires yet, so the league ages. Recheck drift when step 3 adds retirements (done in step 3: ages now fall slightly).
+
+## Done: head coaches and turnover, step 3 of the carousel (2026-10-30)
+As built: [COACHES.md](COACHES.md), "Coaches over time".
+- **Head coaches** for every program (`buildHeadCoach`, `headCoachFor`; the user is his own). Each rating does something now:
+  - DEVELOP: a program XP multiplier, ±6% per SD
+  - RECRUIT: his portal calls and visits, ±15% per SD
+  - EVAL: how he hires
+
+  The first two are measured against his tier, so the tiers' calibration holds. Head coaches grow each offseason like assistants.
+- **Turnover** when the offseason opens, before the portal (`turnover`):
+  - CPU head coaches' security, firings off the hot seat, and retirements by age (with "going out on top")
+  - a new head coach's housecleaning
+  - every opening filled from 4 outside candidates (`<team>-<role>.<year>.<n>`), picked on worth vs. reputation by the hirer's EVAL
+  - news (`carousel`) for every head coach change and the user's staff
+- **Not in this step:** reputation and motives for FBS coaches move to step 4, where the market reads them. New DCs keep the program's style, so `defIdentity` is unchanged.
+- **Checks:**
+  - `npm run typecheck`.
+  - `npm test`: 227 pass, 3 new (head coach and outside-hire ids; hiring by EVAL and retirement odds; zero-mean program XP; a full offseason keeping every staff full, nobody on two, the user in his job, run once).
+  - The full-season test in `season.test.ts` now has the 20 s timeout its neighbors use. It timed out at 5 s under the full suite, which was likely step 2's one-off failure too.
+  - `npm run balance` is byte-identical.
+  - `npm run season`:
+    - 19.8 head coach changes a year
+    - assistant turnover 8%
+    - ages falling slightly
+    - EVAL regret 2.07 → 0.66 from low to high eval
+    - DEVELOP thirds 0.94 / 1.00 / 1.05
+    - staff gap +1.2
+    - the growth table, tier growth and flags as in step 2
+
+## Done: the coaching carousel, step 4 (2026-10-30)
+As built: [COACHES.md](COACHES.md), "Coaches over time".
+- **A `carousel` offseason stage before the portal** (`season/carousel.ts`):
+  - reputation that lags results, and hidden motives
+  - CPU head coach firings and retirements, plus coordinator firings after a bad unit year
+  - the head coach chain from FBS head coaches, coordinators, coaches out of a job and outside candidates
+  - a new head coach's housecleaning, with his loyalists following him
+  - 5 hiring rounds with claimed offers, then outside hires at the close
+  - `turnover` from step 3 is folded in
+- **Any coach in any chair:** seeded ratings for the chairs he wasn't generated for (`coachAs`).
+- **The user's side:** a CAROUSEL screen (`render/carouselScreen.ts`; the hub's HIRING button) with three tabs:
+  - HIRING: candidates with reputation and blurred ratings, 2 interviews per open chair (sharper ratings, then exact, plus the motive), one offer per chair a round
+  - MY STAFF: fire an assistant
+  - AROUND THE LEAGUE: the news
+
+  F delegates (`delegate.carousel`). `startToPortal` runs it automated for tests and the report.
+- **Checks:**
+  - `npm run typecheck`.
+  - `npm test`: 228 pass. New coverage: the user's hiring flow (fog, interviews, motive, an offer signing, a full staff at the close); market moves between programs; the chain news; reputations stored. The portal tests reach the portal through `startToPortal`, and the determinism test now saves mid-carousel too.
+  - `npm run balance` is byte-identical.
+  - `npm run season` STAFF section:
+    - 20.4 head coach changes a year
+    - assistant turnover 20.7% (real 30–40%; floor 20%)
+    - 52% of openings from moves
+    - talent flowing up a tier (286 up, 100 down)
+    - league level +2.35 (flag 2.5), gap +1.0
+    - EVAL regret 1.34 → 0.24
+    - the rest of the report as in step 3
+  - **The screen, driven in headless Chrome** against `npm run dev`: a simmed season into the carousel; HIRING, MY STAFF and AROUND THE LEAGUE screenshotted; Space through the real input path ended round 1 and the offered candidate signed; no console errors. Two fixes came from it:
+    - a fired coach was listed for his old chair
+    - the trainer's label overflowed its column
+- **Known gaps:**
+  - Assistant turnover sits at the bottom of the real range.
+  - League staff level creeps up (+2.35 in 5 seasons) and needs watching over longer careers.
+  - Money is prestige.
+  - The user can't change jobs, so loyalists only follow CPU head coaches.
+
+## Done: players react to coaches leaving, step 5 of the carousel (2026-10-30)
+- **When the carousel closes** (`reactToDepartures`, `season/carousel.ts`), every player whose position coach, side's coordinator or head coach left loses morale: 0.3 / 0.12 / 0.2 × bond. Bond is seasons together over 3. `Progress.cl` records which chair, the bond, and where the coach went.
+- **Portal:**
+  - entry odds +0.9 × bond, with a new reason, HIS COACH LEFT
+  - the coach's new school gets +0.15 × bond on its appeal, in his market and when he decides
+  - the BOARD card names the coach who left and where he went
+- **Checks:**
+  - `npm test`: 229 pass. A new test fires the user's WR coach against an identical offseason without it: every WR gets `cl`, lower morale and higher entry odds, and the news reports it.
+  - `npm run balance` is byte-identical.
+  - `npm run season` PORTAL section:
+    - entrants per team 12.8 (from 10.2; target 10–15)
+    - 32% of players had a coach leave, and they're 43% of entrants
+    - 13 a year follow their coach
+    - the T5 drift against the control (already flagged, waits on graduation) moves from +6.5 to +7.0
+    - the same 7 flags
+
+## Done: TEACH in development, trees and GAs, steps 6 and 7 of the carousel (2026-10-30)
+- **Step 6:** each position group's XP is ×(1 + 0.05·z), with z its position coach's TEACH against his group's peers in the tier (`groupXp`). It multiplies with the head coach's DEVELOP into `programXp`, which now takes a position. Groups with the weakest teachers level up at 0.93 of the usual rate, the strongest at 1.05. The growth table, mean starter gain and tier growth hold.
+- **Step 7:**
+  - **Graduate assistants:** 2 a program (`TeamState.ga`, generated at level −10 and age 23–28). They grow under their group's coach, can be promoted to any position chair at their program in the carousel, and move on after 3 seasons. About 12 are promoted a year.
+  - **Trees:** `under` now records the head coach too. `treeOf` and `treeScore` (3 a head coach branch, 1 a coordinator) power the user's tree on MY STAFF, and news when someone from the user's tree lands a head coach or coordinator job.
+  - Former players as GAs wait on graduation.
+- **Checks:**
+  - `npm run typecheck`.
+  - `npm test`: 231 pass. New tests cover the TEACH multiplier (zero-mean per position; a better QB coach lifts only QBs), GAs (ids, growth lineage, promotion through the carousel, slots refilled), and a tree and its score.
+  - `npm run balance` is byte-identical.
+  - `npm run season`: the same 7 flags. TEACH and DEVELOP thirds, GA promotions and trees are reported in STAFF.
+  - The MY STAFF tab was checked in headless Chrome.
+
 ## In progress
-- Nothing right now. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
+- **Coaching carousel:** all 7 steps are built (CAROUSEL_PLAN.md). Left for later: former players as GAs (waits on graduation), retention tools, specializations, chemistry, bowl-week interims, DCs bringing their own style (`defIdentity`), the user changing jobs. The CAROUSEL screen was checked in headless Chrome against the dev build, not by hand with keyboard and mouse; the portal card's coach-left line hasn't been seen on screen. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
 ## Known bugs and rough edges
 - **Transfer portal, multi-season drift:** with class years frozen, tier-5 starters gain about 6.6 overall on a no-portal control over 5 offseasons (PORTAL.md). Two-thirds of unplaced entrants go home (placeholder). Waits on graduation.

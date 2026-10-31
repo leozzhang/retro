@@ -1,4 +1,5 @@
 import type { DevTrait, Injury } from '../data/athletes';
+import type { AnyRole, CoachRatings, Group, HeadRatings, RatingName } from '../data/coaches';
 import type { DepthChart } from '../data/depth';
 import type { Position } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
@@ -16,6 +17,8 @@ export interface Delegation {
   gamePlan: boolean;
   /** The transfer portal board and the leaving list (season/portal.ts `autoPortal`). Missing means the user runs it. */
   portal?: boolean;
+  /** The user's openings in the coaching carousel (season/carousel.ts). Missing means the user hires. */
+  carousel?: boolean;
 }
 
 export interface SeasonConfig {
@@ -109,7 +112,7 @@ export interface Poll {
 
 export interface NewsItem {
   week: number;
-  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal';
+  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal' | 'carousel';
   text: string;
   teams: string[];
 }
@@ -172,6 +175,11 @@ export interface Progress {
   pr?: CoachPromise;
   /** The year a promise to him was broken: it pushes him toward the portal that offseason. */
   pb?: number;
+  /**
+   * A coach of his left in the offseason after `year` (season/carousel.ts `reactToDepartures`): which
+   * chair, their bond (0-1, from seasons together), and the school he went to if he's still in FBS.
+   */
+  cl?: { year: number; role: AnyRole; bond: number; to?: string };
 }
 
 export interface CoachPromise {
@@ -203,8 +211,79 @@ export interface TeamState {
   emph?: Picks;
   /** Level-ups this season, for the program's development record. */
   lu?: number;
+  /** This season's work for the staff's offseason growth (season/coaching.ts): level-ups by group, */
+  lug?: Partial<Record<Group, number>>;
+  /** games each group practiced on an emphasis, */
+  eg?: Partial<Record<Group, number>>;
+  /** and wins over the pregame odds (won 1 or 0, less the odds), summed over games. */
+  xw?: number;
   /** Roster changes laid over the generated roster: who left, and who joined (transfers and walk-ons). */
   roster?: RosterDelta;
+  /** Chairs filled by someone other than the generated coach: role to coach id (season/world.ts `staffFor`). */
+  staff?: StaffSeats;
+  /** The graduate assistants, once they differ from the generated pair (season/world.ts `gasFor`). */
+  ga?: string[];
+}
+
+/** Includes `HC`: the head coach's chair. */
+export type StaffSeats = Partial<Record<AnyRole, string>>;
+
+/** One coach's changes since he was generated, wherever he coaches (season/coaching.ts). */
+export interface CoachProgress {
+  /** All-time rating changes, laid over the generated ratings. */
+  d?: Partial<Record<RatingName, number>>;
+  /** His chair (`team:role`) at the last offseason, and seasons in it; missing before his first offseason. */
+  at?: string;
+  t?: number;
+  /** Offseasons he has grown through. */
+  n?: number;
+  /** A late bloomer who has bloomed. */
+  b?: 1;
+  /** Who he has worked under, oldest first: his coaching tree. */
+  under?: string[];
+  /** A CPU head coach's job security, 0-100 (season/coaching.ts `turnover`); missing is his seeded start. */
+  sec?: number;
+  /** The offseason (season year) he was hired from outside FBS. */
+  hired?: number;
+  /** Out of a job: the offseason, and why. A fired or let-go coach can be hired again that offseason. */
+  gone?: { year: number; why: 'fired' | 'retired' | 'let go' };
+  /** His reputation (season/carousel.ts): what the world thinks he's worth. Missing is his seeded start. */
+  rep?: number;
+}
+
+/** The coaching carousel (season/carousel.ts). Chairs are `team:role`. */
+export interface CarouselState {
+  /** Open chairs. */
+  open: string[];
+  /** The user's offers this round: chair to candidate. */
+  offers: Record<string, string>;
+  /** Who has turned a chair down: chair to candidates. */
+  declined: Record<string, string[]>;
+  /** The user's interviews by candidate, and how many are left. */
+  talks: Record<string, number>;
+  talksLeft: number;
+  /** Coaches who changed chairs this offseason: nobody moves twice. */
+  moved: string[];
+  /** Every hire, in order: the chair, who, and where from (a chair, `free` or `outside`). */
+  log: { chair: string; id: string; from: string }[];
+  /** Who sat in every chair when the carousel opened, for the players' reactions at the close. */
+  was?: Record<string, string>;
+}
+
+/** A coach's history (season/coaching.ts): a row per finished season. Nothing in the sim reads it. */
+export interface CoachCareer {
+  seasons: CoachSeason[];
+}
+
+export interface CoachSeason {
+  year: number;
+  team: string;
+  role: AnyRole;
+  /** His ratings at the season's end. */
+  r: CoachRatings | HeadRatings;
+  /** The team's record. */
+  w: number;
+  l: number;
 }
 
 /**
@@ -344,11 +423,14 @@ export interface SeasonSummary {
 }
 
 /** Offseason stages, in order (season/offseason.ts). Graduation, the draft and signing day go before the portal. */
-export type OffseasonStage = 'portal';
+export type OffseasonStage = 'carousel' | 'portal';
 
 export interface OffseasonState {
   stage: OffseasonStage;
-  /** Portal round: 0 the leaving list, before anyone enters; 1 and 2 the head coaches' rounds. */
+  /**
+   * Carousel: the hiring round, 1 to `CAROUSEL.rounds` (season/carousel.ts). Portal: 0 the leaving list,
+   * before anyone enters; 1 and 2 the head coaches' rounds.
+   */
   round: number;
   /** Last season's promises, judged when the offseason opened. */
   promises?: { kept: number; broken: number };
@@ -375,7 +457,7 @@ export interface LeavingEntry {
   kind?: CoachPromise['kind'];
 }
 
-export type PortalReason = 'buried' | 'contender' | 'home' | 'develop' | 'morale';
+export type PortalReason = 'buried' | 'contender' | 'home' | 'develop' | 'morale' | 'coach';
 
 export interface PortalState {
   entrants: PortalEntrant[];
@@ -422,7 +504,12 @@ export interface SeasonState {
   confLog?: ConfEvent[];
   /** Every player's history by athlete id (season/career.ts). Kept across seasons; nothing in the sim reads it. */
   careers?: Record<string, Career>;
+  /** Coaches' changes by coach id, kept across seasons and jobs (season/coaching.ts). */
+  coaches?: Record<string, CoachProgress>;
+  /** Every coach's history by coach id. Kept across seasons; nothing in the sim reads it. */
+  coachCareers?: Record<string, CoachCareer>;
   /** The offseason after this season (open-ended seasons only), and its transfer portal. */
   offseason?: OffseasonState;
   portal?: PortalState;
+  carousel?: CarouselState;
 }

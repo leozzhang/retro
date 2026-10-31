@@ -217,6 +217,8 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
  */
 export function progressTeam(
   ts: TeamState, squad: Squad, grades: Map<string, GameGrade>, week: number, rng: Rng, focus?: { staff: Staff; picks?: Picks },
+  /** The program's XP multiplier by position, from its head coach and position coaches (season/coaching.ts `programXp`). */
+  program: (pos: Position) => number = () => 1,
 ): LevelUpEvent[] {
   const base = new Map(buildSquad(squad.team).athletes.map((a) => [a.id, a]));
   const prog = (ts.progress ??= {});
@@ -226,7 +228,7 @@ export function progressTeam(
     if (!g || g.team !== squad.team.id || !g.snaps) continue;
     const p = (prog[a.id] ??= { xp: 0, lvl: 0, d: {} });
     const mult = xpMultiplier(a, p, moraleOf(ts, a)).total;
-    p.xp += Math.round(gameXp(g) * mult);
+    p.xp += Math.round(gameXp(g) * mult * program(a.pos));
     const tags = (p.tags ??= {});
     for (const [k, v] of Object.entries(g.tags) as [RatingKey, number][]) tags[k] = round1((tags[k] ?? 0) + v);
     if (focus) for (const [k, v] of practiceTags(a.pos, g.share, focus.staff, focus.picks)) tags[k] = round1((tags[k] ?? 0) + v);

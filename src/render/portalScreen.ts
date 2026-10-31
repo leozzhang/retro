@@ -266,7 +266,9 @@ function drawBoardCard(g: CanvasRenderingContext2D, s: SeasonState, board: Board
     text(g, `${STANDING_LABEL[st.tag]} (NO. ${st.rank})  SUITORS: ${su.join(' ') || 'NONE YET'}`, 10, CARD_Y + 40, { color: STANDING_COLOR[st.tag] });
     const pr = s.portal!.promises[`${u}:${e.id}`];
     const focus = s.portal!.focus.includes(e.id) ? 'FOCUS' : s.portal!.drop.includes(e.id) ? 'DROPPED' : '';
-    text(g, `${pr ? `PROMISED ${pr === 'start' ? 'A START' : 'SNAPS'}  ` : ''}${focus}`, 10, CARD_Y + 52, { color: GOLD });
+    const cl = s.teamState[e.from]?.progress?.[e.id]?.cl;
+    const left = cl?.year === s.year ? `HIS ${cl.role === 'HC' ? 'HEAD COACH' : `${cl.role} COACH`} LEFT${cl.to ? ` FOR ${teamById(cl.to).abbr}` : ''}  ` : '';
+    text(g, `${left}${pr ? `PROMISED ${pr === 'start' ? 'A START' : 'SNAPS'}  ` : ''}${focus}`, 10, CARD_Y + 52, { color: GOLD });
   } else {
     text(g, statusOf(s, e).t, 10, CARD_Y + 40, { color: SOFT });
   }

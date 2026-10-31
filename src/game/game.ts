@@ -32,6 +32,11 @@ import { advanceWeek, defaultConfig, newSeason, seasonOver, userGameThisWeek } f
 import type { InjuryLevel, SeasonConfig } from '../season/types';
 import { advanceOffseason, startOffseason } from '../season/offseason';
 import { actOnLeaving, offer, pursue, setTarget, withdraw } from '../season/portal';
+import { fireAssistant, interview, offerChair, withdrawOffer } from '../season/carousel';
+import {
+  CAROUSEL_ADVANCE, CAROUSEL_ROWS, CAROUSEL_TABS, carouselActionRect, carouselRowRect, carouselTabAt, chairChipRect, drawCarousel, hiringRows,
+  leagueRows, newCarouselView, openChairs, staffRows, type CarouselView,
+} from '../render/carouselScreen';
 import {
   actionRect, ADVANCE_BTN, BOARD_ROWS, boardRows, chipRect, drawPortal, LEAVING_ROWS, leavingRows, newPortalView, PORTAL_TABS, portalTabAt, POS_CHIPS,
   rowRect, type PortalView,
@@ -58,7 +63,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -189,6 +194,7 @@ export class Game {
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
   private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
   private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
+  private carouselView: CarouselView = newCarouselView();
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
@@ -232,6 +238,9 @@ export class Game {
         break;
       case 'portal':
         this.updatePortal(input);
+        break;
+      case 'carousel':
+        this.updateCarousel(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -405,10 +414,10 @@ export class Game {
       this.toCareer('season');
       return;
     }
-    // In the offseason the PREP button is the portal's.
+    // In the offseason the PREP button is the stage's: the carousel, then the portal.
     const prepBtn = input.mouse.pressed && inBox(PREP_BTN, input.mouse.x, input.mouse.y);
     if (s.phase === 'offseason') {
-      if (input.hit('KeyO', 'Space', 'Enter') || prepBtn) this.toPortal();
+      if (input.hit('KeyO', 'Space', 'Enter') || prepBtn) this.toOffseason();
       return;
     }
     if (input.hit('KeyO') || prepBtn) {
@@ -418,11 +427,11 @@ export class Game {
     const sim = input.hit('KeyX');
     if (!input.hit('Space', 'Enter') && !sim) return;
     if (seasonOver(s)) {
-      // An open-ended season goes into its offseason, starting with the portal.
+      // An open-ended season goes into its offseason, starting with the coaching carousel.
       if (s.config.length !== 'open') return;
       startOffseason(s);
       saveSeason(s);
-      this.toPortal();
+      this.toOffseason();
       return;
     }
     const game = userGameThisWeek(s);
@@ -608,6 +617,101 @@ export class Game {
     else {
       v.open = shown[i].id;
       v.flip = false;
+    }
+  }
+
+  // ------------------------------------------------------------ coaching carousel
+
+  /** The offseason's current stage. */
+  private toOffseason(): void {
+    if (this.season?.offseason?.stage === 'carousel') {
+      this.screen = 'carousel';
+      this.carouselView = newCarouselView();
+    } else this.toPortal();
+  }
+
+  /**
+   * The carousel (season/carousel.ts): tabs; on HIRING, Q/E picks the open chair, 1 offers (or
+   * withdraws), 2 interviews; on MY STAFF, 1 fires; F hands hiring to staff; Space ends the round. The
+   * last round's advance opens the portal. Every change is saved.
+   */
+  private updateCarousel(input: Input): void {
+    const s = this.season!;
+    const v = this.carouselView;
+    const { x, y, pressed } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'season';
+      return;
+    }
+    const n = CAROUSEL_TABS.length;
+    let tab = v.tab;
+    if (input.hit('KeyA', 'ArrowLeft')) tab = (tab + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight')) tab = (tab + 1) % n;
+    if (pressed && carouselTabAt(x, y) >= 0) tab = carouselTabAt(x, y);
+    if (tab !== v.tab) {
+      Object.assign(v, { tab, sel: 0, top: 0, note: '' });
+      return;
+    }
+    if (input.hit('KeyF')) {
+      s.config.delegate.carousel = !s.config.delegate.carousel;
+      v.note = s.config.delegate.carousel ? 'YOUR STAFF HIRES (F: TAKE IT BACK)' : 'YOU HIRE';
+      saveSeason(s);
+      return;
+    }
+    if (input.hit('Space', 'Enter') || (pressed && inBox(CAROUSEL_ADVANCE, x, y))) {
+      advanceOffseason(s);
+      saveSeason(s);
+      if (s.offseason?.stage !== 'carousel') {
+        this.toPortal();
+        return;
+      }
+      Object.assign(v, { sel: 0, top: 0, chair: Math.min(v.chair, Math.max(0, openChairs(s).length - 1)), note: `ROUND ${s.offseason.round}: SEE WHO SIGNED ON AROUND THE LEAGUE` });
+      return;
+    }
+    const which = CAROUSEL_TABS[v.tab];
+    const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0) + Math.sign(input.mouse.wheel);
+    if (which === 'AROUND THE LEAGUE') {
+      v.top = Math.max(0, Math.min(Math.max(0, leagueRows(s).length - 24), v.top + step));
+      return;
+    }
+    const pick = (i: number) => input.hit(`Digit${i + 1}`) || (pressed && inBox(carouselActionRect(i), x, y));
+    if (which === 'MY STAFF') {
+      const rows = staffRows();
+      if (step) v.sel = Math.max(0, Math.min(rows.length - 1, v.sel + step));
+      if (pressed) for (let i = 0; i < rows.length; i++) if (inBox(carouselRowRect(i), x, y)) v.sel = i;
+      if (pick(0) && !s.config.delegate.carousel) {
+        v.note = fireAssistant(s, rows[v.sel]) ? 'FIRED: HIS CHAIR IS OPEN ON THE HIRING TAB' : 'HIS CHAIR IS ALREADY OPEN';
+        saveSeason(s);
+      }
+      return;
+    }
+    const chairs = openChairs(s);
+    let chair = v.chair;
+    chair = chairs.length ? (chair + (input.hit('KeyE') ? 1 : 0) - (input.hit('KeyQ') ? 1 : 0) + chairs.length) % chairs.length : 0;
+    if (pressed) chairs.forEach((_, i) => inBox(chairChipRect(i), x, y) && (chair = i));
+    if (chair !== v.chair) {
+      Object.assign(v, { chair, sel: 0, top: 0 });
+      return;
+    }
+    const rows = hiringRows(s, v);
+    if (step && rows.length) v.sel = Math.max(0, Math.min(rows.length - 1, v.sel + step));
+    if (pressed) for (let i = 0; i < CAROUSEL_ROWS; i++) if (inBox(carouselRowRect(i), x, y) && v.top + i < rows.length) v.sel = v.top + i;
+    if (v.sel < v.top) v.top = v.sel;
+    if (v.sel >= v.top + CAROUSEL_ROWS) v.top = v.sel - CAROUSEL_ROWS + 1;
+    const c = rows[v.sel];
+    const ch = chairs[v.chair];
+    if (!c || !ch || s.config.delegate.carousel) return;
+    if (pick(0)) {
+      if (s.carousel!.offers[ch] === c.id) {
+        withdrawOffer(s, ch);
+        v.note = 'OFFER WITHDRAWN';
+      } else v.note = offerChair(s, ch, c.id) ? 'OFFER MADE: HE ANSWERS WHEN THE ROUND ENDS' : 'NOT NOW: HE HAS YOUR OFFER FOR ANOTHER CHAIR, OR TURNED THIS ONE DOWN';
+      saveSeason(s);
+    } else if (pick(1)) {
+      v.note = interview(s, c.id) ? 'INTERVIEWED: HIS RATINGS ARE SHARPER' : 'NO INTERVIEWS LEFT, OR YOU KNOW ALL YOU CAN';
+      saveSeason(s);
     }
   }
 
@@ -1358,6 +1462,10 @@ export class Game {
     if (this.screen === 'portal') {
       const s = this.season!;
       drawPortal(g, s, this.portalView, staffFor(s, s.config.userTeamId));
+      return;
+    }
+    if (this.screen === 'carousel') {
+      drawCarousel(g, this.season!, this.carouselView);
       return;
     }
     if (this.screen === 'prep') {

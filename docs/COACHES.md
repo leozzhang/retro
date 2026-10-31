@@ -21,7 +21,86 @@ Staffs are generated from the team id and never stored, like rosters (`buildStaf
 - **Level:** a program's level is `STAFF.base + perPrestige × prestige` (40 + 0.4 × prestige), plus a per-program spread (`levelSd` 6). Each coach's ratings scatter around it (`ratingSd` 7), clamped to 30–95.
 - **Ages:** 32–66.
 - **Names:** from the player name pools.
-- **`staffFor(state, id)`:** returns the generated staff. Hires, firings and the carousel will lay their changes over it there, the way `squadFor` does for rosters.
+- **`staffFor(state, id)`:** the season's staff, with chairs and rating changes laid over the generated one, the way `squadFor` does for rosters (see "Coaches over time").
+
+### Coaches over time
+Head coaches, offseason growth, and the coaching carousel (plan: [CAROUSEL_PLAN.md](CAROUSEL_PLAN.md)).
+- **Ids for life:** a coach's id is `<team>-<role>`, the staff he was generated on, or `<team>-<role>.<year>.<n>` for outside candidate `n` for that chair in the offseason after `year`. `parseCoachId` reads one back; `generatedCoach`, `generatedHeadCoach` and `anyCoach` rebuild him.
+- **Chairs:** `TeamState.staff` maps a role (`HC` included) to the coach in it, when that isn't the generated coach.
+- **Rating changes:** `SeasonState.coaches[id].d`, carried wherever he coaches, within 1–99 (`applyCoachDelta`).
+- **`staffFor`** lays both over the generated staff (cached), and `headCoachFor` over the generated head coach. A coach seated in a new chair takes that role. His ratings for it are his own where he has them; the rest (a coordinator made head coach, say) are seeded around his own level, SD 5 (`coachAs`, `ROLE_KEYS`). A DC keeps his style, or takes the program's. Ages go up a year each season past the one he was generated for (`from`, else `CALENDAR.year`).
+- **Coach careers** (`season/coaching.ts`, `SeasonState.coachCareers`): when a season completes, every coach (head coaches included) gets a row with team, chair, ratings at the season's end and the team's record. It's history only, about 1,800 rows a season.
+- **Offseason growth** (`progressCoaches`, run by `newSeason` on the season before; tuned with `COACH_GROWTH`). Each rating of each seated coach, head coaches included, changes by arc × age × work, in whole points:
+  - **Arc** (hidden, seeded from his id, young coaches lean riser and old ones fading):
+    - riser: +1.4 a year, up to 20 over his generated rating
+    - steady: +0.3, up to 8
+    - plateau: flat
+    - late bloomer: flat until a move or 2–6 seasons in, then +1.8, up to 16
+    - fading: −0.5, and he ages 1.5× as fast
+  - **Age:** each rating has a peak window: scout and eval 48–68, teach and develop 40–58, game 44–57, recruit 34–50. Below it he gains 0.3 a year; past it he loses 0.3 plus 0.06 a year past the window, up to 1.5.
+  - **Work** (counted in the season, `TeamState.lug`, `eg`, `xw`; z-scores against the league, within ±2):
+    - teach: his group's level-ups per player, against the same group league-wide (×0.8)
+    - scout: wins over the pregame odds (`winOdds`) a game (×0.4), a stand-in for reads that came true
+    - recruit: portal signings less half the misses (targets he built interest with who signed elsewhere) (×0.8)
+    - game: the share of games his group practiced on an emphasis (×1.5). Only the user picks emphases, so CPU staffs grow GAME from arc and age alone
+    - a head coach's develop: the program's level-ups per player (×0.8); his recruit: the program's signings less misses; his eval: no work
+    - a coach hired this offseason did none of the season's work
+  - **Comfort:** after 5 seasons in one chair growth halves. Starting tenure is seeded (0–8), so some coaches start comfortable. A move restarts it, with +1.
+  - **Mentor:** a position coach grows up to 15% faster under a coordinator 25 scout over his tier's mean, and up to 15% slower under a weak one. It's measured against the tier so mentoring doesn't widen the gap between tiers. `CoachProgress.under` keeps everyone he has worked under (his coordinator, or a GA's position coach, and his head coach): his place in coaching trees.
+  - It returns the next season's changes and leaves the old season alone, so it gives the same result however often it runs.
+- **Head coaches** (`buildHeadCoach`, `<team>-hc`, on the stream `hc:<team>` at the program's staff level, aged 40–68). The user is his own team's head coach. Each rating has one job, and the first two are measured against the head coaches in the same tier (z-scores within ±2, `HEAD_EFFECT`). Programs within a tier spread apart while the league and its tiers stay calibrated:
+  - **DEVELOP:** the program's XP multiplier, ×(1 + 0.06·z) (`programXp`, into `progressTeam`). It multiplies with the position coach's TEACH factor below
+  - **RECRUIT:** his portal calls' and visits' interest, ×(1 + 0.15·z) (`headRecruit`, in `pursue`)
+  - **EVAL:** how he hires: true worth over reputation (`hire`)
+- **The coaching carousel** (`season/carousel.ts`), the offseason's first stage, before the portal. Tuned with `CAROUSEL`, `TURNOVER`, `WILL`, and `HEAD` in `data/coaches.ts`.
+  - **Reputation** (`CoachProgress.rep`, `repOf`): his worth plus a seeded error (SD 8) to start. Each offseason it moves 30% of the way to what the world saw: his program's staff level plus 6 per SD of his unit's results. Those are points scored for the offense, points allowed for the defense, wins against expectations for a head coach, and wins for ST and the trainer. A stacked roster flatters its coaches. Losing a job costs 4. An outside candidate's reputation is 3 under his worth's.
+  - **Motives** (hidden, seeded, `motiveOf`): climber, lifer, mercenary, homebody, loyalist or winner, 25% climbers and 15% each of the rest. `willing` scores a move by motive: a base; per level up the ladder (position coach, coordinator, head coach); per 20 prestige up; per win share up; ±home region (homebodies); and −0.8 for an assistant job under a hot-seat head coach. Noise SD is 0.3, and he takes the move over 0.1. A coach out of a job takes nearly anything, but he's put off by big steps down (−0.5 per 20 prestige). Outside candidates always say yes.
+  - **Opening:**
+    - CPU head coaches' security moves by wins against `expectedWins` (6 a win). It starts at a seeded 30–85, and at 60 for a new hire. Under the hot seat (25) after 2 seasons, he's fired at 50% odds.
+    - Retirement for everyone but the user: 0.4% a year under 60, then 3% plus 2.5% a year past 60 (up to 50%), certain at 76. A big year (3 wins over expected) adds 12% at 56+.
+    - A CPU head coach fires his OC or DC at 50% after a season more than 1 SD under the league on his side of the ball.
+  - **The head coach chain** (`headChain`, instant): openings fill best program first. The pool is FBS head coaches at programs 5+ prestige smaller, coordinators at programs no more than 30 smaller, coaches out of a job, and 3 outside candidates. The athletic director picks among the willing, 30% on worth and 70% on reputation. A hire from FBS empties his chair, and an emptied head coach chair joins the chain.
+  - **A new head coach** keeps each assistant at 30%. His loyalists from his old staff follow him into the chairs he opened.
+  - **Hiring rounds** (5, `carouselRound`): every open assistant chair gets one offer, best program first. A CPU staff calls around and offers the best candidate who'd listen, by its head coach's eval; it doesn't offer a coach another CPU staff already has an offer out to. The user's offers compete with anyone's. Each candidate takes his best offer if he'd move for it, and a move empties his old chair for the next round.
+    - **Pools** (`poolFor`): the same chair at a program 5+ prestige smaller; for a coordinator job, his side's position coaches at programs no more than 20 smaller; in-house promotions; the best 12 by reputation. Plus 4 coaches out of a job (never back to the program that let them go) and 3 outside candidates.
+  - **The close** (`closeCarousel`): chairs still open go to the best outside candidate.
+  - **Outside candidates** (`outsideFor`) are built from their ids at the program's staff level plus a tier shift: −9, −7.5, −6, −4, −2 for T1 to T5. The FCS is a real pool for a small program, not for a big one. They're younger: assistants 29–48, head coaches 38–58.
+  - **The pick** (`hire`) weighs true worth by the hirer's eval (30 → 0, 95 → 1) and reputation for the rest.
+  - **The user's side** (the CAROUSEL screen, `render/carouselScreen.ts`; the hub's HIRING button):
+    - **HIRING:** each open chair's candidates show reputation and where they are now. Their ratings are ranges as wide as the user's eval leaves them ((100 − eval) / 4, 2 to 14). There are 2 interviews per open chair: one halves the ranges and reveals the motive, a second makes the ratings exact. One offer per chair a round.
+    - **MY STAFF:** fire an assistant to open his chair.
+    - **AROUND THE LEAGUE:** the offseason's coaching news.
+    - F hands hiring to the staff (`delegate.carousel`). `startToPortal` runs the carousel delegated, for tests and the report.
+  - Every head coach change, coordinator firing, and the user's staff changes make the news (`carousel`) and open the next year's feed. `CarouselState.log` records every hire.
+  - **Players react** (`reactToDepartures`, at the close, from who sat in every chair when it opened, `CarouselState.was`):
+    - **Bond:** seasons together over 3, from 1/3 to 1. Together is the shorter of his seasons on the team (since he transferred in, else his class) and the coach's seasons in the chair. A coach who recruited him and coached him for years hurts most.
+    - **Morale** drops by 0.3 × bond for his position coach, 0.12 for his side's coordinator and 0.2 for a head coach. The biggest one counts, and `Progress.cl` records it (chair, bond, and where the coach went).
+    - **In the portal:** his entry odds rise and the coach's new school pulls him ([PORTAL.md](PORTAL.md)).
+    - **For the user:** firing an assistant shakes his room, and the news says how many took it hard.
+- **Checked by** the STAFF section of `npm run season` (the portal report's career, 5 offseasons), as of 2026-10-30:
+  - **Growth** (assistants seated all 5 offseasons): risers +5 to +6.5 a rating, 75% up 4+; plateau flat to −2; fading −1 to −6, 33% down 4+. By age, the young gain and the 60+ lose teach, game and recruit. Their drift a year is at most +0.5.
+  - **Turnover:** 20.4 head coach changes a year (real about 20–25). Assistant turnover is 20.7% a year (real about 30–40%; the floor is 20%). Chairs opened: moves 52%, let go 29%, retired 13%, fired 6%. They were filled by FBS coaches 33% (promotions 4.5%), coaches out of a job 21%, outside 47%.
+  - **Flows:** FBS moves by tier go up 286, same 215, down 100.
+  - **Ages:** assistants 48.6 → 46.7, head coaches 55.3 → 53.4.
+  - **Staff level:** the league +2.35 over 5 seasons (flag at 2.5); the T1–T5 gap +1.0 (flag at 1.5).
+  - **EVAL:** worth given up against the best candidate is 1.34 under 55 eval, 0.86 at 55–69, 0.24 at 70+.
+  - **DEVELOP:** level-ups a player run 0.95 / 1.03 / 1.01 by the head coach's develop, bottom / middle / top third.
+  - **The rest of the report:** unchanged from step 3: the growth table, starter gain by tier, and the 7 flags already known.
+  - **Step 6 (TEACH):** level-ups a player run 0.93 / 1.02 / 1.05 by his position coach's TEACH factor, bottom / middle / top third. The per-position growth table and mean starter gain (1.39) hold, and starter gain by tier is unchanged.
+  - **Step 7:** 12 GAs promoted a year (3.4% of hires). The user's tree is 6 after 5 seasons; the league's biggest is 42.
+  - **Tuning history:** the first pass filled 79% of chairs from outside, because the best of several noisy outside reputations beat real coaches. Then every staff called the same free agents. Claimed offers, weaker outside candidates, and a tier-based outside shift made the market work while keeping the gap and level in bounds.
+- **TEACH and development** (step 6 of the plan): a position group's XP is also ×(1 + 0.05·z), where z is its position coach's TEACH against the same group's coaches in the tier (`groupXp`). A great QB coach lifts his QBs, and the league and its tiers stay calibrated. TEACH also still steers an emphasis's level-ups (`coachFactor`).
+- **Graduate assistants** (step 7; `GA` in `data/coaches.ts`, `TeamState.ga`, `gasFor` in `season/world.ts`):
+  - 2 a program, with ids `<team>-<group>.<year>.ga<n>`. They're generated at the staff level −10, aged 23–28 (so mostly risers), with a group they lean to.
+  - They grow each offseason under that group's coach, with no work of their own.
+  - In the carousel, they're candidates for any position chair at their program, and they always accept. On the HIRING tab they show as YOUR GA.
+  - They move on after 3 seasons, and new ones fill the slots at the close.
+  - Former players as GAs wait on graduation.
+- **Coaching trees** (step 7):
+  - `treeOf(root)` lists the coaches who have worked under him and now sit at another program. `treeScore` counts 3 for a head coach on it and 1 for a coordinator.
+  - The user's tree shows on MY STAFF.
+  - A hire from the user's tree to a head coach or coordinator job elsewhere makes the news ("your 2nd head coach branch").
+- **Still reading the generated staff:** `defIdentity` (`data/identity.ts`) reads the generated DC's style. New DCs keep the program's style, so that's still right. It needs the season's staff once a DC brings his own.
 
 **Ratings.** Every one changes something:
 

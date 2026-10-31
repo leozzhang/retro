@@ -8,15 +8,18 @@ import { bowlGames, bracketGames, bracketRoundDone, confChampGames, newBracket, 
 import { SAVE_VERSION } from './save';
 import { generateSchedule } from './schedule';
 import { DEV_LABEL } from '../data/athletes';
+import type { Group } from '../data/coaches';
 import { athleteName, generatedAthlete, type Squad } from '../data/depth';
 import { archiveSeason, storyWeek } from './career';
+import { archiveCoaches, programXp, progressCoaches } from './coaching';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
 import { carryMorale, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
 import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
-import { GAME_SIM, settleTie, simGame } from './simGame';
-import { emphasisMods, type TeamMods } from './emphasis';
+import { GAME_SIM, settleTie, simGame, winOdds } from './simGame';
+import { emphasisMods, groupOf, type TeamMods } from './emphasis';
+import { STANDARD } from '../data/emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, SeasonSummary, TeamState } from './types';
 import { baseRoster, seasonRng, squadFor, staffFor } from './world';
@@ -37,11 +40,14 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     coach: prev?.coach ?? (config.coachCareer ? newCoach(config.userTeamId) : undefined),
     history: prev?.history ?? [],
     careers: prev?.careers ?? {},
+    // The staffs grow through the offseason (season/coaching.ts).
+    ...(prev ? { coaches: progressCoaches(prev) } : {}),
+    ...(prev?.coachCareers ? { coachCareers: prev.coachCareers } : {}),
   };
-  // Progression and morale carry over, without last season's week marks.
+  // Progression, morale, rosters and staffs carry over, without last season's week marks.
   for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
-    if (!ts.progress && !ts.mo && !ts.roster) continue;
-    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo, roster: ts.roster })) as TeamState;
+    if (!ts.progress && !ts.mo && !ts.roster && !ts.staff && !ts.ga) continue;
+    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo, roster: ts.roster, staff: ts.staff, ga: ts.ga })) as TeamState;
     for (const p of Object.values(next.progress ?? {})) {
       delete p.up;
       carryConfidence(p);
@@ -115,6 +121,13 @@ const play: WeekStep = (state, ctx) => {
       g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives, emph });
     }
     ctx.played.set(g.id, { drives, home, away, neutral: g.neutral });
+    // Wins over the pregame odds, for the staffs' scouting growth.
+    const odds = winOdds(home, away, g.neutral);
+    const homeWon = g.result.home > g.result.away ? 1 : 0;
+    for (const [t, x] of [[g.home, homeWon - odds], [g.away, odds - homeWon]] as const) {
+      const ts = (state.teamState[t] ??= {});
+      ts.xw = Math.round(((ts.xw ?? 0) + x) * 1000) / 1000;
+    }
   }
 };
 
@@ -154,8 +167,16 @@ const progress: WeekStep = (state, ctx) => {
       const t = sq.team.id;
       const ts = (state.teamState[t] ??= {});
       const focus = t === user && ts.emph ? { staff: staffFor(state, t), picks: ts.emph } : undefined;
-      const events = progressTeam(ts, sq, grades, ctx.week, seasonRng(state, 'progress', t, ctx.week), focus);
+      const events = progressTeam(ts, sq, grades, ctx.week, seasonRng(state, 'progress', t, ctx.week), focus, programXp(state, t));
       if (events.length) ts.lu = (ts.lu ?? 0) + events.length;
+      // The staff's work this season (season/coaching.ts): level-ups by group, games on an emphasis.
+      for (const e of events) {
+        const g = groupOf(e.athlete.pos);
+        (ts.lug ??= {})[g] = (ts.lug[g] ?? 0) + 1;
+      }
+      for (const [g, pick] of Object.entries(focus?.picks ?? {}) as [Group, string][]) {
+        if (pick !== STANDARD) (ts.eg ??= {})[g] = (ts.eg[g] ?? 0) + 1;
+      }
       for (const e of events) {
         if (!e.big) continue;
         if (t === user) told(e);
@@ -266,6 +287,7 @@ const transition: WeekStep = (state, ctx) => {
         ...yearRecord(state),
       });
       archiveSeason(state);
+      archiveCoaches(state);
       if (state.config.coachCareer) state.news.push(...evaluateCoach(state));
     } else if (bracketRoundDone(state)) {
       state.games.push(...bracketGames(state, week + 1));
@@ -347,7 +369,7 @@ export function phaseLabel(state: SeasonState): string {
     case 'postseason':
       return 'BOWLS AND PLAYOFF';
     case 'offseason':
-      return 'OFFSEASON: PORTAL';
+      return state.offseason?.stage === 'carousel' ? 'OFFSEASON: CAROUSEL' : 'OFFSEASON: PORTAL';
     default:
       return 'SEASON OVER';
   }

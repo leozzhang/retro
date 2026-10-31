@@ -1,4 +1,5 @@
-import { buildStaff, type Staff } from '../data/coaches';
+import { applyCoachDelta, buildHeadCoach, buildStaff, COACH_ROLES, coachAs, GA, GROUPS, type Coach, type HeadCoach, type Staff } from '../data/coaches';
+import { CALENDAR } from '../data/season/calendar';
 import type { Athlete } from '../data/athletes';
 import { buildDepth, buildSquad, generatedAthlete, type Squad } from '../data/depth';
 import { teamById } from '../data/teams';
@@ -103,11 +104,45 @@ function rosterKey(ts: { roster?: unknown } | undefined): string {
 const rosterCache = new WeakMap<object, { key: string; squad: Squad }>();
 
 /**
- * A team's coaching staff this season: the generated staff (data/coaches.ts). Hires, firings and the
- * coaching carousel will lay their changes over it here, the way `squadFor` does for rosters.
+ * A team's coaching staff this season: the generated staff (data/coaches.ts) with the carousel's
+ * changes laid over it, the way `squadFor` does for rosters. Each chair holds its generated coach unless
+ * `TeamState.staff` seats someone else; every coach carries his rating changes (`SeasonState.coaches`)
+ * and ages a year a season. With no changes it's the generated staff itself.
  */
-export function staffFor(_state: SeasonState, teamId: string): Staff {
-  return buildStaff(teamById(teamId));
+export function staffFor(state: SeasonState, teamId: string): Staff {
+  const gen = buildStaff(teamById(teamId));
+  const seats = state.teamState[teamId]?.staff;
+  const years = state.year - CALENDAR.year;
+  const ids = COACH_ROLES.map((role) => seats?.[role] ?? gen[role].id);
+  const deltas = ids.map((id) => state.coaches?.[id]?.d);
+  if (!seats && !years && deltas.every((d) => !d)) return gen;
+  const key = `${years}|${ids.join(',')}|${JSON.stringify(deltas)}`;
+  const hit = staffCache.get(teamId);
+  if (hit?.key === key) return hit.staff;
+  const staff = {} as Staff;
+  COACH_ROLES.forEach((role, i) => {
+    const c = (coachAs(ids[i], role) as Coach | undefined) ?? gen[role];
+    staff[role] = { ...c, role, ...(role === 'DC' ? { style: c.style ?? gen.DC.style } : {}), age: c.age + state.year - (c.from ?? CALENDAR.year), r: applyCoachDelta(c.r, deltas[i]) };
+  });
+  staffCache.set(teamId, { key, staff });
+  return staff;
+}
+
+const staffCache = new Map<string, { key: string; staff: Staff }>();
+
+/** The program's graduate assistants: its own list, or the generated pair who joined before the first season. */
+export function gasFor(state: SeasonState, teamId: string): string[] {
+  return state.teamState[teamId]?.ga ?? Array.from({ length: GA.slots }, (_, n) => {
+    const g = GROUPS[hashString(`ga:${teamId}:${n}`) % GROUPS.length];
+    return `${teamId}-${g.toLowerCase()}.${CALENDAR.year - 1}.ga${n}`;
+  });
+}
+
+/** The program's head coach this season: its `HC` chair (or the generated one) with his changes, his age this year. */
+export function headCoachFor(state: SeasonState, teamId: string): HeadCoach {
+  const id = state.teamState[teamId]?.staff?.HC;
+  const c = (id && (coachAs(id, 'HC') as HeadCoach | undefined)) || buildHeadCoach(teamById(teamId));
+  return { ...c, age: c.age + state.year - (c.from ?? CALENDAR.year), r: applyCoachDelta(c.r, state.coaches?.[c.id]?.d) };
 }
 
 /**

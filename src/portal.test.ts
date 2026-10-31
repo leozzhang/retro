@@ -3,7 +3,7 @@ import { generatedAthlete, starters } from './data/depth';
 import { overall, type Position } from './data/positions';
 import { parseWalkOn, walkOnId } from './data/rosterGen';
 import { TEAMS, teamById } from './data/teams';
-import { advanceOffseason, simOffseason, startOffseason } from './season/offseason';
+import { advanceOffseason, simOffseason, startOffseason, startToPortal } from './season/offseason';
 import {
   actOnLeaving, appeal, buildBoard, entryOdds, judgePromises, leavingList, MIN_COUNT, motives, offer, offerCap, PORTAL, ptFactor, type School,
 } from './season/portal';
@@ -53,7 +53,7 @@ describe('roster deltas', () => {
 describe('who enters', () => {
   it('a star at a weak program is likelier to enter than one at a power', () => {
     const s = copy();
-    startOffseason(s);
+    startToPortal(s);
     const board = buildBoard(s);
     const topOdds = (tier: number) => {
       const ps: number[] = [];
@@ -68,7 +68,7 @@ describe('who enters', () => {
 
   it('a buried gem at a power program looks to leave, and more than its starters', () => {
     const s = copy();
-    startOffseason(s);
+    startToPortal(s);
     const board = buildBoard(s);
     const gems: number[] = [];
     const starts: number[] = [];
@@ -143,11 +143,13 @@ describe('a whole offseason', () => {
     }
   });
 
-  it('is deterministic, and a save mid-portal continues identically', () => {
+  it('is deterministic, and a save mid-carousel or mid-portal continues identically', () => {
     const b = simOffseason(copy());
     expect(JSON.stringify(b)).toBe(JSON.stringify(a));
     let c = copy();
     startOffseason(c);
+    c = advanceOffseason(JSON.parse(JSON.stringify(c)));
+    while (c.offseason?.stage === 'carousel') c = advanceOffseason(c);
     c = advanceOffseason(c);
     c = advanceOffseason(JSON.parse(JSON.stringify(c)));
     c = JSON.parse(JSON.stringify(c));
@@ -158,7 +160,7 @@ describe('a whole offseason', () => {
   it('only open-ended seasons have an offseason', () => {
     const s = copy();
     s.config.length = 'single';
-    startOffseason(s);
+    startToPortal(s);
     expect(s.phase).toBe('complete');
   });
 });
@@ -170,7 +172,7 @@ describe('the user side', () => {
     const s = copy();
     s.config.userTeamId = user;
     s.config.delegate.portal = false;
-    startOffseason(s);
+    startToPortal(s);
     return s;
   };
 
@@ -219,7 +221,7 @@ describe('the user side', () => {
       p.pr = { kind: 'start', year: s.year, to: 'georgia' };
     }
     const before = { kept: ts.mo![kept], broken: ts.mo![broken] };
-    startOffseason(s);
+    startToPortal(s);
     expect(s.offseason!.promises).toEqual({ kept: 1, broken: 1 });
     expect(ts.mo![kept]).toBeGreaterThan(before.kept);
     expect(ts.mo![broken]).toBeLessThan(before.broken);

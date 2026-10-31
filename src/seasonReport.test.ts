@@ -10,12 +10,14 @@ import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, simSeaso
 import { records, recordText, winner } from './season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
 import type { DriveLog, InjuryLevel, SeasonState, TeamState } from './season/types';
-import { squadFor } from './season/world';
+import { headCoachFor, squadFor, staffFor } from './season/world';
 import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
 import { BREAKOUT, CONFIDENCE, confOf } from './season/confidence';
 import { setUserDepth } from './season/staff';
 import { actualRole, moraleContext, moraleOf, moraleReason, type MoraleDriver } from './season/morale';
-import { buildStaff, COACH_ROLES, type CoachRole, type Staff } from './data/coaches';
+import { anyCoach, buildHeadCoach, buildStaff, COACH_ROLES, coachName, GROUPS, type AnyRole, type Coach, type CoachRole, type Staff } from './data/coaches';
+import { ARCS, coachArc, groupXp } from './season/coaching';
+import { hire, outsideFor, TREE_SCORE, treeOf, treeScore } from './season/carousel';
 import { EMPHASES, GROUP_POS, GROUP_SLOTS } from './data/emphasis';
 import { hashString, mulberry32 } from './engine/math';
 import { driveMods, emphasisMods, type DriveMods } from './season/emphasis';
@@ -25,8 +27,8 @@ import { SCOUT_TIERS } from './season/scouting';
 import { simGame } from './season/simGame';
 import { SCHEME_PASS } from './season/staff';
 import { START_SLOTS } from './season/confidence';
-import { actOnLeaving, leavingList, MIN_COUNT, PORTAL } from './season/portal';
-import { advanceOffseason, startOffseason } from './season/offseason';
+import { actOnLeaving, buildBoard, entryOdds, leavingList, MIN_COUNT, PORTAL } from './season/portal';
+import { advanceOffseason, startToPortal } from './season/offseason';
 import { baseRoster } from './season/world';
 import { overall } from './data/positions';
 
@@ -428,6 +430,8 @@ function portalReport(n: number): string[] {
   const flows = new Map<string, number>();
   const net = [0, 0, 0, 0, 0];
   const promises = { kept: 0, broken: 0, made: 0 };
+  // Players whose coach left (docs/CAROUSEL_PLAN.md step 5): entrants among them, coach-left reasons, followers.
+  const react = { left: 0, followed: 0, reason: 0, shaken: 0, players: 0 };
   let walkOns = 0;
   let maxRoster = 0;
   let minPos = Infinity;
@@ -435,10 +439,21 @@ function portalReport(n: number): string[] {
   const fmt = (x: number[]) => x.map((v) => v.toFixed(2)).join(' ');
   const t0 = Date.now();
   let gapDrift = 0;
+  const market: Market = { heads: 0, chairs: 0, fbs: 0, outside: 0, free: 0, ga: 0, promoted: 0, flows: [0, 0, 0], why: new Map(), teach: [] };
   for (let y = 1; y <= n; y++) {
     simSeason(s);
     simSeason(c);
-    startOffseason(s);
+    // Step 6: each group's level-ups this season against its position coach's teach (as a share of the multiplier).
+    for (const t of TEAMS) {
+      const roster = baseRoster(s, t.id);
+      for (const g of GROUPS) {
+        const n = roster.filter((a) => GROUP_POS[g].includes(a.pos)).length;
+        if (n && g !== 'ST') market.teach.push([groupXp(s, t.id, g), (s.teamState[t.id]?.lug?.[g] ?? 0) / n]);
+      }
+    }
+    const chairsBefore = allChairs(s);
+    startToPortal(s);
+    carouselStats(s, chairsBefore, allChairs(s), market);
     if (y > 1) {
       promises.kept += s.offseason!.promises!.kept;
       promises.broken += s.offseason!.promises!.broken;
@@ -448,6 +463,17 @@ function portalReport(n: number): string[] {
     for (const t of TEAMS) for (const a of Object.values(starters(squadFor(s, t.id)))) startersNow.add(a.id);
     // The user's leaving list, as the staff would see it, then promise spam.
     s.portal!.leaving = leavingList(s, user);
+    {
+      const board = buildBoard(s);
+      for (const t of TEAMS) {
+        for (const [id, p] of Object.entries(s.teamState[t.id]?.progress ?? {})) {
+          if (p.cl?.year !== s.year || !board.players.has(id)) continue;
+          react.shaken++;
+          if (entryOdds(s, board, id).reason === 'coach') react.reason++;
+        }
+        react.players += baseRoster(s, t.id).length;
+      }
+    }
     for (const id of Object.keys(s.portal!.leaving)) {
       if (actOnLeaving(s, id, 'promise', startersNow.has(id) ? 'start' : 'snaps')) promises.made++;
     }
@@ -456,6 +482,12 @@ function portalReport(n: number): string[] {
     const portal = old.portal!;
     const count = new Map<string, number>();
     for (const e of portal.entrants) {
+      const to = portal.commits[e.id];
+      const cl = (old.teamState[e.from]?.progress?.[e.id] ?? (to ? old.teamState[to]?.progress?.[e.id] : undefined))?.cl;
+      if (cl?.year === old.year) {
+        react.left++;
+        if (cl.to && to === cl.to) react.followed++;
+      }
       count.set(e.from, (count.get(e.from) ?? 0) + 1);
       roles[startersNow.has(e.id) ? 'starter' : 'backup']++;
       outs[e.out as keyof typeof outs]++;
@@ -512,13 +544,187 @@ function portalReport(n: number): string[] {
       `; tightest position ${minPos >= 0 ? `+${minPos}` : minPos} over its minimum` + (minPos < 0 ? '  <-- under' : ''),
     'starter overall by tier (T1..T5), after each offseason:', ...talent,
     `  T1-T5 gap change vs control after ${n}: ${gapDrift.toFixed(2)}` + (Math.abs(gapDrift) > 1 ? '  <-- gap drift' : ''),
+    `coach departures: ${pctText(react.shaken / react.players)} of players had a coach leave; of them ${pctText(react.reason / Math.max(1, react.shaken))} ` +
+      `would give it as the reason to go; ${pctText(react.left / Math.max(1, per.reduce((x, y) => x + y, 0)))} of entrants had a coach leave, ` +
+      `${(react.followed / n).toFixed(1)} a year followed him to his new school`,
     `promises (the user's staff promises everyone on the leaving list): ${promises.made} made, ${judged} judged, ` +
       `kept ${pctText(promises.kept / Math.max(1, judged))}, broken ${pctText(promises.broken / Math.max(1, judged))}`,
     '', `CAREERS (docs/CAREERS.md), the same career after ${n} seasons. History only: nothing in the sim reads it.`,
     `${careers.length} players, ${(JSON.stringify(s.careers ?? {}).length / n / 1e6).toFixed(2)} MB of JSON per season; ` +
       `rostered players with a past season ${pctText(withRows / rostered.length)}`,
     'story lines per team-season: ' + [...story.keys()].sort().map((k) => `${k} ${perTeam(k)}`).join('  '),
+    ...staffReport(s, n, market),
   ];
+}
+
+/**
+ * Coaches over time (docs/COACHES.md), the portal report's career after `n` offseasons: rating change
+ * by hidden arc and by age, the league's drift a year, and staff level by tier.
+ */
+/** What each carousel did, summed over the career's offseasons. */
+interface Market {
+  /** Head coach chairs and assistant chairs with someone new. */
+  heads: number;
+  chairs: number;
+  /** Where the new assistants and head coaches came from. */
+  fbs: number;
+  outside: number;
+  free: number;
+  /** Moves up the ladder (position coach, coordinator, head coach). */
+  promoted: number;
+  /** FBS moves by tier: up, same, down. */
+  flows: [number, number, number];
+  /** Why the old coach left his chair. */
+  why: Map<string, number>;
+  /** Graduate assistants promoted. */
+  ga: number;
+  /** Each season's position groups: their coach's teach z against his tier and group, and level-ups a player. */
+  teach: [number, number][];
+}
+
+function allChairs(s: SeasonState): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const t of TEAMS) {
+    out.set(`${t.id}:HC`, headCoachFor(s, t.id).id);
+    for (const [role, c] of Object.entries(staffFor(s, t.id))) out.set(`${t.id}:${role}`, c.id);
+  }
+  return out;
+}
+
+function carouselStats(s: SeasonState, before: Map<string, string>, after: Map<string, string>, m: Market): void {
+  const level = (role: string) => (role === 'HC' ? 3 : role === 'OC' || role === 'DC' ? 2 : 1);
+  for (const [chair, id] of after) {
+    const was = before.get(chair)!;
+    if (was === id) continue;
+    if (chair.endsWith(':HC')) m.heads++;
+    else m.chairs++;
+    const why = s.coaches?.[was]?.gone?.why ?? 'moved';
+    m.why.set(why, (m.why.get(why) ?? 0) + 1);
+  }
+  for (const h of s.carousel?.log ?? []) {
+    if (h.from === 'outside') m.outside++;
+    else if (h.from === 'free') m.free++;
+    else if (h.from === 'ga') m.ga++;
+    else {
+      m.fbs++;
+      const [ft, fr] = h.from.split(':');
+      const [tt, tr] = h.chair.split(':');
+      if (level(tr) > level(fr)) m.promoted++;
+      const d = teamById(tt).profile.tier - teamById(ft).profile.tier;
+      m.flows[d < 0 ? 0 : d === 0 ? 1 : 2]++;
+    }
+  }
+}
+
+function staffReport(s: SeasonState, n: number, m: Market): string[] {
+  const keys = ['scout', 'teach', 'game', 'recruit'] as const;
+  type K = (typeof keys)[number];
+  const seated = TEAMS.flatMap((t) => Object.values(staffFor(s, t.id)).map((c) => ({ c, t })));
+  const delta = (id: string, k: K) => s.coaches?.[id]?.d?.[k] ?? 0;
+  const has = (c: Coach, k: K) => c.r[k] !== undefined;
+  const signed = (x: number, dp = 1) => `${x >= 0 ? '+' : ''}${x.toFixed(dp)}`;
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / Math.max(1, xs.length);
+  const meanOf = (cs: Coach[], k: K) => mean(cs.filter((c) => has(c, k)).map((c) => delta(c.id, k)));
+  const meanRow = (cs: Coach[]) => keys.map((k) => `${k} ${signed(meanOf(cs, k))}`).join('  ');
+  const total = (c: Coach) => keys.reduce((a, k) => a + delta(c.id, k), 0) / keys.filter((k) => has(c, k)).length;
+  // Growth is read on the coaches who were there from the start and still are.
+  const stayed = seated.map((x) => x.c).filter((c) => !c.from && s.coaches?.[c.id]?.n === n);
+  const rows = [
+    '', `STAFF (docs/COACHES.md), the same career after ${n} offseasons.`,
+    `Mean rating change of the ${stayed.length} assistants seated all ${n} offseasons, by hidden arc, then by age at the start:`,
+  ];
+  for (const arc of ARCS) {
+    const cs = stayed.filter((c) => coachArc(c.id) === arc);
+    const up = cs.filter((c) => total(c) >= 4).length;
+    const down = cs.filter((c) => total(c) <= -4).length;
+    rows.push(`  ${arc.padEnd(8)} ${String(cs.length).padStart(4)}  ${meanRow(cs)}   up 4+ ${pctText(up / Math.max(1, cs.length))}, down 4+ ${pctText(down / Math.max(1, cs.length))}`);
+  }
+  for (const [lo, hi] of [[30, 39], [40, 49], [50, 59], [60, 70]]) {
+    const cs = stayed.filter((c) => c.age - n >= lo && c.age - n <= hi);
+    rows.push(`  age ${lo}-${hi} ${String(cs.length).padStart(4)}  ${meanRow(cs)}`);
+  }
+  const drift = keys.map((k) => meanOf(stayed, k) / n);
+  rows.push('  their drift a year: ' + keys.map((k, i) => `${k} ${signed(drift[i], 2)}`).join('  '));
+
+  // Turnover, a year, from every chair before and after each carousel.
+  const chairs = TEAMS.length * COACH_ROLES.length;
+  const hires = m.fbs + m.outside + m.free + m.ga;
+  const why = ['fired', 'retired', 'let go', 'moved'].map((k) => `${k} ${pctText((m.why.get(k) ?? 0) / Math.max(1, m.heads + m.chairs))}`).join(', ');
+  rows.push(
+    `head coach changes a year ${(m.heads / n).toFixed(1)} (real FBS about 20-25)` + (m.heads / n < 15 || m.heads / n > 30 ? '  <-- off target' : ''),
+    `assistant turnover a year ${pctText(m.chairs / n / chairs)} (real about 30-40%)` + (m.chairs / n / chairs < 0.2 || m.chairs / n / chairs > 0.45 ? '  <-- off target' : ''),
+    `why the chair opened: ${why}`,
+    `who filled it: FBS ${pctText(m.fbs / hires)} (promotions ${pctText(m.promoted / hires)}), out of a job ${pctText(m.free / hires)}, outside FBS ${pctText(m.outside / hires)}, ` +
+      `graduate assistants ${pctText(m.ga / hires)} (${(m.ga / n).toFixed(1)} a year)`,
+    `FBS moves by tier: up ${m.flows[0]}, same ${m.flows[1]}, down ${m.flows[2]}` + (m.flows[0] < m.flows[2] ? '  <-- talent should flow up' : ''),
+  );
+  const ages = (cs: { age: number }[]) => mean(cs.map((c) => c.age));
+  const heads0 = TEAMS.map((t) => buildHeadCoach(t));
+  const headsNow = TEAMS.map((t) => headCoachFor(s, t.id));
+  rows.push(`mean age: assistants ${ages(TEAMS.flatMap((t) => Object.values(buildStaff(t)))).toFixed(1)} -> ${ages(seated.map((x) => x.c)).toFixed(1)}, ` +
+    `head coaches ${ages(heads0).toFixed(1)} -> ${ages(headsNow).toFixed(1)}`);
+
+  // Staff level by tier: everyone seated now against the generated staffs.
+  const level = (cs: Coach[]) => mean(cs.flatMap((c) => keys.filter((k) => has(c, k)).map((k) => c.r[k]!)));
+  const tiers = [1, 2, 3, 4, 5];
+  const start = tiers.map((tier) => level(TEAMS.filter((t) => t.profile.tier === tier).flatMap((t) => Object.values(buildStaff(t)))));
+  const end = tiers.map((tier) => level(seated.filter((x) => x.t.profile.tier === tier).map((x) => x.c)));
+  const gap = end[0] - end[4] - (start[0] - start[4]);
+  const shift = mean(end) - mean(start);
+  rows.push('staff level by tier (T1..T5), start then now: ' + start.map((v) => v.toFixed(1)).join(' ') + '  ->  ' + end.map((v) => v.toFixed(1)).join(' '),
+    `  league change ${signed(shift, 2)}` + (Math.abs(shift) > 2.5 ? '  <-- drift' : '') + `, T1-T5 gap change ${signed(gap, 2)}` + (Math.abs(gap) > 1.5 ? '  <-- gap drift' : ''));
+
+  // Head coaches' ratings at work: hiring by eval, development by develop.
+  const regret = new Map<string, number[]>();
+  for (const t of TEAMS) {
+    const ev = headCoachFor(s, t.id).r.eval;
+    const band = ev >= 70 ? '70+' : ev >= 55 ? '55-69' : '<55';
+    for (const role of COACH_ROLES) {
+      const c = outsideFor(s, t.id, role);
+      if (!regret.has(band)) regret.set(band, []);
+      regret.get(band)!.push(Math.max(...c.map((x) => x.worth)) - hire(c, ev)!.worth);
+    }
+  }
+  const adRegret = mean(TEAMS.map((t) => {
+    const c = outsideFor(s, t.id, 'HC');
+    return Math.max(...c.map((x) => x.worth)) - hire(c)!.worth;
+  }));
+  rows.push('EVAL: worth given up against the best candidate, by the hiring head coach\'s eval: ' +
+    ['<55', '55-69', '70+'].map((b) => `${b} ${mean(regret.get(b) ?? []).toFixed(2)} (${regret.get(b)?.length ?? 0})`).join('  ') +
+    ` (an AD picking a head coach ${adRegret.toFixed(2)})`);
+  const byDev: [number, number][] = [];
+  const headRows = Object.values(s.coachCareers ?? {}).flatMap((c) => c.seasons.filter((x) => x.role === 'HC'));
+  for (const h of s.history) {
+    for (const row of headRows.filter((x) => x.year === h.year)) {
+      const dev = (row.r as { develop?: number }).develop;
+      if (dev !== undefined && h.dev?.[row.team] !== undefined) byDev.push([dev, h.dev[row.team]]);
+    }
+  }
+  byDev.sort((a, b) => a[0] - b[0]);
+  const third = Math.floor(byDev.length / 3);
+  const thirds = [byDev.slice(0, third), byDev.slice(third, 2 * third), byDev.slice(2 * third)];
+  rows.push('DEVELOP: level-ups a player by the head coach\'s develop (mean develop: rate), bottom/middle/top third: ' +
+    thirds.map((x) => `${mean(x.map((y) => y[0])).toFixed(0)}: ${mean(x.map((y) => y[1])).toFixed(3)}`).join('  '));
+
+  // Step 6: position coaches' teach, as the multiplier it gives his group relative to the program's.
+  const tm = [...m.teach].sort((a, b) => a[0] - b[0]);
+  const t3 = Math.floor(tm.length / 3);
+  rows.push("TEACH: level-ups a player by his position coach's teach multiplier (mean: rate), bottom/middle/top third: " +
+    [tm.slice(0, t3), tm.slice(t3, 2 * t3), tm.slice(2 * t3)].map((x) => `${mean(x.map((y) => y[0])).toFixed(3)}: ${mean(x.map((y) => y[1])).toFixed(3)}`).join('  '));
+  // Step 7: coaching trees. A branch is a coach now in a head coach (3) or coordinator (1) job at another program.
+  const roots = new Map<string, number>();
+  const seatedNow = TEAMS.flatMap((t) => [{ id: headCoachFor(s, t.id).id, team: t.id, role: 'HC' as AnyRole }, { id: staffFor(s, t.id).OC.id, team: t.id, role: 'OC' as AnyRole }, { id: staffFor(s, t.id).DC.id, team: t.id, role: 'DC' as AnyRole }]);
+  for (const x of seatedNow) for (const r of s.coaches?.[x.id]?.under ?? []) roots.set(r, (roots.get(r) ?? 0) + (TREE_SCORE[x.role] ?? 0));
+  const top = [...roots].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const mine = treeOf(s, headCoachFor(s, s.config.userTeamId).id);
+  rows.push(`trees: the user's ${treeScore(mine)} (${mine.length} branches); the league's biggest: ` +
+    top.map(([id, v]) => `${coachName(anyCoach(id)!)} ${v}`).join(', ') + ` (a root counts every branch, his own program's included)`);
+  rows.push(`${s.config.userTeamId} staff (arc hidden in the game):`);
+  for (const c of Object.values(staffFor(s, s.config.userTeamId))) {
+    const d = keys.filter((k) => has(c, k)).map((k) => `${k} ${c.r[k]} (${signed(delta(c.id, k), 0)})`).join(' ');
+    rows.push(`  ${c.role.padEnd(7)} age ${c.age}  ${coachArc(c.id).padEnd(8)} ${c.from ? 'hired ' : '      '}${d}`);
+  }
+  return rows;
 }
 
 /** Share of the 22 starters on every team below 90 health right now. */

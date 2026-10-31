@@ -58,8 +58,12 @@ function vsText(g: SeasonGame, team: string): string {
   return g.home === team ? 'VS' : '@';
 }
 
+/** The offseason stage's button: the carousel, then the portal. */
+const offseasonLabel = (s: SeasonState) => (s.offseason?.stage === 'carousel' ? 'HIRING' : 'PORTAL');
+
 /** The line under the header: this week's game, or what Space does instead. */
 export function nextGameText(s: SeasonState): string {
+  if (s.phase === 'offseason' && s.offseason?.stage === 'carousel') return `COACHING CAROUSEL, ROUND ${s.offseason.round}  -  SPACE: OPEN`;
   if (s.phase === 'offseason') return `TRANSFER PORTAL, ${s.offseason?.round ? `ROUND ${s.offseason.round}` : 'OPENING'}  -  SPACE: OPEN`;
   if (s.phase === 'complete') {
     const champ = `CHAMPION: ${teamById(s.bracket!.champion!).school.toUpperCase()}`;
@@ -134,13 +138,13 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
   text(g, 'PLAYBOOK', BOOK_BTN.x + BOOK_BTN.w / 2, BOOK_BTN.y + 4, { align: 'center' });
   g.fillStyle = team.colors.primary;
   g.fillRect(PREP_BTN.x, PREP_BTN.y, PREP_BTN.w, PREP_BTN.h);
-  text(g, s.phase === 'offseason' ? 'PORTAL' : 'PREP', PREP_BTN.x + PREP_BTN.w / 2, PREP_BTN.y + 4, { align: 'center' });
+  text(g, s.phase === 'offseason' ? offseasonLabel(s) : 'PREP', PREP_BTN.x + PREP_BTN.w / 2, PREP_BTN.y + 4, { align: 'center' });
   g.fillStyle = team.colors.primary;
   g.fillRect(STATS_BTN.x, STATS_BTN.y, STATS_BTN.w, STATS_BTN.h);
   text(g, 'STATS', STATS_BTN.x + STATS_BTN.w / 2, STATS_BTN.y + 4, { align: 'center' });
   drawProgressLine(g, s);
-  const play = userGameThisWeek(s) ? 'SPACE: PLAY  X: SIM' : s.phase === 'offseason' ? 'SPACE: PORTAL' : s.phase === 'complete' ? '' : 'SPACE: ADVANCE';
-  drawHint(g, `${play}  A/D/W/S: BROWSE  O: ${s.phase === 'offseason' ? 'PORTAL' : 'PREP'}  T: TEAM  P: BOOK  H: STATS  ESC`);
+  const play = userGameThisWeek(s) ? 'SPACE: PLAY  X: SIM' : s.phase === 'offseason' ? `SPACE: ${offseasonLabel(s)}` : s.phase === 'complete' ? '' : 'SPACE: ADVANCE';
+  drawHint(g, `${play}  A/D/W/S: BROWSE  O: ${s.phase === 'offseason' ? offseasonLabel(s) : 'PREP'}  T: TEAM  P: BOOK  H: STATS  ESC`);
 }
 
 /**
@@ -262,7 +266,7 @@ function drawNews(g: CanvasRenderingContext2D, s: SeasonState, sub: number): voi
   const lines: { t: string; c: string }[] = [];
   const u = s.config.userTeamId;
   for (const n of [...s.news].reverse()) {
-    const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : n.kind === 'injury' ? '#ff7a7a' : n.kind === 'portal' ? '#c9a0ff' : '#ffffff';
+    const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : n.kind === 'injury' ? '#ff7a7a' : n.kind === 'portal' ? '#c9a0ff' : n.kind === 'carousel' ? '#8fd4ff' : '#ffffff';
     wrap(`WK ${n.week}  ${n.text.toUpperCase()}`, 74).forEach((t) => lines.push({ t, c }));
   }
   const start = mod(sub, Math.max(1, Math.ceil(lines.length / ROWS))) * ROWS;

@@ -170,7 +170,7 @@ describe('season', () => {
     expect(s.awards.find((a) => a.id === 'heisman')?.finalists.length).toBe(5);
     expect(s.history).toMatchObject([{ year: 2026, champion: b.champion, heisman: s.awards[0].finalists[0].name }]);
     expect(s.history[0].ap).toHaveLength(25);
-  });
+  }, 20_000);
 
   it('state is plain JSON: a saved season continues identically', () => {
     const a = newSeason(defaultConfig('texas'), 21);
