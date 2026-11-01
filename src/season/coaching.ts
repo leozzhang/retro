@@ -3,6 +3,7 @@ import {
   applyCoachDelta, parseCoachId,
 } from '../data/coaches';
 import { GROUP_POS } from '../data/emphasis';
+import { prospect } from '../data/recruits';
 import type { Position } from '../data/positions';
 import { groupOf } from './emphasis';
 import { TEAMS } from '../data/teams';
@@ -147,8 +148,9 @@ function zScores(xs: Map<string, number>): Map<string, number> {
 
 /**
  * The season's work, by `team:group` (`team` for scouting and the head coach): level-ups a player in
- * the group (or the program), wins over the pregame odds a game, and portal signings less half the
- * misses (targets he built interest with who signed elsewhere), each against the league.
+ * the group (or the program), wins over the pregame odds a game, and portal and HS signings less half
+ * the misses (targets he built interest with who signed elsewhere; HS signings weighted by stars), each
+ * against the league.
  */
 function seasonWork(state: SeasonState) {
   const teach = new Map<string, number>();
@@ -177,6 +179,26 @@ function seasonWork(state: SeasonState) {
       const x = to === school ? 1 : -0.5;
       recruit.set(`${school}:${g}`, recruit.get(`${school}:${g}`)! + x);
       signings.set(school, signings.get(school)! + x);
+    }
+  }
+  // HS signings by stars, less half for targets the staff worked hard who signed elsewhere.
+  const rs = state.recruiting;
+  const worth = (stars: number) => 0.5 * (stars - 1);
+  for (const [id, team] of Object.entries(rs?.signed ?? {})) {
+    const p = prospect(id);
+    if (!p) continue;
+    const g = GROUPS.find((x) => GROUP_POS[x].includes(p.pos))!;
+    recruit.set(`${team}:${g}`, recruit.get(`${team}:${g}`)! + worth(p.stars));
+    signings.set(team, signings.get(team)! + worth(p.stars));
+  }
+  for (const [team, ids] of Object.entries(rs?.boards ?? {})) {
+    for (const id of ids) {
+      const to = rs!.signed[id];
+      const p = prospect(id);
+      if (!p || !to || to === team || (rs!.interest[id]?.[team] ?? 0) < 0.5) continue;
+      const g = GROUPS.find((x) => GROUP_POS[x].includes(p.pos))!;
+      recruit.set(`${team}:${g}`, recruit.get(`${team}:${g}`)! - worth(p.stars) / 2);
+      signings.set(team, signings.get(team)! - worth(p.stars) / 2);
     }
   }
   // Teach is judged within each group: a QB room levels up at its own rate.
@@ -279,12 +301,13 @@ interface TierZ {
   teach: Map<string, number>;
 }
 
-const tierCache = new WeakMap<SeasonState, { key: string; z: TierZ }>();
+const tierCache = new WeakMap<SeasonState, { key: string; coaches: unknown; z: TierZ }>();
 
+/** Cached by the chairs and the coaches' changes (which only move between seasons, so by reference). */
 function tierZ(state: SeasonState): TierZ {
   const key = `${state.year}|${TEAMS.map((t) => JSON.stringify(state.teamState[t.id]?.staff ?? '')).join(',')}`;
   let hit = tierCache.get(state);
-  if (hit?.key !== key) {
+  if (hit?.key !== key || hit.coaches !== state.coaches) {
     const z: TierZ = { head: new Map(), teach: new Map() };
     // Against his own tier: a better staff at a bigger program is already in its rosters and appeal.
     for (let tier = 1; tier <= 5; tier++) {
@@ -298,7 +321,7 @@ function tierZ(state: SeasonState): TierZ {
         for (const [k, v] of zScores(new Map(teams.map((t) => [`${t.id}:${g}`, staffFor(state, t.id)[g].r.teach ?? 50])))) z.teach.set(k, v);
       }
     }
-    hit = { key, z };
+    hit = { key, coaches: state.coaches, z };
     tierCache.set(state, hit);
   }
   return hit.z;

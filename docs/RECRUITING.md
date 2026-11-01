@@ -1,6 +1,6 @@
 # Recruiting, graduation and the draft
 
-Planned in [RECRUITING_PLAN.md](RECRUITING_PLAN.md). This page is the design as built. Phase 1 (departures) is done; HS recruiting (phases 2–5) isn't built yet, and placeholder freshmen stand in for it.
+Planned in [RECRUITING_PLAN.md](RECRUITING_PLAN.md). This page is the design as built: phase 1 (departures) and HS recruiting (phases 2–5). Recruiting runs in open-ended careers only; a single season has no class to enroll.
 
 ## Phase 1: departures
 
@@ -26,7 +26,7 @@ The offseason is `carousel` → `departures` → `portal`.
      7 rounds of 32 in one seeded city order, plus `comp` compensatory picks closing rounds 3–7: 257 in all. NFL teams are only cities (`NFL_CITIES`).
   4. Everyone graduating or declaring leaves (`dropPlayer`). Each gets career story lines (`graduated`/`declared`, `drafted`, or "goes undrafted"), and the draft lands in `SeasonSummary.draft`. The news (`'draft'` kind, carried into next season's week 0) covers the departures count, the first pick, the top conference and every user pick.
 - **Round 1** shows who left. Advancing it opens the portal. `DeparturesState.left` (players lost per team) gives transfers `departShare` of those spots.
-- **After the portal,** placeholder freshmen (`makeFreshman`) fill every roster to 85. They start at the team's generated-freshman level (`freshmanOffset`: how far its generated true freshmen sit from their unit targets) with spread `LEVEL_SD`.
+- **After the portal,** placeholder freshmen (`makeFreshman`) fill what the signed class and transfers left, to 85 (about 1.6 a team with recruiting). They start at the team's generated-freshman level (`freshmanOffset`: how far its generated true freshmen sit from their unit targets) with spread `LEVEL_SD`.
 
 ### Offseason growth
 See [PROGRESSION.md](PROGRESSION.md#offseason-growth). Returning players grow as the next season opens; incoming freshmen don't.
@@ -57,3 +57,93 @@ The real-world references are approximate, from general knowledge, not a verifie
 - **Most true freshmen redshirt,** because backups barely play in season. The depth chart doesn't manage the 4-game limit yet, and there's no REDSHIRT toggle on the team page.
 - **Saves grow:** graduates' careers are kept, and redshirt and graduation lines add up (CAREERS.md).
 - **`SAVE_VERSION` is unchanged.** Every new field is optional, so a saved season continues; an old save mid-offseason at the portal skips departures that year.
+
+## Phases 2–5: HS recruiting
+
+### The class (`data/recruits.ts`)
+- **About 3,500 prospects a class:** `perTeam` (23) rolled at each FBS program's generated-freshman level (`rollFreshman`, the same roller as placeholder freshmen), plus `extra` (350) under FBS level.
+  - Which program a prospect was rolled from is never shown. The market decides where he goes.
+  - `spread` (0.6 of `LEVEL_SD`) and `tierShift` calibrate it. The market sorts the class into contiguous bands by tier, where generated rosters overlap, so a narrower spread keeps each tier's signees at its level.
+- **Ids are `r{class}.{salt}.{n}`:** the season he enrolls, a salt from the career's seed, and his number. `generatedAthlete` and `joinYear` read them, so a recruit is rebuilt from his id like any player, and his class year starts as a freshman the season he enrolls.
+- **The services' composite** (shown):
+  - It's built from his level plus `upside` × his growth room, plus noise. The noise is bigger in thin states and off the big metro, and late bloomers are marked down.
+  - Stars by national rank: 32 five-stars, 398 four-stars and 1,800 three-stars, with the rest 2-stars. Each prospect also gets a position rank.
+  - `pub` is the level the services think he is. Recruits judge playing time with it.
+- **Makeup** (hidden, from the id):
+  - his timeline: early (summer), normal (from a week), or late (signing day)
+  - `firm`, his resistance to flips
+  - `spotlight`, how much a visit moves him
+  - a dream school for about one in seven
+  - wants: PT, WIN, DEV, HOME, NFL, COACH
+- **His portal motives once he enrolls** are his recruiting wants (PT, WIN, DEV, HOME renormalized).
+
+### The cycle (`season/recruiting.ts`)
+Season Y recruits the class of Y+1. Every school runs the same code. The user's position coaches always make the contacts; the user decides boards, offers, visits and in-homes unless `Delegation.recruiting` (F) hands them to the staff.
+
+- **Summer** (`openRecruiting`, at `newSeason`): every staff, the user's included, builds a board and runs 4 rounds of contacts, summer official visits and offers. Early deciders commit.
+- **Weekly** (`recruitWeek`, the `recruit` week step after the polls):
+  1. Home games host official visits: the user's picks (HOST VISIT) and the staffs' for everyone else. The boost scales with the atmosphere (prestige), then the result: a win, the margin, a ranked opponent, a rivalry. A blowout loss can backfire, and `spotlight` scales the swing. The user's visitors make the news ("LOVED IT" ... "LEFT COLD").
+  2. Contacts: each position coach works `contacts` (8) prospects on his part of the board: top targets first, then offers he's waiting on, then his commits, then the best reads. Interest builds with his recruit rating, the school's appeal and pipelines, and saturates at `cap`. Interest a school isn't working decays.
+  3. Boards refresh at weeks 3, 6, 9 and 12. Offers go out weekly (CPU staffs, or a delegated user).
+  4. Decisions:
+     - Commits roll on decommitting: a rival's lead, his firmness, a blowout loss, a 3-game losing streak, falling out of the AP poll, a better commit at his position.
+     - Then everyone due and open takes his best offer with room, if it leads his next choice by the week's bar. The bar falls through the season and with each official visit he's taken. A decommit can flip the same week.
+  5. Week 15 closes with the **early signing period**: commits sign, binding, by firmness. Late deciders mostly wait. In-home visits open (6 for the user, the CPU staffs a few).
+- **Appeal** is the prospect's wants times the school's factors:
+  - PT: making next year's two-deep, judged on returners plus `growth` and the commits at his position
+  - WIN: this season, the last two, and the brand
+  - DEV: the position coach's teach and the program's development record
+  - HOME
+  - NFL: the program's draft picks at his group
+  - COACH: the position coach's recruit rating
+
+  On top come a dream school's pull and the program's pipeline in his state. His **market** is the schools whose boards reach him (`buildMarkets`).
+- **The CPU staffs** (and a delegated user):
+  - **Needs:** seniors and `attrition` out, by position against the usual mix.
+  - **Board:** `board.mult` targets a spot, from prospects who rank the school in their top 12 among the schools that would take them; a board still short reaches to the top 24. Each staff ranks by its own read (`estimate`): a weak scout's lasting bias plus noise that shrinks with effort. A program with less brand than its tier reaches lower (`reach`).
+  - **Offers:** to prospects who rank it top 6, within twice the class plus `paceOffers` when behind pace. Offers to prospects committed elsewhere stand but don't count against the budget.
+- **The carousel** (`recruitsReact`, at its close): an unsigned commit whose head coach or position coach left rolls on decommitting, and the coach's new school picks up interest.
+- **Signing day** (`runSigningDay`, the `signing` stage between departures and the portal):
+  - Round 0 is the user's last chance (offers, in-homes). Advancing it runs the day: staffs with room make last offers, everyone open takes his best offer with room, every commit signs, and the rest go unsigned (FCS or JUCO).
+  - Signees join `TeamState.roster.in` as freshmen, with baseline morale and a `signed` career line. They don't grow this offseason and can't enter the portal before they enroll. A roster the class put over 85 sends its lowest players to the portal (`overCap`). A full roster short at a position lets its lowest player go at the deepest position (`makeRoomForMinimums`).
+- **Class rank:** star points summed, each later commit counting less (`classRanks`).
+- **Coach growth:** recruit work (`coaching.ts seasonWork`) counts HS signings by stars, less half for targets worked hard who signed elsewhere.
+
+### Pipelines (phase 4)
+- **A coach's** (`coachPipe`): 1–2 states seeded from his id near where he came up, plus what his signings grow (`CoachProgress.pipe`). They move with him; the carousel's HIRING card shows them.
+- **A program's** (`TeamState.pipe`, carried across seasons): it grows with each signee from a state and fades a quarter a year.
+- **Effect:** more interest from contacts, sharper evaluations, and a small familiarity pull.
+
+### The user's screen (`render/recruitScreen.ts`; the hub's RECRUIT button or R)
+- **BOARD:** stars, national rank, hometown, your standing (RATES YOU HIGH / ON HIS LIST / LUKEWARM / NOT INTERESTED), status, and flags (O offered, V visit, H in-home).
+  - The card shows the position coach's **evaluation in words**: when he'd play (WILL PLAY EARLY / NEEDS A YEAR / DEVELOPMENTAL PROJECT), his ceiling here (SPECIAL ... DEPTH PIECE), how sure the coach is (HUNCH / FAIRLY SURE / CONVINCED), and two notes. There's nothing until the staff has worked him.
+  - His wants appear as contacts reveal them, along with his top schools, official visits and how the last one went.
+  - Actions 1–5: OFFER, HOST VISIT (next home game, 4 a game), IN-HOME (from week 15), TOP TARGET, ADD/DROP. G: staff fill. F: hand it to the staff.
+- **SEARCH:** the national class by group, filtered (R) by ALL, OPEN, IN-STATE or PIPELINE.
+- **CLASS:** commits and signees, needs left, the national top 10, and your pipelines.
+- **Elsewhere:** the prep page shows how many recruits visit a home game. In the signing stage, the screen is national signing day (Space runs it, then opens the portal).
+
+### Results (`npm run season`, RECRUITING section; the same 5-season career)
+The real-world references are approximate, from general knowledge, not a verified table.
+
+| Measure | Result | Target |
+| --- | --- | --- |
+| Signees a team-class (T1..T5) | 18.9, 18.1, 18.3, 20.7, 22.5 (19.7 overall); 807 unsigned a class | |
+| True level against the tier's generated freshmen | T1 +0.6, T2 +0.2, T3 +1.3, T4 +1.2, T5 +3.4 | within 1.5 |
+| Stars by tier | T1 9% five-stars, 54% four-stars; T3 81% three-stars; T5 69% two-stars | |
+| True level by stars | 5* 79.9, 4* 73.0, 3* 62.5, 2* 50.9 | |
+| Top 300 committed | summer 22%, week 5 42%, week 10 61%, week 15 77% | about half by the season, 75-85% by early signing |
+| Commits signing early | 81.6% (63% of the final signees) | 75-85% |
+| Decommits / flips | 13.6% of commits; 238 flips a class | 10-20% |
+| In-state signees | T1 19%, T2 42%, T3 58%, T4 54%, T5 44% | |
+| Third-season starters | 30% of 3-stars and under start (gems); 34% of 4-5 stars don't (busts) | |
+| Placeholder freshmen | 1.6 a team-offseason (was a whole class) | |
+| Time | 0.31 s a sim week, whole week; a season opens about 0.5 s slower | under 0.5 s |
+| Starter overall since the start, after 5 | T1 +0.8, T2 -0.8, T3 +1.2, T4 +1.8, T5 +4.2 | within 1.5 |
+
+### Flags
+- **Tier 5 signs about 3 over its generated freshmen:** tier-5 schools land tier 4's leftovers (playing time and home pull), and their own template group goes unsigned. With the portal's drop-downs, T5 starters still rise about 4 over 5 seasons, about where phase 1 left them. Without fixing T5's market, a lower `tierShift` for tier 5 barely moves it.
+- **The summer is slow at the top:** about 22% of the top 300 commit by the season, against about half in reality.
+- **A user who never opens the screen** signs only the summer's commits (about 7), and placeholder freshmen fill the rest at the team's level. The season-open news says how to hand it to the staff.
+- **Saves:** the cycle is about 1.25 MB of JSON while it runs; it's replaced each season. Careers grow about 3.2 MB a season, since signees get stories.
+- **Not built:** NIL, the 105-man roster, hot-seat rumors denting interest midseason, high school names, and walk-on/grayshirt decisions.

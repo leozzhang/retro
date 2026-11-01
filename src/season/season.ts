@@ -20,6 +20,7 @@ import { deltaText, offseasonGrowth, POS_POINTS, progressTeam, type LevelUpEvent
 import { joinYear } from '../data/rosterGen';
 import { GAME_SIM, settleTie, simGame, winOdds } from './simGame';
 import { emphasisMods, groupOf, type TeamMods } from './emphasis';
+import { openRecruiting, recruitWeek } from './recruiting';
 import { STANDARD } from '../data/emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, SeasonSummary, TeamState } from './types';
@@ -47,8 +48,8 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
   };
   // Progression, morale, rosters and staffs carry over, without last season's week marks.
   for (const [id, ts] of Object.entries(prev?.teamState ?? {})) {
-    if (!ts.progress && !ts.mo && !ts.roster && !ts.staff && !ts.ga) continue;
-    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo, roster: ts.roster, staff: ts.staff, ga: ts.ga })) as TeamState;
+    if (!ts.progress && !ts.mo && !ts.roster && !ts.staff && !ts.ga && !ts.pipe) continue;
+    const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo, roster: ts.roster, staff: ts.staff, ga: ts.ga, pipe: ts.pipe })) as TeamState;
     for (const p of Object.values(next.progress ?? {})) {
       delete p.up;
       delete p.gp;
@@ -62,6 +63,8 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
   const pre = apPoll(state, 0).poll;
   state.polls.push(pre);
   state.news.push({ week: 0, kind: 'poll', teams: [pre.ranks[0].team], text: `${teamById(pre.ranks[0].team).school} opens ${year} at No. 1 in the preseason AP poll` });
+  // A class only matters with a next season to enroll in.
+  if (config.length === 'open') openRecruiting(state);
   return state;
 }
 
@@ -268,12 +271,17 @@ const results: WeekStep = (state, ctx) => {
   for (const e of worst.slice(0, INJURY_NEWS)) told(e);
 };
 
-/** Rankings: the AP poll every week; the committee's rankings from `cfpStartWeek` until selection. */
+/** Recruiting (season/recruiting.ts): contacts, this week's official visitors, offers, commits and flips; the early signing period at week 15. */
+const recruit: WeekStep = (state, ctx) => {
+  recruitWeek(state, ctx.week);
+};
+
 /** Story: games, starts and this week's moments go into each player's career (season/career.ts). */
 const story: WeekStep = (state, ctx) => {
   storyWeek(state, ctx.week, ctx.grades.values());
 };
 
+/** Rankings: the AP poll every week; the committee's rankings from `cfpStartWeek` until selection. */
 const rankings: WeekStep = (state, ctx) => {
   state.polls.push(apPoll(state, ctx.week).poll);
   if (state.phase !== 'postseason' && ctx.week >= CALENDAR.cfpStartWeek) state.polls.push(cfpRankings(state, ctx.week).poll);
@@ -356,6 +364,7 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
   { name: 'results', run: results },
   { name: 'story', run: story },
   { name: 'rankings', run: rankings },
+  { name: 'recruit', run: recruit },
   { name: 'news', run: news },
   { name: 'transition', run: transition },
 ];
@@ -400,7 +409,7 @@ export function phaseLabel(state: SeasonState): string {
     case 'postseason':
       return 'BOWLS AND PLAYOFF';
     case 'offseason':
-      return `OFFSEASON: ${({ carousel: 'CAROUSEL', departures: 'DEPARTURES', portal: 'PORTAL' } as const)[state.offseason?.stage ?? 'portal']}`;
+      return `OFFSEASON: ${({ carousel: 'CAROUSEL', departures: 'DEPARTURES', signing: 'SIGNING DAY', portal: 'PORTAL' } as const)[state.offseason?.stage ?? 'portal']}`;
     default:
       return 'SEASON OVER';
   }

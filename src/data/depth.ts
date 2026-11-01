@@ -2,6 +2,7 @@ import type { Athlete } from './athletes';
 import { CONF, CONF_OVR, type UnitConf } from './confidence';
 import { overall, POS_ROLE, SLOT_POS, type Position } from './positions';
 import type { RatingKey, Ratings } from './ratings';
+import { recruitAthlete } from './recruits';
 import { generateAthletes, makeFreshman, makeWalkOn, parseFreshman, parseWalkOn } from './rosterGen';
 import { SLOT_ROLE, TEAMS, teamById, type RosterPlayer, type Team } from './teams';
 
@@ -271,10 +272,15 @@ export function originTeam(id: string): string | undefined {
 }
 
 /**
- * Any player by id as he was generated: `${team}-${i}` from his team's roster, or a walk-on or
- * placeholder freshman rebuilt from his id. A transfer is always one of these, whatever roster he's on now.
+ * Any player by id as he was generated: `${team}-${i}` from his team's roster, a walk-on or
+ * placeholder freshman rebuilt from his id, or an HS recruit from his class (data/recruits.ts). A
+ * transfer is always one of these, whatever roster he's on now.
  */
 export function generatedAthlete(id: string): Athlete | undefined {
+  if (id.startsWith('r')) {
+    const r = recruitAthlete(id);
+    if (r) return r;
+  }
   const wo = parseWalkOn(id);
   const fr = wo ? undefined : parseFreshman(id);
   if (wo || fr) {

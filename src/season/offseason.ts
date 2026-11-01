@@ -2,17 +2,19 @@ import { TEAMS } from '../data/teams';
 import { nextSeason } from './season';
 import { carouselRound, openCarousel } from './carousel';
 import { openDepartures, runDepartures } from './departures';
-import { autoPortal, closePortal, coachesWork, decide, judgePromises, leavingList, listCuts, newPortal, rollEntries } from './portal';
+import { openSigning, recruitsReact, runSigningDay } from './recruiting';
+import { autoPortal, closePortal, coachesWork, decide, judgePromises, leavingList, listCuts, newPortal, overCap, rollEntries } from './portal';
 import type { NewsItem, OffseasonStage, SeasonState } from './types';
 
 /**
  * The offseason, between a complete season and the next (open-ended seasons only). Its stages run in
  * order: the coaching carousel (season/carousel.ts), then departures (season/departures.ts: redshirts,
- * graduation, early declarations and the NFL draft), then the transfer portal, so a player can react to
- * a coach leaving and the portal reads next year's depth chart. Signing day goes before the portal
- * later; offseason growth runs as the next season opens. See docs/PORTAL.md and docs/RECRUITING_PLAN.md.
+ * graduation, early declarations and the NFL draft), then national signing day (season/recruiting.ts),
+ * then the transfer portal, so a player can react to a coach leaving and the portal reads next year's
+ * depth chart with the signed class on it. Offseason growth runs as the next season opens. See
+ * docs/PORTAL.md and docs/RECRUITING.md.
  */
-export const OFFSEASON_STAGES: OffseasonStage[] = ['carousel', 'departures', 'portal'];
+export const OFFSEASON_STAGES: OffseasonStage[] = ['carousel', 'departures', 'signing', 'portal'];
 
 /** The portal's last round: advancing it closes the portal. */
 export const LAST_ROUND = 2;
@@ -25,15 +27,18 @@ export function startOffseason(state: SeasonState): void {
   openCarousel(state);
 }
 
-/** The portal opens on the leaving list. */
+/** The portal opens on the leaving list. A roster the signed class put over the cap sends its lowest players. */
 function openPortal(state: SeasonState): void {
   state.portal = newPortal();
+  state.portal.forced = overCap(state);
   if (!state.config.delegate.portal) state.portal.leaving = leavingList(state, state.config.userTeamId);
 }
 
 /**
- * Advance the offseason one step. In the carousel, a hiring round; after its last, departures open on
- * the declare watch. Departures: round 0 runs the stage, round 1 (who left) opens the portal.
+ * Advance the offseason one step. In the carousel, a hiring round; after its last, recruits react to
+ * the coaching changes and departures open on the declare watch. Departures: round 0 runs the stage,
+ * round 1 (who left) opens signing day. Signing: round 0 runs national signing day, round 1 (the
+ * class) opens the portal.
  * In the portal, round 0: entries roll and the position coaches work the board. Rounds 1 and 2: the CPU
  * staffs (and a delegated user) pursue, the coaches keep working, and players decide. After the last
  * round the portal closes and the next season starts: that state is returned.
@@ -43,12 +48,26 @@ export function advanceOffseason(state: SeasonState): SeasonState {
   if (state.phase !== 'offseason' || !os) return state;
   if (os.stage === 'carousel') {
     carouselRound(state);
-    if (state.offseason!.stage === 'departures') openDepartures(state);
+    if (state.offseason!.stage === 'departures') {
+      recruitsReact(state);
+      openDepartures(state);
+    }
     return state;
   }
   if (os.stage === 'departures') {
     if (os.round === 0) {
       runDepartures(state);
+      os.round = 1;
+    } else {
+      os.stage = 'signing';
+      os.round = 0;
+      openSigning(state);
+    }
+    return state;
+  }
+  if (os.stage === 'signing') {
+    if (os.round === 0) {
+      runSigningDay(state);
       os.round = 1;
     } else {
       os.stage = 'portal';
@@ -76,22 +95,22 @@ export function advanceOffseason(state: SeasonState): SeasonState {
   }
   closePortal(state);
   const next = nextSeason(state);
-  // The coaching changes and the user's portal stories open the new year's news.
+  // The coaching changes, the draft, signing day and the user's portal stories open the new year's news.
   const mine: NewsItem[] = state.news
-    .filter((n) => n.kind === 'carousel' || n.kind === 'draft' || (n.kind === 'portal' && n.teams.includes(user)))
+    .filter((n) => n.kind === 'carousel' || n.kind === 'draft' || (n.kind === 'portal' && n.teams.includes(user)) || (n.kind === 'recruiting' && n.teams.includes(user) && n.week === state.week))
     .map((n) => ({ ...n, week: 0 }));
   next.news.push(...mine);
   return next;
 }
 
 /**
- * Into the offseason and through the carousel and departures (the user's side handled as the staff
- * would), to the portal.
+ * Into the offseason and through the carousel, departures and signing day (the user's side handled as
+ * the staff would), to the portal.
  */
 export function startToPortal(state: SeasonState): void {
   startOffseason(state);
-  const own = { carousel: state.config.delegate.carousel, departures: state.config.delegate.departures };
-  Object.assign(state.config.delegate, { carousel: true, departures: true });
+  const own = { carousel: state.config.delegate.carousel, departures: state.config.delegate.departures, recruiting: state.config.delegate.recruiting };
+  Object.assign(state.config.delegate, { carousel: true, departures: true, recruiting: true });
   while (state.phase === 'offseason' && state.offseason?.stage !== 'portal') advanceOffseason(state);
   Object.assign(state.config.delegate, own);
 }

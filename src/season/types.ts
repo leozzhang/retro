@@ -21,6 +21,8 @@ export interface Delegation {
   carousel?: boolean;
   /** The user's declare watch before the NFL draft (season/departures.ts). Missing means the user meets them. */
   departures?: boolean;
+  /** HS recruiting: boards, offers, visits and signing day (season/recruiting.ts `autoRecruit`). Missing means the user recruits. */
+  recruiting?: boolean;
 }
 
 export interface SeasonConfig {
@@ -114,7 +116,7 @@ export interface Poll {
 
 export interface NewsItem {
   week: number;
-  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal' | 'carousel' | 'draft';
+  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal' | 'carousel' | 'draft' | 'recruiting';
   text: string;
   teams: string[];
 }
@@ -229,6 +231,8 @@ export interface TeamState {
   staff?: StaffSeats;
   /** The graduate assistants, once they differ from the generated pair (season/world.ts `gasFor`). */
   ga?: string[];
+  /** The program's recruiting pipelines by state, 0-1, from recent classes (season/recruiting.ts). Carried across seasons. */
+  pipe?: Record<string, number>;
 }
 
 /** Includes `HC`: the head coach's chair. */
@@ -255,6 +259,8 @@ export interface CoachProgress {
   gone?: { year: number; why: 'fired' | 'retired' | 'let go' };
   /** His reputation (season/carousel.ts): what the world thinks he's worth. Missing is his seeded start. */
   rep?: number;
+  /** His recruiting pipelines grown from signings, by state (season/recruiting.ts `coachPipe` adds his seeded ones). */
+  pipe?: Record<string, number>;
 }
 
 /** The coaching carousel (season/carousel.ts). Chairs are `team:role`. */
@@ -400,7 +406,7 @@ export interface StoryEvent {
   /** The week it happened; missing means the offseason after `year`'s season. */
   week?: number;
   team: string;
-  kind: 'start' | 'spark' | 'bench' | 'breakout' | 'breakthrough' | 'injury' | 'award' | 'portal' | 'transfer' | 'left' | 'redshirt' | 'graduated' | 'declared' | 'drafted';
+  kind: 'start' | 'spark' | 'bench' | 'breakout' | 'breakthrough' | 'injury' | 'award' | 'portal' | 'transfer' | 'left' | 'redshirt' | 'graduated' | 'declared' | 'drafted' | 'signed';
   text: string;
   /** A transfer's old school (`team` is the new one). */
   from?: string;
@@ -479,15 +485,57 @@ export interface DeparturesState {
   left?: Record<string, number>;
 }
 
-/** Offseason stages, in order (season/offseason.ts). Signing day goes before the portal later. */
-export type OffseasonStage = 'carousel' | 'departures' | 'portal';
+/** One recruiting move, for the news, the board and the season report. */
+export interface RecruitEvent {
+  week: number;
+  id: string;
+  team: string;
+  kind: 'commit' | 'decommit' | 'sign';
+  /** A commit that flipped from another school. */
+  from?: string;
+}
+
+/**
+ * The HS recruiting cycle (season/recruiting.ts) for the class that enrolls next season. Kept sparse:
+ * interest only where a school has worked a prospect, boards only for what each staff is tracking.
+ */
+export interface RecruitingState {
+  /** The class (the season it enrolls) and the career's salt for its ids (data/recruits.ts). */
+  cls: number;
+  salt: string;
+  /** Interest by prospect, then school. */
+  interest: Record<string, Record<string, number>>;
+  /** Open offers by school. */
+  offers: Record<string, string[]>;
+  /** Prospect to the school he's committed to (signed or not), and to the one he signed with (binding). */
+  commits: Record<string, string>;
+  signed: Record<string, string>;
+  /** Each school's board. */
+  boards: Record<string, string[]>;
+  /** The user's top targets, and his staff's evaluation effort by prospect. */
+  top: string[];
+  effort: Record<string, number>;
+  /** Official visitors by home game id; the schools each prospect has visited (5 at most). */
+  visits: Record<string, string[]>;
+  ov: Record<string, string[]>;
+  /** The head coaches' in-home visits by school. */
+  homes: Record<string, string[]>;
+  /** How the user's visitors took their last visit, -1..1. */
+  vibe: Record<string, number>;
+  /** Prospects who went unsigned (to FCS or JUCO) after signing day. */
+  gone?: string[];
+  log: RecruitEvent[];
+}
+
+/** Offseason stages, in order (season/offseason.ts). */
+export type OffseasonStage = 'carousel' | 'departures' | 'signing' | 'portal';
 
 export interface OffseasonState {
   stage: OffseasonStage;
   /**
    * Carousel: the hiring round, 1 to `CAROUSEL.rounds` (season/carousel.ts). Departures: 0 the declare
-   * watch, 1 who left and the draft. Portal: 0 the leaving list, before anyone enters; 1 and 2 the head
-   * coaches' rounds.
+   * watch, 1 who left and the draft. Signing: 0 before national signing day, 1 the class. Portal: 0 the
+   * leaving list, before anyone enters; 1 and 2 the head coaches' rounds.
    */
   round: number;
   /** Last season's promises, judged when the offseason opened. */
@@ -571,4 +619,6 @@ export interface SeasonState {
   portal?: PortalState;
   carousel?: CarouselState;
   departures?: DeparturesState;
+  /** This season's HS recruiting cycle, through national signing day in its offseason. */
+  recruiting?: RecruitingState;
 }

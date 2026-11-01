@@ -58,7 +58,7 @@ const REDSHIRT_ADJ = 1.5;
 const CLASS_SHARE: [ClassYear, number][] = [['FR', 0.28], ['SO', 0.26], ['JR', 0.24], ['SR', 0.22]];
 const REDSHIRT_ODDS: Record<ClassYear, number> = { FR: 0.35, SO: 0.4, JR: 0.45, SR: 0.5 };
 /** Spread of talent within a position group, before calibration. */
-const LEVEL_SD = 5;
+export const LEVEL_SD = 5;
 /** Researched standouts by tier: [floor, points over the unit target, cap]. */
 const STANDOUT_LEVEL: Record<Standout['tier'], [number, number, number]> = {
   elite: [84, 7, 97],
@@ -379,9 +379,9 @@ export function parseFreshman(id: string): { team: string; pos: Position } | und
   return m ? { team: m[1], pos: m[2] as Position } : undefined;
 }
 
-/** The season a walk-on or freshman joined as a freshman (from his id); undefined for a generated player. */
+/** The season a walk-on, freshman or HS recruit joined as a freshman (from his id); undefined for a generated player. */
 export function joinYear(id: string): number | undefined {
-  const m = /-[wf](\d+)\.[A-Z]+\.\d+$/.exec(id);
+  const m = /-[wf](\d+)\.[A-Z]+\.\d+$/.exec(id) ?? /^r(\d+)\.[a-z0-9]+\.\d+$/.exec(id);
   return m ? Number(m[1]) : undefined;
 }
 
@@ -400,14 +400,27 @@ function freshmanOffset(p: TeamProfile): number {
   return off;
 }
 
+/** The level a team's generated true freshmen sit at, at a position: where its incoming class starts. */
+export function freshmanLevel(p: TeamProfile, pos: Position): number {
+  return unitTargets(p)[POS_UNIT[pos]] + freshmanOffset(p);
+}
+
 /**
  * A placeholder freshman, standing in for a recruiting class until HS recruiting: rolled at his team's
  * generated-freshman level (`freshmanOffset`, spread `LEVEL_SD`), with growth and potential as the
  * generator gives a freshman. Seeded by his id on his own stream; his jersey is picked when he joins.
  */
 export function makeFreshman(p: TeamProfile, id: string, pos: Position): Athlete {
-  const rng = mulberry32(hashString(`freshman:${id}`));
-  const level = clamp(unitTargets(p)[POS_UNIT[pos]] + freshmanOffset(p) + gauss(rng) * LEVEL_SD, 35, 99);
+  return rollFreshman(p, id, pos, 'freshman', 0, LEVEL_SD);
+}
+
+/**
+ * An incoming freshman rolled at `p`'s generated-freshman level plus `shift`, spread `sd`, on the
+ * stream `${key}:${id}`. Placeholder freshmen and HS recruits (data/recruits.ts) are both made here.
+ */
+export function rollFreshman(p: TeamProfile, id: string, pos: Position, key: string, shift: number, sd: number): Athlete {
+  const rng = mulberry32(hashString(`${key}:${id}`));
+  const level = clamp(freshmanLevel(p, pos) + shift + gauss(rng) * sd, 35, 99);
   const archetype = weighted(rng, archetypeOdds(pos, p));
   const b = BUILD[pos];
   const hz = clamp(gauss(rng), -2.2, 2.2);

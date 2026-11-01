@@ -5,7 +5,8 @@ import { GROUPS, type Group } from '../data/coaches';
 import { athleteName, generatedAthlete, originTeam } from '../data/depth';
 import { REGION, TEAM_STATE } from '../data/fbs/geo';
 import { overall, POSITIONS, type Position } from '../data/positions';
-import { COMPOSITION, freeNumber, freshmanId, parseWalkOn, STARTERS } from '../data/rosterGen';
+import { prospect } from '../data/recruits';
+import { COMPOSITION, freeNumber, freshmanId, joinYear, parseWalkOn, STARTERS } from '../data/rosterGen';
 import { TEAMS, teamById } from '../data/teams';
 import { clamp, gauss, hashString, mulberry32 } from '../engine/math';
 import { tell } from './career';
@@ -114,6 +115,14 @@ const motiveCache = new Map<string, Record<Motive, number>>();
 export function motives(a: Pick<Athlete, 'id'>): Record<Motive, number> {
   let m = motiveCache.get(a.id);
   if (m) return m;
+  // An HS recruit wants what he wanted as a recruit.
+  const w = prospect(a.id)?.m.wants;
+  if (w) {
+    const sum = w.PT + w.WIN + w.DEV + w.HOME;
+    m = { PT: w.PT / sum, WIN: w.WIN / sum, DEV: w.DEV / sum, HOME: w.HOME / sum };
+    motiveCache.set(a.id, m);
+    return m;
+  }
   const t = temperament(a);
   const rng = mulberry32(hashString(`portal:${a.id}`));
   const o = originTeam(a.id);
@@ -355,10 +364,34 @@ export function entryOdds(state: SeasonState, board: Board, id: string): EntryOd
     if (d > gap) [best, gap] = [k, d];
   }
   const reason = mo < -0.3 && E.morale * mo > E.k * gap ? 'morale' : left && REACT.entry * left.bond > E.k * gap ? 'coach' : MOTIVE_REASON[best];
-  return { p: walkOn(id) ? 0 : sigmoid(logit), logit, stay, market, reason };
+  return { p: walkOn(id) || joinYear(id) === state.year + 1 ? 0 : sigmoid(logit), logit, stay, market, reason };
 }
 
 const walkOn = (id: string) => !!parseWalkOn(id);
+
+/**
+ * Rosters the signed class put over the cap: the lowest players by overall go to the portal, never
+ * an incoming signee and never below a position's minimum (season/recruiting.ts plans classes to fit).
+ */
+export function overCap(state: SeasonState): string[] {
+  const out: string[] = [];
+  for (const t of TEAMS) {
+    const roster = baseRoster(state, t.id);
+    let over = roster.length - PORTAL.rosterMax;
+    if (over <= 0) continue;
+    const count = new Map<Position, number>();
+    for (const a of roster) count.set(a.pos, (count.get(a.pos) ?? 0) + 1);
+    const cands = roster.filter((a) => joinYear(a.id) !== state.year + 1).sort((a, b) => overall(a.r, a.pos) - overall(b.r, b.pos));
+    for (const a of cands) {
+      if (over <= 0) break;
+      if ((count.get(a.pos) ?? 0) <= MIN_COUNT[a.pos]) continue;
+      out.push(a.id);
+      count.set(a.pos, count.get(a.pos)! - 1);
+      over--;
+    }
+  }
+  return out;
+}
 
 /** He's back on a school's chart (signed, or home again): the board in place, re-keyed. */
 function onChart(state: SeasonState, board: Board, id: string, team: string): void {
@@ -782,7 +815,8 @@ export function rollEntries(state: SeasonState): void {
   for (const t of TEAMS) if (t.id !== user || state.config.delegate.portal) autoLeaving(state, board, t.id, odds);
   const forced = new Set(portal.forced);
   for (const [id, pl] of board.players) {
-    if (walkOn(id)) continue;
+    // Walk-ons stay, and so do signees who haven't enrolled yet.
+    if (walkOn(id) || joinYear(id) === state.year + 1) continue;
     const o = odds.get(id)!;
     const p = sigmoid(o.logit + (portal.adj[id] ?? 0));
     if (forced.has(id) || seasonRng(state, 'portal', 'enter', id)() < p) {
@@ -834,6 +868,7 @@ export function closePortal(state: SeasonState): void {
  */
 export function refillFreshmen(state: SeasonState): void {
   for (const t of TEAMS) {
+    makeRoomForMinimums(state, t.id);
     const roster = baseRoster(state, t.id);
     if (roster.length >= PORTAL.rosterMax) continue;
     const count = new Map<Position, number>();
@@ -851,6 +886,26 @@ export function refillFreshmen(state: SeasonState): void {
       (r.in ??= []).push({ id, num });
       count.set(pos, (count.get(pos) ?? 0) + 1);
     }
+  }
+}
+
+/**
+ * A full roster with a position under its minimum (the portal took its players and the signed class
+ * filled the room): the staff let the lowest player go at the position furthest over its usual count,
+ * so a placeholder freshman can fill the hole.
+ */
+function makeRoomForMinimums(state: SeasonState, team: string): void {
+  for (;;) {
+    const roster = baseRoster(state, team);
+    const count = new Map<Position, number>();
+    for (const a of roster) count.set(a.pos, (count.get(a.pos) ?? 0) + 1);
+    const short = POSITIONS.filter((p) => (count.get(p) ?? 0) < MIN_COUNT[p]).reduce((s, p) => s + MIN_COUNT[p] - (count.get(p) ?? 0), 0);
+    if (!short || roster.length + short <= PORTAL.rosterMax) return;
+    const usual = new Map(COMPOSITION);
+    const [pos] = [...count].filter(([p, c]) => c > MIN_COUNT[p]).sort((a, b) => b[1] - usual.get(b[0])! - (a[1] - usual.get(a[0])!))[0];
+    const cut = roster.filter((a) => a.pos === pos && joinYear(a.id) !== state.year + 1).sort((a, b) => overall(a.r, a.pos) - overall(b.r, b.pos))[0]
+      ?? roster.filter((a) => a.pos === pos).sort((a, b) => overall(a.r, a.pos) - overall(b.r, b.pos))[0];
+    leaveFbs(state, cut.id, team);
   }
 }
 

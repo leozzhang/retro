@@ -9,6 +9,7 @@ import { gasFor, headCoachFor, staffFor } from '../season/world';
 import { drawHint } from './hud';
 import { inBox } from './teamScreen';
 import { text } from './text';
+import { coachPipe, pipeLabel } from '../season/recruiting';
 
 /**
  * The coaching carousel (season/carousel.ts): HIRING (your open chairs and their candidates, ratings
@@ -210,6 +211,7 @@ function drawHiring(g: CanvasRenderingContext2D, s: SeasonState, v: CarouselView
     text(g, `NOW: ${c.from === 'outside' ? 'OUTSIDE FBS' : c.from === 'ga' ? 'YOUR GRADUATE ASSISTANT' : c.from === 'free' ? 'OUT OF A JOB' : `${teamById(splitChair(c.from).team).school.toUpperCase()} ${titleOf(splitChair(c.from).role)}`}  REPUTATION ${Math.round(c.rep)}`, 10, CARD_Y + 16, { color: SOFT });
     text(g, talked ? `INTERVIEWED${talked > 1 ? ' TWICE' : ''}: ${MOTIVE_TEXT[motiveOf(c.id)]}` : 'INTERVIEW HIM TO SHARPEN HIS RATINGS AND LEARN WHAT HE WANTS', 10, CARD_Y + 28, { color: talked ? ACCENT : DIM });
     text(g, 'HE PICKS HIS BEST OFFER WHEN THE ROUND ENDS. A HOT SEAT SCARES ASSISTANTS OFF.', 10, CARD_Y + 44, { color: DIM });
+    if (role !== 'HC' && role !== 'OC' && role !== 'DC' && role !== 'TRAINER' && role !== 'ST') text(g, `RECRUITING PIPELINES: ${pipeLabel(coachPipe(s, c.id))}`, 10, CARD_Y + 56, { color: ACCENT });
     if (!s.config.delegate.carousel) {
       drawButton(g, carouselActionRect(0), cs.offers[chair] === c.id ? '1 WITHDRAW' : '1 OFFER', v);
       drawButton(g, carouselActionRect(1), `2 INTERVIEW (${cs.talksLeft})`, v);

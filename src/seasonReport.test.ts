@@ -31,6 +31,9 @@ import { actOnLeaving, buildBoard, entryOdds, leavingList, MIN_COUNT, PORTAL } f
 import { advanceOffseason, startToPortal } from './season/offseason';
 import { baseRoster } from './season/world';
 import { overall } from './data/positions';
+import { prospect } from './data/recruits';
+import { freshmanLevel } from './data/rosterGen';
+import { TEAM_STATE } from './data/fbs/geo';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -429,6 +432,134 @@ function ladderRow(s: SeasonState): string {
   }).join('  ');
 }
 
+/** HS recruiting over the portal report's career (docs/RECRUITING.md). */
+interface RecruitSample {
+  /** Share of the top 300 committed: in the summer (week 0), and after weeks 5, 10 and 15. */
+  pace: Map<number, number[]>;
+  /** By tier: signees, their true level, generated-freshman level at their positions, stars, in-state signees. */
+  tiers: { n: number; level: number; gen: number; stars: number[]; home: number }[];
+  commits: number;
+  decommits: number;
+  flips: number;
+  early: number;
+  /** Commits standing when the early period opened. */
+  earlyOf: number;
+  signed: number;
+  unsigned: number;
+  teamSeasons: number;
+  /** Signees by class with stars and team, for gems and busts later. */
+  classes: { year: number; id: string; team: string; stars: number }[];
+  gems: number;
+  busts: number;
+  judged: [number, number];
+  weekMs: number[];
+  /** Mean true level by stars, all classes. */
+  byStars: Map<number, number[]>;
+}
+
+function newRecruitSample(): RecruitSample {
+  return {
+    pace: new Map(), tiers: [0, 1, 2, 3, 4].map(() => ({ n: 0, level: 0, gen: 0, stars: [0, 0, 0, 0, 0, 0], home: 0 })), commits: 0, decommits: 0,
+    flips: 0, early: 0, earlyOf: 0, signed: 0, unsigned: 0, teamSeasons: 0, classes: [], gems: 0, busts: 0, judged: [0, 0], weekMs: [], byStars: new Map(),
+  };
+}
+
+/** A season with recruiting: the top 300's commit pace and the time each week's recruiting adds. */
+function recruitSeason(s: SeasonState, r: RecruitSample): void {
+  const top = () => {
+    const rs = s.recruiting!;
+    let k = 0;
+    for (const id of Object.keys(rs.commits)) if (prospect(id)!.rank <= 300) k++;
+    return k / 300;
+  };
+  const note = (w: number) => {
+    let x = r.pace.get(w);
+    if (!x) r.pace.set(w, (x = []));
+    x.push(top());
+  };
+  note(0);
+  while (!seasonOver(s)) {
+    const w0 = Date.now();
+    advanceWeek(s);
+    r.weekMs.push(Date.now() - w0);
+    if ([5, 10, 15].includes(s.week - 1)) note(s.week - 1);
+    if (s.week - 1 === CALENDAR.champWeek) r.earlyOf += Object.keys(s.recruiting!.commits).length;
+  }
+}
+
+/** After signing day: who signed where, against each tier's generated-freshman level. */
+function recruitSigned(s: SeasonState, r: RecruitSample): void {
+  const rs = s.recruiting!;
+  for (const e of rs.log) {
+    if (e.kind === 'commit') {
+      r.commits++;
+      if (e.from) r.flips++;
+    } else if (e.kind === 'decommit') r.decommits++;
+    else if (e.kind === 'sign' && e.week <= CALENDAR.champWeek) r.early++;
+  }
+  r.unsigned += rs.gone?.length ?? 0;
+  r.teamSeasons += TEAMS.length;
+  for (const [id, team] of Object.entries(rs.signed)) {
+    const p = prospect(id)!;
+    const t = r.tiers[teamById(team).profile.tier - 1];
+    t.n++;
+    t.level += p.level;
+    t.gen += freshmanLevel(teamById(team).profile, p.pos);
+    t.stars[p.stars]++;
+    if (p.a.hometown.state === TEAM_STATE[team]) t.home++;
+    r.signed++;
+    r.classes.push({ year: rs.cls, id, team, stars: p.stars });
+    let x = r.byStars.get(p.stars);
+    if (!x) r.byStars.set(p.stars, (x = []));
+    x.push(p.level);
+  }
+}
+
+/** Each new season: classes in their third season judged. A gem is a 3-star or lower who starts; a bust a 4- or 5-star who doesn't. */
+function recruitLater(s: SeasonState, r: RecruitSample): void {
+  const startersNow = new Set<string>();
+  for (const t of TEAMS) for (const a of Object.values(starters(squadFor(s, t.id)))) startersNow.add(a.id);
+  for (const c of r.classes.filter((x) => x.year === s.year - 2)) {
+    const starts = startersNow.has(c.id);
+    if (c.stars <= 3) {
+      r.judged[0]++;
+      if (starts) r.gems++;
+    } else {
+      r.judged[1]++;
+      if (!starts) r.busts++;
+    }
+  }
+}
+
+function recruitingReport(r: RecruitSample, n: number): string[] {
+  const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / Math.max(1, x.length);
+  const tierRows = r.tiers.map((t, i) => {
+    const lv = t.level / Math.max(1, t.n);
+    const gen = t.gen / Math.max(1, t.n);
+    const per = t.n / (TEAMS.filter((x) => x.profile.tier === i + 1).length * n);
+    const sum = t.stars.reduce((a, b) => a + b, 0) || 1;
+    return `  T${i + 1}: ${per.toFixed(1)} a class, true level ${lv.toFixed(1)} vs generated freshmen ${gen.toFixed(1)} (${(lv - gen >= 0 ? '+' : '') + (lv - gen).toFixed(1)})` +
+      (Math.abs(lv - gen) > 1.5 ? '  <-- off' : '') +
+      `, stars 5/4/3/2 ${[5, 4, 3, 2].map((k) => pctText(t.stars[k] / sum)).join('/')}, in-state ${pctText(t.home / Math.max(1, t.n))}`;
+  });
+  const avgWeek = mean(r.weekMs);
+  return [
+    '', `RECRUITING (docs/RECRUITING.md), the same career, every staff automated. Targets (approximate): each tier's signees within`,
+    'about 1.5 of its generated-freshman level; about half the top 300 committed by the season, 75-85% by early signing; 75-85% of',
+    'commits signing early; decommits 10-20% of commits.',
+    `top 300 committed: summer ${pctText(mean(r.pace.get(0) ?? []))}, week 5 ${pctText(mean(r.pace.get(5) ?? []))}, week 10 ${pctText(mean(r.pace.get(10) ?? []))}, ` +
+      `week 15 ${pctText(mean(r.pace.get(15) ?? []))}`,
+    `per cycle: ${(r.signed / n).toFixed(0)} signed (${(r.signed / r.teamSeasons).toFixed(1)} a team), ${(r.unsigned / n).toFixed(0)} unsigned; ` +
+      `early signing: ${pctText(r.early / Math.max(1, r.earlyOf))} of commits then, ${pctText(r.early / Math.max(1, r.signed))} of signees; decommits ${pctText(r.decommits / Math.max(1, r.commits))} of commits` +
+      (r.decommits / r.commits < 0.1 || r.decommits / r.commits > 0.2 ? '  <-- off target' : '') + `, flips ${(r.flips / n).toFixed(0)} a cycle`,
+    'signees by tier:', ...tierRows,
+    'true level by stars: ' + [5, 4, 3, 2].map((k) => `${k}* ${mean(r.byStars.get(k) ?? []).toFixed(1)}`).join('  '),
+    `in their third season: gems (3 stars or fewer who start) ${pctText(r.gems / Math.max(1, r.judged[0]))} of ${r.judged[0]}, ` +
+      `busts (4-5 stars who don't) ${pctText(r.busts / Math.max(1, r.judged[1]))} of ${r.judged[1]}`,
+    `time per week with recruiting ${(avgWeek / 1000).toFixed(2)} s (the whole week)`,
+  ];
+}
+
 /**
  * The transfer portal (docs/PORTAL.md): an open-ended career of `n` seasons with every portal side
  * automated, paired with a control on the same seeds that skips the offseason. Volume and who enters,
@@ -437,7 +568,7 @@ function ladderRow(s: SeasonState): string {
  * spam is measured).
  */
 function portalReport(n: number): string[] {
-  const cfg = { ...defaultConfig('georgia'), length: 'open' as const, delegate: { depthChart: true, gamePlan: true, portal: true } };
+  const cfg = { ...defaultConfig('georgia'), length: 'open' as const, delegate: { depthChart: true, gamePlan: true, portal: true, recruiting: true } };
   let s = newSeason(cfg, 1);
   let c = newSeason(cfg, 1);
   const tierOf = (id: string) => teamById(id).profile.tier;
@@ -460,8 +591,9 @@ function portalReport(n: number): string[] {
   const t0 = Date.now();
   let gapDrift = 0;
   const market: Market = { heads: 0, chairs: 0, fbs: 0, outside: 0, free: 0, ga: 0, promoted: 0, flows: [0, 0, 0], why: new Map(), teach: [] };
+  const rec = newRecruitSample();
   for (let y = 1; y <= n; y++) {
-    simSeason(s);
+    recruitSeason(s, rec);
     simSeason(c);
     // Step 6: each group's level-ups this season against its position coach's teach (as a share of the multiplier).
     for (const t of TEAMS) {
@@ -473,6 +605,7 @@ function portalReport(n: number): string[] {
     }
     const chairsBefore = allChairs(s);
     startToPortal(s);
+    recruitSigned(s, rec);
     carouselStats(s, chairsBefore, allChairs(s), market);
     if (y > 1) {
       promises.kept += s.offseason!.promises!.kept;
@@ -548,6 +681,7 @@ function portalReport(n: number): string[] {
       for (const [pos, min] of Object.entries(MIN_COUNT)) minPos = Math.min(minPos, (byPos.get(pos) ?? 0) - min);
     }
     c = nextSeason(c);
+    recruitLater(s, rec);
     const a = tierStarters(s);
     const b = tierStarters(c);
     const diff = a.map((v, i) => v - b[i]);
@@ -595,6 +729,7 @@ function portalReport(n: number): string[] {
     'picks per draft by conference: ' + [...dep.conf].sort((a, b) => b[1] - a[1]).map(([c, k]) => `${c} ${(k / n).toFixed(1)}`).join(', '),
     'picks per draft by tier: ' + dep.tier.map((k, i) => `T${i + 1} ${(k / n).toFixed(1)}`).join('  '),
     'overall by season in the program (and players a team), each new season:', ...ladder,
+    ...recruitingReport(rec, n),
     '', `CAREERS (docs/CAREERS.md), the same career after ${n} seasons. History only: nothing in the sim reads it.`,
     `${careers.length} players, ${(JSON.stringify(s.careers ?? {}).length / n / 1e6).toFixed(2)} MB of JSON per season; ` +
       `rostered players with a past season ${pctText(withRows / rostered.length)}`,

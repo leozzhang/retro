@@ -44,6 +44,8 @@ export const BOOK_BTN = { x: VIEW_W - 172, y: 328, w: 90, h: 15 };
 export const PREP_BTN = { x: VIEW_W - 238, y: 328, w: 60, h: 15 };
 /** The button to the STATS page (careers and stories), left of PREP. */
 export const STATS_BTN = { x: VIEW_W - 304, y: 328, w: 60, h: 15 };
+/** The button to HS recruiting (the board, search and the class), left of STATS. */
+export const RECRUIT_BTN = { x: VIEW_W - 382, y: 328, w: 72, h: 15 };
 
 function resultText(g: SeasonGame, team: string): string {
   const r = g.result;
@@ -58,13 +60,14 @@ function vsText(g: SeasonGame, team: string): string {
   return g.home === team ? 'VS' : '@';
 }
 
-/** The offseason stage's button: the carousel, departures and the draft, then the portal. */
-const offseasonLabel = (s: SeasonState) => ({ carousel: 'HIRING', departures: 'DRAFT', portal: 'PORTAL' } as const)[s.offseason?.stage ?? 'portal'];
+/** The offseason stage's button: the carousel, departures and the draft, signing day, then the portal. */
+const offseasonLabel = (s: SeasonState) => ({ carousel: 'HIRING', departures: 'DRAFT', signing: 'SIGNING', portal: 'PORTAL' } as const)[s.offseason?.stage ?? 'portal'];
 
 /** The line under the header: this week's game, or what Space does instead. */
 export function nextGameText(s: SeasonState): string {
   if (s.phase === 'offseason' && s.offseason?.stage === 'carousel') return `COACHING CAROUSEL, ROUND ${s.offseason.round}  -  SPACE: OPEN`;
   if (s.phase === 'offseason' && s.offseason?.stage === 'departures') return `DEPARTURES AND THE NFL DRAFT${s.offseason.round ? ': DONE' : ''}  -  SPACE: OPEN`;
+  if (s.phase === 'offseason' && s.offseason?.stage === 'signing') return `NATIONAL SIGNING DAY${s.offseason.round ? ': DONE' : ''}  -  SPACE: OPEN`;
   if (s.phase === 'offseason') return `TRANSFER PORTAL, ${s.offseason?.round ? `ROUND ${s.offseason.round}` : 'OPENING'}  -  SPACE: OPEN`;
   if (s.phase === 'complete') {
     const champ = `CHAMPION: ${teamById(s.bracket!.champion!).school.toUpperCase()}`;
@@ -143,9 +146,14 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
   g.fillStyle = team.colors.primary;
   g.fillRect(STATS_BTN.x, STATS_BTN.y, STATS_BTN.w, STATS_BTN.h);
   text(g, 'STATS', STATS_BTN.x + STATS_BTN.w / 2, STATS_BTN.y + 4, { align: 'center' });
+  if (s.recruiting) {
+    g.fillStyle = team.colors.primary;
+    g.fillRect(RECRUIT_BTN.x, RECRUIT_BTN.y, RECRUIT_BTN.w, RECRUIT_BTN.h);
+    text(g, 'RECRUIT', RECRUIT_BTN.x + RECRUIT_BTN.w / 2, RECRUIT_BTN.y + 4, { align: 'center' });
+  }
   drawProgressLine(g, s);
   const play = userGameThisWeek(s) ? 'SPACE: PLAY  X: SIM' : s.phase === 'offseason' ? `SPACE: ${offseasonLabel(s)}` : s.phase === 'complete' ? '' : 'SPACE: ADVANCE';
-  drawHint(g, `${play}  A/D/W/S: BROWSE  O: ${s.phase === 'offseason' ? offseasonLabel(s) : 'PREP'}  T: TEAM  P: BOOK  H: STATS  ESC`);
+  drawHint(g, `${play}  A/D/W/S: BROWSE  O: ${s.phase === 'offseason' ? offseasonLabel(s) : 'PREP'}  T: TEAM  P: BOOK  H: STATS${s.recruiting ? '  R: RECRUIT' : ''}  ESC`);
 }
 
 /**
@@ -172,7 +180,7 @@ function drawProgressLine(g: CanvasRenderingContext2D, s: SeasonState): void {
   } else if (nm) tail = `NEXT MAN UP: ${name(nm)}`;
   if (!ups && !tail) return;
   const head = ups ? `${ups} LEVEL-UP${ups === 1 ? '' : 'S'}` : '';
-  text(g, `LAST WEEK: ${[head, tail].filter(Boolean).join('  ')}`.slice(0, 40), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
+  text(g, `LAST WEEK: ${[head, tail].filter(Boolean).join('  ')}`.slice(0, 30), 10, BOOK_BTN.y + 4, { color: GREEN, shadow: false });
 }
 
 function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {

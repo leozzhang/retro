@@ -107,7 +107,10 @@ export function drawPrep(
   const site = r.game.neutral ? 'VS' : r.game.home === s.config.userTeamId ? 'VS' : '@';
   text(g, `WEEK ${s.week} PREP: ${site} ${r.rank ? `#${r.rank} ` : ''}${team.school.toUpperCase()} ${team.mascot.toUpperCase()}`, 10, 6, { size: 8 });
   text(g, `${r.record}  (${team.conference.toUpperCase()})${r.game.name ? `  ${r.game.name.toUpperCase()}` : ''}`, 10, 18, { color: '#e6e6e6' });
-  text(g, `OVR ${r.ratings.opp.ovr}`, VIEW_W - 10, 12, { align: 'right', color: GOLD });
+  text(g, `OVR ${r.ratings.opp.ovr}`, VIEW_W - 10, 6, { align: 'right', color: GOLD });
+  // Official visitors at this home game (season/recruiting.ts): the result swings them.
+  const visitors = s.recruiting?.visits[r.game.id]?.length ?? 0;
+  if (r.game.home === s.config.userTeamId && visitors) text(g, `${visitors} RECRUIT${visitors === 1 ? '' : 'S'} VISITING`, VIEW_W - 10, 18, { align: 'right', color: '#9ad7ff' });
 
   const tw = VIEW_W / PREP_TABS.length;
   PREP_TABS.forEach((t, i) => {

@@ -20,7 +20,12 @@ import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
-import { BOOK_BTN, drawSeason, PREP_BTN, SEASON_TABS, STATS_BTN, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { BOOK_BTN, drawSeason, PREP_BTN, RECRUIT_BTN, SEASON_TABS, STATS_BTN, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import {
+  drawRecruit, FILTER_BTN, GROUP_CHIPS, groupChipRect, newRecruitView, RECRUIT_ACTIONS, RECRUIT_ADVANCE, RECRUIT_ROWS, RECRUIT_TABS, recruitActionRect,
+  recruitRowRect, recruitRows, recruitTabAt, SEARCH_FILTERS, type RecruitView,
+} from '../render/recruitScreen';
+import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, toggleVisit } from '../season/recruiting';
 import { careerList, careerRowAt, careerTabAt, drawCareer, modeAt, newCareerView, type CareerView } from '../render/careerScreen';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
@@ -69,7 +74,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -206,6 +211,7 @@ export class Game {
   private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
   private carouselView: CarouselView = newCarouselView();
   private departuresView: DeparturesView = { tab: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
+  private recruitView: RecruitView = { tab: 0, chip: 0, filter: 1, sel: 0, top: 0, mx: 0, my: 0, note: '' };
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
@@ -255,6 +261,9 @@ export class Game {
         break;
       case 'departures':
         this.updateDepartures(input);
+        break;
+      case 'recruit':
+        this.updateRecruit(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -428,6 +437,10 @@ export class Game {
     }
     if (input.hit('KeyH') || (input.mouse.pressed && inBox(STATS_BTN, input.mouse.x, input.mouse.y))) {
       this.toCareer('season');
+      return;
+    }
+    if (s.recruiting && (input.hit('KeyR') || (input.mouse.pressed && inBox(RECRUIT_BTN, input.mouse.x, input.mouse.y)))) {
+      this.toRecruit();
       return;
     }
     // In the offseason the PREP button is the stage's: the carousel, then the portal.
@@ -645,7 +658,107 @@ export class Game {
       this.screen = 'carousel';
       this.carouselView = newCarouselView();
     } else if (stage === 'departures') this.toDepartures();
+    else if (stage === 'signing') this.toRecruit();
     else this.toPortal();
+  }
+
+  // ------------------------------------------------------------ HS recruiting and signing day
+
+  private toRecruit(): void {
+    this.screen = 'recruit';
+    this.recruitView = newRecruitView(this.season!);
+  }
+
+  /**
+   * Recruiting (season/recruiting.ts): A/D tabs, Q/E position groups, W/S rows, R the SEARCH filter,
+   * 1-5 (or the card's buttons) offer, host a visit, in-home, top target and add or drop; G fills the
+   * board as the staff would; F hands recruiting to staff. On signing day Space runs it, then opens the
+   * portal. Every change is saved.
+   */
+  private updateRecruit(input: Input): void {
+    const s = this.season!;
+    const v = this.recruitView;
+    const { x, y, pressed } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'season';
+      return;
+    }
+    const signingDay = s.phase === 'offseason' && s.offseason?.stage === 'signing';
+    if (signingDay && (input.hit('Space', 'Enter') || (pressed && inBox(RECRUIT_ADVANCE, x, y)))) {
+      advanceOffseason(s);
+      saveSeason(s);
+      this.toOffseason();
+      return;
+    }
+    const n = RECRUIT_TABS.length;
+    let tab = v.tab;
+    if (input.hit('KeyA', 'ArrowLeft')) tab = (tab + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight')) tab = (tab + 1) % n;
+    if (pressed && recruitTabAt(x, y) >= 0) tab = recruitTabAt(x, y);
+    let chip = v.chip;
+    const nc = GROUP_CHIPS.length;
+    if (input.hit('KeyQ')) chip = (chip + nc - 1) % nc;
+    if (input.hit('KeyE')) chip = (chip + 1) % nc;
+    if (pressed) for (let i = 0; i < nc; i++) if (inBox(groupChipRect(i), x, y)) chip = i;
+    let filter = v.filter;
+    if (RECRUIT_TABS[tab] === 'SEARCH' && (input.hit('KeyR') || (pressed && inBox(FILTER_BTN, x, y)))) filter = (filter + 1) % SEARCH_FILTERS.length;
+    if (tab !== v.tab || chip !== v.chip || filter !== v.filter) {
+      Object.assign(v, { tab, chip, filter, sel: 0, top: 0, note: '' });
+      return;
+    }
+    if (input.hit('KeyF')) {
+      s.config.delegate.recruiting = !s.config.delegate.recruiting;
+      v.note = s.config.delegate.recruiting ? 'YOUR STAFF RECRUITS: BOARD, OFFERS AND VISITS (F: TAKE IT BACK)' : 'YOU RECRUIT';
+      saveSeason(s);
+      return;
+    }
+    if (input.hit('KeyG') && RECRUIT_TABS[v.tab] === 'BOARD' && !s.config.delegate.recruiting) {
+      const added = staffFill(s);
+      v.note = added ? `STAFF ADDED ${added} TO THE BOARD` : 'THE BOARD IS FULL FOR YOUR NEEDS';
+      saveSeason(s);
+      return;
+    }
+    const rows = recruitRows(s, v);
+    const shown = RECRUIT_TABS[v.tab] === 'CLASS' ? 22 : RECRUIT_ROWS;
+    const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0) + Math.sign(input.mouse.wheel);
+    if (step && rows.length) v.sel = Math.max(0, Math.min(rows.length - 1, v.sel + step));
+    if (pressed) for (let i = 0; i < shown; i++) if (inBox(recruitRowRect(i), x, y) && v.top + i < rows.length) v.sel = v.top + i;
+    v.sel = Math.min(v.sel, Math.max(0, rows.length - 1));
+    if (v.sel < v.top) v.top = v.sel;
+    if (v.sel >= v.top + shown) v.top = v.sel - shown + 1;
+    const id = rows[v.sel];
+    if (!id || RECRUIT_TABS[v.tab] === 'CLASS' || s.config.delegate.recruiting || (signingDay && s.offseason!.round > 0)) return;
+    const keys = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'];
+    const act = RECRUIT_ACTIONS.findIndex((_, i) => input.hit(keys[i]) || (pressed && inBox(recruitActionRect(i), x, y)));
+    if (act < 0) return;
+    const u = s.config.userTeamId;
+    switch (RECRUIT_ACTIONS[act]) {
+      case 'OFFER': {
+        const r = toggleOffer(s, id);
+        v.note = { offered: 'OFFER MADE', withdrawn: 'OFFER WITHDRAWN', full: 'NO OFFERS LEFT: WITHDRAW ONE FIRST', no: 'CAN\'T OFFER HIM NOW' }[r];
+        break;
+      }
+      case 'HOST VISIT': {
+        const r = toggleVisit(s, id);
+        v.note = { hosted: 'HE VISITS AT YOUR NEXT HOME GAME', cancelled: 'VISIT CANCELLED', full: 'THAT GAME IS FULL', used: 'HE HAS NO OFFICIAL VISITS LEFT FOR YOU', none: 'NO HOME GAMES LEFT', no: 'CAN\'T HOST HIM' }[r];
+        break;
+      }
+      case 'IN-HOME':
+        v.note = inHome(s, u, id) ? 'THE HEAD COACH SITS DOWN IN HIS LIVING ROOM' : 'IN-HOMES OPEN AFTER THE REGULAR SEASON (AND YOU HAVE A FEW)';
+        break;
+      case 'TOP TARGET':
+        v.note = toggleTop(s, id) ? 'TOP TARGET: HIS COACH WORKS HIM FIRST' : 'NO LONGER A TOP TARGET';
+        break;
+      case 'BOARD':
+        if ((s.recruiting!.boards[u] ?? []).includes(id)) {
+          dropFromBoard(s, id);
+          v.note = 'OFF THE BOARD';
+        } else v.note = addToBoard(s, id) ? 'ON THE BOARD: HIS POSITION COACH WILL WORK HIM' : 'CAN\'T ADD HIM';
+        break;
+    }
+    saveSeason(s);
   }
 
   // ------------------------------------------------------------ departures and the draft
@@ -1563,6 +1676,10 @@ export class Game {
     }
     if (this.screen === 'departures') {
       drawDepartures(g, this.season!, this.departuresView);
+      return;
+    }
+    if (this.screen === 'recruit') {
+      drawRecruit(g, this.season!, this.recruitView);
       return;
     }
     if (this.screen === 'prep') {

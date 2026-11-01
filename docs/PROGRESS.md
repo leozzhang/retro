@@ -1246,11 +1246,42 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
   - Careers grow to about 2.9 MB of JSON a season.
   - Assistant turnover is 19.9%, just under its 20% floor (noise).
 
+## Done: HS recruiting, phases 2-5 (2026-10-31)
+Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUITING.md). Open-ended careers only.
+- **The class** (`data/recruits.ts`): about 3,500 prospects a year, rolled at each program's generated-freshman level and rebuilt from their ids (`r{class}.{salt}.{n}`). The services show stars (32/398/1,800) and national and position ranks, with noise. Each prospect has a hidden makeup (timeline, firmness, spotlight, dream school) and wants (PT, WIN, DEV, HOME, NFL, COACH).
+- **The cycle** (`season/recruiting.ts`):
+  - an automated summer for every staff
+  - a weekly `recruit` step: contacts by the position coaches, official visits at home games swung by the result, offers, commits, decommits and flips
+  - the early signing period at week 15, then in-home visits
+  - the carousel's departures shaking commits loose
+  - a new `signing` offseason stage (national signing day) before the portal; signees join their rosters as freshmen
+- **CPU staffs** recruit by need from their own reads. The user's side runs the same code when delegated (F).
+- **Pipelines:** coaches' (seeded, grown by signings, moving with them; shown on the carousel's HIRING card) and programs' (from recent classes, carried across seasons).
+- **Screen** `render/recruitScreen.ts` (the hub's RECRUIT button or R):
+  - BOARD, with the position coach's evaluation in words only and actions to offer, host a visit, in-home, mark a top target, add or drop
+  - SEARCH, with filters
+  - CLASS, with needs, the national top 10 and pipelines
+  - The prep page shows visitors.
+- **Other changes:**
+  - Portal: an over-cap roster sends its lowest players to the portal; signees can't enter before they enroll; recruits' portal motives are their recruiting wants; a full roster short at a position lets a player go so the refill can fix it.
+  - Coach recruit growth counts HS signings.
+  - The tier z-score cache now sees coaches' rating changes.
+- **Checks:**
+  - `npm run typecheck`
+  - `npm test`: 256 pass, 11 new in `src/recruiting.test.ts`
+  - `npm run balance` is byte-identical.
+  - `npm run season`: single-season sections unchanged; the new RECRUITING section (table in RECRUITING.md):
+    - tiers 1-4 sign within 1.3 of their generated-freshman level; T5 +3.4
+    - 77% of the top 300 committed by early signing; 82% of commits sign early; 13.6% decommit
+    - 0.31 s a sim week
+  - Driven in headless Chrome against the dev build (hub → board → top target → visit → search → offer → class → signing day → portal). No console errors.
+- **Flags** (in RECRUITING.md): T5 signs above its level and its starters still drift up about 4 over 5 seasons; the summer is slow at the top (22% of the top 300); a passive user signs only the summer's commits (placeholders fill); careers grow to about 3.2 MB a season.
+
 ## In progress
 - **Coaching carousel:** all 7 steps are built (CAROUSEL_PLAN.md). Left for later: former players as GAs (waits on graduation), retention tools, specializations, chemistry, bowl-week interims, DCs bringing their own style (`defIdentity`), the user changing jobs. The CAROUSEL screen was checked in headless Chrome against the dev build, not by hand with keyboard and mouse; the portal card's coach-left line hasn't been seen on screen. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
 ## Known bugs and rough edges
-- **Transfer portal, multi-season drift:** with departures, T1–T3 hold, but T4 starters rise about 2 and T5 about 4.4 over 5 offseasons through drop-down transfers (PORTAL.md). About 59% of entrants go home (placeholder), since graduates leave room.
+- **Multi-season tier drift:** with departures and recruiting, T1–T3 hold, but T4 starters rise about 1.8 and T5 about 4.2 over 5 offseasons: tier 5 signs about 3 above its generated freshmen, and drop-down transfers add to it (PORTAL.md, RECRUITING.md). About 40% of entrants go home (placeholder).
 - **Desktop app:** no app icon (Electron's default), no code signing (SmartScreen warns on first launch), one save slot, and no auto-update. A failed write leaves a stray `.tmp` beside the save; it's overwritten on the next save.
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
@@ -1258,7 +1289,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
 - **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
 - **Progression:** in season only players who play grow; everyone grows in the offseason (RECRUITING.md). A full season is about 2.6 MB of JSON, plus about 2.9 MB of careers a season with departures (CAREERS.md); gzipped saves are about a seventh of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
-- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season's offseason has no HS recruiting yet (placeholder freshmen fill rosters).
+- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
@@ -1293,9 +1324,9 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 
 ## Next up (rough priority)
 1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
-1. **HS recruiting**, phases 2–5 of [RECRUITING_PLAN.md](RECRUITING_PLAN.md) (phase 1, departures, is done). They add a seeded HS prospect pool with stars and hidden truth, an in-season recruiting cycle (boards, home-game visits, commits, flips and decommits, early and national signing days), coach and program pipelines, and the RECRUIT screen with the position coaches' vague evaluations and staff auto-recruiting.
+1. **Recruiting, round 2** ([RECRUITING.md](RECRUITING.md) flags): bring tier 5's classes and starters back to level; a faster summer at the top; the REDSHIRT toggle and 4-game depth management; former players as GAs; play a full cycle by hand.
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns with the coaches' pitch, and the coaching carousel through `staffFor`.
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; the offseason's systems (carousel, departures, recruiting, portal) are built.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
