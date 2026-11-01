@@ -47,10 +47,11 @@ The .exe isn't code-signed, so Windows SmartScreen warns on first launch: click 
 | Transfer portal | In a dynasty, Space on the finished season opens the offseason. A/D or click a tab (Board, My Room, Leaving). Board: Q/E or click a position chip, W/S or click a player, then 1 offer, 2 promise (snaps, then a start), 3 call, 4 visit, 5 focus or drop. Leaving: 1 meet, 2 promise a start, 3 promise snaps, 4 let go, 5 encourage. F hands the portal to your staff, Space advances a round, Esc returns to the hub (its PORTAL button comes back). See [docs/PORTAL.md](docs/PORTAL.md) |
 | Team page | T (or the TEAM button) in the season hub. A/D or click a tab to pick a position, click a player for his card, drag a player up or down the depth chart to reorder it. G hands the depth chart to your staff or takes it back. Esc returns to the hub |
 | Playbook page | P (or the PLAYBOOK button) in the season hub. A/D or click a tab (Starred, Pass, Run, Play Action), W/S pages. Click a card to see it drawn with your starters; click a card's star to save the play. In a play: A/D previous/next, Space star, F flip, Esc back |
-| Quarter length | Q/E on the title screen (3, 5, 8 or 15 minutes) |
+| Quarter length | Q/E on the title screen: SHORT 4:00, STANDARD 6:00 or LONG 8:00 quarters (about 4, 5 or 7 drives each) |
 | Playbook tab (Pass / Run / Play Action / Special) | Click a tab, or Q/E or Tab |
 | Formation filter | A/D or the mouse wheel (or click a chip) picks STARRED (your starred plays on this tab) or a formation; W/S pages when there are more than 9 plays. Click a card's star to star or unstar it |
-| Call a play | Click a card or press 1–9. Watch the play clock: if it runs out, it's delay of game |
+| Call a play | Click a card or press 1–9. Watch the play clock: if it runs out, it's delay of game. With the clock running, the snap runs it down to :14 (huddle) or :28 (hurry-up), however fast you call the play |
+| Tempo | H on the play-call screen toggles HUDDLE and HURRY. Hurry switches itself on once when you're not ahead inside 2:00 of a half |
 | Speed option | Right-click to pitch while you attack the end; run past the line to keep it |
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
 | Audible (pre-snap) | Esc |

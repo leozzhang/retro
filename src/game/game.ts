@@ -12,7 +12,7 @@ import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
 import type { Vec3 } from '../engine/math';
 import { drawField, makeCrowd } from '../render/field';
-import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug } from '../render/hud';
+import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
@@ -51,8 +51,9 @@ import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { getSprite, teamUniform } from '../render/sprites';
 import { text, textWidth } from '../render/text';
 import {
-  adminStop, advanceSim, afterPlay, clockText, mmss, newClock, nextQuarter, penaltySpot, playClockText,
-  QUARTER_OPTIONS, quarterName, readyForPlay, snapClock, tickBetween, tickLive, timeLeftInHalf, type Clock,
+  adminStop, advanceSim, afterPlay, clockText, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
+  QUARTER_DRIVES, QUARTER_LABELS, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap, snapClock, tickBetween, tickLive,
+  timeLeftInHalf, type Clock, type Tempo,
 } from './clock';
 import { KickPlay } from './kickPlay';
 import { Play } from './playState';
@@ -142,7 +143,7 @@ export class Game {
   /** Roster screen: whose roster and which page. */
   private rosterIdx = 0;
   private rosterPage = 0;
-  private qIdx = QUARTER_OPTIONS.indexOf(8);
+  private qIdx = QUARTER_OPTIONS.indexOf(6);
   /** The injury setting a new season starts with (I on the title screen). */
   private injuryIdx = INJURY_OPTIONS.indexOf('normal');
   private lengthIdx = 0;
@@ -159,7 +160,11 @@ export class Game {
   private cam = new Camera();
   private rng = Math.random;
   private score = { user: 0, cpu: 0 };
-  private clock: Clock = newClock(8);
+  private clock: Clock = newClock(6);
+  /** Huddle (the accelerated clock runs to :14 at the snap) or hurry-up (:28). H on the call screen. */
+  private tempo: Tempo = 'normal';
+  /** The quarter the hurry-up last switched itself on in, so the user can switch it back off. */
+  private autoHurryQ = 0;
   private drive: Drive = startDrive(25);
   private play: Play | null = null;
   private kick: KickPlay | null = null;
@@ -371,6 +376,8 @@ export class Game {
     this.crowd = makeCrowd(this.user, this.cpu);
     this.score = { user: 0, cpu: 0 };
     this.clock = newClock(QUARTER_OPTIONS[this.qIdx]);
+    this.tempo = 'normal';
+    this.autoHurryQ = 0;
     this.drive = startDrive(25);
     this.wind = newWind(this.rng);
     this.windQuarter = 1;
@@ -956,6 +963,11 @@ export class Game {
     this.press = { CB1: this.rng() < pr.CB1, CB2: this.rng() < pr.CB2, NB: this.rng() < pr.NB };
     if (mode === 'pat' || mode === 'try') this.tab = Math.min(this.tab, 2);
     readyForPlay(this.clock);
+    // Inside two minutes of a half and not ahead: go no-huddle, once, so the user can still huddle up.
+    if (mode === 'normal' && inTwoMinute(this.clock) && this.score.user <= this.score.cpu && this.autoHurryQ !== this.clock.quarter) {
+      this.tempo = 'hurry';
+      this.autoHurryQ = this.clock.quarter;
+    }
     this.cam.follow(this.spotX(), 0.4);
   }
 
@@ -1029,6 +1041,7 @@ export class Game {
 
   private updateCall(dt: number, input: Input): void {
     if (this.tickBetweenPlays(dt)) return;
+    if (input.hit('KeyH')) this.tempo = this.tempo === 'hurry' ? 'normal' : 'hurry';
     const tabs = this.tabs();
     const n = tabs.length;
     if (n) {
@@ -1183,7 +1196,10 @@ export class Game {
       }
       if (input.hit('Space') || input.mouse.pressed) {
         play.snap();
-        if (!this.drive.try) snapClock(this.clock); // tries are untimed
+        if (!this.drive.try) {
+          runoffAtSnap(this.clock, this.tempo); // tries are untimed
+          snapClock(this.clock);
+        }
         input.mouse.pressed = false; // the snap click must not start an aim
       }
     }
@@ -1226,13 +1242,17 @@ export class Game {
       }
       if (kp.unit === 'punt' && (input.hit('Space') || input.mouse.pressed)) {
         kp.snap();
+        runoffAtSnap(this.clock, this.tempo);
         snapClock(this.clock);
         input.mouse.pressed = false; // the snap click must not start the punt aim
       }
     }
     const was = kp.phase;
     kp.update(dt, input);
-    if (was === 'presnap' && kp.phase !== 'presnap' && kp.unit === 'fg') snapClock(this.clock);
+    if (was === 'presnap' && kp.phase !== 'presnap' && kp.unit === 'fg') {
+      runoffAtSnap(this.clock, this.tempo);
+      snapClock(this.clock);
+    }
     if (kp.clockRunning()) tickLive(this.clock, dt);
     const f = kp.focus();
     this.cam.follow(f.x, f.lead);
@@ -1377,7 +1397,7 @@ export class Game {
     const c = this.clock;
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
-    const late = (c.quarter === 4 && left < 300) || (c.quarter === 2 && left < 120);
+    const late = (c.quarter === 4 && left < Math.min(300, c.qSecs * 0.4)) || (c.quarter === 2 && left < 120);
     const plays: SimPlay[] = [];
     const cpuConf = teamConf(this.cpuSquad);
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
@@ -1489,6 +1509,7 @@ export class Game {
       this.screen === 'call' || (this.screen === 'play' && this.play?.phase === 'presnap') ||
       (this.screen === 'kick' && this.kick?.phase === 'presnap');
     if (huddle && this.callMode !== 'kickoff') drawPlayClock(g, playClockText(this.clock), this.clock.play, this.t);
+    if (huddle && this.callMode === 'normal') drawTempo(g, this.tempo === 'hurry', this.screen === 'call');
     const kicking = this.screen === 'kick' || (this.screen === 'call' && this.cards()[0]?.kind === 'kick');
     if (huddle && this.callMode !== 'kickoff' && !this.drive.try) {
       // A big snap: show the key man's nerve, the QB's or, lining up a kick, the kicker's.
@@ -1755,7 +1776,8 @@ export class Game {
     this.drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A/D TEAM  W/S CONF', true);
     this.drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
     text(g, 'VS', VIEW_W / 2, 196, { size: 16, align: 'center', color: '#ffffff' });
-    text(g, `<  QUARTERS: ${QUARTER_OPTIONS[this.qIdx]} MIN  >   (Q / E)`, VIEW_W / 2, 270, { align: 'center', color: '#9ad7ff' });
+    const qMin = QUARTER_OPTIONS[this.qIdx];
+    text(g, `<  ${QUARTER_LABELS[this.qIdx]}: ${qMin}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES  >   (Q / E)`, VIEW_W / 2, 270, { align: 'center', color: '#9ad7ff' });
     text(g, `NEW SEASON: ${LENGTH_LABEL[LENGTH_OPTIONS[this.lengthIdx]]} (L)   INJURIES: ${INJURY_OPTIONS[this.injuryIdx].toUpperCase()} (I)`, VIEW_W / 2, 283, {
       align: 'center', color: '#8fa0b8', shadow: false,
     });

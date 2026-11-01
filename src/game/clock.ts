@@ -1,16 +1,24 @@
 import type { OutcomeType } from './rules';
 
 /**
- * Game clock and play clock, in football seconds. A 15:00 quarter always reads
- * 15:00; shorter "quarter length" settings make the between-play time (huddle,
- * play call, pre-snap) run faster so a game takes less real time.
- * Live plays always run 1:1.
+ * Game clock and play clock, in football seconds, Madden style: the quarter is as long as the
+ * setting (a 6-minute game reads 6:00) and every play costs what it would in a real game, so the
+ * quarter length alone sets how many possessions there are (about 12 x minutes / 15 a team).
+ * Both clocks run 1:1. A snap with the clock running burns the play clock down to `SNAP_AT`
+ * (accelerated clock), so a running play costs about 30 s however fast the user calls it.
  */
-export const QUARTER_SECS = 15 * 60;
 export const PLAY_CLOCK = 40;
 export const PLAY_CLOCK_ADMIN = 25;
 export const TWO_MIN = 120;
-export const QUARTER_OPTIONS = [3, 5, 8, 15];
+/** Quarter lengths in minutes, and about how many possessions each team gets (checked by the pacing test in logic.test.ts). */
+export const QUARTER_OPTIONS = [4, 6, 8];
+export const QUARTER_DRIVES = [4, 5, 7];
+export const QUARTER_LABELS = ['SHORT', 'STANDARD', 'LONG'];
+/** Play clock left at the snap when the clock was running: normal tempo huddles, hurry-up only lines up. */
+export const SNAP_AT = 14;
+export const HURRY_AT = 28;
+
+export type Tempo = 'normal' | 'hurry';
 
 /** 'untilReady' restarts when the next play call opens; 'untilSnap' restarts on the snap. */
 export type ClockMode = 'run' | 'untilReady' | 'untilSnap';
@@ -20,23 +28,33 @@ export interface Clock {
   time: number;
   play: number;
   mode: ClockMode;
-  /** Real minutes a quarter's between-play time is compressed into. */
-  qMin: number;
+  /** Quarter length, seconds. */
+  qSecs: number;
 }
 
 export function newClock(qMin: number): Clock {
-  return { quarter: 1, time: QUARTER_SECS, play: PLAY_CLOCK_ADMIN, mode: 'untilSnap', qMin };
-}
-
-export function betweenRate(c: Clock): number {
-  return 15 / c.qMin;
+  const qSecs = qMin * 60;
+  return { quarter: 1, time: qSecs, play: PLAY_CLOCK_ADMIN, mode: 'untilSnap', qSecs };
 }
 
 /** Huddle / play call / pre-snap: play clock always counts, game clock only if running. */
 export function tickBetween(c: Clock, dt: number): void {
-  const d = dt * betweenRate(c);
-  c.play = Math.max(0, c.play - d);
-  if (c.mode === 'run') c.time = Math.max(0, c.time - d);
+  c.play = Math.max(0, c.play - dt);
+  if (c.mode === 'run') c.time = Math.max(0, c.time - dt);
+}
+
+/**
+ * Accelerated clock, just before the snap: with the clock running, the play clock (and the game
+ * clock with it) runs down to the tempo's snap mark. A stopped clock costs nothing. It always
+ * leaves a second, so it never takes away a snap (there are no timeouts or spikes yet); running the
+ * clock out still works by waiting. Returns the seconds burned.
+ */
+export function runoffAtSnap(c: Clock, tempo: Tempo): number {
+  if (c.mode !== 'run') return 0;
+  const burn = Math.max(0, Math.min(c.play - (tempo === 'hurry' ? HURRY_AT : SNAP_AT), c.time - 1));
+  c.play -= burn;
+  c.time -= burn;
+  return burn;
 }
 
 export function tickLive(c: Clock, dt: number): void {
@@ -77,14 +95,14 @@ export function isHalfEnd(c: Clock): boolean {
 
 /** Seconds left until halftime or the end of the game. */
 export function timeLeftInHalf(c: Clock): number {
-  return c.time + (c.quarter === 1 || c.quarter === 3 ? QUARTER_SECS : 0);
+  return c.time + (c.quarter === 1 || c.quarter === 3 ? c.qSecs : 0);
 }
 
 /** Start the next quarter. Returns false if the game is over. */
 export function nextQuarter(c: Clock): boolean {
   if (c.quarter >= 4) return false;
   c.quarter++;
-  c.time = QUARTER_SECS;
+  c.time = c.qSecs;
   adminStop(c);
   return true;
 }

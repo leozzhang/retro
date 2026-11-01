@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-28_
+_Last updated: 2026-10-31_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -23,9 +23,17 @@ _Last updated: 2026-10-28_
 - **Rules:** down and distance, first downs, touchdown (+7), safety, turnover on downs. The CPU's possessions are simulated by `simulateDrive`.
 - **Tooling:** 28 unit tests, a balance harness (`npm run balance`), an F1 debug overlay, and a `window.game` dev hook.
 
+## Done: game pacing (2026-10-31)
+- **The problem:** every setting showed 15:00 quarters, and the setting only sped up the time between plays. A user play cost about 6–20 s of game clock, but a CPU drive cost about 32 s per play. Games had about 15 possessions a team and scores like 80-14.
+- **Quarters are as long as the setting** (Madden style): SHORT 4:00, STANDARD 6:00 (default), LONG 8:00. `QUARTER_DRIVES` (4/5/7 possessions a team) is checked by a pacing test that plays alternating `simulateDrive` possessions through `advanceSim` (it measures 3.8/5.3/6.7).
+- **Both clocks run 1:1.** Plays and CPU drives cost what they would in real football, so the quarter length alone sets the number of possessions.
+- **Accelerated clock:** `runoffAtSnap` runs the play clock down to `SNAP_AT` (:14, huddle) or `HURRY_AT` (:28, hurry-up) at the snap when the clock is running. A running play costs about 30 s however fast it's called. A stopped clock (incompletion, change of possession) costs nothing. The runoff always leaves 0:01, so it never takes away a last-second kick; waiting still runs the clock out.
+- **Tempo:** H on the call screen toggles HUDDLE and HURRY (a tag under the play clock). It switches to HURRY once per quarter when the user isn't ahead inside 2:00 of a half.
+- The CPU's late hurry-up window in Q4 is `min(5:00, 40% of a quarter)` instead of 5:00.
+- Research: Retro Bowl uses 1–3 minute quarters with offense-only play and opponent drives as summaries. Madden's accelerated clock burns the play clock down to a set minimum at the snap.
+
 ## Done: clock, game end, run game (2026-10-23)
-- **Game clock and play clock** (`game/clock.ts`). Clocks show real football time (15:00 quarters, 40/25 s play clock).
-  - Quarter length is selectable on the title screen (3/5/8/15 min, Q/E). Shorter settings speed up only the between-play time; live plays always run 1:1.
+- **Game clock and play clock** (`game/clock.ts`). 40/25 s play clock. (Quarter length and the accelerated clock were reworked; see "Done: game pacing" below.)
   - NCAA stoppage rules: an incompletion stops the clock until the snap. Out of bounds and first downs stop it only inside 2:00 of a half; otherwise out of bounds restarts on the ready-for-play and first downs don't stop it.
   - The play clock runs on the call screen and pre-snap, so audibles cost time. If it expires, it's **delay of game**: 5 yards (half the distance inside the 10), replay the down.
 - **Quarters, halftime, final.** At halftime the CPU gets the second-half kickoff. The final screen allows ties (no OT yet).
@@ -1241,6 +1249,8 @@ As built: [COACHES.md](COACHES.md), "Coaches over time".
 - **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The defense has no run-defense calls yet.
 - **WR stalk blocks lose the matchup quickly:** in `runEngagement` the defender's side is `str*0.7 + spd*0.3`, and the WR adds only his `blk` (about 45). A fast corner wins by about 30 points and sheds at about 2.3/s. On stretch plays the WR also takes the lineman's `REACH_PENALTY`. Perimeter blocks now form and last longer than before, but they still don't hold long. Not tuned: consider a stalk-block rule (the WR only has to stay between, not drive) or no reach penalty for non-linemen.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
+- **Live games now score less than CPU-vs-CPU season games:** about 5 possessions a team at STANDARD vs about 12 in `simGame`. That lowers the user's points for and against and the margin terms in the polls (`AP_WEIGHTS`, `CFP_WEIGHTS`). Not compensated yet.
+- **Check the user's points per drive by playing.** If the live offense scores on more than 60% of drives, that's a gameplay balance issue, separate from pacing.
 - **No zone underneath coverage:** defenses are man or deep zones only.
 - **RPOs are still a run plus a tagged route.** There's no read on a defender yet, and the harness measures only the give.
 - **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB on his backside shed at once. Keeps were unchanged by the perimeter-block fix. A human steering the QB should do better; check by playing before tuning.

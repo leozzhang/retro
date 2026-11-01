@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Camera, project, unproject } from './engine/camera';
 import { dist, mulberry32 } from './engine/math';
 import {
-  advanceSim, afterPlay, clockText, newClock, penaltySpot, playClockText, readyForPlay, tickBetween, tickLive, type Clock,
+  advanceSim, afterPlay, clockText, newClock, nextQuarter, penaltySpot, playClockText, QUARTER_DRIVES, QUARTER_OPTIONS, readyForPlay, runoffAtSnap,
+  tickBetween, tickLive, timeLeftInHalf, type Clock,
 } from './game/clock';
 import { DEF_CALLS, packageFor, type DefCall } from './data/defenses';
 import { ACE, EMPTY, FORMATIONS, GUN_TRIPS, I_FORM, PLAYBOOK, type Formation, type PlayDef } from './data/plays';
@@ -285,16 +286,60 @@ describe('clock', () => {
     afterPlay(q4, 'oob', false);
     expect(q4.mode).toBe('untilSnap');
   });
-  it('between plays runs faster with shorter quarters; live plays run 1:1', () => {
-    const c: Clock = { ...at(1, 600, 5), mode: 'run', play: 40 };
+  it('quarters are as long as the setting', () => {
+    const c = newClock(7);
+    expect(c.time).toBe(420);
+    nextQuarter(c);
+    expect(c.quarter).toBe(2);
+    expect(c.time).toBe(420);
+  });
+  it('both clocks run 1:1 between plays and in live play', () => {
+    const c: Clock = { ...at(1, 300, 5), mode: 'run', play: 40 };
     tickBetween(c, 1);
-    expect(c.play).toBeCloseTo(37);
-    expect(c.time).toBeCloseTo(597);
+    expect(c.play).toBeCloseTo(39);
+    expect(c.time).toBeCloseTo(299);
     c.mode = 'untilSnap';
     tickBetween(c, 1);
-    expect(c.time).toBeCloseTo(597);
+    expect(c.time).toBeCloseTo(299);
     tickLive(c, 2);
-    expect(c.time).toBeCloseTo(595);
+    expect(c.time).toBeCloseTo(297);
+  });
+  it('a snap with the clock running burns the play clock to the tempo mark', () => {
+    const huddle: Clock = { ...at(1, 300, 5), mode: 'run', play: 38 };
+    expect(runoffAtSnap(huddle, 'normal')).toBeCloseTo(24);
+    expect(huddle.play).toBeCloseTo(14);
+    expect(huddle.time).toBeCloseTo(276);
+    const hurry: Clock = { ...at(1, 300, 5), mode: 'run', play: 40 };
+    expect(runoffAtSnap(hurry, 'hurry')).toBeCloseTo(12);
+    const waited: Clock = { ...at(1, 300, 5), mode: 'run', play: 9 };
+    expect(runoffAtSnap(waited, 'normal')).toBe(0);
+    const stopped: Clock = { ...at(1, 300, 5), mode: 'untilSnap', play: 40 };
+    expect(runoffAtSnap(stopped, 'normal')).toBe(0);
+    expect(stopped.time).toBe(300);
+  });
+  it('the runoff always leaves a second for the snap', () => {
+    const c: Clock = { ...at(4, 10, 5), mode: 'run', play: 40 };
+    runoffAtSnap(c, 'normal');
+    expect(c.time).toBeCloseTo(1);
+  });
+  it('each quarter option gives about the possessions its label says', () => {
+    // User plays now cost what drive-sim plays do (accelerated runoff), so a game of alternating sim drives models the live one.
+    const rng = mulberry32(11);
+    const games = 300;
+    const mean = QUARTER_OPTIONS.map((q) => {
+      let drives = 0;
+      for (let g = 0; g < games; g++) {
+        const c = newClock(q);
+        let over = false;
+        while (!over) {
+          drives++;
+          const s = simulateDrive(80, 80, 25, rng, { timeLeft: timeLeftInHalf(c), hurry: false, milk: false });
+          if (advanceSim(c, s.secs).halfOver) over = !nextQuarter(c);
+        }
+      }
+      return drives / games / 2;
+    });
+    mean.forEach((m, i) => expect(Math.abs(m - QUARTER_DRIVES[i])).toBeLessThan(0.5));
   });
   it('simulated time rolls into the next quarter and stops at halftime', () => {
     const c = at(1, 60);

@@ -61,6 +61,16 @@ export function drawPlayClock(g: CanvasRenderingContext2D, s: string, secs: numb
   text(g, s, x + 20, 22, { align: 'center', color: flash ? '#ffffff' : urgent ? '#ff5a5a' : '#ffffff' });
 }
 
+/** Tempo tag under the play clock: HUDDLE or HURRY, with the H key on the call screen. */
+export function drawTempo(g: CanvasRenderingContext2D, hurry: boolean, key: boolean): void {
+  const s = `${key ? 'H ' : ''}${hurry ? 'HURRY' : 'HUDDLE'}`;
+  const w = Math.ceil(textWidth(g, s, 8)) + 8;
+  const x = VIEW_W - 4 - w;
+  g.fillStyle = 'rgba(8,10,14,0.85)';
+  g.fillRect(x, 36, w, 12);
+  text(g, s, x + w / 2, 38, { align: 'center', color: hurry ? '#ffd23f' : '#cfd6df', shadow: false });
+}
+
 /**
  * A big snap (data/confidence.ts): a CLUTCH tag left of the play clock with the key man's confidence,
  * green when he's confident, red when he's shaky.
