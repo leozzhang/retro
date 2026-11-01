@@ -219,7 +219,8 @@ describe('coaches over time', () => {
     while (n.offseason?.stage === 'carousel') n = advanceOffseason(n);
     expect(staffFor(n, 'georgia').WR.id).toBe(outside.id);
     expect(userChairs(n)).toEqual([]);
-    expect(n.portal).toBeDefined();
+    expect(n.offseason?.stage).toBe('departures');
+    expect(n.departures).toBeDefined();
   }, 30_000);
 
   it('players react when their coach leaves: morale drops and the portal pulls', () => {

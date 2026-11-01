@@ -112,12 +112,19 @@ Overall gained over a season by the generated depth chart's starters (11-personn
 - **By program tier:** T1 1.60, T2 1.69, T3 1.64, T4 1.54, T5 1.38. Grades don't cause the slope. Two factors in the XP multiplier do:
   - **Morale** read the team's win % then, up to about 6% more XP for a winning team. Morale is now its own system (MORALE.md): winning lifts it through team mood, but role and temperament matter more. The tier line is a little flatter since (T1 1.39 to T5 1.23).
   - **Dev traits** come out better for better players when rosters are generated.
-- **Backups and package players** gain 0–0.3, since they play little. Offseason growth belongs to the offseason, which isn't built yet.
+- **Backups and package players** gain 0–0.3 in season, since they play little. Most of their growth comes in the offseason (below).
 - **Scores and polls** didn't move outside noise: 26.3 points per team, 4.9 ranked losses a week.
 - **Speed:** a season now takes about 1.7 s, up from 0.63 s. Most of it is grading every snap of every game (about 0.5 ms a game).
 
+## Offseason growth
+`offseasonGrowth` runs as the next season opens, after a real offseason (`growOffseason`, `season/season.ts`), for everyone returning; incoming freshmen arrive as they are. Winter, spring and summer work: XP is `OFFSEASON.xp` for his class (FR 1450, SO 1300, JR 950, SR 650), times his multiplier without confidence (room to his potential, dev trait, morale, class) and his program's `programXp`, then levels up as in season with no performance tags. The user's three biggest gains make the week-0 news.
+
+It's calibrated so the generated class ladder holds once players graduate (RECRUITING.md): overall by season in the program stays about 61.5 / 66 / 68.5 / 70 / 69 over 5 seasons (generated: 61.1 / 64.5 / 68.2 / 70.6 / 71.3), and without portal entries every tier's starters hold within about 1.3. Starters gain about 1.4 in season and backups 0.2, so most of the ladder (about +5, +4, +2 a year) comes from here.
+
+A career row's gains include the offseason before that season (`seasonRow` measures from the last archive).
+
 ## Not built yet
-- Offseason growth, graduation and aging.
+- Aging past college (nothing after the draft).
 - Practice focus is built as weekly emphases ([COACHES.md](COACHES.md)), for the user's team only so far.
 - Per-game grades on the card. (Confidence and morale have their own rows.)
-- A player who doesn't play still earns nothing, including a redshirting freshman.
+- In season, a player who doesn't play still earns nothing, including a redshirting freshman (he grows in the offseason).

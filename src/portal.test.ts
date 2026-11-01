@@ -81,8 +81,9 @@ describe('who enters', () => {
     }
     const mean = (x: number[]) => x.reduce((a, b) => a + b, 0) / x.length;
     expect(gems.length).toBeGreaterThan(10);
-    expect(mean(gems)).toBeGreaterThan(2 * mean(starts));
-    expect(Math.max(...gems)).toBeGreaterThan(0.4);
+    // Seniors have graduated by now, so the charts are next year's and the buried are underclassmen.
+    expect(mean(gems)).toBeGreaterThan(1.5 * mean(starts));
+    expect(Math.max(...gems)).toBeGreaterThan(0.3);
   });
 
   it('a playing-time-first player picks a start over prestige', () => {
@@ -91,7 +92,7 @@ describe('who enters', () => {
     const pl = [...board.players.values()].find((p) => motives(p.a).PT >= 0.45 && p.a.pos === 'WR')!;
     const school = (win: number, chart: number[]): School => ({
       id: 'x', home: 'ZZ', win, dev: board.schools.get('georgia')!.dev, room: 0, extra: 0,
-      chart: new Map<Position, number[]>([['WR', chart]]), count: new Map(), size: 80, left: 0, signed: 0,
+      chart: new Map<Position, number[]>([['WR', chart]]), count: new Map(), size: 80, left: 0, gone: 0, signed: 0,
     });
     const blueBlood = school(0.9, [pl.ovr + 6, pl.ovr + 5, pl.ovr + 4, pl.ovr + 3]);
     const startsHere = school(0.4, [pl.ovr - 5, pl.ovr - 6, pl.ovr - 7]);
@@ -138,8 +139,9 @@ describe('a whole offseason', () => {
       expect(prog.tr).toEqual({ from: e.from, year: old.year });
       expect(a.teamState[e.from]?.progress?.[e.id]).toBeUndefined();
       expect(a.teamState[to].mo![e.id]).toBeDefined();
+      // He arrives as he left, then grows in the offseason like everyone else.
       const sq = squadFor(a, to).athletes.find((x) => x.id === e.id)!;
-      expect(overall(sq.r, sq.pos)).toBe(e.ovr);
+      expect(overall(sq.r, sq.pos)).toBeGreaterThanOrEqual(e.ovr);
     }
   });
 
@@ -205,15 +207,17 @@ describe('the user side', () => {
     for (const e of s.portal!.entrants) if (offer(s, user, e.id)) n++;
     expect(n).toBe(cap);
     expect(s.portal!.offers[user].length).toBe(cap);
-    expect(cap).toBeLessThanOrEqual(Math.ceil(PORTAL.signShare * board.schools.get(user)!.left) + PORTAL.overOffer);
+    const sch = board.schools.get(user)!;
+    expect(cap).toBeLessThanOrEqual(Math.ceil(PORTAL.signShare * sch.left + PORTAL.departShare * sch.gone) + PORTAL.overOffer);
   });
 
   it('a kept promise lifts morale; a broken one hurts and pushes him toward the portal', () => {
     const s = copy();
     const ts = s.teamState.georgia;
-    const st = starters(squadFor(s, 'georgia'));
-    const kept = st.QB.id;
-    const broken = Object.values(st).find((x) => x.id !== kept && (ts.progress?.[x.id]?.gs ?? 0) > 0)!.id;
+    // Starters who'll still be there after departures: seniors graduate before the portal.
+    const st = Object.values(starters(squadFor(s, 'georgia'))).filter((x) => x.year !== 'SR' && x.year !== 'JR');
+    const kept = st[0].id;
+    const broken = st.find((x) => x.id !== kept && (ts.progress?.[x.id]?.gs ?? 0) > 0)!.id;
     const gp = ts.gp!;
     for (const [id, gs] of [[kept, gp], [broken, 0]] as const) {
       const p = (ts.progress![id] ??= { xp: 0, lvl: 0, d: {} });

@@ -6,7 +6,8 @@ import { teamById } from '../data/teams';
 import { clamp, hashString, mulberry32, type Rng } from '../engine/math';
 import { CONFIDENCE, confOf, newStarters } from './confidence';
 import { applyDelta } from './progression';
-import type { SeasonState } from './types';
+import { withClass } from './classes';
+import type { SeasonState, TeamState } from './types';
 
 /** A random stream for one thing in one season, so results don't depend on the order things are simulated in. */
 export function seasonRng(state: Pick<SeasonState, 'seed' | 'year'>, ...parts: (string | number)[]): Rng {
@@ -72,7 +73,7 @@ export function squadFor(state: SeasonState, teamId: string): Squad {
 /**
  * A team's roster this season before anything is laid over it: the generated roster, less the players
  * who left, plus the ones who joined (each rebuilt from the roster he was generated on, in his new
- * jersey). With no changes it's the generated roster itself.
+ * jersey), each in his class this season (season/classes.ts). With no changes it's the generated roster itself.
  */
 export function baseRoster(state: SeasonState, teamId: string): Athlete[] {
   return baseSquad(state, teamId).athletes;
@@ -81,27 +82,38 @@ export function baseRoster(state: SeasonState, teamId: string): Athlete[] {
 /** `baseRoster` as a squad, with the staff chart built for it. */
 export function baseSquad(state: SeasonState, teamId: string): Squad {
   const gen = buildSquad(teamById(teamId));
-  const r = state.teamState[teamId]?.roster;
-  if (!r || (!r.out?.length && !r.in?.length)) return gen;
-  const key = rosterKey(state.teamState[teamId]);
-  const hit = rosterCache.get(r);
+  const ts = state.teamState[teamId];
+  const r = ts?.roster;
+  const moved = !!(r && (r.out?.length || r.in?.length));
+  const rs = redshirts(ts, state.year);
+  if (!moved && state.year === CALENDAR.year && !rs.size) return gen;
+  const key = `${state.year}|${rosterKey(ts)}|${[...rs].join(',')}`;
+  const hit = rosterCache.get(teamId);
   if (hit?.key === key) return hit.squad;
-  const out = new Set(r.out);
+  const out = new Set(r?.out);
   const athletes = gen.athletes.filter((a) => !out.has(a.id));
-  for (const e of r.in ?? []) {
+  for (const e of r?.in ?? []) {
     const a = generatedAthlete(e.id);
     if (a) athletes.push({ ...a, num: e.num });
   }
-  const squad = { team: gen.team, athletes, depth: buildDepth(athletes) };
-  rosterCache.set(r, { key, squad });
+  const now = athletes.map((a) => withClass(a, state.year, rs.get(a.id)));
+  const squad = { team: gen.team, athletes: now, depth: buildDepth(now) };
+  rosterCache.set(teamId, { key, squad });
   return squad;
+}
+
+/** The roster's redshirt seasons by id (`Progress.rs`), for the ones already taken by season `year`. */
+function redshirts(ts: TeamState | undefined, year: number): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [id, p] of Object.entries(ts?.progress ?? {})) if (p.rs !== undefined && p.rs < year) out.set(id, p.rs);
+  return out;
 }
 
 function rosterKey(ts: { roster?: unknown } | undefined): string {
   return ts?.roster ? JSON.stringify(ts.roster) : '';
 }
 
-const rosterCache = new WeakMap<object, { key: string; squad: Squad }>();
+const rosterCache = new Map<string, { key: string; squad: Squad }>();
 
 /**
  * A team's coaching staff this season: the generated staff (data/coaches.ts) with the carousel's

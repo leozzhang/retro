@@ -412,6 +412,23 @@ function tierStarters(s: SeasonState): number[] {
   });
 }
 
+/** Overall by season in the program (a redshirt freshman is in his second) and players a team: the class ladder. */
+function ladderRow(s: SeasonState): string {
+  const by = new Map<number, number[]>();
+  for (const t of TEAMS) {
+    for (const a of squadFor(s, t.id).athletes) {
+      const n = ['FR', 'SO', 'JR', 'SR'].indexOf(a.year) + (a.redshirt ? 1 : 0) + 1;
+      let x = by.get(n);
+      if (!x) by.set(n, (x = []));
+      x.push(overall(a.r, a.pos));
+    }
+  }
+  return `  ${s.year}: ` + [1, 2, 3, 4, 5].map((n) => {
+    const x = by.get(n) ?? [];
+    return `yr${n} ${x.length ? (x.reduce((a, b) => a + b, 0) / x.length).toFixed(1) : '-'} (${(x.length / TEAMS.length).toFixed(0)})`;
+  }).join('  ');
+}
+
 /**
  * The transfer portal (docs/PORTAL.md): an open-ended career of `n` seasons with every portal side
  * automated, paired with a control on the same seeds that skips the offseason. Volume and who enters,
@@ -433,6 +450,9 @@ function portalReport(n: number): string[] {
   // Players whose coach left (docs/CAROUSEL_PLAN.md step 5): entrants among them, coach-left reasons, followers.
   const react = { left: 0, followed: 0, reason: 0, shaken: 0, players: 0 };
   let walkOns = 0;
+  const dep = { grads: 0, declared: 0, early: 0, earlyR1: 0, redshirts: 0, conf: new Map<string, number>(), tier: [0, 0, 0, 0, 0] };
+  const start = tierStarters(s);
+  const ladder: string[] = [ladderRow(s)];
   let maxRoster = 0;
   let minPos = Infinity;
   const talent: string[] = [];
@@ -480,6 +500,22 @@ function portalReport(n: number): string[] {
     const old = s;
     while (s.phase === 'offseason') s = advanceOffseason(s);
     const portal = old.portal!;
+    {
+      const gone = old.departures!.gone!;
+      const picks = s.history.find((h) => h.year === old.year)!.draft!;
+      const grads = gone.filter((g) => g.why === 'grad').length;
+      dep.grads += grads;
+      dep.declared += gone.length - grads;
+      dep.early += picks.filter((p) => p.early).length;
+      dep.earlyR1 += picks.slice(0, 32).filter((p) => p.early).length;
+      for (const t of TEAMS) dep.redshirts += Object.values(old.teamState[t.id]?.progress ?? {}).filter((p) => p.rs === old.year).length;
+      for (const p of picks) {
+        const c = teamById(p.team).conference;
+        dep.conf.set(c, (dep.conf.get(c) ?? 0) + 1);
+        dep.tier[tierOf(p.team) - 1]++;
+      }
+      ladder.push(ladderRow(s));
+    }
     const count = new Map<string, number>();
     for (const e of portal.entrants) {
       const to = portal.commits[e.id];
@@ -506,7 +542,7 @@ function portalReport(n: number): string[] {
       per.push(count.get(t.id) ?? 0);
       const r = baseRoster(s, t.id);
       maxRoster = Math.max(maxRoster, r.length);
-      walkOns += (s.teamState[t.id]?.roster?.in ?? []).filter((e) => e.id.includes(`-w${old.year + 1}.`)).length;
+      walkOns += (s.teamState[t.id]?.roster?.in ?? []).filter((e) => e.id.includes(`-f${old.year + 1}.`)).length;
       const byPos = new Map<string, number>();
       for (const a of r) byPos.set(a.pos, (byPos.get(a.pos) ?? 0) + 1);
       for (const [pos, min] of Object.entries(MIN_COUNT)) minPos = Math.min(minPos, (byPos.get(pos) ?? 0) - min);
@@ -516,7 +552,8 @@ function portalReport(n: number): string[] {
     const b = tierStarters(c);
     const diff = a.map((v, i) => v - b[i]);
     gapDrift = diff[0] - diff[4];
-    talent.push(`  year ${y}: portal ${fmt(a)}  control ${fmt(b)}  diff ${fmt(diff)}` + (Math.max(...diff.map(Math.abs)) > 1 ? '  <-- drift' : ''));
+    const since = a.map((v, i) => v - start[i]);
+    talent.push(`  year ${y}: portal ${fmt(a)}  control ${fmt(b)}  diff ${fmt(diff)}  since the start ${fmt(since)}` + (Math.max(...since.map(Math.abs)) > 1.5 ? '  <-- drift' : ''));
   }
   const avg = per.reduce((x, y) => x + y, 0) / per.length;
   const sd = Math.sqrt(per.reduce((x, y) => x + (y - avg) ** 2, 0) / per.length);
@@ -539,16 +576,25 @@ function portalReport(n: number): string[] {
     `outcomes: signed ${pctText(outs.commit / total)}, back home ${pctText(outs.return / total)} (placeholder), out of FBS ${pctText(outs.gone / total)}`,
     'flows by overall band (tier up/same/down): ' + bands.map((b) => `${b} ${flows.get(`${b} up`) ?? 0}/${flows.get(`${b} same`) ?? 0}/${flows.get(`${b} down`) ?? 0}`).join('  '),
     'net talent per team-offseason by tier (overall points in less out): ' + net.map((v, i) => `T${i + 1} ${(v / tierTeams[i] / n).toFixed(0)}`).join('  '),
-    `walk-ons per team-offseason ${(walkOns / TEAMS.length / n).toFixed(1)} (placeholder); largest roster ${maxRoster}` +
+    `placeholder freshmen per team-offseason ${(walkOns / TEAMS.length / n).toFixed(1)}; largest roster ${maxRoster}` +
       (maxRoster > PORTAL.rosterMax ? '  <-- over the cap' : '') +
       `; tightest position ${minPos >= 0 ? `+${minPos}` : minPos} over its minimum` + (minPos < 0 ? '  <-- under' : ''),
-    'starter overall by tier (T1..T5), after each offseason:', ...talent,
+    'starter overall by tier (T1..T5), after each offseason. The control skips the offseason (no departures or growth), so',
+    `"since the start" (${fmt(start)}) is the drift to watch: within about 1.5 at every tier.`, ...talent,
     `  T1-T5 gap change vs control after ${n}: ${gapDrift.toFixed(2)}` + (Math.abs(gapDrift) > 1 ? '  <-- gap drift' : ''),
     `coach departures: ${pctText(react.shaken / react.players)} of players had a coach leave; of them ${pctText(react.reason / Math.max(1, react.shaken))} ` +
       `would give it as the reason to go; ${pctText(react.left / Math.max(1, per.reduce((x, y) => x + y, 0)))} of entrants had a coach leave, ` +
       `${(react.followed / n).toFixed(1)} a year followed him to his new school`,
     `promises (the user's staff promises everyone on the leaving list): ${promises.made} made, ${judged} judged, ` +
       `kept ${pctText(promises.kept / Math.max(1, judged))}, broken ${pctText(promises.broken / Math.max(1, judged))}`,
+    '', `DEPARTURES (docs/RECRUITING_PLAN.md, phase 1), the same career. Targets (approximate): about 80-110 early entrants a year,`,
+    'about 257 picks with the SEC and Big Ten on top and some from the Group of 5, and the class ladder holding.',
+    `per team-offseason: graduates ${(dep.grads / TEAMS.length / n).toFixed(1)}, early entrants ${(dep.declared / TEAMS.length / n).toFixed(2)}, redshirts ${(dep.redshirts / TEAMS.length / n).toFixed(1)}`,
+    `per draft: early entrants ${(dep.declared / n).toFixed(0)}` + (dep.declared / n < 80 || dep.declared / n > 110 ? '  <-- off target' : '') +
+      `, underclassmen drafted ${(dep.early / n).toFixed(0)}, of them in round 1 ${(dep.earlyR1 / n).toFixed(1)}`,
+    'picks per draft by conference: ' + [...dep.conf].sort((a, b) => b[1] - a[1]).map(([c, k]) => `${c} ${(k / n).toFixed(1)}`).join(', '),
+    'picks per draft by tier: ' + dep.tier.map((k, i) => `T${i + 1} ${(k / n).toFixed(1)}`).join('  '),
+    'overall by season in the program (and players a team), each new season:', ...ladder,
     '', `CAREERS (docs/CAREERS.md), the same career after ${n} seasons. History only: nothing in the sim reads it.`,
     `${careers.length} players, ${(JSON.stringify(s.careers ?? {}).length / n / 1e6).toFixed(2)} MB of JSON per season; ` +
       `rostered players with a past season ${pctText(withRows / rostered.length)}`,

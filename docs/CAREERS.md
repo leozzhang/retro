@@ -40,6 +40,10 @@ The current season's row is never stored. `liveSeason` builds it on demand until
 | `portal` | Entered the portal, came back to his school, or had no offer he liked |
 | `transfer` | Signed with a new school |
 | `left` | Left FBS |
+| `redshirt` | Took a redshirt year (4 or fewer games as a true freshman, or a season-ending injury) |
+| `graduated` | Out of eligibility |
+| `declared` | Declared early for the NFL draft |
+| `drafted` | Drafted (round, pick and city), or an early entrant who went undrafted |
 
 `headline` sums up a career in up to two phrases: a transfer, a breakout (from the bench if he wasn't a starter before it), next man up, N-year starter, or waiting his turn.
 
@@ -50,7 +54,7 @@ Older saves with no `careers` show all-time gains in SZN until their first archi
 
 ## Not built yet
 - Program records and career leaders (all-time passing, rushing, receiving), and a league-wide player search.
-- Class years are frozen until graduation exists, so every row in a career shows the same class.
+- **Size with departures:** graduated players' careers are kept, and redshirt and graduation lines add up, so a 5-season career runs about 2.9 MB of JSON a season (from about 2.0). Trimming `dnp` rows and non-user redshirt lines are the first levers.
 - Live games record no box scores, so the user's played games add games and starts but no stats.
 - Box-score credit goes to starters only (SEASON.md), so backups' stat lines are thin.
 - No defensive stats exist, so defenders' stories are made of starts, sparks, injuries and growth.

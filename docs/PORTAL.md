@@ -7,13 +7,13 @@ Rosters are still generated from the team id and never stored. A team's changes 
 - `out`: the generated players who left.
 - `in`: the players who joined, as `{ id, num }`.
 
-A player keeps his id for life, and the id names the roster he was generated on. That makes him rebuildable anywhere: `generatedAthlete(id)` (`data/depth.ts`). Walk-on ids encode the team, year, position and a count (`${team}-w2027.QB.0`), and they're rebuilt on their own random stream (`makeWalkOn`, `data/rosterGen.ts`).
+A player keeps his id for life, and the id names the roster he was generated on. That makes him rebuildable anywhere: `generatedAthlete(id)` (`data/depth.ts`). Walk-on ids encode the team, year, position and a count (`${team}-w2027.QB.0`), and they're rebuilt on their own random stream (`makeWalkOn`, `data/rosterGen.ts`). Placeholder freshmen work the same way (`${team}-f2027.QB.0`, `makeFreshman`). Since departures (RECRUITING.md), `baseRoster` also lays each player's class for the season over him.
 
 `baseRoster`/`baseSquad` (`season/world.ts`) give the generated roster with the delta applied. `squadFor`, progression's ceilings, confidence's bases and `carryMorale` all start from it. With no deltas, every report is byte-identical to the old code. `newSeason` carries `roster` into the next year.
 
 ## The offseason
 - `Phase` gains `'offseason'`. An open-ended season goes `complete` → `startOffseason` → the portal → `nextSeason`. A one-season game has no offseason.
-- `OFFSEASON_STAGES` is `['carousel', 'portal']`: the coaching carousel ([COACHES.md](COACHES.md)) runs first, so players can react to coaches leaving. Graduation, the draft, signing day and offseason growth go before the portal later.
+- `OFFSEASON_STAGES` is `['carousel', 'departures', 'portal']`: the coaching carousel ([COACHES.md](COACHES.md)) runs first, so players can react to coaches leaving, then departures (redshirts, graduation, early declarations and the NFL draft; [RECRUITING.md](RECRUITING.md)), so the portal reads next year's depth chart. Signing day goes before the portal later; offseason growth runs as the next season opens.
 - `SeasonSummary` now keeps the final AP top 25 (`ap`), win shares (`wp`) and level-ups per player (`dev`, from `TeamState.lu`). The portal reads the last two seasons from these for "recent results" and the development record.
 
 ## The player's side
@@ -68,9 +68,8 @@ Rounds 1 and 2 are the head coaches':
 
 **Closing (§7 placeholder):**
 - An unplaced player goes back to his old school if it has room after its position minimums, with a morale hit (`returnHit`). Otherwise he leaves FBS.
-- Walk-ons then fill every roster to 85: positions under their minimum first, then the furthest under `COMPOSITION`.
-- Transfers can take only `signShare` (half) of a school's departures. Walk-ons, standing in for the HS class, take the rest.
-- Class years stay frozen.
+- Placeholder freshmen (`refillFreshmen`, `makeFreshman`) then fill every roster to 85: positions under their minimum first, then the furthest under `COMPOSITION`. They start at the team's generated-freshman level and stand in for the HS class until recruiting.
+- Transfers can take only `signShare` (half) of the players a school lost to the portal, plus `departShare` (0.15) of those who graduated or declared. The freshmen take the rest.
 
 ## Leaving list and promises
 Before the portal opens, the user sees every player with at least 20% odds of entering, with his reason and lean (LEANING OUT at 50%+, TORN otherwise).
@@ -118,11 +117,12 @@ The agreed target here is 10–15 a team, with real spread.
 **Starter overall by tier against the control** (T1..T5): `+0.20 0.00 +0.16 +0.79 +2.05` after one offseason, and `+0.76 +0.33 +0.32 +2.52 +6.55` after five. The T1–T5 gap closes by 5.8 points.
 
 ## Flags (not solved)
-- **The bottom tiers gain every year** ("poor get richer", the opposite of the feared rich-get-richer). Buried backups at tier 2–4 are better than tier-5 starters, and they drop down to start. That's realistic.
-  - What isn't realistic is that they never leave: class years are frozen and nobody graduates, so every transfer stays forever and the gain compounds.
-  - Tried: loss aversion on WIN, the origin lean, and half the spots to transfers. Together they cut it from about 7.5 to 6.6 over 5 seasons (and steered drop-downs toward nearby tiers).
-  - **Graduation is the real fix and should come next.** Until then, long dynasties compress the tiers.
-- **Two-thirds of entrants go home,** because §7 sends anyone unplaced back when there's room. Real entrants rarely go back.
+- **The bottom tiers gain** ("poor get richer", the opposite of the feared rich-get-richer). Buried backups at tier 2–4 are better than tier-5 starters, and they drop down to start. That's realistic.
+  - Before departures, class years were frozen and every transfer stayed forever, so the gain compounded (T5 starters +7.1 over a no-portal control after 5 offseasons).
+  - **With departures** (RECRUITING.md), transfers graduate and it levels off: since the start of the career, T1–T3 starters hold within about 0.7 over 5 seasons, T4 rises about 2 and T5 about 4.5. Without portal entries, every tier holds within 1.3, so what's left is the drop-down flow itself.
+  - Tried before departures: loss aversion on WIN, the origin lean, and half the spots to transfers (about 7.5 to 6.6).
+  - Next levers: stronger WIN pull for good players (85+ entrants still go down more than up), and real HS recruiting, where power programs out-recruit the rest.
+- **Most unplaced entrants go home,** because §7 sends anyone unplaced back when there's room, and with graduates gone there's almost always room (about 59% of entrants go home, almost none leave FBS). Real entrants rarely go back.
 - **Snaps promises are judged by starts,** since snaps aren't stored. A backup promised snaps who plays without starting counts as broken.
 - **Real-world calibration** of entry and placement rates wasn't researched against a table.
 

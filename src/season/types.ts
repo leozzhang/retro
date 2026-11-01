@@ -19,6 +19,8 @@ export interface Delegation {
   portal?: boolean;
   /** The user's openings in the coaching carousel (season/carousel.ts). Missing means the user hires. */
   carousel?: boolean;
+  /** The user's declare watch before the NFL draft (season/departures.ts). Missing means the user meets them. */
+  departures?: boolean;
 }
 
 export interface SeasonConfig {
@@ -112,7 +114,7 @@ export interface Poll {
 
 export interface NewsItem {
   week: number;
-  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal' | 'carousel';
+  kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal' | 'carousel' | 'draft';
   text: string;
   teams: string[];
 }
@@ -180,6 +182,10 @@ export interface Progress {
    * chair, their bond (0-1, from seasons together), and the school he went to if he's still in FBS.
    */
   cl?: { year: number; role: AnyRole; bond: number; to?: string };
+  /** Games he took a snap in this season: 4 or fewer keeps a redshirt (season/departures.ts). */
+  gp?: number;
+  /** The season he redshirted: it doesn't count toward his class (season/classes.ts). */
+  rs?: number;
 }
 
 export interface CoachPromise {
@@ -394,7 +400,7 @@ export interface StoryEvent {
   /** The week it happened; missing means the offseason after `year`'s season. */
   week?: number;
   team: string;
-  kind: 'start' | 'spark' | 'bench' | 'breakout' | 'breakthrough' | 'injury' | 'award' | 'portal' | 'transfer' | 'left';
+  kind: 'start' | 'spark' | 'bench' | 'breakout' | 'breakthrough' | 'injury' | 'award' | 'portal' | 'transfer' | 'left' | 'redshirt' | 'graduated' | 'declared' | 'drafted';
   text: string;
   /** A transfer's old school (`team` is the new one). */
   from?: string;
@@ -420,16 +426,68 @@ export interface SeasonSummary {
   wp?: Record<string, number>;
   /** Level-ups per player by team: the development record. */
   dev?: Record<string, number>;
+  /** The NFL draft that followed it (season/draft.ts), in pick order. */
+  draft?: DraftPick[];
 }
 
-/** Offseason stages, in order (season/offseason.ts). Graduation, the draft and signing day go before the portal. */
-export type OffseasonStage = 'carousel' | 'portal';
+/** One NFL draft pick. Name, position and overall are copied in, since he's gone from FBS. */
+export interface DraftPick {
+  id: string;
+  /** His college. */
+  team: string;
+  name: string;
+  pos: Position;
+  ovr: number;
+  round: number;
+  /** Overall pick, from 1. */
+  pick: number;
+  /** The NFL team, by city. */
+  city: string;
+  /** An underclassman who declared early. */
+  early?: boolean;
+}
+
+/** A player leaving after his season: out of eligibility, or declared for the draft. */
+export interface Departure {
+  id: string;
+  team: string;
+  name: string;
+  pos: Position;
+  ovr: number;
+  why: 'grad' | 'declare';
+}
+
+/** One of the user's underclassmen thinking about the draft, and what the user did about it. */
+export interface DeclareEntry {
+  /** His odds of declaring before a meeting, and where he projects. */
+  p: number;
+  proj: number;
+  met?: boolean;
+  /** The meeting kept him. */
+  ok?: boolean;
+}
+
+/** The departures stage (season/departures.ts): the declare watch, then who left. */
+export interface DeparturesState {
+  /** The user's declare watch. */
+  watch: Record<string, DeclareEntry>;
+  /** Logit shifts on declaring from meetings (every team). */
+  adj: Record<string, number>;
+  meets: number;
+  /** Everyone who left, once the stage has run; and how many left each team (the portal's spots read it). */
+  gone?: Departure[];
+  left?: Record<string, number>;
+}
+
+/** Offseason stages, in order (season/offseason.ts). Signing day goes before the portal later. */
+export type OffseasonStage = 'carousel' | 'departures' | 'portal';
 
 export interface OffseasonState {
   stage: OffseasonStage;
   /**
-   * Carousel: the hiring round, 1 to `CAROUSEL.rounds` (season/carousel.ts). Portal: 0 the leaving list,
-   * before anyone enters; 1 and 2 the head coaches' rounds.
+   * Carousel: the hiring round, 1 to `CAROUSEL.rounds` (season/carousel.ts). Departures: 0 the declare
+   * watch, 1 who left and the draft. Portal: 0 the leaving list, before anyone enters; 1 and 2 the head
+   * coaches' rounds.
    */
   round: number;
   /** Last season's promises, judged when the offseason opened. */
@@ -512,4 +570,5 @@ export interface SeasonState {
   offseason?: OffseasonState;
   portal?: PortalState;
   carousel?: CarouselState;
+  departures?: DeparturesState;
 }

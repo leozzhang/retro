@@ -41,6 +41,11 @@ import {
   actionRect, ADVANCE_BTN, BOARD_ROWS, boardRows, chipRect, drawPortal, LEAVING_ROWS, leavingRows, newPortalView, PORTAL_TABS, portalTabAt, POS_CHIPS,
   rowRect, type PortalView,
 } from '../render/portalScreen';
+import {
+  departureRowCount, DEPARTURE_ROWS, DEPARTURE_TABS, DEPARTURES_ADVANCE, departuresRowRect, departuresTabAt, drawDepartures, MEET_BTN,
+  newDeparturesView, watchRows, type DeparturesView,
+} from '../render/departuresScreen';
+import { meetOnWatch } from '../season/departures';
 import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
@@ -64,7 +69,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -200,6 +205,7 @@ export class Game {
   private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
   private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
   private carouselView: CarouselView = newCarouselView();
+  private departuresView: DeparturesView = { tab: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
@@ -246,6 +252,9 @@ export class Game {
         break;
       case 'carousel':
         this.updateCarousel(input);
+        break;
+      case 'departures':
+        this.updateDepartures(input);
         break;
       case 'call':
         this.updateCall(dt, input);
@@ -631,10 +640,74 @@ export class Game {
 
   /** The offseason's current stage. */
   private toOffseason(): void {
-    if (this.season?.offseason?.stage === 'carousel') {
+    const stage = this.season?.offseason?.stage;
+    if (stage === 'carousel') {
       this.screen = 'carousel';
       this.carouselView = newCarouselView();
-    } else this.toPortal();
+    } else if (stage === 'departures') this.toDepartures();
+    else this.toPortal();
+  }
+
+  // ------------------------------------------------------------ departures and the draft
+
+  private toDepartures(): void {
+    this.screen = 'departures';
+    this.departuresView = newDeparturesView(this.season!);
+  }
+
+  /**
+   * Departures (season/departures.ts): tabs, rows, 1 (or the button) to meet a player on the declare
+   * watch, F to hand the watch to staff, Space to run the stage and then to open the portal. Every
+   * change is saved.
+   */
+  private updateDepartures(input: Input): void {
+    const s = this.season!;
+    const v = this.departuresView;
+    const { x, y, pressed } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'season';
+      return;
+    }
+    const n = DEPARTURE_TABS.length;
+    let tab = v.tab;
+    if (input.hit('KeyA', 'ArrowLeft')) tab = (tab + n - 1) % n;
+    if (input.hit('KeyD', 'ArrowRight')) tab = (tab + 1) % n;
+    if (pressed && departuresTabAt(x, y) >= 0) tab = departuresTabAt(x, y);
+    if (tab !== v.tab) {
+      Object.assign(v, { tab, sel: 0, top: 0, note: '' });
+      return;
+    }
+    if (input.hit('KeyF') && !s.offseason?.round) {
+      s.config.delegate.departures = !s.config.delegate.departures;
+      v.note = s.config.delegate.departures ? 'YOUR STAFF MEETS THEM (F: TAKE IT BACK)' : 'YOU MEET THEM';
+      saveSeason(s);
+      return;
+    }
+    if (input.hit('Space', 'Enter') || (pressed && inBox(DEPARTURES_ADVANCE, x, y))) {
+      advanceOffseason(s);
+      saveSeason(s);
+      this.toOffseason();
+      return;
+    }
+    const count = departureRowCount(s, v.tab);
+    const watch = DEPARTURE_TABS[v.tab] === 'DECLARE WATCH';
+    const shown = watch ? 14 : DEPARTURE_ROWS;
+    const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0) + Math.sign(input.mouse.wheel);
+    if (step && count) v.sel = Math.max(0, Math.min(count - 1, v.sel + step));
+    if (pressed) for (let i = 0; i < shown; i++) if (inBox(departuresRowRect(i), x, y) && v.top + i < count) v.sel = v.top + i;
+    if (v.sel < v.top) v.top = v.sel;
+    if (v.sel >= v.top + shown) v.top = v.sel - shown + 1;
+    if (!watch || s.config.delegate.departures) return;
+    const id = watchRows(s)[v.sel];
+    if (!id || !(input.hit('Digit1') || (pressed && inBox(MEET_BTN, x, y)))) return;
+    if (!meetOnWatch(s, id)) {
+      v.note = s.departures?.watch[id]?.met ? 'YOU ALREADY MET HIM' : 'NO MEETINGS LEFT';
+      return;
+    }
+    v.note = s.departures!.watch[id].ok ? 'GOOD TALK: HE IS LEANING TOWARD COMING BACK' : 'HE HEARD YOU OUT, BUT HIS MIND IS ON THE NFL';
+    saveSeason(s);
   }
 
   /**
@@ -671,7 +744,7 @@ export class Game {
       advanceOffseason(s);
       saveSeason(s);
       if (s.offseason?.stage !== 'carousel') {
-        this.toPortal();
+        this.toOffseason();
         return;
       }
       Object.assign(v, { sel: 0, top: 0, chair: Math.min(v.chair, Math.max(0, openChairs(s).length - 1)), note: `ROUND ${s.offseason.round}: SEE WHO SIGNED ON AROUND THE LEAGUE` });
@@ -1486,6 +1559,10 @@ export class Game {
     }
     if (this.screen === 'carousel') {
       drawCarousel(g, this.season!, this.carouselView);
+      return;
+    }
+    if (this.screen === 'departures') {
+      drawDepartures(g, this.season!, this.departuresView);
       return;
     }
     if (this.screen === 'prep') {

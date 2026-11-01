@@ -35,7 +35,7 @@ The season framework: every system in the week loop exists end to end, each behi
 | `results` | Injuries count down and health recovers, then each game's knocks and injuries from its grades (`season/injuries.ts`, [INJURIES.md](INJURIES.md)); injury news | Suspensions; mid-game injuries in live games |
 | `rankings` | AP poll every week; CFP rankings from `CALENDAR.cfpStartWeek` until selection | |
 | `news` | `weekNews`: user results, upsets, ranked matchups, big games, new No. 1, Heisman watch | More templates, coach quotes, recruiting news |
-| `transition` | Regular season → championship week → selection (bracket, bowls, awards) → playoff rounds → complete | Offseason: graduation, offseason growth, recruiting, coaching carousel |
+| `transition` | Regular season → championship week → selection (bracket, bowls, awards) → playoff rounds → complete | Offseason (open seasons): coaching carousel, departures and the draft, transfer portal; offseason growth as the next season opens. Recruiting later |
 
 Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (week 16: bowls and the first playoff round, then one week per round) → `complete`. An open-ended season (DYNASTY on the title screen, L) then goes to `offseason`: its stages (`season/offseason.ts`) run the transfer portal ([PORTAL.md](PORTAL.md)), and the last one calls `nextSeason`, which rolls into the next year with the rosters' changes (`TeamState.roster`), progression and morale. Graduation, the draft, signing day and offseason growth will be stages before the portal. Each finished year's summary keeps the final AP top 25, win shares and level-ups per player, for reputations.
 

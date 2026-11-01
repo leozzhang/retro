@@ -2,7 +2,7 @@ import type { Athlete } from './athletes';
 import { CONF, CONF_OVR, type UnitConf } from './confidence';
 import { overall, POS_ROLE, SLOT_POS, type Position } from './positions';
 import type { RatingKey, Ratings } from './ratings';
-import { generateAthletes, makeWalkOn, parseWalkOn } from './rosterGen';
+import { generateAthletes, makeFreshman, makeWalkOn, parseFreshman, parseWalkOn } from './rosterGen';
 import { SLOT_ROLE, TEAMS, teamById, type RosterPlayer, type Team } from './teams';
 
 /**
@@ -262,23 +262,24 @@ export function buildSquad(team: Team): Squad {
   return sq;
 }
 
-/**
- * Any player by id as he was generated: `${team}-${i}` from his team's roster, or a walk-on rebuilt
- * from his id. A transfer is always one of these, whatever roster he's on now.
- */
 /** The team a player was generated on (recruited by), from his id. */
 export function originTeam(id: string): string | undefined {
-  const wo = parseWalkOn(id);
+  const wo = parseWalkOn(id) ?? parseFreshman(id);
   if (wo) return wo.team;
   const t = id.slice(0, id.lastIndexOf('-'));
   return TEAM_IDS.has(t) ? t : undefined;
 }
 
+/**
+ * Any player by id as he was generated: `${team}-${i}` from his team's roster, or a walk-on or
+ * placeholder freshman rebuilt from his id. A transfer is always one of these, whatever roster he's on now.
+ */
 export function generatedAthlete(id: string): Athlete | undefined {
   const wo = parseWalkOn(id);
-  if (wo) {
+  const fr = wo ? undefined : parseFreshman(id);
+  if (wo || fr) {
     let a = walkOns.get(id);
-    if (!a) walkOns.set(id, (a = makeWalkOn(teamById(wo.team).profile, id, wo.pos)));
+    if (!a) walkOns.set(id, (a = wo ? makeWalkOn(teamById(wo.team).profile, id, wo.pos) : makeFreshman(teamById(fr!.team).profile, id, fr!.pos)));
     return a;
   }
   const cut = id.lastIndexOf('-');

@@ -58,12 +58,13 @@ function vsText(g: SeasonGame, team: string): string {
   return g.home === team ? 'VS' : '@';
 }
 
-/** The offseason stage's button: the carousel, then the portal. */
-const offseasonLabel = (s: SeasonState) => (s.offseason?.stage === 'carousel' ? 'HIRING' : 'PORTAL');
+/** The offseason stage's button: the carousel, departures and the draft, then the portal. */
+const offseasonLabel = (s: SeasonState) => ({ carousel: 'HIRING', departures: 'DRAFT', portal: 'PORTAL' } as const)[s.offseason?.stage ?? 'portal'];
 
 /** The line under the header: this week's game, or what Space does instead. */
 export function nextGameText(s: SeasonState): string {
   if (s.phase === 'offseason' && s.offseason?.stage === 'carousel') return `COACHING CAROUSEL, ROUND ${s.offseason.round}  -  SPACE: OPEN`;
+  if (s.phase === 'offseason' && s.offseason?.stage === 'departures') return `DEPARTURES AND THE NFL DRAFT${s.offseason.round ? ': DONE' : ''}  -  SPACE: OPEN`;
   if (s.phase === 'offseason') return `TRANSFER PORTAL, ${s.offseason?.round ? `ROUND ${s.offseason.round}` : 'OPENING'}  -  SPACE: OPEN`;
   if (s.phase === 'complete') {
     const champ = `CHAMPION: ${teamById(s.bracket!.champion!).school.toUpperCase()}`;

@@ -159,7 +159,7 @@ function seasonRow(state: SeasonState, a: Athlete, team: string, st: Partial<Rec
   const games = Math.max(1, ts?.gp ?? 0);
   const role: CareerRole = gs >= games * CAREER.starter ? 'starter' : gs || gp >= games * CAREER.rotation ? 'rotation' : gp ? 'reserve' : 'dnp';
   const row: CareerSeason = {
-    year: state.year, team, cls: classLabel(base), role,
+    year: state.year, team, cls: classLabel(a), role,
     ovr0: overall(applyDelta(base.r, prior.d), base.pos), ovr1: overall(applyDelta(base.r, p?.d ?? {}), base.pos),
   };
   if (gp) row.gp = gp;

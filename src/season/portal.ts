@@ -5,7 +5,7 @@ import { GROUPS, type Group } from '../data/coaches';
 import { athleteName, generatedAthlete, originTeam } from '../data/depth';
 import { REGION, TEAM_STATE } from '../data/fbs/geo';
 import { overall, POSITIONS, type Position } from '../data/positions';
-import { COMPOSITION, freeNumber, parseWalkOn, STARTERS, walkOnId } from '../data/rosterGen';
+import { COMPOSITION, freeNumber, freshmanId, parseWalkOn, STARTERS } from '../data/rosterGen';
 import { TEAMS, teamById } from '../data/teams';
 import { clamp, gauss, hashString, mulberry32 } from '../engine/math';
 import { tell } from './career';
@@ -53,6 +53,7 @@ export const PORTAL = {
   origin: { win: 0.5, dev: 0.15 },
   lossAversion: 2,
   signShare: 0.5,
+  departShare: 0.15,
   ptScale: 2.5,
   crackPt: 0.5,
   marketPct: 0.85,
@@ -148,8 +149,9 @@ export interface School {
   chart: Map<Position, number[]>;
   count: Map<Position, number>;
   size: number;
-  /** Players who left it for the portal, and transfers it has signed. */
+  /** Players who left it for the portal, who left it in departures (graduated or declared), and transfers it has signed. */
   left: number;
+  gone: number;
   signed: number;
 }
 
@@ -250,7 +252,7 @@ export function buildBoard(state: SeasonState): Board {
     schools.set(t.id, {
       id: t.id, home: TEAM_STATE[t.id] ?? 'TX', win: winFactor(state, t.id, wp.get(t.id) ?? 0.5), dev,
       room: PORTAL.roomW * (mood / Math.max(1, sq.athletes.length)), extra: PORTAL.securityW * security,
-      chart, count, size, left: left.get(t.id) ?? 0, signed: signed.get(t.id) ?? 0,
+      chart, count, size, left: left.get(t.id) ?? 0, gone: state.departures?.left?.[t.id] ?? 0, signed: signed.get(t.id) ?? 0,
     });
   }
   const board = { schools, players };
@@ -460,10 +462,13 @@ export function rosterRoom(board: Board, team: string): number {
   return PORTAL.rosterMax - board.schools.get(team)!.size;
 }
 
-/** Spots open to transfers: roster room, within `signShare` of the school's departures. */
+/**
+ * Spots open to transfers: roster room, within `signShare` of the players it lost to the portal and
+ * `departShare` of those who graduated or declared. The freshman class takes the rest.
+ */
 export function openSpots(board: Board, team: string): number {
   const s = board.schools.get(team)!;
-  return Math.min(rosterRoom(board, team), Math.ceil(PORTAL.signShare * s.left) - s.signed);
+  return Math.min(rosterRoom(board, team), Math.ceil(PORTAL.signShare * s.left + PORTAL.departShare * s.gone) - s.signed);
 }
 
 /** Spots the school still needs for positions under their minimum, once a player at `pos` joins. */
@@ -714,13 +719,18 @@ function dropFrom(ts: TeamState, id: string): void {
 
 /** He leaves FBS: off his roster, and his records with him. */
 function leaveFbs(state: SeasonState, id: string, from: string): void {
+  dropPlayer(state, id, from);
+  tell(state, id, { team: from, kind: 'left', text: 'Leaves FBS' });
+}
+
+/** Off his roster for good (out of FBS, graduated or drafted), with his progress, morale and health. */
+export function dropPlayer(state: SeasonState, id: string, from: string): void {
   const ts = (state.teamState[from] ??= {});
   dropFrom(ts, id);
   delete ts.progress?.[id];
   delete ts.mo?.[id];
   delete ts.health?.[id];
   delete ts.injuries?.[id];
-  tell(state, id, { team: from, kind: 'left', text: 'Leaves FBS' });
 }
 
 function sign(state: SeasonState, board: Board, e: PortalEntrant, team: string): void {
@@ -793,8 +803,8 @@ export function rollEntries(state: SeasonState): void {
 
 /**
  * The portal closes: the unplaced go back to their old school if it has a spot (unhappy about it), or
- * leave FBS; then walk-ons refill every roster below the cap, short positions first. Both are
- * placeholders until graduation and HS recruiting.
+ * leave FBS; then a freshman class fills every roster to the cap, short positions first. Both are
+ * placeholders until HS recruiting.
  */
 export function closePortal(state: SeasonState): void {
   const portal = state.portal!;
@@ -813,13 +823,16 @@ export function closePortal(state: SeasonState): void {
     }
   }
   dropBoard(state);
-  refillWalkOns(state);
+  refillFreshmen(state);
   const placed = portal.entrants.filter((e) => e.out === 'commit').length;
   state.news.push(portalNews(state, `PORTAL CLOSES: ${placed} of ${portal.entrants.length} entrants signed with a new school`, []));
 }
 
-/** Walk-ons fill each roster to the cap: positions under their minimum first, then the furthest under its usual count. */
-export function refillWalkOns(state: SeasonState): void {
+/**
+ * Placeholder freshmen (`makeFreshman`) fill each roster to the cap: positions under their minimum
+ * first, then the furthest under its usual count. They stand in for a recruiting class.
+ */
+export function refillFreshmen(state: SeasonState): void {
   for (const t of TEAMS) {
     const roster = baseRoster(state, t.id);
     if (roster.length >= PORTAL.rosterMax) continue;
@@ -828,11 +841,11 @@ export function refillWalkOns(state: SeasonState): void {
     const taken = roster.map((a) => a.num);
     const ts = (state.teamState[t.id] ??= {});
     const r = (ts.roster ??= {});
-    const rng = seasonRng(state, 'portal', 'walkon', t.id);
+    const rng = seasonRng(state, 'portal', 'freshman', t.id);
     for (let n = 0, size = roster.length; size < PORTAL.rosterMax; n++, size++) {
       const short = POSITIONS.find((p) => (count.get(p) ?? 0) < MIN_COUNT[p]);
       const pos = short ?? COMPOSITION.map(([p, c]) => [p, c - (count.get(p) ?? 0)] as const).sort((a, b) => b[1] - a[1])[0][0];
-      const id = walkOnId(t.id, state.year + 1, pos, n);
+      const id = freshmanId(t.id, state.year + 1, pos, n);
       const num = freeNumber(rng, pos, taken);
       taken.push(num);
       (r.in ??= []).push({ id, num });

@@ -368,6 +368,75 @@ export function makeWalkOn(p: TeamProfile, id: string, pos: Position): Athlete {
   };
 }
 
+/** A placeholder freshman's id: his team, the season he joins, his position and a count. */
+export function freshmanId(teamId: string, year: number, pos: Position, n: number): string {
+  return `${teamId}-f${year}.${pos}.${n}`;
+}
+
+/** Parses a placeholder freshman's id; undefined for any other id. */
+export function parseFreshman(id: string): { team: string; pos: Position } | undefined {
+  const m = /^(.*)-f\d+\.([A-Z]+)\.\d+$/.exec(id);
+  return m ? { team: m[1], pos: m[2] as Position } : undefined;
+}
+
+/** The season a walk-on or freshman joined as a freshman (from his id); undefined for a generated player. */
+export function joinYear(id: string): number | undefined {
+  const m = /-[wf](\d+)\.[A-Z]+\.\d+$/.exec(id);
+  return m ? Number(m[1]) : undefined;
+}
+
+/**
+ * How far a team's generated true freshmen sit from their units' targets, on average: the level a
+ * placeholder freshman starts at, so an incoming class matches the one the roster was generated with.
+ */
+const freshmanOffsets = new Map<string, number>();
+function freshmanOffset(p: TeamProfile): number {
+  let off = freshmanOffsets.get(p.id);
+  if (off !== undefined) return off;
+  const targets = unitTargets(p);
+  const fr = generateAthletes(p).filter((a) => a.year === 'FR' && !a.redshirt && !a.real);
+  off = fr.length ? fr.reduce((s, a) => s + overallRaw(a.r, a.pos) - targets[POS_UNIT[a.pos]], 0) / fr.length : CLASS_ADJ.FR;
+  freshmanOffsets.set(p.id, off);
+  return off;
+}
+
+/**
+ * A placeholder freshman, standing in for a recruiting class until HS recruiting: rolled at his team's
+ * generated-freshman level (`freshmanOffset`, spread `LEVEL_SD`), with growth and potential as the
+ * generator gives a freshman. Seeded by his id on his own stream; his jersey is picked when he joins.
+ */
+export function makeFreshman(p: TeamProfile, id: string, pos: Position): Athlete {
+  const rng = mulberry32(hashString(`freshman:${id}`));
+  const level = clamp(unitTargets(p)[POS_UNIT[pos]] + freshmanOffset(p) + gauss(rng) * LEVEL_SD, 35, 99);
+  const archetype = weighted(rng, archetypeOdds(pos, p));
+  const b = BUILD[pos];
+  const hz = clamp(gauss(rng), -2.2, 2.2);
+  const wz = clamp(gauss(rng) * 0.8 + hz * 0.45, -2.5, 2.5);
+  const r = rollRatings(rng, pos, archetype, level, wz, hz);
+  const dev = devTrait(rng, level);
+  const ovr = overallRaw(r, pos);
+  const potential = Math.round(clamp(ovr + Math.max(0, GROWTH.FR * DEV_MULT[dev] + gauss(rng) * 3), ovr, 99));
+  return {
+    id,
+    first: pick(rng, FIRST_NAMES),
+    last: pick(rng, LAST_NAMES),
+    num: 0,
+    pos,
+    archetype,
+    year: 'FR',
+    redshirt: false,
+    heightIn: Math.round(b.h[0] + hz * b.h[1]),
+    weightLb: Math.round(b.w[0] + wz * b.w[1]),
+    hometown: hometown(rng, p),
+    stars: starsFor(potential, dev),
+    potential,
+    dev,
+    r,
+    skin: pick(rng, SKINS),
+    injury: null,
+  };
+}
+
 /** A free jersey for a player joining a roster, seeded so the pick is repeatable. */
 export function freeNumber(rng: Rng, pos: Position, taken: Iterable<number>): number {
   return pickNumber(rng, POS_ROLE[pos], new Set(taken));

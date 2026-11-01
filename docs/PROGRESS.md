@@ -1212,19 +1212,53 @@ As built: [COACHES.md](COACHES.md), "Coaches over time".
   - `npm run season`: the same 7 flags. TEACH and DEVELOP thirds, GA promotions and trees are reported in STAFF.
   - The MY STAFF tab was checked in headless Chrome.
 
+## Done: departures, phase 1 of recruiting (2026-10-31)
+Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUITING.md).
+- **Class years move** (`season/classes.ts`): from the generated class (or a walk-on's or freshman's join year) plus seasons since, less a redshirt year (`Progress.rs`). `baseSquad` lays it over every athlete, so morale, XP, the portal and careers read the real class.
+- **A `departures` offseason stage** between the carousel and the portal (`season/departures.ts`):
+  - redshirts: 4 or fewer games (`Progress.gp`) as a true freshman, or a medical redshirt
+  - early declarations by projected pick and temperament; the user's DECLARE WATCH with 3 meetings; CPU staffs meet their 2 likeliest
+  - graduation
+  - a 257-pick NFL draft by city (`season/draft.ts`) in `SeasonSummary.draft`, with news and career story lines
+- **Offseason growth** (`offseasonGrowth`, run as the next season opens): calibrated so the class ladder and the tiers hold.
+- **Placeholder freshmen** (`makeFreshman`, at the team's generated-freshman level) replace walk-ons in the post-portal refill. Transfers get `departShare` (0.15) of graduates' spots.
+- **Screen** `render/departuresScreen.ts` (the hub's DRAFT button): DECLARE WATCH, SENIORS and DRAFT tabs.
+- **Checks:**
+  - `npm run typecheck`
+  - `npm test`: 245 pass, 10 new in `src/departures.test.ts`. Five existing tests changed for the new stage order:
+    - seniors graduate before the portal
+    - transfers grow in the offseason
+    - offer caps count graduates
+    - a promise test picks non-seniors
+    - the carousel closes into departures
+  - `npm run balance` is byte-identical.
+  - `npm run season`: the new DEPARTURES section:
+    - 103 early entrants a year, 64 underclassmen drafted, the SEC and Big Ten on top
+    - the class ladder holds within about 2
+    - starters since the start: T1–T3 within 0.7 after 5 seasons; T4 +2.0 and T5 +4.4 through the portal (before: T5 +7.1 and compounding)
+    - the single-season sections are unchanged
+  - Driven in headless Chrome against the dev build (hub → watch → meet → seniors → draft → portal). No console errors; the column overlaps it showed were fixed.
+- **Flags:** in [RECRUITING.md](RECRUITING.md):
+  - T4/T5 portal drift remains.
+  - The Group of 5 is under-drafted (22 vs about 30).
+  - Class-size waves in the first years.
+  - Most true freshmen redshirt (no 4-game management or REDSHIRT toggle yet).
+  - Careers grow to about 2.9 MB of JSON a season.
+  - Assistant turnover is 19.9%, just under its 20% floor (noise).
+
 ## In progress
 - **Coaching carousel:** all 7 steps are built (CAROUSEL_PLAN.md). Left for later: former players as GAs (waits on graduation), retention tools, specializations, chemistry, bowl-week interims, DCs bringing their own style (`defIdentity`), the user changing jobs. The CAROUSEL screen was checked in headless Chrome against the dev build, not by hand with keyboard and mouse; the portal card's coach-left line hasn't been seen on screen. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
 ## Known bugs and rough edges
-- **Transfer portal, multi-season drift:** with class years frozen, tier-5 starters gain about 6.6 overall on a no-portal control over 5 offseasons (PORTAL.md). Two-thirds of unplaced entrants go home (placeholder). Waits on graduation.
+- **Transfer portal, multi-season drift:** with departures, T1–T3 hold, but T4 starters rise about 2 and T5 about 4.4 over 5 offseasons through drop-down transfers (PORTAL.md). About 59% of entrants go home (placeholder), since graduates leave room.
 - **Desktop app:** no app icon (Electron's default), no code signing (SmartScreen warns on first launch), one save slot, and no auto-update. A failed write leaves a stray `.tmp` beside the save; it's overwritten on the next save.
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
 - **Injuries are rolled after games only.** The user's live games have no mid-game injuries; that waits for mid-game roster changes. Knocks have no body-part label. Real players listed as injured in the research (for example Sayin) start the season healthy. The QB missing 3+ games rate (5.7%) is a bit under the ~8% aim, on purpose.
 - **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
 - **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
-- **Progression is in season only:** no offseason growth, graduation or aging yet, and players who don't play (redshirts, deep backups) don't grow. A full season is about 2.6 MB of JSON, plus about 2 MB of careers a season (CAREERS.md); gzipped saves are about a seventh of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
-- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season's offseason has only the transfer portal (no graduation, draft or recruiting yet, so class years stay frozen).
+- **Progression:** in season only players who play grow; everyone grows in the offseason (RECRUITING.md). A full season is about 2.6 MB of JSON, plus about 2.9 MB of careers a season with departures (CAREERS.md); gzipped saves are about a seventh of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
+- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled, and an open-ended season's offseason has no HS recruiting yet (placeholder freshmen fill rosters).
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
@@ -1259,7 +1293,7 @@ As built: [COACHES.md](COACHES.md), "Coaches over time".
 
 ## Next up (rough priority)
 1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
-1. **Graduation and class years** as an offseason stage before the portal (`OFFSEASON_STAGES`): seniors leave, classes advance, and walk-ons stop standing in for a recruiting class. This fixes the portal's compounding tier drift (PORTAL.md flags). Then HS recruiting from `stars`/hometowns with the coaches' RECRUIT, replacing the portal's §7 placeholder.
+1. **HS recruiting**, phases 2–5 of [RECRUITING_PLAN.md](RECRUITING_PLAN.md) (phase 1, departures, is done). They add a seeded HS prospect pool with stars and hidden truth, an in-season recruiting cycle (boards, home-game visits, commits, flips and decommits, early and national signing days), coach and program pipelines, and the RECRUIT screen with the position coaches' vague evaluations and staff auto-recruiting.
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
 1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; then the offseason: graduation, offseason growth (in-season progression is done; see PROGRESSION.md), recruiting from `stars`/hometowns with the coaches' pitch, and the coaching carousel through `staffFor`.
 1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.

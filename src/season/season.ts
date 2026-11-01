@@ -13,10 +13,11 @@ import { athleteName, generatedAthlete, type Squad } from '../data/depth';
 import { archiveSeason, storyWeek } from './career';
 import { archiveCoaches, programXp, progressCoaches } from './coaching';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
-import { carryMorale, moraleStep } from './morale';
+import { carryMorale, moraleOf, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
-import { deltaText, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
+import { deltaText, offseasonGrowth, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
+import { joinYear } from '../data/rosterGen';
 import { GAME_SIM, settleTie, simGame, winOdds } from './simGame';
 import { emphasisMods, groupOf, type TeamMods } from './emphasis';
 import { STANDARD } from '../data/emphasis';
@@ -50,16 +51,46 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     const next = JSON.parse(JSON.stringify({ progress: ts.progress, mo: ts.mo, roster: ts.roster, staff: ts.staff, ga: ts.ga })) as TeamState;
     for (const p of Object.values(next.progress ?? {})) {
       delete p.up;
+      delete p.gp;
       carryConfidence(p);
     }
     carryMorale(next, baseRoster(prev!, id));
     state.teamState[id] = next;
   }
+  if (prev?.phase === 'offseason') growOffseason(prev, state);
   state.games = generateSchedule(TEAMS, year, seasonRng(state, 'schedule'));
   const pre = apPoll(state, 0).poll;
   state.polls.push(pre);
   state.news.push({ week: 0, kind: 'poll', teams: [pre.ranks[0].team], text: `${teamById(pre.ranks[0].team).school} opens ${year} at No. 1 in the preseason AP poll` });
   return state;
+}
+
+/** The user's biggest offseason gainers that make the news. */
+const OFFSEASON_NEWS = 3;
+
+/**
+ * Offseason growth (season/progression.ts `offseasonGrowth`) for every returning player, from the
+ * roster and staff as last season's offseason left them; the incoming freshmen arrive as they are.
+ * Only after a real offseason: a season rolled straight over skips it.
+ */
+function growOffseason(prev: SeasonState, state: SeasonState): void {
+  const user = state.config.userTeamId;
+  for (const t of TEAMS) {
+    const ts = (state.teamState[t.id] ??= {});
+    const prog = (ts.progress ??= {});
+    const old = prev.teamState[t.id];
+    const gains = offseasonGrowth(
+      prog, squadFor(prev, t.id), (a) => moraleOf(old, a), seasonRng(state, 'offseason', t.id), programXp(prev, t.id),
+      (id) => joinYear(id) === state.year,
+    );
+    if (t.id !== user) continue;
+    for (const g of gains.filter((x) => x.to > x.from).sort((a, b) => b.to - b.from - (a.to - a.from)).slice(0, OFFSEASON_NEWS)) {
+      state.news.push({
+        week: 0, kind: 'progress', teams: [user],
+        text: `OFFSEASON: ${athleteName(g.athlete)} (${g.athlete.pos}) comes out of the offseason up ${g.to - g.from} to ${g.to} overall`,
+      });
+    }
+  }
 }
 
 /** The user's game this week, if any is still to be played. */
@@ -353,8 +384,8 @@ export function simSeason(state: SeasonState): void {
 }
 
 /**
- * An open-ended season rolls into the next year. Players keep their progression; class years don't
- * change yet: graduation, offseason growth and recruiting belong in the offseason here.
+ * An open-ended season rolls into the next year. Players keep their progression, and after a real
+ * offseason they grow (`growOffseason`); class years follow from the year (season/classes.ts).
  */
 export function nextSeason(state: SeasonState): SeasonState {
   return newSeason(state.config, state.seed, state.year + 1, state);
@@ -369,7 +400,7 @@ export function phaseLabel(state: SeasonState): string {
     case 'postseason':
       return 'BOWLS AND PLAYOFF';
     case 'offseason':
-      return state.offseason?.stage === 'carousel' ? 'OFFSEASON: CAROUSEL' : 'OFFSEASON: PORTAL';
+      return `OFFSEASON: ${({ carousel: 'CAROUSEL', departures: 'DEPARTURES', portal: 'PORTAL' } as const)[state.offseason?.stage ?? 'portal']}`;
     default:
       return 'SEASON OVER';
   }

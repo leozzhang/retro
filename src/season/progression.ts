@@ -227,6 +227,7 @@ export function progressTeam(
     const g = grades.get(a.id);
     if (!g || g.team !== squad.team.id || !g.snaps) continue;
     const p = (prog[a.id] ??= { xp: 0, lvl: 0, d: {} });
+    p.gp = (p.gp ?? 0) + 1;
     const mult = xpMultiplier(a, p, moraleOf(ts, a)).total;
     p.xp += Math.round(gameXp(g) * mult * program(a.pos));
     const tags = (p.tags ??= {});
@@ -254,6 +255,57 @@ export function progressTeam(
     }
   }
   return events;
+}
+
+/**
+ * Offseason growth (docs/RECRUITING_PLAN.md, phase 1): winter conditioning, spring ball and summer
+ * work, for everyone on the roster whether he played or not. XP is `OFFSEASON.xp` for his class, times
+ * his multiplier (room to his potential, dev trait, morale, class; confidence is left out) and his
+ * program's development (`program`), then it levels up as in season, without performance tags.
+ * Calibrated so each class keeps the generated class ladder (`CLASS_ADJ`), in season and offseason
+ * together: most of a backup's growth is here.
+ */
+export const OFFSEASON = {
+  xp: { FR: 1450, SO: 1300, JR: 950, SR: 650 } as Record<ClassYear, number>,
+};
+
+export interface OffseasonGain {
+  athlete: Athlete;
+  /** Overall before and after. */
+  from: number;
+  to: number;
+}
+
+/**
+ * One team's offseason. `squad` is the roster as last season ended it (progress applied), in last
+ * season's classes; `prog` is the next season's progress, raised in place. Players in `skip` (incoming
+ * freshmen) don't grow: their level is where they arrive.
+ */
+export function offseasonGrowth(
+  prog: Record<string, Progress>, squad: Squad, mood: (a: Athlete) => number, rng: Rng,
+  program: (pos: Position) => number = () => 1, skip: (id: string) => boolean = () => false,
+): OffseasonGain[] {
+  const base = new Map(buildSquad(squad.team).athletes.map((a) => [a.id, a]));
+  const out: OffseasonGain[] = [];
+  for (const a of squad.athletes) {
+    if (skip(a.id)) continue;
+    const p = (prog[a.id] ??= { xp: 0, lvl: 0, d: {} });
+    const m = xpMultiplier(a, { ...p, c: 0, sp: 0 }, mood(a)).total;
+    let xp = Math.round(OFFSEASON.xp[a.year] * m * program(a.pos));
+    const b = base.get(a.id) ?? generatedAthlete(a.id) ?? a;
+    const ceil = p.pot ? { ...b, potential: b.potential + p.pot } : b;
+    const r = { ...a.r };
+    const from = overallRaw(r, a.pos);
+    while (xp >= LEVEL_XP[a.pos]) {
+      xp -= LEVEL_XP[a.pos];
+      const up = levelUp(r, ceil, {}, rng);
+      if (!Object.keys(up.d).length) continue;
+      p.lvl++;
+      for (const [k, v] of Object.entries(up.d) as [RatingKey, number][]) p.d[k] = (p.d[k] ?? 0) + v;
+    }
+    out.push({ athlete: a, from, to: overallRaw(r, a.pos) });
+  }
+  return out;
 }
 
 /** The last week that's been played: the week before the current one, or the last one once the season is over. */

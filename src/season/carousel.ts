@@ -646,7 +646,7 @@ export function closeCarousel(state: SeasonState): void {
   refreshGAs(state);
   reactToDepartures(state);
   delete cs.was;
-  state.offseason!.stage = 'portal';
+  state.offseason!.stage = 'departures';
   state.offseason!.round = 0;
 }
 
