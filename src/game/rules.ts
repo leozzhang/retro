@@ -203,6 +203,11 @@ export interface DriveClock {
   milk: boolean;
   /** Time per play multiplier: a fast-tempo game is under 1 (more possessions). */
   pace?: number;
+  /**
+   * `timeLeft` ends at a quarter break, not the half (a partial sim handing the game to the field):
+   * no last-second field goal, the drive just stops and is played on from there.
+   */
+  quarterBreak?: boolean;
 }
 
 const NO_CLOCK: DriveClock = { timeLeft: Infinity, hurry: false, milk: false };
@@ -215,6 +220,9 @@ export interface SimPlay {
   /** The down and distance before the snap. */
   down: number;
   toGo: number;
+  /** The spot before the snap, yards from the offense's own goal, and the drive's seconds before it (for highlights). */
+  yard: number;
+  t: number;
   /** A field goal try ends the drive: its distance and whether it was good. */
   fg?: { dist: number; made: boolean };
   punt?: boolean;
@@ -293,16 +301,17 @@ export function simulateDrive(
   while (plays < 25) {
     if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
     plays++;
+    const at = { yard, t: secs };
     secs += simPlaySecs(clock, rng);
     const lev = leverage(down, 100 - yard, conf?.late ?? false);
     const em = mods ? snapEdge(mods, down, toGo, yard) : 0;
     const emp = em ? { em } : {};
     if (rng() < DRIVE_SIM.turnover * (mods ? turnoverFactor(mods, down, toGo, yard) : 1)) {
-      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, lev, ...emp });
+      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, ...at, lev, ...emp });
       return done(0, 'TURNOVER');
     }
     const [gain, explosive] = simGain((conf ? diff + unitEdge(conf.off - conf.def, lev) : diff) + em, rng, mods ? explosiveFactor(mods, down, toGo, yard) : 1);
-    onPlay?.({ gain, explosive, turnover: false, down, toGo, lev, ...emp });
+    onPlay?.({ gain, explosive, turnover: false, down, toGo, ...at, lev, ...emp });
     yard += gain;
     toGo -= gain;
     if (yard >= 100) return done(7, 'TOUCHDOWN', 100);
@@ -314,13 +323,13 @@ export function simulateDrive(
     down++;
     const fgDist = 100 - yard + 17;
     // Out of time with a makeable kick: line up for the field goal now.
-    const lastPlay = secs + 20 >= clock.timeLeft && fgDist <= 52;
+    const lastPlay = !clock.quarterBreak && secs + 20 >= clock.timeLeft && fgDist <= 52;
     if (down === 4 || lastPlay) {
       if (fgDist <= 52) {
         const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);
         const kEm = mods ? kickEdge(mods, fgDist) : 0;
         const made = rng() < fgOdds(fgDist, (conf ? unitEdge(conf.k, fgLev) : 0) + kEm);
-        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
+        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
         return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
       }
       if (toGo <= 2 && yard > 45 && rng() < 0.5) {
@@ -333,11 +342,11 @@ export function simulateDrive(
         }
         return done(0, 'DOWNS');
       }
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true, lev: 0 });
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
       return done(0, 'PUNT');
     }
   }
-  onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, punt: true, lev: 0 });
+  onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
   return done(0, 'PUNT');
 }
 

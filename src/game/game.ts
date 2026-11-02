@@ -21,7 +21,8 @@ import {
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
 import {
-  drawSeason, navAt, navItems, newSeasonView, newsMaxScroll, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV, type NavItem, type SeasonView,
+  drawSeason, navAt, navItems, newSeasonView, newsMaxScroll, PLAY_KEYS_BTN, playMenuRect, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV,
+  type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
   drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
@@ -61,8 +62,11 @@ import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
-import { driveLog } from '../season/simGame';
-import type { DriveLog, GameResult, SeasonGame, SeasonState } from '../season/types';
+import { driveLog, simPart } from '../season/simGame';
+import { newStory, type StoryDrive } from '../season/story';
+import type { BoxScore, DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
+import { drawShow, keyShow, prefetchShow, updateShow, type KeyShow, type ShowCtx } from './highlights';
+import { KEY_LEVELS, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { text, textWidth } from '../render/text';
 import {
@@ -79,7 +83,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -96,21 +100,42 @@ const FG_RANGE_HINT = 55;
 /** Injury settings for a new season, as I cycles them. */
 const INJURY_OPTIONS: InjuryLevel[] = ['normal', 'light', 'off'];
 
+const KEY_LABELS = ['LEAN', 'NORMAL', 'FULL'];
+
 /**
- * The new-dynasty settings, one row each: its options, the one picked first, and what it sets.
- * A new setting is one more entry.
+ * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
+ * sets, and which option a dynasty has now (the hub's SETTINGS page). A new setting is one more entry.
  */
-const SETTINGS: { label: string; help: string; options: string[]; start: number; apply: (c: SeasonConfig, i: number) => void }[] = [
+const SETTINGS: {
+  label: string; help: string; options: string[]; start: number; apply: (c: SeasonConfig, i: number) => void; read: (c: SeasonConfig) => number;
+}[] = [
   {
     label: 'INJURIES', help: 'HOW OFTEN PLAYERS GET HURT', options: INJURY_OPTIONS.map((o) => o.toUpperCase()), start: 0,
     apply: (c, i) => (c.injuries = INJURY_OPTIONS[i]),
+    read: (c) => INJURY_OPTIONS.indexOf(c.injuries ?? 'normal'),
   },
   {
     label: 'GAME LENGTH', help: 'QUARTER LENGTH IN THE GAMES YOU PLAY',
     options: QUARTER_OPTIONS.map((q, i) => `${QUARTER_LABELS[i]} ${q}:00`), start: QUARTER_OPTIONS.indexOf(6),
     apply: (c, i) => (c.quarter = QUARTER_OPTIONS[i]),
+    read: (c) => Math.max(0, QUARTER_OPTIONS.indexOf(c.quarter ?? 6)),
+  },
+  {
+    label: 'SIM GAMES', help: 'SIMULATED GAMES AND QUARTERS: THE RESULT, OR WATCH THE KEY PLAYS',
+    options: ['RESULT ONLY', ...KEY_LABELS], start: 0,
+    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, sim: KEY_LEVELS[i] }),
+    read: (c) => KEY_LEVELS.indexOf(keyLevels(c).sim),
+  },
+  {
+    label: 'CPU DRIVES', help: 'IN GAMES YOU PLAY: A SUMMARY, OR THE KEY PLAYS OF EACH CPU DRIVE',
+    options: ['SUMMARY', ...KEY_LABELS], start: 2,
+    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: KEY_LEVELS[i] }),
+    read: (c) => KEY_LEVELS.indexOf(keyLevels(c).defense),
   },
 ];
+
+/** PLAY GAME's choices: the quarter the user takes over in (1 plays the whole game). */
+const PLAY_FROM = [1, 2, 3, 4];
 
 interface Notice {
   title: string;
@@ -120,6 +145,8 @@ interface Notice {
   /** Scorebug state when the notice was queued (later notices may already have advanced the clock and score). */
   clock?: string;
   score?: { user: number; cpu: number };
+  /** A key play shown on the field in place of the banner (game/highlights.ts). */
+  show?: KeyShow;
 }
 
 /** Slow-motion while the QB is aiming. 1 = off. */
@@ -233,6 +260,14 @@ export class Game {
   private liveDrives: DriveLog[] | null = null;
   /** A season game's weekly emphases for the user's team: the user's defense plays them in the CPU's simulated drives. */
   private userEmph: TeamMods | undefined;
+  /** The two teams as the key plays show them. */
+  private showCtx: ShowCtx | null = null;
+  /** Key plays for the CPU's drives in an exhibition (K on its setup screen). */
+  private exhibitionKeys: KeyLevel = 'normal';
+  /** The simulated quarters' box score, when the user took over a game partway. */
+  private partBox: BoxScore | null = null;
+  /** Watching a simulated game's key plays: the result is already in the season. */
+  private watchOnly = false;
   private seasonView: SeasonView = newSeasonView();
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private careerView: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, back: 'season', mx: 0, my: 0 };
@@ -321,14 +356,21 @@ export class Game {
         this.updateKick(dt, input);
         break;
       case 'notice':
-        if (input.hit('Space', 'Enter') || input.mouse.pressed) this.nextNotice();
+        if (this.notices[0]?.show) this.updateShows(dt, input);
+        else if (input.hit('Space', 'Enter') || input.mouse.pressed) this.nextNotice();
         break;
       case 'final':
         if (input.hit('Space', 'Enter') || input.mouse.pressed) {
           if (this.seasonGame) {
             this.finishSeasonGame();
+          } else if (this.watchOnly) {
+            this.watchOnly = false;
+            this.screen = 'season';
           } else this.screen = 'exhibition';
         }
+        break;
+      case 'settings':
+        this.updateDynastySettings(input);
         break;
     }
     if (this.inGame() && this.clock.quarter !== this.windQuarter) {
@@ -398,6 +440,8 @@ export class Game {
     if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
+    const cycleKeys = () => (this.exhibitionKeys = KEY_LEVELS[(KEY_LEVELS.indexOf(this.exhibitionKeys) + 1) % KEY_LEVELS.length]);
+    if (input.hit('KeyK')) cycleKeys();
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -415,8 +459,10 @@ export class Game {
       } else if (y >= PANEL_CONF_Y[0] && y < PANEL_CONF_Y[1]) {
         if (user) this.userIdx = this.stepConference(this.userIdx, d, this.cpuIdx);
         else this.cpuIdx = this.stepConference(this.cpuIdx, d, this.userIdx);
-      } else if (y >= 262 && y < 284) {
+      } else if (y >= 262 && y < 280) {
         this.qIdx = (this.qIdx + (x < VIEW_W / 2 ? nq - 1 : 1)) % nq;
+      } else if (y >= 280 && y < 290) {
+        cycleKeys();
       } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
@@ -582,7 +628,8 @@ export class Game {
     if (input.hit('Escape', 'Enter', 'Backspace')) this.screen = 'exhibition';
   }
 
-  private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx], squads?: { user: Squad; cpu: Squad }): void {
+  /** Put two teams on the field: squads, rosters, crowd, and how the key plays show them. */
+  private setupField(user: Team, cpu: Team, squads?: { user: Squad; cpu: Squad }): void {
     this.user = user;
     this.cpu = cpu;
     this.userSquad = squads?.user ?? buildSquad(user);
@@ -591,6 +638,20 @@ export class Game {
     this.cpuRoster = onField(this.cpuSquad);
     this.crowd = makeCrowd(this.user, this.cpu);
     this.crowdKey = '';
+    const s = this.season;
+    const own = this.seasonGame && s && !s.config.delegate.gamePlan ? s.teamState[user.id]?.plan : undefined;
+    this.showCtx = {
+      user, cpu, userSide: { team: user, roster: this.userRoster }, cpuSide: { team: cpu, roster: this.cpuRoster },
+      userPass: (own ?? autoGamePlan(this.userSquad, this.cpuSquad)).passShare, cpuPass: autoGamePlan(this.cpuSquad, this.userSquad).passShare,
+    };
+  }
+
+  /** Kick off a game on the field; a season game can be simulated up to quarter `from` first (PLAY GAME's choices). */
+  private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx], squads?: { user: Squad; cpu: Squad }, from = 1): void {
+    this.setupField(user, cpu, squads);
+    this.notices = [];
+    this.partBox = null;
+    this.watchOnly = false;
     this.score = { user: 0, cpu: 0 };
     // A dynasty's games use its own quarter length; exhibitions use the picker's.
     this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? 6 : QUARTER_OPTIONS[this.qIdx]);
@@ -604,7 +665,115 @@ export class Game {
     this.liveDrives = this.seasonGame ? [{ off: user.id, plays: [] }] : null;
     const s = this.season;
     this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
-    this.toCall();
+    if (from > 1 && this.seasonGame) this.simAhead(from);
+    else this.toCall();
+  }
+
+  /** The key-play level for the CPU's drives in this game, or for simulated stretches. */
+  private keyLevel(kind: 'sim' | 'defense'): KeyLevel {
+    if (this.seasonGame || this.watchOnly) return keyLevels(this.season?.config)[kind];
+    return kind === 'defense' ? this.exhibitionKeys : 'off';
+  }
+
+  /** Queue key plays to show, each on the field in its own notice. */
+  private queueShows(picks: KeyPlay[]): void {
+    for (const k of picks) {
+      this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0) });
+    }
+  }
+
+  /**
+   * Simulate the season game's first quarters (`simPart`, on this game's clock) until quarter
+   * `from`, show their key plays, and hand the field the score, the clock and the ball.
+   */
+  private simAhead(from: number): void {
+    const s = this.season!;
+    const g = this.seasonGame!;
+    const story = newStory(g.home, g.away);
+    const own = !s.config.delegate.gamePlan ? s.teamState[this.user.id]?.plan : undefined;
+    const r = simPart(this.userSquad, this.cpuSquad, g.home === this.user.id, this.clock.qSecs / 60, from, this.rng, {
+      neutral: g.neutral,
+      plans: { user: own ?? autoGamePlan(this.userSquad, this.cpuSquad), cpu: autoGamePlan(this.cpuSquad, this.userSquad) },
+      emph: { user: this.userEmph },
+      drives: this.liveDrives ?? undefined,
+      story,
+    });
+    this.partBox = r.box;
+    this.score = { user: r.user, cpu: r.cpu };
+    this.clock.quarter = r.quarter;
+    this.clock.time = r.time;
+    adminStop(this.clock);
+    this.queueShows(pickGame(story, this.keyLevel('sim')));
+    const to = ['', '', 'THE 2ND QUARTER', 'HALFTIME', 'THE 4TH QUARTER'][from];
+    const summary = (extra: string) => this.notify({ title: `SIMULATED TO ${to}`, sub: this.scoreLine(), extra, color: '#9ad7ff' });
+    switch (r.next.kind) {
+      case 'user':
+        this.drive = startDrive(r.next.start);
+        summary(`${r.next.mid ? 'Your drive goes on' : 'Your ball'} at the ${fieldLabel(this.drive.los)}  ${clockText(this.clock)}`);
+        this.showNotices('call');
+        return;
+      case 'userKickoff':
+        summary(`You kick off  ${clockText(this.clock)}`);
+        this.showNotices('kickoff');
+        return;
+      case 'cpu':
+        summary(`${this.cpu.abbr} ${r.next.mid ? 'drive goes on' : 'ball'}  ${clockText(this.clock)}`);
+        this.cpuDrive(r.next.start);
+        return;
+      case 'halftime':
+        this.halftime();
+        return;
+      default:
+        this.showNotices('final');
+    }
+  }
+
+  /**
+   * SIM GAME with key plays on: the week is simulated (and saved) first, so the result is in
+   * whatever happens next, then the user's game is shown from its story, ending on the final.
+   */
+  private watchSim(game: SeasonGame): void {
+    const s = this.season!;
+    const u = s.config.userTeamId;
+    const opp = game.home === u ? game.away : game.home;
+    // The squads as they took the field, before the week's injuries and progression.
+    const squads = { user: squadFor(s, u), cpu: squadFor(s, opp) };
+    const story = newStory(game.home, game.away);
+    advanceWeek(s, undefined, undefined, story);
+    this.save();
+    const r = game.result!;
+    this.seasonGame = null;
+    this.watchOnly = true;
+    this.setupField(teamById(u), teamById(opp), squads);
+    this.notices = [];
+    this.score = { user: game.home === u ? r.home : r.away, cpu: game.home === u ? r.away : r.home };
+    this.clock = newClock(15);
+    this.clock.quarter = 4;
+    this.clock.time = 0;
+    this.drive = startDrive(25);
+    this.play = null;
+    this.kick = null;
+    this.applied = null;
+    this.callMode = 'normal';
+    this.cam.follow(OWN_GOAL + 50, 0.5);
+    this.queueShows(pickGame(story, keyLevels(s.config).sim));
+    this.showNotices('final');
+  }
+
+  /** On a key play: play it, Space to skip it, Esc to skip the rest. The next one searches meanwhile. */
+  private updateShows(dt: number, input: Input): void {
+    if (input.hit('Escape', 'Backspace')) {
+      while (this.notices[0]?.show) this.notices.shift();
+      if (!this.notices.length) this.finishNotices();
+      return;
+    }
+    if (input.hit('Space', 'Enter') || input.mouse.pressed) {
+      this.nextNotice();
+      return;
+    }
+    const next = this.notices[1]?.show;
+    if (next) prefetchShow(next);
+    if (updateShow(this.notices[0].show!, dt, this.cam)) this.nextNotice();
   }
 
   // ------------------------------------------------------------ season hub
@@ -622,6 +791,7 @@ export class Game {
     else if (item.page === 'prep') this.toPrep();
     else if (item.page === 'recruit') this.toRecruit();
     else if (item.page === 'career') this.toCareer('season');
+    else if (item.page === 'settings') this.toSettings();
   }
 
   /**
@@ -635,6 +805,10 @@ export class Game {
     const m = input.mouse;
     v.mx = m.x;
     v.my = m.y;
+    if (v.playMenu !== undefined) {
+      this.updatePlayMenu(input);
+      return;
+    }
     if (input.hit('Escape', 'Backspace')) {
       this.toTitle();
       return;
@@ -700,15 +874,96 @@ export class Game {
       return;
     }
     if (game && !sim) {
-      // Play it on the field; the final screen writes the result back.
-      const u = s.config.userTeamId;
-      const opp = game.home === u ? game.away : game.home;
-      this.seasonGame = game;
-      this.startGame(teamById(u), teamById(opp), { user: squadFor(s, u), cpu: squadFor(s, opp) });
+      // Choose how much of it to play first.
+      v.playMenu = 0;
+      return;
+    }
+    if (game && keyLevels(s.config).sim !== 'off') {
+      this.watchSim(game);
       return;
     }
     advanceWeek(s);
     this.save();
+  }
+
+  /**
+   * PLAY GAME's choices: the whole game, or simulate to the 2nd quarter, halftime or the 4th and
+   * take over there. 1-4, W/S and Enter, or a click; K (or its line) cycles the simulated
+   * stretch's key plays; Esc closes it.
+   */
+  private updatePlayMenu(input: Input): void {
+    const s = this.season!;
+    const v = this.seasonView;
+    const m = input.mouse;
+    const n = PLAY_FROM.length;
+    if (input.hit('Escape', 'Backspace')) {
+      v.playMenu = undefined;
+      return;
+    }
+    if (input.hit('KeyW', 'ArrowUp')) v.playMenu = (v.playMenu! + n - 1) % n;
+    if (input.hit('KeyS', 'ArrowDown')) v.playMenu = (v.playMenu! + 1) % n;
+    if (input.hit('KeyK') || (m.pressed && inRect(m.x, m.y, PLAY_KEYS_BTN))) {
+      const lv = keyLevels(s.config).sim;
+      s.config.keyPlays = { ...s.config.keyPlays, sim: KEY_LEVELS[(KEY_LEVELS.indexOf(lv) + 1) % KEY_LEVELS.length] };
+      this.save();
+      return;
+    }
+    let pick = -1;
+    ['Digit1', 'Digit2', 'Digit3', 'Digit4'].forEach((k, i) => {
+      if (input.hit(k)) pick = i;
+    });
+    if (input.hit('Enter', 'Space')) pick = v.playMenu!;
+    if (m.pressed) {
+      const i = PLAY_FROM.findIndex((_, j) => inRect(m.x, m.y, playMenuRect(j)));
+      if (i >= 0) pick = i;
+    }
+    const game = userGameThisWeek(s);
+    if (pick < 0 || !game) return;
+    v.playMenu = undefined;
+    // Play it on the field; the final screen writes the result back.
+    const u = s.config.userTeamId;
+    const opp = game.home === u ? game.away : game.home;
+    this.seasonGame = game;
+    this.startGame(teamById(u), teamById(opp), { user: squadFor(s, u), cpu: squadFor(s, opp) }, PLAY_FROM[pick]);
+  }
+
+  // ------------------------------------------------------------ dynasty settings
+
+  private toSettings(): void {
+    const c = this.season!.config;
+    this.settingIdx = SETTINGS.map((r) => Math.max(0, r.read(c)));
+    this.settingSel = 0;
+    this.screen = 'settings';
+  }
+
+  /** The hub's SETTINGS page: the new-dynasty rows, each change applied and saved at once. Enter or Esc goes back. */
+  private updateDynastySettings(input: Input): void {
+    const m = input.mouse;
+    const c = this.season!.config;
+    if (input.hit('Escape', 'Backspace', 'Enter', 'Space') || (m.pressed && inRect(m.x, m.y, GO_BTN))) {
+      this.screen = 'season';
+      return;
+    }
+    const n = SETTINGS.length;
+    if (input.hit('KeyW', 'ArrowUp')) this.settingSel = (this.settingSel + n - 1) % n;
+    if (input.hit('KeyS', 'ArrowDown')) this.settingSel = (this.settingSel + 1) % n;
+    const change = (row: number, d: number) => {
+      const k = SETTINGS[row].options.length;
+      this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
+      SETTINGS[row].apply(c, this.settingIdx[row]);
+      this.save();
+    };
+    if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
+    if (input.hit('KeyD', 'ArrowRight')) change(this.settingSel, 1);
+    if (m.pressed) {
+      for (let i = 0; i < n; i++) {
+        if (!inRect(m.x, m.y, settingRect(i))) continue;
+        this.settingSel = i;
+        const a = settingArrows(i);
+        if (inRect(m.x, m.y, a.prev)) change(i, -1);
+        else if (inRect(m.x, m.y, a.next) || m.x < a.prev.x) change(i, 1);
+      }
+    }
   }
 
   // ------------------------------------------------------------ team page
@@ -1360,8 +1615,13 @@ export class Game {
     const home = userHome ? this.score.user : this.score.cpu;
     const away = userHome ? this.score.cpu : this.score.user;
     const blank = (points: number) => ({ points, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 });
-    // TODO: record the live game's team and player stats from the plays.
-    const result: GameResult = { home, away, ot: 0, box: { home: blank(home), away: blank(away), players: [] } };
+    // TODO: record the live game's team and player stats from the plays. Simulated quarters keep theirs.
+    const pb = this.partBox;
+    const box = pb
+      ? { home: { ...pb.home, points: home }, away: { ...pb.away, points: away }, players: pb.players }
+      : { home: blank(home), away: blank(away), players: [] };
+    this.partBox = null;
+    const result: GameResult = { home, away, ot: 0, box };
     this.seasonGame = null;
     advanceWeek(s, result, this.liveDrives ?? undefined);
     this.liveDrives = null;
@@ -1822,10 +2082,19 @@ export class Game {
     const plays: SimPlay[] = [];
     const cpuConf = teamConf(this.cpuSquad);
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
+    // Watching the snaps (for the grades and the key plays) draws no random numbers.
     const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, {
       timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
-    }, this.liveDrives ? (p) => plays.push(p) : undefined, conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
+    }, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
+    const level = this.keyLevel('defense');
+    if (level !== 'off') {
+      const d: StoryDrive = {
+        off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
+        start, result: sim.result, points: sim.points, plays, credit: { catches: [], runs: [] },
+      };
+      this.queueShows(pickDrive(d, level, 'defense'));
+    }
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += sim.points;
     const notice = this.notify({
@@ -1863,6 +2132,11 @@ export class Game {
   private nextNotice(): void {
     if (this.notices.length) this.notices.shift();
     if (this.notices.length) return;
+    this.finishNotices();
+  }
+
+  /** The notice queue is empty: go where it was leading. */
+  private finishNotices(): void {
     if (this.afterNotices === 'final') this.screen = 'final';
     else if (this.afterNotices === 'kickoff') this.toCall('kickoff');
     else if (this.afterNotices === 'pat') this.toCall('pat');
@@ -1873,7 +2147,10 @@ export class Game {
 
   render(g: CanvasRenderingContext2D): void {
     g.imageSmoothingEnabled = false;
-    if (this.screen === 'title' || this.screen === 'exhibition' || this.screen === 'slots' || this.screen === 'newTeam' || this.screen === 'newSettings') {
+    if (
+      this.screen === 'title' || this.screen === 'exhibition' || this.screen === 'slots' || this.screen === 'newTeam' || this.screen === 'newSettings' ||
+      this.screen === 'settings'
+    ) {
       this.renderMenu(g);
       return;
     }
@@ -1923,6 +2200,11 @@ export class Game {
       drawPrep(g, s, r ? squadFor(s, r.opp) : null, this.prepView, this.starred, staffFor(s, s.config.userTeamId));
       return;
     }
+    const show = this.screen === 'notice' ? this.notices[0]?.show : undefined;
+    if (show && this.showCtx) {
+      drawShow(g, this.cam, show, this.showCtx, this.crowd!, this.debug);
+      return;
+    }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
     drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
@@ -1930,8 +2212,8 @@ export class Game {
     else if (this.play) drawPlay(g, this.cam, this.play, this.debug);
     else this.drawBallSpot(g);
 
-    const center = kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
-    const right = this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
+    const center = this.watchOnly ? 'FINAL' : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
+    const right = this.watchOnly ? 'SIMULATED' : this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
     const shown = this.screen === 'notice' ? this.notices[0] : undefined;
     drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockText(this.clock), center, right);
     const huddle =
@@ -2000,7 +2282,7 @@ export class Game {
     const { user, cpu } = this.score;
     const title = user === cpu ? 'FINAL: TIE' : user > cpu ? `FINAL: ${this.user.abbr} WINS` : `FINAL: ${this.cpu.abbr} WINS`;
     drawBanner(g, title, this.scoreLine(), user >= cpu ? '#ffd23f' : '#ff5a5a', `${this.user.school.toUpperCase()} VS ${this.cpu.school.toUpperCase()}`);
-    drawHint(g, this.seasonGame ? 'CLICK OR SPACE TO CONTINUE THE SEASON' : 'CLICK OR SPACE FOR THE TITLE SCREEN');
+    drawHint(g, this.seasonGame || this.watchOnly ? 'CLICK OR SPACE TO CONTINUE THE SEASON' : 'CLICK OR SPACE FOR THE EXHIBITION SCREEN');
   }
 
   private drawBallSpot(g: CanvasRenderingContext2D): void {
@@ -2195,7 +2477,7 @@ export class Game {
   /** The menus before a game or dynasty, over the title backdrop. */
   private renderMenu(g: CanvasRenderingContext2D): void {
     const pick = this.screen === 'newTeam' || this.screen === 'newSettings';
-    const user = TEAMS[pick ? this.newTeamIdx : this.userIdx];
+    const user = this.screen === 'settings' ? teamById(this.season!.config.userTeamId) : TEAMS[pick ? this.newTeamIdx : this.userIdx];
     const cpu = TEAMS[this.cpuIdx];
     // The crowd is painted in the two teams' colors; repaint it when either changes.
     const key = `${user.id}|${cpu.id}`;
@@ -2211,7 +2493,10 @@ export class Game {
         break;
       case 'exhibition':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
-        drawExhibition(g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`, x, y);
+        drawExhibition(
+          g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`,
+          `CPU DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : `${this.exhibitionKeys.toUpperCase()} KEY PLAYS`}  (K)`, x, y,
+        );
         break;
       case 'slots':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY', 'CHOOSE A SAVE SLOT');
@@ -2224,6 +2509,10 @@ export class Game {
       case 'newSettings':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'NEW DYNASTY');
         drawSettings(g, user, this.slot, this.settingRows(), this.settingSel, x, y);
+        break;
+      case 'settings':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'CHANGES SAVE AS YOU MAKE THEM');
+        drawSettings(g, user, this.slot, this.settingRows(), this.settingSel, x, y, true);
         break;
     }
   }

@@ -24,7 +24,8 @@ import { driveMods, emphasisMods, type DriveMods } from './season/emphasis';
 import { simulateDrive } from './game/rules';
 import { progressTeam } from './season/progression';
 import { SCOUT_TIERS } from './season/scouting';
-import { simGame } from './season/simGame';
+import { simGame, simPart } from './season/simGame';
+import { autoGamePlan } from './season/staff';
 import { SCHEME_PASS } from './season/staff';
 import { START_SLOTS } from './season/confidence';
 import { actOnLeaving, buildBoard, entryOdds, leavingList, MIN_COUNT, PORTAL } from './season/portal';
@@ -1081,6 +1082,50 @@ function detail(s: SeasonState): string[] {
   return rows;
 }
 
+/**
+ * PLAY GAME's partial sims (`simPart`, docs/SIMULATION.md) against SIM GAME (`simGame`): a game
+ * simulated on the live clock has the possessions of a played game, so fewer than `simGame`'s.
+ * Shown, not tuned: the favorite's win rate and points per team by the overall gap, on neutral fields.
+ */
+function partialSim(): string[] {
+  const rng = mulberry32(4242);
+  const squads = new Map(TEAMS.map((t) => [t.id, buildSquad(t)]));
+  const ovr = new Map([...squads].map(([id, sq]) => [id, teamRatings(sq).ovr]));
+  const buckets = [[0, 4], [4, 8], [8, 14], [14, 99]] as const;
+  const acc = buckets.map(() => ({ n: 0, fullWin: 0, partWin: 0, fullPts: 0, partPts: 0 }));
+  const perBucket = 150;
+  let guard = 0;
+  while (acc.some((a) => a.n < perBucket) && guard++ < 200_000) {
+    const a = TEAMS[Math.floor(rng() * TEAMS.length)].id;
+    const b = TEAMS[Math.floor(rng() * TEAMS.length)].id;
+    if (a === b) continue;
+    const [fav, dog] = ovr.get(a)! >= ovr.get(b)! ? [a, b] : [b, a];
+    const gap = ovr.get(fav)! - ovr.get(dog)!;
+    const i = buckets.findIndex(([lo, hi]) => gap >= lo && gap < hi);
+    if (i < 0 || acc[i].n >= perBucket) continue;
+    const f = squads.get(fav)!;
+    const d = squads.get(dog)!;
+    const full = simGame(f, d, rng, { neutral: true });
+    const part = simPart(f, d, true, 6, 5, rng, { neutral: true, plans: { user: autoGamePlan(f, d), cpu: autoGamePlan(d, f) } });
+    const x = acc[i];
+    x.n++;
+    x.fullWin += full.home > full.away ? 1 : full.home === full.away ? 0.5 : 0;
+    x.partWin += part.user > part.cpu ? 1 : part.user === part.cpu ? 0.5 : 0;
+    x.fullPts += (full.home + full.away) / 2;
+    x.partPts += (part.user + part.cpu) / 2;
+  }
+  const rows = ['', '== PARTIAL SIM ==', '', 'favorite win % and points per team, SIM GAME (simGame) vs a whole game on the live clock (simPart, STANDARD 6:00)'];
+  buckets.forEach(([lo, hi], i) => {
+    const x = acc[i];
+    const label = hi >= 99 ? `gap ${lo}+` : `gap ${lo}-${hi}`;
+    rows.push(
+      `  ${label.padEnd(9)} n=${x.n}  win ${pctText(x.fullWin / x.n)} vs ${pctText(x.partWin / x.n)}  ` +
+        `points ${(x.fullPts / x.n).toFixed(1)} vs ${(x.partPts / x.n).toFixed(1)}`,
+    );
+  });
+  return rows;
+}
+
 it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const n = Number(process.env.SEASONS ?? 5);
   const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
@@ -1110,7 +1155,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
     ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
-    ...portalReport(n), ...coaches(), ...detail(seasons[0]),
+    ...portalReport(n), ...coaches(), ...partialSim(), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

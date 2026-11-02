@@ -36,7 +36,14 @@ export interface SeasonConfig {
   injuries?: InjuryLevel;
   /** Quarter length in minutes for the user's live games (game/clock.ts `QUARTER_OPTIONS`). Missing means 6. */
   quarter?: number;
+  /**
+   * Key-play highlights (game/keyPlays.ts): `sim` for simulated games and stretches (missing: off,
+   * the result only), `defense` for the CPU's drives in games the user plays (missing: normal).
+   */
+  keyPlays?: { sim?: KeyLevel; defense?: KeyLevel };
 }
+
+export type KeyLevel = 'off' | 'lean' | 'normal' | 'full';
 
 export type InjuryLevel = 'off' | 'light' | 'normal';
 

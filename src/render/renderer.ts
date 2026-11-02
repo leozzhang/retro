@@ -152,13 +152,14 @@ export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, 
   g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
 }
 
-export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean): void {
+/** `replay`: a key-play replay, the CPU on both sides, so none of the user's aids (routes, ring, handoff hint). */
+export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean, replay = false): void {
   const presnap = play.phase === 'presnap';
-  if (presnap) drawRoutePreview(g, cam, play);
+  if (presnap && !replay) drawRoutePreview(g, cam, play);
   if (debug) drawDebug(g, cam, play);
 
   // Controlled player ring
-  const ctl = play.controlled;
+  const ctl = replay ? null : play.controlled;
   if (ctl) {
     const s = cam.toScreen(ctl.pos.x, ctl.pos.y);
     g.strokeStyle = '#ffd23f';
@@ -169,7 +170,7 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
   }
 
   // Handoff window: the back can take it right now.
-  const ho = play.handoffOption();
+  const ho = replay ? null : play.handoffOption();
   if (ho) {
     const s = cam.toScreen(play.rb.pos.x, play.rb.pos.y);
     g.strokeStyle = '#9ad7ff';

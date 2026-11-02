@@ -23,6 +23,42 @@ _Last updated: 2026-11-01_
 - **Rules:** down and distance, first downs, touchdown (+7), safety, turnover on downs. The CPU's possessions are simulated by `simulateDrive`.
 - **Tooling:** 28 unit tests, a balance harness (`npm run balance`), an F1 debug overlay, and a `window.game` dev hook.
 
+## Done: partial sims and key plays (2026-11-01)
+Design and numbers are in [SIMULATION.md](SIMULATION.md).
+- **PLAY GAME offers four choices:** the whole game, or sim to the 2nd quarter, halftime or the 4th and take over there.
+  - `simPart` simulates on the live clock, with the field's conventions.
+  - A drive still going at the quarter break goes on live from its spot, so you always get the whole quarter.
+  - The simulated quarters' box score is kept.
+- **Key plays:** on-field replays with the CPU on both sides, matched to what the sim decided.
+  - **SIM GAMES** sets them for simulated games and quarters. X with key plays on saves the result first, then shows the game and the final.
+  - **CPU DRIVES** sets them for the CPU's drives in games you play: its big plays and conversions, and your stops, sacks and picks before the drive summary.
+  - Levels are OFF / LEAN / NORMAL / FULL. When a replay can't be matched, a card shows instead.
+- **Settings:**
+  - Both are dynasty settings (`SeasonConfig.keyPlays`), on the new-dynasty screen and on a new hub **SETTINGS** page. That page also edits injuries and game length, and saves on change.
+  - Exhibitions have a CPU DRIVES line (K).
+- **Balance is untouched:**
+  - The sim only gained observation: `SimPlay.yard`/`t`, a story and a credit record, none of which draw random numbers. `simGame` plays the same, and `harness.ts` isn't changed.
+  - `balance.txt` came out byte-identical, and `season.txt` too apart from the timings and a new PARTIAL SIM section.
+  - The new `DriveClock.quarterBreak` is only used by `simPart`.
+- **Checks:**
+  - `npm test`: 264 pass, 7 of them new in `highlights.test.ts`. They cover:
+    - a story changes nothing, and adds up to the score
+    - the `simPart` hand-off at each quarter
+    - possessions per team
+    - the level caps
+    - the replay match rate: 138/141 between Georgia and Alabama
+    - replays replaying identically and leaving the rosters alone
+  - Driven in headless Chrome over CDP with screenshots, no console errors:
+    - the new-dynasty settings
+    - the PLAY GAME choices
+    - sim to the 4th: key plays, then 4TH 6:00 with "Your drive goes on"
+    - a CPU drive's defensive key plays (a sack, a 3rd down)
+    - the hub SETTINGS page
+    - X in watch mode (week advanced and saved, then the final and back to the hub)
+    - the exhibition line
+  - Not played by hand yet.
+- **Flag (not tuned):** a whole game simulated on the live clock scores about 9-11 points a team, against 26 in SIM GAME. Favorites win 3-7 points less often (PARTIAL SIM in `season.txt`). It's the same gap as "live games score less" below.
+
 ## Done: UI pass 1: main menu, dynasty slots, the hub's sidebar (2026-11-01)
 - **Main menu** (`render/menuScreen.ts`, the `'title'` screen): CONTINUE (the most recently saved dynasty, straight into its hub), DYNASTY and EXHIBITION, over the field-and-crowd backdrop, with a player from each side. The single-season option is gone from the UI (old `length: 'single'` saves still load and play; `defaultConfig` is unchanged for the tests and reports).
 - **Exhibition** (`'exhibition'`): the old title's pickers and quarter length, with a KICK OFF button. The final screen comes back here. Esc goes to the menu.
@@ -1368,6 +1404,8 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB on his backside shed at once. Keeps were unchanged by the perimeter-block fix. A human steering the QB should do better; check by playing before tuning.
 - **The read key's crash is a coin flip.** It doesn't depend on the call, the down, or the key's awareness yet.
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
+
+- **Key plays:** kicks never get replays (cards only). A drive continued at a quarter break starts a new set of downs. Replays between very uneven teams match less often (more cards). There's no mid-game "sim the rest" yet.
 
 ## Next up (rough priority)
 1. **UI, pass 2:** give the sub-pages (team, playbook, prep, recruiting, stats, portal, carousel, departures) the hub's look: a shared header with a clickable BACK, and the same sidebar-and-panel style where it fits. A settings page in the hub for the dynasty's options (game length, injuries) and the delegation toggles. More new-dynasty options (coach career, staff delegation). Rename a slot; export and import a save.

@@ -23,7 +23,7 @@ import { text } from './text';
  * The week's main action (play, sim, advance, the offseason stage) is the button under the sidebar.
  */
 
-export type Page = 'team' | 'playbook' | 'prep' | 'recruit' | 'career';
+export type Page = 'team' | 'playbook' | 'prep' | 'recruit' | 'career' | 'settings';
 
 export interface NavItem {
   /** A panel's name, or the page it opens. */
@@ -45,6 +45,8 @@ export interface SeasonView {
   scroll: number;
   mx: number;
   my: number;
+  /** PLAY GAME's choices are open, with this one highlighted. */
+  playMenu?: number;
 }
 
 export const newSeasonView = (): SeasonView => ({ nav: 'HOME', sub: 0, scroll: 0, mx: 0, my: 0 });
@@ -90,6 +92,7 @@ function navGroups(s: SeasonState): { head: string; items: NavItem[] }[] {
         { id: 'prep', label: 'GAME PREP', page: 'prep', key: 'O', off: s.phase === 'offseason' },
         ...(s.recruiting ? [{ id: 'recruit', label: 'RECRUITING', page: 'recruit', key: 'R' } as NavItem] : []),
         { id: 'career', label: 'PLAYER STATS', page: 'career', key: 'H' },
+        { id: 'settings', label: 'SETTINGS', page: 'settings' },
       ],
     },
     { head: 'AROUND THE FBS', items: ['SCORES', 'STANDINGS', 'POLLS', 'NEWS', 'LEADERS', 'AWARDS', 'PLAYOFF'].map(panel) },
@@ -278,7 +281,58 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
       // HOME, and the pages' items (their panel is HOME until Enter opens them).
       drawHome(g, s, v);
   }
-  drawHint(g, hintFor(s, v, navItems(s).find((it) => it.id === v.nav)));
+  if (v.playMenu !== undefined) {
+    drawPlayMenu(g, s, v);
+    drawHint(g, '1-4 OR W/S + ENTER: CHOOSE   K: KEY PLAYS   ESC: BACK');
+  } else drawHint(g, hintFor(s, v, navItems(s).find((it) => it.id === v.nav)));
+}
+
+// ------------------------------------------------------------ PLAY GAME's choices
+
+const PLAY_CHOICES = [
+  ['PLAY THE WHOLE GAME', 'FROM THE OPENING KICKOFF'],
+  ['SIM TO THE 2ND QUARTER', 'TAKE OVER AFTER THE 1ST'],
+  ['SIM TO HALFTIME', 'PLAY THE SECOND HALF'],
+  ['SIM TO THE 4TH QUARTER', 'PLAY THE FOURTH QUARTER'],
+];
+const MENU_W = 300;
+const MENU_X = (VIEW_W - MENU_W) / 2;
+const MENU_Y = 96;
+
+export function playMenuRect(i: number): Box {
+  return { x: MENU_X + 10, y: MENU_Y + 30 + i * 30, w: MENU_W - 20, h: 26 };
+}
+
+/** The line under the choices that cycles the simulated stretch's key plays. */
+export const PLAY_KEYS_BTN: Box = { x: MENU_X + 10, y: MENU_Y + 152, w: MENU_W - 20, h: 16 };
+
+function drawPlayMenu(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): void {
+  g.fillStyle = 'rgba(5,7,10,0.7)';
+  g.fillRect(0, 30, VIEW_W, 316);
+  g.fillStyle = '#0a0d12';
+  g.fillRect(MENU_X, MENU_Y, MENU_W, 178);
+  g.fillStyle = teamById(s.config.userTeamId).colors.primary;
+  g.fillRect(MENU_X, MENU_Y, MENU_W, 20);
+  text(g, nextGameText(s), MENU_X + MENU_W / 2, MENU_Y + 6, { align: 'center' });
+  PLAY_CHOICES.forEach(([label, sub], i) => {
+    const r = playMenuRect(i);
+    const on = i === v.playMenu;
+    const hover = inBox(r, v.mx, v.my);
+    g.fillStyle = on ? '#24324a' : hover ? '#1a2230' : CARD;
+    g.fillRect(r.x, r.y, r.w, r.h);
+    if (on) {
+      g.fillStyle = GOLD;
+      g.fillRect(r.x, r.y, 3, r.h);
+    }
+    text(g, `${i + 1}`, r.x + 12, r.y + 9, { color: DIM, shadow: false });
+    text(g, label, r.x + 28, r.y + 4, { color: on || hover ? GOLD : '#ffffff', shadow: false });
+    text(g, sub, r.x + 28, r.y + 15, { color: SOFT, shadow: false });
+  });
+  const lv = s.config.keyPlays?.sim ?? 'off';
+  const b = PLAY_KEYS_BTN;
+  const hot = inBox(b, v.mx, v.my);
+  const label = lv === 'off' ? 'RESULT ONLY' : `${lv.toUpperCase()} KEY PLAYS`;
+  text(g, `SIMMED QUARTERS: ${label}  (K)`, b.x + b.w / 2, b.y + 4, { align: 'center', color: hot ? GOLD : ACCENT, shadow: false });
 }
 
 // ------------------------------------------------------------ HOME

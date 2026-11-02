@@ -679,7 +679,8 @@ export class Play {
     return this.aim ? aimTarget(this.aim, this.qb.pos, cam, this.qb.r.arm) : null;
   }
 
-  private throwBall(target: Vec): void {
+  /** Throw to `target` (the user's aim, or the CPU's on a replay). */
+  throwBall(target: Vec): void {
     const qb = this.qb;
     const rng = this.rng;
     let nearest = Infinity;

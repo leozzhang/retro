@@ -23,6 +23,7 @@ import { emphasisMods, groupOf, type TeamMods } from './emphasis';
 import { openRecruiting, recruitWeek } from './recruiting';
 import { STANDARD } from '../data/emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
+import type { GameStory } from './story';
 import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, SeasonSummary, TeamState } from './types';
 import { baseRoster, seasonRng, squadFor, staffFor } from './world';
 
@@ -113,6 +114,8 @@ interface WeekContext {
   userResult?: GameResult;
   /** The user's live game as drive logs, for the progression grades. */
   userDrives?: DriveLog[];
+  /** Records the user's simulated game drive by drive, for its highlights. */
+  userStory?: GameStory;
   plans: Map<string, GamePlan>;
   /** Weekly emphases by team: only the user's staff picks any so far (CPU staffs stay on standard). */
   emph: Map<string, TeamMods>;
@@ -152,7 +155,8 @@ const play: WeekStep = (state, ctx) => {
       drives.push(...(ctx.userDrives ?? []));
       g.result = { ...settleTie(ctx.userResult, home, away, rng, g.neutral, drives, emph), live: true };
     } else {
-      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives, emph });
+      const story = g.home === user || g.away === user ? ctx.userStory : undefined;
+      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives, emph, story });
     }
     ctx.played.set(g.id, { drives, home, away, neutral: g.neutral });
     // Wins over the pregame odds, for the staffs' scouting growth.
@@ -364,11 +368,12 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
 /**
  * Play out the current week: the user's game with `userResult` (and its drives, for progression) if
  * they played it on the field, everything else simulated. Does nothing once the season is complete.
- * The user's weekly emphases are spent: every week starts on standard.
+ * The user's weekly emphases are spent: every week starts on standard. A simulated user game fills
+ * `userStory` (season/story.ts) as it goes; that only watches, so the week plays the same without it.
  */
-export function advanceWeek(state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[]): void {
+export function advanceWeek(state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[], userStory?: GameStory): void {
   if (seasonOver(state)) return;
-  const ctx: WeekContext = { week: state.week, userResult, userDrives, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map() };
+  const ctx: WeekContext = { week: state.week, userResult, userDrives, userStory, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map() };
   for (const step of WEEK_STEPS) step.run(state, ctx);
   delete state.teamState[state.config.userTeamId]?.emph;
   if (!seasonOver(state)) state.week++;

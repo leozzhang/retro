@@ -120,11 +120,12 @@ export function drawTeamPanel(g: CanvasRenderingContext2D, t: Team, cx: number, 
 export const PANEL_TEAM_Y = [110, 218] as const;
 export const PANEL_CONF_Y = [218, 234] as const;
 
-export function drawExhibition(g: CanvasRenderingContext2D, user: Team, cpu: Team, quarter: string, mx: number, my: number): void {
+export function drawExhibition(g: CanvasRenderingContext2D, user: Team, cpu: Team, quarter: string, keys: string, mx: number, my: number): void {
   drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A/D TEAM  W/S CONF', true);
   drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
   text(g, 'VS', VIEW_W / 2, 152, { size: 16, align: 'center', color: '#ffffff' });
-  text(g, `<  ${quarter}  >   (Q / E)`, VIEW_W / 2, 270, { align: 'center', color: ACCENT });
+  text(g, `<  ${quarter}  >   (Q / E)`, VIEW_W / 2, 266, { align: 'center', color: ACCENT });
+  text(g, keys, VIEW_W / 2, 280, { align: 'center', color: my >= 280 && my < 290 ? GOLD : SOFT, shadow: false });
   goButton(g, 'KICK OFF', inBox(GO_BTN, mx, my));
   drawHint(g, 'ENTER: KICK OFF   R / T: ROSTERS   ESC: BACK');
 }
@@ -250,7 +251,8 @@ export function settingArrows(i: number): { prev: Box; next: Box } {
   return { prev: { x: r.x + r.w - 196, y: r.y, w: 20, h: r.h }, next: { x: r.x + r.w - 24, y: r.y, w: 20, h: r.h } };
 }
 
-export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number, rows: SettingRow[], sel: number, mx: number, my: number): void {
+/** `hub`: the dynasty's SETTINGS page (changes save as they're made) instead of a new dynasty's. */
+export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number, rows: SettingRow[], sel: number, mx: number, my: number, hub = false): void {
   g.fillStyle = t.colors.primary;
   g.fillRect(SET_X, 68, SET_W, 20);
   text(g, `${t.school.toUpperCase()} ${t.mascot.toUpperCase()}`.slice(0, 40), SET_X + 8, 74);
@@ -272,6 +274,11 @@ export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number,
   });
   const y = SET_Y + rows.length * SET_STEP + 6;
   if (rows[sel]) text(g, rows[sel].help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });
+  if (hub) {
+    goButton(g, 'DONE', inBox(GO_BTN, mx, my));
+    drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER / ESC: BACK TO THE HUB');
+    return;
+  }
   text(g, 'MORE OPTIONS ARE COMING', VIEW_W / 2, y + 30, { align: 'center', color: DIM, shadow: false });
   goButton(g, 'START DYNASTY', inBox(GO_BTN, mx, my));
   drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER: START   ESC: BACK');
