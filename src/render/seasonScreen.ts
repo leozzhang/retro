@@ -21,8 +21,10 @@ export const SEASON_TABS = ['SCHEDULE', 'SCORES', 'STANDINGS', 'POLLS', 'NEWS', 
 
 export interface SeasonView {
   tab: number;
-  /** Per-tab cycling with W/S: the week on SCORES, the conference on STANDINGS, AP/CFP on POLLS, the scroll on NEWS. */
+  /** Per-tab cycling with W/S: the week on SCORES and NEWS, the conference on STANDINGS, AP/CFP on POLLS. */
   sub: number;
+  /** The first line shown of the week's NEWS (mouse wheel, Q/E). */
+  scroll: number;
 }
 
 const TOP = 56;
@@ -35,6 +37,16 @@ const GOLD = '#ffd23f';
 const GREEN = '#7dff9a';
 
 const mod = (n: number, m: number) => ((n % m) + m) % m;
+
+/** The clickable week arrows on SCORES and NEWS: the week before, and the week after. */
+export const WEEK_PREV = { x: VIEW_W / 2 - 76, y: TOP - 7, w: 20, h: 14 };
+export const WEEK_NEXT = { x: VIEW_W / 2 + 56, y: TOP - 7, w: 20, h: 14 };
+
+function drawWeekHeader(g: CanvasRenderingContext2D, label: string): void {
+  text(g, '<', WEEK_PREV.x + WEEK_PREV.w / 2, TOP - 4, { align: 'center', color: ACCENT });
+  text(g, label, VIEW_W / 2, TOP - 4, { align: 'center', color: ACCENT });
+  text(g, '>', WEEK_NEXT.x + WEEK_NEXT.w / 2, TOP - 4, { align: 'center', color: ACCENT });
+}
 
 /** The button to the team page (depth chart and player cards), bottom right. */
 export const TEAM_BTN = { x: VIEW_W - 76, y: 328, w: 70, h: 15 };
@@ -122,7 +134,7 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
       drawPolls(g, s, v.sub);
       break;
     case 'NEWS':
-      drawNews(g, s, v.sub);
+      drawNews(g, s, v);
       break;
     case 'LEADERS':
       drawLeaders(g, s);
@@ -207,7 +219,7 @@ function drawScores(g: CanvasRenderingContext2D, s: SeasonState, sub: number): v
   const before = latestPoll(s, 'ap', week);
   const best = (x: SeasonGame) => Math.min(rankIn(before, x.home) || 99, rankIn(before, x.away) || 99);
   const games = s.games.filter((x) => x.week === week && x.result).sort((a, b) => best(a) - best(b));
-  text(g, `< WEEK ${week} >`, VIEW_W / 2, TOP - 4, { align: 'center', color: ACCENT });
+  drawWeekHeader(g, `WEEK ${week}`);
   const col = (x: SeasonGame, i: number) => {
     const cx = i < ROWS ? 20 : 330;
     const y = TOP + 10 + (i % ROWS) * LINE;
@@ -271,15 +283,53 @@ function wrap(s: string, n: number): string[] {
   return out;
 }
 
-function drawNews(g: CanvasRenderingContext2D, s: SeasonState, sub: number): void {
+/** The weeks with news, newest first; `sub` steps back through them. */
+function newsWeek(s: SeasonState, sub: number): number | undefined {
+  const weeks = [...new Set(s.news.map((n) => n.week))].sort((a, b) => b - a);
+  return weeks.length ? weeks[mod(sub, weeks.length)] : undefined;
+}
+
+/** One week's news as wrapped lines, newest first. */
+function newsLines(s: SeasonState, sub: number): { t: string; c: string }[] {
+  const week = newsWeek(s, sub);
   const lines: { t: string; c: string }[] = [];
   const u = s.config.userTeamId;
   for (const n of [...s.news].reverse()) {
+    if (n.week !== week) continue;
     const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : n.kind === 'injury' ? '#ff7a7a' : n.kind === 'portal' ? '#c9a0ff' : n.kind === 'carousel' ? '#8fd4ff' : '#ffffff';
-    wrap(`WK ${n.week}  ${n.text.toUpperCase()}`, 74).forEach((t) => lines.push({ t, c }));
+    wrap(n.text.toUpperCase(), 74).forEach((t) => lines.push({ t, c }));
   }
-  const start = mod(sub, Math.max(1, Math.ceil(lines.length / ROWS))) * ROWS;
-  lines.slice(start, start + ROWS).forEach((l, i) => text(g, l.t, 20, TOP + i * LINE, { color: l.c }));
+  return lines;
+}
+
+/** NEWS lines on a page: one fewer than the other tabs, clear of the bar under it. */
+const NEWS_ROWS = ROWS - 1;
+
+/** How far the week's NEWS can scroll. */
+export function newsMaxScroll(s: SeasonState, sub: number): number {
+  return Math.max(0, newsLines(s, sub).length - NEWS_ROWS);
+}
+
+/** One week's news (W/S or the arrows step through the weeks), scrolled by the wheel or Q/E when it runs long. */
+function drawNews(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): void {
+  const week = newsWeek(s, v.sub);
+  if (week === undefined) {
+    text(g, 'NO NEWS YET', VIEW_W / 2, TOP + 40, { align: 'center', color: DIM, shadow: false });
+    return;
+  }
+  drawWeekHeader(g, week === 0 ? 'PRESEASON' : `WEEK ${week}`);
+  const lines = newsLines(s, v.sub);
+  const top = Math.min(v.scroll, Math.max(0, lines.length - NEWS_ROWS));
+  lines.slice(top, top + NEWS_ROWS).forEach((l, i) => text(g, l.t, 20, TOP + 10 + i * LINE, { color: l.c }));
+  if (lines.length > NEWS_ROWS) {
+    // The scrollbar: the track, and the thumb for the lines in view.
+    const h = NEWS_ROWS * LINE;
+    g.fillStyle = '#1f2a3a';
+    g.fillRect(VIEW_W - 12, TOP + 10, 4, h);
+    g.fillStyle = SOFT;
+    g.fillRect(VIEW_W - 12, TOP + 10 + (top / lines.length) * h, 4, Math.max(6, (NEWS_ROWS / lines.length) * h));
+    text(g, 'WHEEL / Q E: SCROLL', VIEW_W - 20, TOP - 4, { align: 'right', color: DIM, shadow: false });
+  }
 }
 
 function drawLeaders(g: CanvasRenderingContext2D, s: SeasonState): void {

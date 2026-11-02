@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-10-31_
+_Last updated: 2026-11-01_
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -22,6 +22,10 @@ _Last updated: 2026-10-31_
 - **Running:** user-controlled carrier, sprint with stamina, broken tackles, sacks, scrambles, out of bounds, interception returns and pick sixes.
 - **Rules:** down and distance, first downs, touchdown (+7), safety, turnover on downs. The CPU's possessions are simulated by `simulateDrive`.
 - **Tooling:** 28 unit tests, a balance harness (`npm run balance`), an F1 debug overlay, and a `window.game` dev hook.
+
+## Done: news by week (2026-11-01)
+- **The NEWS tab shows one week at a time,** like SCORES: newest week first, W/S or the clickable < > arrows step through the weeks (the SCORES arrows are clickable too). Week 0 shows as PRESEASON. A long week scrolls with the mouse wheel or Q/E, with a scrollbar; changing the week starts it back at the top.
+- **Other teams' breakthroughs no longer make the news** (`progress` in `season/season.ts`); breakouts elsewhere still do (`BREAKOUT_NEWS`, the top two a week).
 
 ## Done: game pacing (2026-10-31)
 - **The problem:** every setting showed 15:00 quarters, and the setting only sped up the time between plays. A user play cost about 6–20 s of game clock, but a CPU drive cost about 32 s per play. Games had about 15 possessions a team and scores like 80-14.
@@ -644,7 +648,7 @@ Players now improve automatically during the season; nobody picks attributes. Ev
 - **Level-ups:** 1–3 points at a typical position, scaled per position (`POS_POINTS`, `LEVEL_XP`) so a level-up is worth the same overall everywhere. A 4% breakthrough gives 4–6.
   - Each point is a weighted draw: OVR weight × profile (grow into strengths) × performance tags (deep completions → `dac`, contested catches → `cit`, broken tackles → `elu`, sacks → `rsh`...) × growth rate (speed almost never) × headroom to a per-rating ceiling.
 - **State:** `TeamState.progress` (XP, level, all-time deltas, last level-up week, tags, recent grades). `squadFor` applies it and rebuilds the staff depth chart. `nextSeason` carries it over.
-- **Week loop:** a new `progress` step after `play`. Breakthroughs make the news: the user's team, plus the two biggest by real players elsewhere each week.
+- **Week loop:** a new `progress` step after `play`. Breakthroughs make the news for the user's team only (other teams' breakthroughs were dropped from the news; their breakouts still show).
 - **Team page:**
   - The OVR breakdown's `+/-` column is gone. **WK** shows a green arrow for a rating raised last week, or a flat line; **ALL** is the all-time change.
   - Grown ratings in the other-ratings grid are green.

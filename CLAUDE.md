@@ -79,7 +79,7 @@ Controls are listed in [README.md](README.md).
   - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `ST_SPEED_GAP`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)
   - sprint: `SPRINT_TIME`, `SPRINT_RECOVER` (`game/playState.ts`), scaled by `endurance` (`sim/player.ts`)
   - season: `DRIVE_SIM` (`game/rules.ts`, also the live game's CPU drives), `GAME_SIM`, `TARGETS`, `QB_RUN_SHARE` (`season/simGame.ts`), all fit to real FBS scores (SEASON.md); `AP_WEIGHTS`, `CFP_WEIGHTS` (`season/polls.ts`), `AWARDS` (`season/awards.ts`), `UPSET_GAP` (`season/news.ts`), scheme pass shares (`season/staff.ts`)
-  - progression: `GRADES` (including the fitted expected success rate), `TAG`, `ROTATION`, `PACKAGES`, `PAIRS` (`season/grades.ts`); `PROGRESSION` (including `atPotential`, the soft potential ceiling), `DEV_XP`, `YEAR_XP`, `GROWTH_RATE` (`season/progression.ts`); `BREAKTHROUGH_NEWS` (`season/season.ts`)
+  - progression: `GRADES` (including the fitted expected success rate), `TAG`, `ROTATION`, `PACKAGES`, `PAIRS` (`season/grades.ts`); `PROGRESSION` (including `atPotential`, the soft potential ceiling), `DEV_XP`, `YEAR_XP`, `GROWTH_RATE` (`season/progression.ts`); `BREAKOUT_NEWS` (`season/season.ts`)
   - injuries: `INJURY` (`season/injuries.ts`), `HITS`, `ROTATION_HURT` (`season/grades.ts`), `HEALTH` (playing hurt and staff rest, `data/depth.ts`), `INJURY_NEWS` (`season/season.ts`)
   - confidence: `CONF` (leverage, the clutch shift, the staff's slump and incumbent weights, `data/confidence.ts`); `CONFIDENCE`, `BREAKOUT` (`season/confidence.ts`)
   - morale: `MORALE` (`season/morale.ts`); its XP factor `moraleXp` (`PROGRESSION`)

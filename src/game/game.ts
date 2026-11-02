@@ -20,7 +20,7 @@ import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
-import { BOOK_BTN, drawSeason, PREP_BTN, RECRUIT_BTN, SEASON_TABS, STATS_BTN, TEAM_BTN, type SeasonView } from '../render/seasonScreen';
+import { BOOK_BTN, drawSeason, newsMaxScroll, PREP_BTN, RECRUIT_BTN, SEASON_TABS, STATS_BTN, TEAM_BTN, WEEK_NEXT, WEEK_PREV, type SeasonView } from '../render/seasonScreen';
 import {
   drawRecruit, FILTER_BTN, GROUP_CHIPS, groupChipRect, newRecruitView, RECRUIT_ACTIONS, RECRUIT_ADVANCE, RECRUIT_ROWS, RECRUIT_TABS, recruitActionRect,
   recruitRowRect, recruitRows, recruitTabAt, SEARCH_FILTERS, type RecruitView,
@@ -203,7 +203,7 @@ export class Game {
   private liveDrives: DriveLog[] | null = null;
   /** A season game's weekly emphases for the user's team: the user's defense plays them in the CPU's simulated drives. */
   private userEmph: TeamMods | undefined;
-  private seasonView: SeasonView = { tab: 0, sub: 0 };
+  private seasonView: SeasonView = { tab: 0, sub: 0, scroll: 0 };
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private careerView: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, back: 'season', mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
@@ -411,17 +411,31 @@ export class Game {
 
   private toSeason(): void {
     this.screen = 'season';
-    this.seasonView = { tab: 0, sub: 0 };
+    this.seasonView = { tab: 0, sub: 0, scroll: 0 };
   }
 
   private updateSeason(input: Input): void {
     const s = this.season!;
     const v = this.seasonView;
     const n = SEASON_TABS.length;
-    if (input.hit('KeyA', 'ArrowLeft')) this.seasonView = { tab: (v.tab + n - 1) % n, sub: 0 };
-    if (input.hit('KeyD', 'ArrowRight')) this.seasonView = { tab: (v.tab + 1) % n, sub: 0 };
-    if (input.hit('KeyW', 'ArrowUp')) v.sub--;
-    if (input.hit('KeyS', 'ArrowDown')) v.sub++;
+    if (input.hit('KeyA', 'ArrowLeft')) this.seasonView = { tab: (v.tab + n - 1) % n, sub: 0, scroll: 0 };
+    if (input.hit('KeyD', 'ArrowRight')) this.seasonView = { tab: (v.tab + 1) % n, sub: 0, scroll: 0 };
+    const tab = SEASON_TABS[this.seasonView.tab];
+    const m = input.mouse;
+    const weekly = tab === 'SCORES' || tab === 'NEWS';
+    // A new week starts the news back at its top.
+    if (input.hit('KeyW', 'ArrowUp') || (weekly && m.pressed && inBox(WEEK_NEXT, m.x, m.y))) {
+      v.sub--;
+      v.scroll = 0;
+    }
+    if (input.hit('KeyS', 'ArrowDown') || (weekly && m.pressed && inBox(WEEK_PREV, m.x, m.y))) {
+      v.sub++;
+      v.scroll = 0;
+    }
+    if (tab === 'NEWS') {
+      const step = m.wheel * 3 + (input.hit('KeyE') ? 3 : 0) - (input.hit('KeyQ') ? 3 : 0);
+      if (step) v.scroll = Math.max(0, Math.min(newsMaxScroll(s, v.sub), v.scroll + step));
+    }
     if (input.hit('Escape', 'Backspace')) {
       this.screen = 'title';
       this.titleTime = 0;

@@ -16,7 +16,7 @@ import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason }
 import { carryMorale, moraleOf, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
-import { deltaText, offseasonGrowth, POS_POINTS, progressTeam, type LevelUpEvent } from './progression';
+import { deltaText, offseasonGrowth, progressTeam, type LevelUpEvent } from './progression';
 import { joinYear } from '../data/rosterGen';
 import { GAME_SIM, settleTie, simGame, winOdds } from './simGame';
 import { emphasisMods, groupOf, type TeamMods } from './emphasis';
@@ -165,8 +165,8 @@ const play: WeekStep = (state, ctx) => {
   }
 };
 
-/** Breakthroughs by real players on other teams that make the news each week. */
-const BREAKTHROUGH_NEWS = 2;
+/** Breakouts on other teams that make the news each week. */
+const BREAKOUT_NEWS = 2;
 
 /** How the news says why the next man is up. */
 const SPARK_TEXT: Record<SparkReason, string> = { injured: 'the injured', slumping: 'a slumping', outplayed: 'an outplayed' };
@@ -174,12 +174,11 @@ const SPARK_TEXT: Record<SparkReason, string> = { injured: 'the injured', slumpi
 /**
  * Progress: every player who played earns XP from his game grades and may level up
  * (season/progression.ts), then the whole roster's morale moves (season/morale.ts) and confidence moves, new starters spark and breakouts land
- * (season/confidence.ts). Breakthroughs and breakouts on the user's team make the news, and the
- * biggest few by real players elsewhere; so does the user's next man up.
+ * (season/confidence.ts). Breakthroughs and breakouts on the user's team make the news, plus a few
+ * breakouts elsewhere; so does the user's next man up.
  */
 const progress: WeekStep = (state, ctx) => {
   const user = state.config.userTeamId;
-  const elsewhere: LevelUpEvent[] = [];
   const breakouts: BreakoutEvent[] = [];
   const told = (e: LevelUpEvent) =>
     state.news.push({
@@ -211,11 +210,7 @@ const progress: WeekStep = (state, ctx) => {
       for (const [g, pick] of Object.entries(focus?.picks ?? {}) as [Group, string][]) {
         if (pick !== STANDARD) (ts.eg ??= {})[g] = (ts.eg[g] ?? 0) + 1;
       }
-      for (const e of events) {
-        if (!e.big) continue;
-        if (t === user) told(e);
-        else if (e.athlete.real) elsewhere.push(e);
-      }
+      if (t === user) for (const e of events) if (e.big) told(e);
       // Morale first: it reads last game's starters, which the confidence step moves on.
       moraleStep(state, ts, sq, seasonRng(state, 'morale', t, ctx.week));
       const bases = new Map(baseRoster(state, t).map((a) => [a.id, generatedAthlete(a.id) ?? a]));
@@ -235,10 +230,7 @@ const progress: WeekStep = (state, ctx) => {
     }
   }
   // Real players first: breakouts are mostly backups, so they can't be the only ones told.
-  for (const e of breakouts.sort((a, b) => Number(!!b.athlete.real) - Number(!!a.athlete.real)).slice(0, BREAKTHROUGH_NEWS)) toldBreakout(e);
-  // Biggest by overall, not raw points (a QB level-up spends more points than a tackle's).
-  const pts = (e: LevelUpEvent) => Object.values(e.d).reduce((a, b) => a + (b ?? 0), 0) / POS_POINTS[e.athlete.pos];
-  for (const e of elsewhere.sort((a, b) => pts(b) - pts(a)).slice(0, BREAKTHROUGH_NEWS)) told(e);
+  for (const e of breakouts.sort((a, b) => Number(!!b.athlete.real) - Number(!!a.athlete.real)).slice(0, BREAKOUT_NEWS)) toldBreakout(e);
 };
 
 /** Injuries of 2+ weeks to real players elsewhere that make the news each week. */

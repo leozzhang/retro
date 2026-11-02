@@ -67,7 +67,7 @@ Confidence and morale are both stored per player and move after each game (CONFI
 
 ## 4. Level-ups and which ratings grow
 - **XP per level:** `LEVEL_XP[pos]` (175 at most positions).
-- **Points per level-up:** 1–3 at a typical position. A **breakthrough** (`breakOdds`, 4%) gives 4–6 and makes the news: always on the user's team, plus the two biggest by real players elsewhere each week.
+- **Points per level-up:** 1–3 at a typical position. A **breakthrough** (`breakOdds`, 4%) gives 4–6 and makes the news: only on the user's team (other teams' breakouts still make it; CONFIDENCE.md).
   - The 4% is flat per level-up, so a player's breakthroughs scale with how often he levels: about 1 in 5 starters a season, far fewer for players at their potential.
   - A level-up where no point can land (every rating at its ceiling) isn't counted: its XP is spent, but there's no level, no WK arrow and no breakthrough. Before this fix, such a level-up could make the news as an empty breakthrough.
 - **Every point is a separate weighted draw,** re-weighted after it lands:
