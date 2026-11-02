@@ -15,7 +15,8 @@ import { advanceWeek, defaultConfig, newSeason, simSeason } from './season/seaso
 import { settleTie, simGame } from './season/simGame';
 import { records, standings, winner } from './season/standings';
 import { leaders } from './season/stats';
-import { packSeason, unpackSeason } from './season/save';
+import { deleteSlot, freeSlot, latestSlot, loadSlot, migrateLegacySave, packSeason, saveSlot, SEASON_KEY, slotMeta, unpackSeason } from './season/save';
+import { getItem, setItem } from './engine/storage';
 import { setUserDepth, useStaffDepth } from './season/staff';
 import { squadFor } from './season/world';
 import type { GameResult, SeasonGame, SeasonState } from './season/types';
@@ -208,5 +209,26 @@ describe('season', () => {
     expect(boxes(JSON.parse(packed))).toBeLessThan(boxes(s) * 0.6);
     expect(gzipSync(packed).length).toBeLessThan(1.5e6);
     expect(JSON.parse(JSON.stringify(unpackSeason(packed)))).toEqual(JSON.parse(JSON.stringify(s)));
+  });
+
+  it('keeps dynasties in save slots, with a summary for each card', async () => {
+    const a = newSeason({ ...defaultConfig('georgia'), length: 'open' }, 3);
+    const b = newSeason({ ...defaultConfig('texas'), length: 'open' }, 4);
+    // An old single save moves into the first free slot.
+    setItem(SEASON_KEY, packSeason(a));
+    migrateLegacySave();
+    expect(getItem(SEASON_KEY)).toBeNull();
+    expect(slotMeta(1)).toMatchObject({ teamId: 'georgia', year: a.year, phase: 'WEEK 1', record: '0-0', seasons: 1 });
+    expect(freeSlot()).toBe(2);
+    saveSlot(2, b);
+    expect(latestSlot()).toBe(2);
+    expect((await loadSlot(1))?.config.userTeamId).toBe('georgia');
+    expect((await loadSlot(2))?.config.userTeamId).toBe('texas');
+    deleteSlot(2);
+    expect(slotMeta(2)).toBeNull();
+    expect(await loadSlot(2)).toBeNull();
+    expect(latestSlot()).toBe(1);
+    deleteSlot(1);
+    expect(latestSlot()).toBe(0);
   });
 });

@@ -34,6 +34,8 @@ export interface SeasonConfig {
   delegate: Delegation;
   /** How often players get hurt (season/injuries.ts). Missing means normal. */
   injuries?: InjuryLevel;
+  /** Quarter length in minutes for the user's live games (game/clock.ts `QUARTER_OPTIONS`). Missing means 6. */
+  quarter?: number;
 }
 
 export type InjuryLevel = 'off' | 'light' | 'normal';

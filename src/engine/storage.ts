@@ -52,6 +52,30 @@ export function getItem(key: string): string | null {
   return cache.get(key) ?? null;
 }
 
+/**
+ * A value that wasn't preloaded at boot (a dynasty's save): read once from storage, then cached.
+ * Queued writes finish first, so it never reads a value that's still being written or removed.
+ */
+export async function loadItem(key: string): Promise<string | null> {
+  checkKey(key);
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+  const b = backend;
+  if (!b) return null;
+  await queue;
+  if (cache.has(key)) return cache.get(key)!;
+  try {
+    const data = await b.read(key);
+    if (!data) return null;
+    const value = await gunzip(data);
+    cache.set(key, value);
+    return value;
+  } catch (err) {
+    report(key, err);
+    return null;
+  }
+}
+
 export function setItem(key: string, value: string): void {
   checkKey(key);
   cache.set(key, value);

@@ -5,7 +5,7 @@ import { initStore, onStoreError } from './engine/storage';
 import { Game } from './game/game';
 import { STARRED_KEY } from './game/starred';
 import { text } from './render/text';
-import { SEASON_KEY } from './season/save';
+import { BOOT_KEYS, migrateLegacySave } from './season/save';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const g = canvas.getContext('2d')!;
@@ -26,7 +26,8 @@ async function boot(): Promise<void> {
   } catch {
     // Fall back to monospace if the font fails to load.
   }
-  await initStore([SEASON_KEY, STARRED_KEY]);
+  await initStore([...BOOT_KEYS, STARRED_KEY]);
+  migrateLegacySave();
   let saveFailed = -Infinity;
   onStoreError(() => {
     saveFailed = performance.now();

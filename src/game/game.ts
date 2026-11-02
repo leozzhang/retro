@@ -20,7 +20,13 @@ import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
-import { BOOK_BTN, drawSeason, newsMaxScroll, PREP_BTN, RECRUIT_BTN, SEASON_TABS, STATS_BTN, TEAM_BTN, WEEK_NEXT, WEEK_PREV, type SeasonView } from '../render/seasonScreen';
+import {
+  drawSeason, navAt, navItems, newSeasonView, newsMaxScroll, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV, type NavItem, type SeasonView,
+} from '../render/seasonScreen';
+import {
+  drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
+  slotConfirmRects, slotDeleteRect, slotRect, type MenuItem, type SettingRow, type SlotsView,
+} from '../render/menuScreen';
 import {
   drawRecruit, FILTER_BTN, GROUP_CHIPS, groupChipRect, newRecruitView, RECRUIT_ACTIONS, RECRUIT_ADVANCE, RECRUIT_ROWS, RECRUIT_TABS, recruitActionRect,
   recruitRowRect, recruitRows, recruitTabAt, SEARCH_FILTERS, type RecruitView,
@@ -32,7 +38,7 @@ import { groupEmphases, STANDARD } from '../data/emphasis';
 import { GROUPS, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
-import { hasSavedSeason, loadSeason, saveSeason } from '../season/save';
+import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
 import { advanceWeek, defaultConfig, newSeason, seasonOver, userGameThisWeek } from '../season/season';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
 import { advanceOffseason, startOffseason } from '../season/offseason';
@@ -58,7 +64,6 @@ import { squadFor, staffFor } from '../season/world';
 import { driveLog } from '../season/simGame';
 import type { DriveLog, GameResult, SeasonGame, SeasonState } from '../season/types';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
-import { getSprite, teamUniform } from '../render/sprites';
 import { text, textWidth } from '../render/text';
 import {
   adminStop, advanceSim, afterPlay, clockText, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
@@ -74,7 +79,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -90,8 +95,22 @@ const KICKOFF_LINE = OWN_GOAL + 35;
 const FG_RANGE_HINT = 55;
 /** Injury settings for a new season, as I cycles them. */
 const INJURY_OPTIONS: InjuryLevel[] = ['normal', 'light', 'off'];
-const LENGTH_OPTIONS: SeasonConfig['length'][] = ['single', 'open'];
-const LENGTH_LABEL: Record<SeasonConfig['length'], string> = { single: 'ONE SEASON', open: 'DYNASTY' };
+
+/**
+ * The new-dynasty settings, one row each: its options, the one picked first, and what it sets.
+ * A new setting is one more entry.
+ */
+const SETTINGS: { label: string; help: string; options: string[]; start: number; apply: (c: SeasonConfig, i: number) => void }[] = [
+  {
+    label: 'INJURIES', help: 'HOW OFTEN PLAYERS GET HURT', options: INJURY_OPTIONS.map((o) => o.toUpperCase()), start: 0,
+    apply: (c, i) => (c.injuries = INJURY_OPTIONS[i]),
+  },
+  {
+    label: 'GAME LENGTH', help: 'QUARTER LENGTH IN THE GAMES YOU PLAY',
+    options: QUARTER_OPTIONS.map((q, i) => `${QUARTER_LABELS[i]} ${q}:00`), start: QUARTER_OPTIONS.indexOf(6),
+    apply: (c, i) => (c.quarter = QUARTER_OPTIONS[i]),
+  },
+];
 
 interface Notice {
   title: string;
@@ -154,9 +173,18 @@ export class Game {
   private rosterIdx = 0;
   private rosterPage = 0;
   private qIdx = QUARTER_OPTIONS.indexOf(6);
-  /** The injury setting a new season starts with (I on the title screen). */
-  private injuryIdx = INJURY_OPTIONS.indexOf('normal');
-  private lengthIdx = 0;
+  /** Main menu: the highlighted item. */
+  private menuSel = 0;
+  /** The dynasty save slots, and the slot being played (1 to `SLOTS`; 0 outside a dynasty). */
+  private slotsView: SlotsView = { sel: 0, confirm: -1, loading: -1, mx: 0, my: 0 };
+  private slot = 0;
+  /** A new dynasty: its school, the settings rows' picks, and the highlighted row. */
+  private newTeamIdx = this.userIdx;
+  private settingIdx = SETTINGS.map((r) => r.start);
+  private settingSel = 0;
+  /** Mouse on the menus, for hover, and whether it moved this step. */
+  private menuMouse = { x: 0, y: 0 };
+  private mouseMoved = false;
   private user!: Team;
   private cpu!: Team;
   /** The two squads in this game: the season's (injuries, the user's depth chart) in a season game. */
@@ -167,6 +195,8 @@ export class Game {
   /** The current snap's leverage (data/confidence.ts), logged with it for the grades. */
   private snapLev = 0;
   private crowd: HTMLCanvasElement | null = null;
+  /** The two teams the menus' crowd was painted for. */
+  private crowdKey = '';
   private cam = new Camera();
   private rng = Math.random;
   private score = { user: 0, cpu: 0 };
@@ -203,7 +233,7 @@ export class Game {
   private liveDrives: DriveLog[] | null = null;
   /** A season game's weekly emphases for the user's team: the user's defense plays them in the CPU's simulated drives. */
   private userEmph: TeamMods | undefined;
-  private seasonView: SeasonView = { tab: 0, sub: 0, scroll: 0 };
+  private seasonView: SeasonView = newSeasonView();
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private careerView: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, back: 'season', mx: 0, my: 0 };
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
@@ -216,11 +246,13 @@ export class Game {
   private starred = loadStarred();
   /** Mouse on the call screen, for the cards' star hover. */
   private callMouse = { x: 0, y: 0 };
-  /** A season is saved in this browser (checked once; parsing it every frame would be slow). */
-  private savedSeason = hasSavedSeason();
   private debug = false;
-  private titleTime = 0;
   private t = 0;
+
+  /** On the field: a play, a kick, the call screen, a notice or the final. */
+  private inGame(): boolean {
+    return this.screen === 'call' || this.screen === 'play' || this.screen === 'kick' || this.screen === 'notice' || this.screen === 'final';
+  }
 
   timeScale(): number {
     if (this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
@@ -230,10 +262,24 @@ export class Game {
 
   update(dt: number, input: Input): void {
     this.t += dt;
+    this.mouseMoved = input.mouse.x !== this.menuMouse.x || input.mouse.y !== this.menuMouse.y;
+    this.menuMouse = { x: input.mouse.x, y: input.mouse.y };
     if (input.hit('F1', 'Backquote')) this.debug = !this.debug;
     switch (this.screen) {
       case 'title':
-        this.updateTitle(dt, input);
+        this.updateTitle(input);
+        break;
+      case 'exhibition':
+        this.updateExhibition(input);
+        break;
+      case 'slots':
+        this.updateSlots(input);
+        break;
+      case 'newTeam':
+        this.updateNewTeam(input);
+        break;
+      case 'newSettings':
+        this.updateNewSettings(input);
         break;
       case 'roster':
         this.updateRoster(input);
@@ -281,25 +327,67 @@ export class Game {
         if (input.hit('Space', 'Enter') || input.mouse.pressed) {
           if (this.seasonGame) {
             this.finishSeasonGame();
-          } else {
-            this.screen = 'title';
-            this.titleTime = 0;
-          }
+          } else this.screen = 'exhibition';
         }
         break;
     }
-    if (this.screen !== 'title' && this.clock.quarter !== this.windQuarter) {
+    if (this.inGame() && this.clock.quarter !== this.windQuarter) {
       this.windQuarter = this.clock.quarter;
       this.wind = nextQuarterWind(this.wind, this.rng);
     }
     this.cam.update(dt);
   }
 
-  // ------------------------------------------------------------ title
+  // ------------------------------------------------------------ main menu
 
-  private updateTitle(dt: number, input: Input): void {
-    this.titleTime += dt;
+  private menuItems(): MenuItem[] {
+    const items: MenuItem[] = [];
+    const last = latestSlot();
+    const m = last ? slotMeta(last) : null;
+    if (m) items.push({ id: 'continue', label: `CONTINUE: ${teamById(m.teamId).school.toUpperCase()}`.slice(0, 32), desc: `${m.year}  ${m.phase}`.slice(0, 32) });
+    items.push({ id: 'dynasty', label: 'DYNASTY', desc: 'BUILD A PROGRAM OVER SEASONS' });
+    items.push({ id: 'exhibition', label: 'EXHIBITION', desc: 'PICK TWO TEAMS AND KICK OFF' });
+    return items;
+  }
+
+  /** Back to the main menu (from the hub, or the setup screens). */
+  private toTitle(): void {
+    this.screen = 'title';
+    this.menuSel = 0;
+  }
+
+  private updateTitle(input: Input): void {
+    const items = this.menuItems();
+    const n = items.length;
+    const m = input.mouse;
+    if (input.hit('KeyW', 'ArrowUp')) this.menuSel = (this.menuSel + n - 1) % n;
+    if (input.hit('KeyS', 'ArrowDown')) this.menuSel = (this.menuSel + 1) % n;
+    this.menuSel = Math.min(this.menuSel, n - 1);
+    // The mouse picks an item when it moves onto it, so the keys still work with it resting there.
+    const hover = items.findIndex((_, i) => inRect(m.x, m.y, menuRect(i)));
+    if (hover >= 0 && (this.mouseMoved || m.pressed)) this.menuSel = hover;
+    const go = input.hit('Enter', 'Space') || (m.pressed && hover >= 0);
+    if (!go) {
+      this.cam.follow(32, 0.5);
+      return;
+    }
+    const item = items[this.menuSel];
+    if (item.id === 'continue') this.openSlot(latestSlot());
+    else if (item.id === 'dynasty') {
+      this.screen = 'slots';
+      const last = latestSlot();
+      this.slotsView = { sel: Math.max(0, (last || freeSlot() || 1) - 1), confirm: -1, loading: -1, mx: m.x, my: m.y };
+    } else this.screen = 'exhibition';
+  }
+
+  // ------------------------------------------------------------ exhibition
+
+  private updateExhibition(input: Input): void {
     const nq = QUARTER_OPTIONS.length;
+    if (input.hit('Escape', 'Backspace')) {
+      this.toTitle();
+      return;
+    }
     if (input.hit('KeyA')) this.userIdx = this.stepTeam(this.userIdx, -1, this.cpuIdx);
     if (input.hit('KeyD')) this.userIdx = this.stepTeam(this.userIdx, 1, this.cpuIdx);
     if (input.hit('KeyW')) this.userIdx = this.stepConference(this.userIdx, -1, this.cpuIdx);
@@ -310,22 +398,6 @@ export class Game {
     if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
-    if (input.hit('KeyI')) this.injuryIdx = (this.injuryIdx + 1) % INJURY_OPTIONS.length;
-    if (input.hit('KeyL')) this.lengthIdx = (this.lengthIdx + 1) % LENGTH_OPTIONS.length;
-    if (input.hit('KeyN')) {
-      const config = { ...defaultConfig(TEAMS[this.userIdx].id), injuries: INJURY_OPTIONS[this.injuryIdx], length: LENGTH_OPTIONS[this.lengthIdx] };
-      this.season = newSeason(config, (Math.random() * 2 ** 31) >>> 0);
-      saveSeason(this.season);
-      this.toSeason();
-      return;
-    }
-    if (input.hit('KeyC')) {
-      this.season ??= loadSeason();
-      if (this.season) {
-        this.toSeason();
-        return;
-      }
-    }
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -337,21 +409,150 @@ export class Game {
       const { x, y } = input.mouse;
       const user = x < VIEW_W / 2;
       const d = x < (user ? 160 : 480) ? -1 : 1;
-      if (y > 150 && y < 222) {
+      if (y >= PANEL_TEAM_Y[0] && y < PANEL_TEAM_Y[1]) {
         if (user) this.userIdx = this.stepTeam(this.userIdx, d, this.cpuIdx);
         else this.cpuIdx = this.stepTeam(this.cpuIdx, d, this.userIdx);
-      } else if (y >= 222 && y < 238) {
+      } else if (y >= PANEL_CONF_Y[0] && y < PANEL_CONF_Y[1]) {
         if (user) this.userIdx = this.stepConference(this.userIdx, d, this.cpuIdx);
         else this.cpuIdx = this.stepConference(this.cpuIdx, d, this.userIdx);
-      } else if (y >= 268 && y < 290) {
+      } else if (y >= 262 && y < 284) {
         this.qIdx = (this.qIdx + (x < VIEW_W / 2 ? nq - 1 : 1)) % nq;
-      } else if (y >= 290) {
+      } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
       }
     }
     if (input.hit('Enter', 'Space')) this.startGame();
     this.cam.follow(32, 0.5);
+  }
+
+  // ------------------------------------------------------------ dynasty slots
+
+  /** Load a slot's dynasty and open its hub. The save loads in the background; the card shows LOADING. */
+  private openSlot(slot: number): void {
+    if (!slot || this.slotsView.loading >= 0) return;
+    this.slotsView.loading = slot - 1;
+    void loadSlot(slot).then((s) => {
+      this.slotsView.loading = -1;
+      if (!s) return;
+      this.season = s;
+      this.slot = slot;
+      this.toSeason();
+    });
+  }
+
+  private updateSlots(input: Input): void {
+    const v = this.slotsView;
+    const m = input.mouse;
+    v.mx = m.x;
+    v.my = m.y;
+    if (v.loading >= 0) return;
+    if (v.confirm >= 0) {
+      const c = slotConfirmRects(v.confirm);
+      if (input.hit('Enter') || (m.pressed && inRect(m.x, m.y, c.yes))) {
+        deleteSlot(v.confirm + 1);
+        v.confirm = -1;
+      } else if (input.hit('Escape', 'Backspace') || (m.pressed && !inRect(m.x, m.y, c.yes))) v.confirm = -1;
+      return;
+    }
+    if (input.hit('Escape', 'Backspace')) {
+      this.toTitle();
+      return;
+    }
+    if (input.hit('KeyA', 'ArrowLeft')) v.sel = (v.sel + SLOTS - 1) % SLOTS;
+    if (input.hit('KeyD', 'ArrowRight')) v.sel = (v.sel + 1) % SLOTS;
+    let go = input.hit('Enter', 'Space');
+    if (m.pressed) {
+      const i = Array.from({ length: SLOTS }, (_, k) => k).find((k) => inRect(m.x, m.y, slotRect(k)));
+      if (i !== undefined) {
+        v.sel = i;
+        if (slotMeta(i + 1) && inRect(m.x, m.y, slotDeleteRect(i))) {
+          v.confirm = i;
+          return;
+        }
+        go = true;
+      }
+    }
+    if (input.hit('Delete') && slotMeta(v.sel + 1)) {
+      v.confirm = v.sel;
+      return;
+    }
+    if (!go) return;
+    if (slotMeta(v.sel + 1)) this.openSlot(v.sel + 1);
+    else {
+      this.slot = v.sel + 1;
+      this.newTeamIdx = this.userIdx;
+      this.screen = 'newTeam';
+    }
+  }
+
+  /** Choosing the new dynasty's school: A/D within the conference, W/S the conference. */
+  private updateNewTeam(input: Input): void {
+    const m = input.mouse;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'slots';
+      return;
+    }
+    if (input.hit('KeyA', 'ArrowLeft')) this.newTeamIdx = this.stepTeam(this.newTeamIdx, -1, -1);
+    if (input.hit('KeyD', 'ArrowRight')) this.newTeamIdx = this.stepTeam(this.newTeamIdx, 1, -1);
+    if (input.hit('KeyW', 'ArrowUp')) this.newTeamIdx = this.stepConference(this.newTeamIdx, -1, -1);
+    if (input.hit('KeyS', 'ArrowDown')) this.newTeamIdx = this.stepConference(this.newTeamIdx, 1, -1);
+    let next = input.hit('Enter', 'Space');
+    if (m.pressed) {
+      const d = m.x < VIEW_W / 2 ? -1 : 1;
+      if (m.y >= PANEL_TEAM_Y[0] && m.y < PANEL_TEAM_Y[1]) this.newTeamIdx = this.stepTeam(this.newTeamIdx, d, -1);
+      else if (m.y >= PANEL_CONF_Y[0] && m.y < PANEL_CONF_Y[1]) this.newTeamIdx = this.stepConference(this.newTeamIdx, d, -1);
+      else if (inRect(m.x, m.y, GO_BTN)) next = true;
+    }
+    if (!next) return;
+    this.settingIdx = SETTINGS.map((r) => r.start);
+    this.settingSel = 0;
+    this.screen = 'newSettings';
+  }
+
+  private settingRows(): SettingRow[] {
+    return SETTINGS.map((r, i) => ({ label: r.label, value: r.options[this.settingIdx[i]], help: r.help }));
+  }
+
+  /** The new dynasty's settings: W/S a row, A/D or its arrows change it; Enter starts the dynasty. */
+  private updateNewSettings(input: Input): void {
+    const m = input.mouse;
+    if (input.hit('Escape', 'Backspace')) {
+      this.screen = 'newTeam';
+      return;
+    }
+    const n = SETTINGS.length;
+    if (input.hit('KeyW', 'ArrowUp')) this.settingSel = (this.settingSel + n - 1) % n;
+    if (input.hit('KeyS', 'ArrowDown')) this.settingSel = (this.settingSel + 1) % n;
+    const change = (row: number, d: number) => {
+      const k = SETTINGS[row].options.length;
+      this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
+    };
+    if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
+    if (input.hit('KeyD', 'ArrowRight')) change(this.settingSel, 1);
+    let start = input.hit('Enter', 'Space');
+    if (m.pressed) {
+      if (inRect(m.x, m.y, GO_BTN)) start = true;
+      for (let i = 0; i < n; i++) {
+        if (!inRect(m.x, m.y, settingRect(i))) continue;
+        this.settingSel = i;
+        const a = settingArrows(i);
+        if (inRect(m.x, m.y, a.prev)) change(i, -1);
+        else if (inRect(m.x, m.y, a.next) || m.x < a.prev.x) change(i, 1);
+      }
+    }
+    if (!start) return;
+    const config: SeasonConfig = { ...defaultConfig(TEAMS[this.newTeamIdx].id), length: 'open' };
+    SETTINGS.forEach((r, i) => r.apply(config, this.settingIdx[i]));
+    this.userIdx = this.newTeamIdx;
+    this.season = newSeason(config, (Math.random() * 2 ** 31) >>> 0);
+    this.save();
+    this.toSeason();
+  }
+
+  /** Save the dynasty in progress to its slot. */
+  private save(): void {
+    if (this.season && this.slot) saveSlot(this.slot, this.season);
   }
 
   /** Next or previous team in the same conference, skipping `other` (the team on the other side). */
@@ -378,10 +579,7 @@ export class Game {
     const n = rosterPages(buildSquad(TEAMS[this.rosterIdx]));
     if (input.hit('KeyA', 'ArrowLeft')) this.rosterPage = (this.rosterPage + n - 1) % n;
     if (input.hit('KeyD', 'ArrowRight') || input.mouse.pressed) this.rosterPage = (this.rosterPage + 1) % n;
-    if (input.hit('Escape', 'Enter', 'Backspace')) {
-      this.screen = 'title';
-      this.titleTime = 0;
-    }
+    if (input.hit('Escape', 'Enter', 'Backspace')) this.screen = 'exhibition';
   }
 
   private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx], squads?: { user: Squad; cpu: Squad }): void {
@@ -392,8 +590,10 @@ export class Game {
     this.userRoster = onField(this.userSquad);
     this.cpuRoster = onField(this.cpuSquad);
     this.crowd = makeCrowd(this.user, this.cpu);
+    this.crowdKey = '';
     this.score = { user: 0, cpu: 0 };
-    this.clock = newClock(QUARTER_OPTIONS[this.qIdx]);
+    // A dynasty's games use its own quarter length; exhibitions use the picker's.
+    this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? 6 : QUARTER_OPTIONS[this.qIdx]);
     this.tempo = 'normal';
     this.autoHurryQ = 0;
     this.drive = startDrive(25);
@@ -411,73 +611,94 @@ export class Game {
 
   private toSeason(): void {
     this.screen = 'season';
-    this.seasonView = { tab: 0, sub: 0, scroll: 0 };
+    this.seasonView = newSeasonView();
   }
 
+  /** Open a sidebar page. */
+  private openPage(item: NavItem): void {
+    if (item.off) return;
+    if (item.page === 'team') this.toTeam();
+    else if (item.page === 'playbook') this.toBook();
+    else if (item.page === 'prep') this.toPrep();
+    else if (item.page === 'recruit') this.toRecruit();
+    else if (item.page === 'career') this.toCareer('season');
+  }
+
+  /**
+   * The hub: W/S or a click picks a sidebar item (panels show at once, Enter opens a page), A/D or
+   * the header arrows step the panel's week, conference or poll, the hotkeys open pages, Space or the
+   * big button runs the week's action, X sims.
+   */
   private updateSeason(input: Input): void {
     const s = this.season!;
     const v = this.seasonView;
-    const n = SEASON_TABS.length;
-    if (input.hit('KeyA', 'ArrowLeft')) this.seasonView = { tab: (v.tab + n - 1) % n, sub: 0, scroll: 0 };
-    if (input.hit('KeyD', 'ArrowRight')) this.seasonView = { tab: (v.tab + 1) % n, sub: 0, scroll: 0 };
-    const tab = SEASON_TABS[this.seasonView.tab];
     const m = input.mouse;
-    const weekly = tab === 'SCORES' || tab === 'NEWS';
-    // A new week starts the news back at its top.
-    if (input.hit('KeyW', 'ArrowUp') || (weekly && m.pressed && inBox(WEEK_NEXT, m.x, m.y))) {
-      v.sub--;
-      v.scroll = 0;
+    v.mx = m.x;
+    v.my = m.y;
+    if (input.hit('Escape', 'Backspace')) {
+      this.toTitle();
+      return;
     }
-    if (input.hit('KeyS', 'ArrowDown') || (weekly && m.pressed && inBox(WEEK_PREV, m.x, m.y))) {
-      v.sub++;
-      v.scroll = 0;
+    const items = navItems(s);
+    const live = items.filter((it) => !it.off);
+    const select = (id: string) => {
+      if (id !== v.nav) Object.assign(v, { nav: id, sub: 0, scroll: 0 });
+    };
+    const at = Math.max(0, live.findIndex((it) => it.id === v.nav));
+    if (input.hit('KeyW', 'ArrowUp')) select(live[(at + live.length - 1) % live.length].id);
+    if (input.hit('KeyS', 'ArrowDown')) select(live[(at + 1) % live.length].id);
+    const cur = items.find((it) => it.id === v.nav);
+    if (cur?.page && input.hit('Enter')) {
+      this.openPage(cur);
+      return;
     }
-    if (tab === 'NEWS') {
+    // A/D or the arrows: the week (newest first, so "next" is a smaller step back), conference or poll.
+    if (SUB_PANELS.has(v.nav)) {
+      const d = (input.hit('KeyD', 'ArrowRight') || (m.pressed && inRect(m.x, m.y, SUB_NEXT)) ? 1 : 0)
+        - (input.hit('KeyA', 'ArrowLeft') || (m.pressed && inRect(m.x, m.y, SUB_PREV)) ? 1 : 0);
+      if (d) {
+        v.sub += v.nav === 'SCORES' || v.nav === 'NEWS' ? -d : d;
+        v.scroll = 0;
+      }
+    }
+    if (v.nav === 'NEWS') {
       const step = m.wheel * 3 + (input.hit('KeyE') ? 3 : 0) - (input.hit('KeyQ') ? 3 : 0);
       if (step) v.scroll = Math.max(0, Math.min(newsMaxScroll(s, v.sub), v.scroll + step));
     }
-    if (input.hit('Escape', 'Backspace')) {
-      this.screen = 'title';
-      this.titleTime = 0;
-      return;
+    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'career', KeyR: 'recruit' };
+    for (const [key, id] of Object.entries(hot)) {
+      const it = items.find((x) => x.id === id);
+      if (it && !it.off && input.hit(key)) {
+        this.openPage(it);
+        return;
+      }
     }
-    if (input.hit('KeyT') || (input.mouse.pressed && inBox(TEAM_BTN, input.mouse.x, input.mouse.y))) {
-      this.toTeam();
-      return;
+    if (m.pressed) {
+      const it = navAt(s, m.x, m.y);
+      if (it && !it.off) {
+        if (it.page) {
+          select(it.id);
+          this.openPage(it);
+        } else select(it.id);
+        return;
+      }
     }
-    if (input.hit('KeyP') || (input.mouse.pressed && inBox(BOOK_BTN, input.mouse.x, input.mouse.y))) {
-      this.toBook();
-      return;
-    }
-    if (input.hit('KeyH') || (input.mouse.pressed && inBox(STATS_BTN, input.mouse.x, input.mouse.y))) {
-      this.toCareer('season');
-      return;
-    }
-    if (s.recruiting && (input.hit('KeyR') || (input.mouse.pressed && inBox(RECRUIT_BTN, input.mouse.x, input.mouse.y)))) {
-      this.toRecruit();
-      return;
-    }
-    // In the offseason the PREP button is the stage's: the carousel, then the portal.
-    const prepBtn = input.mouse.pressed && inBox(PREP_BTN, input.mouse.x, input.mouse.y);
+    const game = userGameThisWeek(s);
+    const sim = input.hit('KeyX') || (!!game && m.pressed && inRect(m.x, m.y, SIM_BTN));
+    const act = input.hit('Space') || (m.pressed && inRect(m.x, m.y, PRIMARY_BTN));
+    if ((!act && !sim) || primaryAction(s).off) return;
     if (s.phase === 'offseason') {
-      if (input.hit('KeyO', 'Space', 'Enter') || prepBtn) this.toOffseason();
+      this.toOffseason();
       return;
     }
-    if (input.hit('KeyO') || prepBtn) {
-      this.toPrep();
-      return;
-    }
-    const sim = input.hit('KeyX');
-    if (!input.hit('Space', 'Enter') && !sim) return;
     if (seasonOver(s)) {
       // An open-ended season goes into its offseason, starting with the coaching carousel.
       if (s.config.length !== 'open') return;
       startOffseason(s);
-      saveSeason(s);
+      this.save();
       this.toOffseason();
       return;
     }
-    const game = userGameThisWeek(s);
     if (game && !sim) {
       // Play it on the field; the final screen writes the result back.
       const u = s.config.userTeamId;
@@ -487,7 +708,7 @@ export class Game {
       return;
     }
     advanceWeek(s);
-    saveSeason(s);
+    this.save();
   }
 
   // ------------------------------------------------------------ team page
@@ -506,7 +727,7 @@ export class Game {
     const s = this.season!;
     if (s.config.delegate.depthChart) setUserDepth(s, { ...squadFor(s, s.config.userTeamId).depth });
     else useStaffDepth(s);
-    saveSeason(s);
+    this.save();
   }
 
   /** Depth chart and player cards: click a tab for its card, drag it to a new spot to reorder. */
@@ -559,7 +780,7 @@ export class Game {
     if (to === d.from) return;
     const [from, at] = fullMove(view, d.from, to);
     setUserDepth(s, reorderPosition(squad, pos, from, at));
-    saveSeason(s);
+    this.save();
   }
 
   // ------------------------------------------------------------ stats page
@@ -702,7 +923,7 @@ export class Game {
     const signingDay = s.phase === 'offseason' && s.offseason?.stage === 'signing';
     if (signingDay && (input.hit('Space', 'Enter') || (pressed && inBox(RECRUIT_ADVANCE, x, y)))) {
       advanceOffseason(s);
-      saveSeason(s);
+      this.save();
       this.toOffseason();
       return;
     }
@@ -725,13 +946,13 @@ export class Game {
     if (input.hit('KeyF')) {
       s.config.delegate.recruiting = !s.config.delegate.recruiting;
       v.note = s.config.delegate.recruiting ? 'YOUR STAFF RECRUITS: BOARD, OFFERS AND VISITS (F: TAKE IT BACK)' : 'YOU RECRUIT';
-      saveSeason(s);
+      this.save();
       return;
     }
     if (input.hit('KeyG') && RECRUIT_TABS[v.tab] === 'BOARD' && !s.config.delegate.recruiting) {
       const added = staffFill(s);
       v.note = added ? `STAFF ADDED ${added} TO THE BOARD` : 'THE BOARD IS FULL FOR YOUR NEEDS';
-      saveSeason(s);
+      this.save();
       return;
     }
     const rows = recruitRows(s, v);
@@ -772,7 +993,7 @@ export class Game {
         } else v.note = addToBoard(s, id) ? 'ON THE BOARD: HIS POSITION COACH WILL WORK HIM' : 'CAN\'T ADD HIM';
         break;
     }
-    saveSeason(s);
+    this.save();
   }
 
   // ------------------------------------------------------------ departures and the draft
@@ -809,12 +1030,12 @@ export class Game {
     if (input.hit('KeyF') && !s.offseason?.round) {
       s.config.delegate.departures = !s.config.delegate.departures;
       v.note = s.config.delegate.departures ? 'YOUR STAFF MEETS THEM (F: TAKE IT BACK)' : 'YOU MEET THEM';
-      saveSeason(s);
+      this.save();
       return;
     }
     if (input.hit('Space', 'Enter') || (pressed && inBox(DEPARTURES_ADVANCE, x, y))) {
       advanceOffseason(s);
-      saveSeason(s);
+      this.save();
       this.toOffseason();
       return;
     }
@@ -834,7 +1055,7 @@ export class Game {
       return;
     }
     v.note = s.departures!.watch[id].ok ? 'GOOD TALK: HE IS LEANING TOWARD COMING BACK' : 'HE HEARD YOU OUT, BUT HIS MIND IS ON THE NFL';
-    saveSeason(s);
+    this.save();
   }
 
   /**
@@ -864,12 +1085,12 @@ export class Game {
     if (input.hit('KeyF')) {
       s.config.delegate.carousel = !s.config.delegate.carousel;
       v.note = s.config.delegate.carousel ? 'YOUR STAFF HIRES (F: TAKE IT BACK)' : 'YOU HIRE';
-      saveSeason(s);
+      this.save();
       return;
     }
     if (input.hit('Space', 'Enter') || (pressed && inBox(CAROUSEL_ADVANCE, x, y))) {
       advanceOffseason(s);
-      saveSeason(s);
+      this.save();
       if (s.offseason?.stage !== 'carousel') {
         this.toOffseason();
         return;
@@ -890,7 +1111,7 @@ export class Game {
       if (pressed) for (let i = 0; i < rows.length; i++) if (inBox(carouselRowRect(i), x, y)) v.sel = i;
       if (pick(0) && !s.config.delegate.carousel) {
         v.note = fireAssistant(s, rows[v.sel]) ? 'FIRED: HIS CHAIR IS OPEN ON THE HIRING TAB' : 'HIS CHAIR IS ALREADY OPEN';
-        saveSeason(s);
+        this.save();
       }
       return;
     }
@@ -915,10 +1136,10 @@ export class Game {
         withdrawOffer(s, ch);
         v.note = 'OFFER WITHDRAWN';
       } else v.note = offerChair(s, ch, c.id) ? 'OFFER MADE: HE ANSWERS WHEN THE ROUND ENDS' : 'NOT NOW: HE HAS YOUR OFFER FOR ANOTHER CHAIR, OR TURNED THIS ONE DOWN';
-      saveSeason(s);
+      this.save();
     } else if (pick(1)) {
       v.note = interview(s, c.id) ? 'INTERVIEWED: HIS RATINGS ARE SHARPER' : 'NO INTERVIEWS LEFT, OR YOU KNOW ALL YOU CAN';
-      saveSeason(s);
+      this.save();
     }
   }
 
@@ -956,18 +1177,18 @@ export class Game {
     if (input.hit('KeyF')) {
       s.config.delegate.portal = !s.config.delegate.portal;
       v.note = s.config.delegate.portal ? 'YOUR STAFF RUNS THE PORTAL (F: TAKE IT BACK)' : 'YOU RUN THE PORTAL';
-      saveSeason(s);
+      this.save();
       return;
     }
     if (input.hit('Space', 'Enter') || (pressed && inBox(ADVANCE_BTN, x, y))) {
       const next = advanceOffseason(s);
       if (next !== s) {
         this.season = next;
-        saveSeason(next);
+        this.save();
         this.toSeason();
         return;
       }
-      saveSeason(s);
+      this.save();
       this.portalView = { ...newPortalView(s), tab: PORTAL_TABS[v.tab] === 'LEAVING' ? 0 : v.tab, chip: v.chip };
       return;
     }
@@ -996,7 +1217,7 @@ export class Game {
     for (let i = 0; i < 5; i++) if (input.hit(`Digit${i + 1}`) || (pressed && inBox(actionRect(i), x, y))) act = i;
     if (act < 0) return;
     v.note = which === 'BOARD' ? this.boardAction(s, id, act) : this.leavingAction(s, id, act);
-    saveSeason(s);
+    this.save();
   }
 
   private boardAction(s: SeasonState, id: string, act: number): string {
@@ -1128,7 +1349,7 @@ export class Game {
         changed = true;
       }
     }
-    if (changed) saveSeason(s);
+    if (changed) this.save();
   }
 
   /** The live game is over: hand the score to the season (box score to come) and go back to the hub. */
@@ -1144,7 +1365,7 @@ export class Game {
     this.seasonGame = null;
     advanceWeek(s, result, this.liveDrives ?? undefined);
     this.liveDrives = null;
-    saveSeason(s);
+    this.save();
     this.toSeason();
   }
 
@@ -1652,8 +1873,8 @@ export class Game {
 
   render(g: CanvasRenderingContext2D): void {
     g.imageSmoothingEnabled = false;
-    if (this.screen === 'title') {
-      this.renderTitle(g);
+    if (this.screen === 'title' || this.screen === 'exhibition' || this.screen === 'slots' || this.screen === 'newTeam' || this.screen === 'newSettings') {
+      this.renderMenu(g);
       return;
     }
     if (this.screen === 'roster') {
@@ -1971,46 +2192,39 @@ export class Game {
     drawMiniPlay(g, p, { x: r.x + 8, y: r.y + 25, w: r.w - 18, h: r.h - 28 }, this.flipCall);
   }
 
-  private renderTitle(g: CanvasRenderingContext2D): void {
-    const user = TEAMS[this.userIdx];
+  /** The menus before a game or dynasty, over the title backdrop. */
+  private renderMenu(g: CanvasRenderingContext2D): void {
+    const pick = this.screen === 'newTeam' || this.screen === 'newSettings';
+    const user = TEAMS[pick ? this.newTeamIdx : this.userIdx];
     const cpu = TEAMS[this.cpuIdx];
-    if (!this.crowd) this.crowd = makeCrowd(user, cpu);
-    drawField(g, this.cam, user, cpu, this.crowd);
-    g.fillStyle = 'rgba(8,10,14,0.72)';
-    g.fillRect(0, 0, VIEW_W, 360);
-    text(g, 'SATURDAY GRIDIRON', VIEW_W / 2, 40, { size: 24, align: 'center', color: '#ffd23f', shadow: '#7a3e14' });
-    text(g, 'COLLEGE FOOTBALL  -  GAMEPLAY MVP', VIEW_W / 2, 76, { size: 8, align: 'center', color: '#cfd6df' });
-
-    this.drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A/D TEAM  W/S CONF', true);
-    this.drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
-    text(g, 'VS', VIEW_W / 2, 196, { size: 16, align: 'center', color: '#ffffff' });
-    const qMin = QUARTER_OPTIONS[this.qIdx];
-    text(g, `<  ${QUARTER_LABELS[this.qIdx]}: ${qMin}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES  >   (Q / E)`, VIEW_W / 2, 270, { align: 'center', color: '#9ad7ff' });
-    text(g, `NEW SEASON: ${LENGTH_LABEL[LENGTH_OPTIONS[this.lengthIdx]]} (L)   INJURIES: ${INJURY_OPTIONS[this.injuryIdx].toUpperCase()} (I)`, VIEW_W / 2, 283, {
-      align: 'center', color: '#8fa0b8', shadow: false,
-    });
-
-    if (Math.floor(this.titleTime * 2) % 2 === 0) {
-      text(g, 'PRESS ENTER TO KICK OFF', VIEW_W / 2, 300, { size: 8, align: 'center', color: '#ffffff' });
+    // The crowd is painted in the two teams' colors; repaint it when either changes.
+    const key = `${user.id}|${cpu.id}`;
+    if (!this.crowd || this.crowdKey !== key) {
+      this.crowd = makeCrowd(user, cpu);
+      this.crowdKey = key;
     }
-    text(g, `R / T: ROSTERS   N: NEW SEASON${this.season || this.savedSeason ? '   C: CONTINUE SEASON' : ''}`, VIEW_W / 2, 316, {
-      size: 8, align: 'center', color: '#9ad7ff',
-    });
-    text(g, 'DRAG + RELEASE TO PASS.  R-CLICK HAND OFF.  WASD MOVE.  SHIFT SPRINT.', VIEW_W / 2, 334, {
-      size: 8, align: 'center', color: '#8fa0b8',
-    });
-  }
-
-  private drawTeamPanel(g: CanvasRenderingContext2D, t: Team, cx: number, label: string, keys: string, home: boolean): void {
-    text(g, label, cx, 108, { align: 'center', color: '#8fa0b8' });
-    const spr = getSprite(teamUniform(t, home), '#c68a5e', 'stand', home ? 1 : -1);
-    g.drawImage(spr, cx - 40, 124, 80, 88);
-    text(g, '<', cx - 70, 164, { size: 16, align: 'center', color: '#ffd23f' });
-    text(g, '>', cx + 70, 164, { size: 16, align: 'center', color: '#ffd23f' });
-    text(g, t.school.toUpperCase(), cx, 210, { size: t.school.length > 13 ? 8 : 12, align: 'center', color: '#ffffff' });
-    text(g, `< ${t.conference.toUpperCase()} >`, cx, 226, { align: 'center', color: '#9ad7ff' });
-    const r = teamRatings(buildSquad(t));
-    text(g, `OVR ${r.ovr}  OFF ${r.off}  DEF ${r.def}`, cx, 240, { align: 'center', color: '#cfd6df' });
-    text(g, keys, cx, 256, { align: 'center', color: '#5d6b80', shadow: false });
+    const { x, y } = this.menuMouse;
+    switch (this.screen) {
+      case 'title':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd);
+        drawMainMenu(g, user, cpu, this.menuItems(), this.menuSel);
+        break;
+      case 'exhibition':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
+        drawExhibition(g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`, x, y);
+        break;
+      case 'slots':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY', 'CHOOSE A SAVE SLOT');
+        drawSlots(g, Array.from({ length: SLOTS }, (_, i) => slotMeta(i + 1)), this.slotsView);
+        break;
+      case 'newTeam':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd, 'CHOOSE YOUR SCHOOL', 'NEW DYNASTY');
+        drawNewTeam(g, user, this.slot, x, y);
+        break;
+      case 'newSettings':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'NEW DYNASTY');
+        drawSettings(g, user, this.slot, this.settingRows(), this.settingSel, x, y);
+        break;
+    }
   }
 }

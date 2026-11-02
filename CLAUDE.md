@@ -22,7 +22,7 @@ python scripts/build_profiles.py   # rebuild src/data/fbs/profiles.ts from docs/
 Controls are listed in [README.md](README.md).
 
 ## Code layout (src/)
-- `engine/`: constants, camera projection, input, math and seeded RNG, and saved data (`storage.ts`: gzipped, preloaded at boot, written in the background; files in the desktop app, IndexedDB in a browser, memory in Node)
+- `engine/`: constants, camera projection, input, math and seeded RNG, and saved data (`storage.ts`: gzipped, preloaded at boot or loaded on demand with `loadItem`, written in the background; files in the desktop app, IndexedDB in a browser, memory in Node)
 - `data/`: players and teams. See [docs/RATINGS.md](docs/RATINGS.md) and [docs/ROSTERS.md](docs/ROSTERS.md)
   - `coaches.ts` (coaching staffs, generated per team; see [docs/COACHES.md](docs/COACHES.md)), `emphasis.ts` (the position coaches' weekly emphases)
   - `ratings.ts` (every rating and what it does), `positions.ts` (positions, overall formulas), `athletes.ts` (player schema, rating templates, archetypes, builds)
@@ -38,8 +38,8 @@ Controls are listed in [README.md](README.md).
   - `rules.ts`: down and distance, scoring, kick spots, CPU drive sim
   - `clock.ts`: game and play clock rules
   - `wind.ts`: per-game wind and its quarterly drift
-  - `game.ts`: screens (title with conference and team pickers, roster, season hub, play call with PAT and kickoff modes, play, kick, notices, final). A season game's final screen writes the score back with `advanceWeek`
-- `season/`: the season engine, headless and plain JSON (`types.ts`): the week loop (`season.ts`), schedule, CPU game sim with box scores (`simGame.ts`), standings and tiebreakers, AP and CFP polls, postseason, stats, awards, news, staff automation (`staff.ts`), coach career, saves. See [docs/SEASON.md](docs/SEASON.md)
+  - `game.ts`: screens (main menu, exhibition setup, dynasty save slots, new dynasty school and settings (`SETTINGS`), roster, season hub, play call with PAT and kickoff modes, play, kick, notices, final). A season game's final screen writes the score back with `advanceWeek`; `save()` writes the dynasty's slot
+- `season/`: the season engine, headless and plain JSON (`types.ts`): the week loop (`season.ts`), schedule, CPU game sim with box scores (`simGame.ts`), standings and tiebreakers, AP and CFP polls, postseason, stats, awards, news, staff automation (`staff.ts`), coach career, saves (`save.ts`: three dynasty slots with a small meta each). See [docs/SEASON.md](docs/SEASON.md)
   - player progression: per-snap game grades from drive logs (`grades.ts`), then XP, levels and weighted attribute draws (`progression.ts`). See [docs/PROGRESSION.md](docs/PROGRESSION.md)
   - health and injuries after each game from the grades' snaps and hits (`injuries.ts`). See [docs/INJURIES.md](docs/INJURIES.md)
   - confidence from the grades, next-man-up sparks and breakouts (`confidence.ts`; the on-field shift by leverage is `data/confidence.ts`). See [docs/CONFIDENCE.md](docs/CONFIDENCE.md)
@@ -52,7 +52,7 @@ Controls are listed in [README.md](README.md).
   - class years from the season and redshirts (`classes.ts`); departures, the offseason stage before the portal: redshirts, graduation, early declarations and the declare watch (`departures.ts`), and the NFL draft by city (`draft.ts`). See [docs/RECRUITING.md](docs/RECRUITING.md)
   - the offseason's stages (`offseason.ts`) and the transfer portal (`portal.ts`: motives, appeal, entries, rounds, the CPU staffs, placement, promises). Rosters change through `TeamState.roster`, laid over the generated roster by `baseRoster` (`world.ts`). See [docs/PORTAL.md](docs/PORTAL.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
-- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the season hub (`seasonScreen.ts`), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`), the portal (`portalScreen.ts`), departures and the draft (`departuresScreen.ts`), recruiting and signing day (`recruitScreen.ts`), the STATS page of careers (`careerScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
+- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the menus before a game or dynasty (`menuScreen.ts`: main menu, exhibition, save slots, new dynasty), the season hub (`seasonScreen.ts`: sidebar, HOME, panels, the week's action button), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`), the portal (`portalScreen.ts`), departures and the draft (`departuresScreen.ts`), recruiting and signing day (`recruitScreen.ts`), the STATS page of careers (`careerScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports
 
 ## Conventions

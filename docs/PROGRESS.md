@@ -23,6 +23,49 @@ _Last updated: 2026-11-01_
 - **Rules:** down and distance, first downs, touchdown (+7), safety, turnover on downs. The CPU's possessions are simulated by `simulateDrive`.
 - **Tooling:** 28 unit tests, a balance harness (`npm run balance`), an F1 debug overlay, and a `window.game` dev hook.
 
+## Done: UI pass 1: main menu, dynasty slots, the hub's sidebar (2026-11-01)
+- **Main menu** (`render/menuScreen.ts`, the `'title'` screen): CONTINUE (the most recently saved dynasty, straight into its hub), DYNASTY and EXHIBITION, over the field-and-crowd backdrop, with a player from each side. The single-season option is gone from the UI (old `length: 'single'` saves still load and play; `defaultConfig` is unchanged for the tests and reports).
+- **Exhibition** (`'exhibition'`): the old title's pickers and quarter length, with a KICK OFF button. The final screen comes back here. Esc goes to the menu.
+- **Dynasty save slots** (`'slots'`), three:
+  - A used card shows the team's player, colors, year and phase, record, AP rank and seasons played. An empty card starts a new dynasty.
+  - DEL or the card's DELETE asks before deleting.
+  - A new dynasty goes school (`'newTeam'`) → settings (`'newSettings'`: injuries, game length) → START.
+  - The settings rows are the `SETTINGS` array in `game.ts`, so a new option is one entry. Game length is the new `SeasonConfig.quarter` (minutes, default 6), used for the dynasty's live games.
+- **Saves** (`season/save.ts`):
+  - Each slot is `season-v1-<n>` plus a small `slot-v1-<n>` meta (`SlotMeta`) for its card. Only the metas preload at boot (`BOOT_KEYS`).
+  - A slot's season loads when it's picked (`loadSlot`, through the new `loadItem` in `engine/storage.ts`, which waits for queued writes). The card shows LOADING.
+  - `Game.save()` writes the current slot.
+  - The old single save (`season-v1`) moves into the first free slot at boot (`migrateLegacySave`). This fixes "N overwrites the saved season without asking".
+- **Season hub** (`render/seasonScreen.ts`):
+  - **Sidebar** in place of the 8 tabs and the 5 bottom-right buttons:
+    - HOME
+    - MY PROGRAM: SCHEDULE, then the pages, each showing its hotkey: ROSTER T, PLAYBOOK P, GAME PREP O, RECRUITING R, PLAYER STATS H
+    - AROUND THE FBS: SCORES, STANDINGS, POLLS, NEWS, LEADERS, AWARDS, PLAYOFF
+  - GAME PREP is dimmed in the offseason. RECRUITING shows when recruiting is open.
+  - The selection is kept by id (`SeasonView.nav`), so it survives a page and back.
+  - **The week's action** is a gold button under the sidebar (`primaryAction`): PLAY GAME with SIM GAME under it, ADVANCE WEEK, START OFFSEASON, or the offseason's stage (COACH HIRING, DEPARTURES, SIGNING DAY, TRANSFER PORTAL).
+  - **HOME** is a dashboard with three parts:
+    - this week's matchup with both teams' players, ranks, records and OVR (or the offseason's four stages with the current one lit, or the national champion)
+    - LAST GAME: the result, last week's level-ups and breakout line, and the newest week of your team's news (whole items only)
+    - your conference standings (your row always shown)
+  - The other panels moved right of the sidebar (`PX`/`PW`): POLLS is one column, and NEWS wraps to the panel.
+  - **Keys:**
+    - W/S moves through the sidebar, Enter opens a page.
+    - A/D (or the header's clickable arrows) steps the week, conference or AP/CFP. This used to be W/S.
+    - Space runs the action, X sims, and Esc goes to the main menu.
+- **Checks:**
+  - `npm run typecheck`. `npm test` passes 257, including a new slot round trip: migrate, save, meta, load, delete, latest.
+  - The sim isn't touched.
+  - Driven in headless Chrome over CDP on the dev server, with screenshots of every screen:
+    - menu → exhibition → kick off → final → exhibition
+    - menu → dynasty → empty slot → school → settings → hub. The config has `length: 'open'` and the chosen quarter, and the live game's clock uses it.
+    - every sidebar item, and pages opening and coming back with the selection kept
+    - X through a whole season → START OFFSEASON → the carousel → Esc → the HOME stage tracker
+    - a reload keeps the slot, and CONTINUE resumes it
+    - a second dynasty in slot 2, deleted with the mouse
+    - no console errors
+  - Not checked by hand with keyboard and mouse yet.
+
 ## Done: news by week (2026-11-01)
 - **The NEWS tab shows one week at a time,** like SCORES: newest week first, W/S or the clickable < > arrows step through the weeks (the SCORES arrows are clickable too). Week 0 shows as PRESEASON. A long week scrolls with the mouse wheel or Q/E, with a scrollbar; changing the week starts it back at the top.
 - **Other teams' breakthroughs no longer make the news** (`progress` in `season/season.ts`); breakouts elsewhere still do (`BREAKOUT_NEWS`, the top two a week).
@@ -1286,14 +1329,14 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 
 ## Known bugs and rough edges
 - **Multi-season tier drift:** with departures and recruiting, T1–T3 hold, but T4 starters rise about 1.8 and T5 about 4.2 over 5 offseasons: tier 5 signs about 3 above its generated freshmen, and drop-down transfers add to it (PORTAL.md, RECRUITING.md). About 40% of entrants go home (placeholder).
-- **Desktop app:** no app icon (Electron's default), no code signing (SmartScreen warns on first launch), one save slot, and no auto-update. A failed write leaves a stray `.tmp` beside the save; it's overwritten on the next save.
+- **Desktop app:** no app icon (Electron's default), no code signing (SmartScreen warns on first launch), and no auto-update. A failed write leaves a stray `.tmp` beside the save; it's overwritten on the next save.
 - **Talent gaps are far too steep in the live sim** (see the ratings and rosters flags): a 32-point overall gap turns nearly every run into a TD. Needs compressing before seasons.
 - **The run game swings about 1 YPC on a few points of the back's elusiveness and strength.**
 - **Injuries are rolled after games only.** The user's live games have no mid-game injuries; that waits for mid-game roster changes. Knocks have no body-part label. Real players listed as injured in the research (for example Sayin) start the season healthy. The QB missing 3+ games rate (5.7%) is a bit under the ~8% aim, on purpose.
 - **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
 - **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
 - **Progression:** in season only players who play grow; everyone grows in the offseason (RECRUITING.md). A full season is about 2.6 MB of JSON, plus about 2.9 MB of careers a season with departures (CAREERS.md); gzipped saves are about a seventh of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
-- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, N on the title screen overwrites the saved season without asking, divisions and real bowl selection orders aren't modeled.
+- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, divisions and real bowl selection orders aren't modeled.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
@@ -1327,6 +1370,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **A user can hand off on any pass play** (the old "call a draw" behavior). `read` could gate this later.
 
 ## Next up (rough priority)
+1. **UI, pass 2:** give the sub-pages (team, playbook, prep, recruiting, stats, portal, carousel, departures) the hub's look: a shared header with a clickable BACK, and the same sidebar-and-panel style where it fits. A settings page in the hub for the dynasty's options (game length, injuries) and the delegation toggles. More new-dynasty options (coach career, staff delegation). Rename a slot; export and import a save.
 1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
 1. **Recruiting, round 2** ([RECRUITING.md](RECRUITING.md) flags): bring tier 5's classes and starters back to level; a faster summer at the top; the REDSHIRT toggle and 4-game depth management; former players as GAs; play a full cycle by hand.
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
