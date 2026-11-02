@@ -41,12 +41,13 @@ export function weekNews(state: SeasonState, week: number): NewsItem[] {
     const wr = seeds ? seeds.indexOf(w) + 1 : rankIn(before, w);
     const lr = seeds ? seeds.indexOf(l) + 1 : rankIn(before, l);
     const label = g.name && g.kind !== 'conf' && g.kind !== 'nonconf' ? `${g.name}: ` : '';
+    const upset = !!lr && (!wr || wr - lr >= UPSET_GAP);
     if (w === user || l === user) {
       out.push({
-        week, kind: 'result', teams: [w, l],
-        text: `${label}${name(w)} ${w === user ? 'beats' : 'tops'} ${name(l)} ${score(g)} (${teamById(user).abbr} ${recordText(recs.get(user)!)})`,
+        week, kind: upset ? 'upset' : 'result', teams: [w, l],
+        text: `${upset ? 'UPSET: ' : ''}${label}${name(w)} ${w === user ? 'beats' : 'tops'} ${name(l)} ${score(g)} (${teamById(user).abbr} ${recordText(recs.get(user)!)})`,
       });
-    } else if (lr && (!wr || wr - lr >= UPSET_GAP)) {
+    } else if (upset) {
       out.push({ week, kind: 'upset', teams: [w, l], text: `UPSET: ${label}${name(w)} stuns ${name(l)} ${score(g)}` });
     } else if (g.kind === 'champ' || g.kind === 'cfp' || (wr && lr)) {
       out.push({ week, kind: 'result', teams: [w, l], text: `${label}${name(w)} beats ${name(l)} ${score(g)}` });
