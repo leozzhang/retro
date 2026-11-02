@@ -1,7 +1,8 @@
 import { FIELD_W, OPP_GOAL, STEP } from '../engine/constants';
 import { add, clamp, dist, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
+import type { Assign } from '../data/defenses';
 import type { Play } from '../game/playState';
-import { isEligible, maxSpeed, seek, seekTimed, type Player } from './player';
+import { isEligible, LEAN_FX, maxSpeed, seek, seekTimed, type Player } from './player';
 import { pickLane, runBlock } from './runBlocking';
 
 const ZERO: Vec = { x: 0, y: 0 };
@@ -22,6 +23,44 @@ const MAN_DEPTH = 3;
  * instead of chasing. Kick coverage keeps the shorter default lead.
  */
 const PURSUIT_LEAD = 2;
+
+/**
+ * Underneath zones (`zoneCover`): each landmark's depth past the LOS, its distance out from the ball
+ * (the flat is set from the sideline instead), how far across from it the defender looks for a
+ * receiver to sit on, and how much deeper than the landmark he'll carry (sink under) one before
+ * letting him go to the deep zone.
+ */
+const ZONE = {
+  mid: { depth: 8, out: 0, area: 7, carry: 6 },
+  hook: { depth: 6, out: 4.5, area: 7, carry: 5 },
+  curl: { depth: 9, out: 10, area: 9, carry: 6 },
+  flat: { depth: 4, out: 7, area: 9, carry: 7 },
+};
+/**
+ * A zone defender with nobody in his area works toward the nearest receiver within `ZONE_HELP` × his
+ * area, but no farther than `ZONE_LEASH` from his landmark: he squeezes the hole next to him.
+ */
+const ZONE_HELP = 1.8;
+/**
+ * A curl defender widens to the flat: lateral distance outside his landmark counts `ZONE_WIDEN` (inside
+ * it, double), and a receiver running out toward the sideline scores `ZONE_OUTSIDE` closer.
+ */
+const ZONE_WIDEN = 0.5;
+const ZONE_OUTSIDE = 3;
+/** The receiver a zone defender is already on scores this much closer. */
+const ZONE_STICK = 1.5;
+const ZONE_LEASH = 5;
+/** A deep third or quarter stays this far over the deepest receiver in his band (halves: 5). */
+const DEEP_OVER_NARROW = 3;
+/** A zone defender sits this far under (QB side of) the receiver in his area. */
+const ZONE_UNDER = 1.5;
+/** A spy sits this deep, mirroring the QB across the field. */
+const SPY_DEPTH = 5;
+/** A contain rusher works to this far outside the QB and doesn't take the inside lane until he's this close. */
+const CONTAIN_WIDTH = 2.5;
+const CONTAIN_CLOSE = 2.6;
+/** A defender sitting on a screen, not in man on someone else, comes for it from this close. */
+const SMELL_RANGE = 10;
 
 /** Chase a ball carrier, aiming at where they will be rather than where they are. */
 export function pursue(p: Player, c: Player, speedMul = 1, lead = 1.2): void {
@@ -285,6 +324,17 @@ export function thinkDefense(play: Play, d: Player): void {
     runFit(play, d);
     return;
   }
+  // He's been sitting on the screen: when the line lets its rushers go, he goes for the target. A
+  // lineman, the target's own man, or a defender near him with nobody else to cover.
+  const st = play.screenTarget;
+  if (
+    play.screenReleased && play.phase === 'live' && st && d.lean.screen > LEAN_FX.smell &&
+    (d.role === 'DL' || d.manTarget === st || (!d.manTarget && dist(d.pos, st.pos) < SMELL_RANGE))
+  ) {
+    d.goal = st.pos;
+    pursue(d, st, 0.9);
+    return;
+  }
   runAssignment(play, d);
 }
 
@@ -355,7 +405,110 @@ function runAssignment(play: Play, d: Player): void {
     case 'robber':
       robber(play, d);
       break;
+    case 'zone':
+      zoneCover(play, d, a);
+      break;
+    case 'spy':
+      spy(play, d);
+      break;
   }
+}
+
+/** Where a zone's landmark is this snap: `side` resolved against the formation's strength. */
+export function zoneSpot(play: Play, a: Extract<Assign, { kind: 'zone' }>): Vec {
+  const z = ZONE[a.spot];
+  const strong = play.resolved.strongSign;
+  const side = a.side === 'strong' ? strong : a.side === 'weak' ? -strong : a.side;
+  const y = a.spot === 'flat' ? (side < 0 ? z.out : FIELD_W - z.out) : play.ballY + side * z.out;
+  return { x: play.los + z.depth, y: clamp(y, 2, FIELD_W - 2) };
+}
+
+/** How well a zone defender fits a receiver: lower is better. */
+function zoneScore(play: Play, d: Player, a: Extract<Assign, { kind: 'zone' }>, spot: Vec, o: Player): { sc: number; dd: number } {
+  const z = ZONE[a.spot];
+  const dy = o.pos.y - spot.y;
+  const outward = Math.sign(spot.y - play.ballY);
+  const curl = a.spot === 'curl';
+  const outside = curl && Math.sign(dy) === outward;
+  // Across the zone counts fully, short of the landmark counts too, deeper doesn't (he sinks). A curl
+  // defender widens to a threat outside him and walls off one breaking inside (that's the hook's).
+  const across = Math.abs(dy) * (outside ? ZONE_WIDEN : curl ? 2 : 1);
+  const dd = across + Math.max(0, spot.x - o.pos.x) * 0.4;
+  // A receiver running out to the flat is the threat he widens for; the man he's already on scores
+  // closer, so he commits instead of flipping; anyone in the area comes before one he'd only lean toward.
+  const flat = outside && o.vel.y * outward > 2 ? ZONE_OUTSIDE : 0;
+  const sc = dd - flat - (o === d.zoneMark ? ZONE_STICK : 0) + (dd > z.area ? 10 : 0);
+  return { sc, dd };
+}
+
+/**
+ * Pattern match the underneath zones as a unit, once a step: pair defenders and receivers lowest
+ * score first, each receiver to one defender, so the hook takes the slant and frees the curl for the
+ * flat. Unpaired defenders sit (`zoneCover`).
+ */
+export function matchZones(play: Play): void {
+  const zs = play.def.filter((d) => d.assign?.kind === 'zone' && !d.down);
+  if (!zs.length) return;
+  const recv = play.off.filter((o) => isEligible(o) && !o.isBlocker && !o.down && o.pos.x >= play.los - 1);
+  const pairs: { d: Player; o: Player; sc: number }[] = [];
+  for (const d of zs) {
+    const a = d.assign as Extract<Assign, { kind: 'zone' }>;
+    const spot = zoneSpot(play, a);
+    for (const o of recv) {
+      const { sc, dd } = zoneScore(play, d, a, spot, o);
+      if (dd <= ZONE[a.spot].area * ZONE_HELP) pairs.push({ d, o, sc });
+    }
+  }
+  pairs.sort((p, q) => p.sc - q.sc);
+  const taken = new Set<Player>();
+  const done = new Set<Player>();
+  for (const d of zs) d.zoneMark = null;
+  for (const p of pairs) {
+    if (done.has(p.d) || taken.has(p.o)) continue;
+    p.d.zoneMark = p.o;
+    done.add(p.d);
+    taken.add(p.o);
+  }
+}
+
+/**
+ * Underneath zone: drop to the landmark, then play the receiver `matchZones` gave him: under one past
+ * the landmark (sinking as far as `carry`), on top of one short of it, or leaning toward one just
+ * outside his area. With nobody, sit and shade toward the QB. On run blocking he takes a read step
+ * instead of bailing, until the run fit or the throw takes over.
+ */
+function zoneCover(play: Play, d: Player, a: Extract<Assign, { kind: 'zone' }>): void {
+  if (play.runBlocking() && play.phase !== 'air') {
+    d.want = ZERO;
+    return;
+  }
+  const z = ZONE[a.spot];
+  const spot = zoneSpot(play, a);
+  const qb = play.qb.pos;
+  const m = d.zoneMark;
+  let tgt: Vec;
+  if (m && zoneScore(play, d, a, spot, m).dd > z.area) {
+    tgt = add(spot, limit(sub(m.pos, spot), ZONE_LEASH));
+  } else if (m) {
+    // Short of the landmark: the faster he's coming upfield, the more he holds the landmark instead.
+    const bx = m.pos.x;
+    const x =
+      bx >= spot.x
+        ? clamp(bx - ZONE_UNDER, spot.x, spot.x + z.carry)
+        : lerp(Math.max(bx + 1, play.los + 1), spot.x, clamp(m.vel.x / 4, 0, 1));
+    tgt = { x, y: m.pos.y + Math.sign(qb.y - m.pos.y) * 0.5 };
+  } else {
+    tgt = { x: spot.x, y: lerp(spot.y, qb.y, 0.2) };
+  }
+  d.goal = tgt;
+  d.want = seek(d, tgt, maxSpeed(d) * 0.92, 1);
+}
+
+/** Spy: mirror the QB from the second level. The scramble and run branches take over when he goes. */
+function spy(play: Play, d: Player): void {
+  const tgt = { x: Math.max(play.los + SPY_DEPTH, play.qb.pos.x + SPY_DEPTH), y: play.qb.pos.y };
+  d.goal = tgt;
+  d.want = seek(d, tgt, maxSpeed(d) * 0.8, 0.8);
 }
 
 function rush(play: Play, d: Player): void {
@@ -371,8 +524,18 @@ function rush(play: Play, d: Player): void {
     d.want = ZERO; // blitzers time their run
     return;
   }
+  const a = d.assign;
+  if (a?.kind === 'rush' && a.contain && dist(d.pos, play.qb.pos) > CONTAIN_CLOSE) {
+    // Contain: work to the QB's outside shoulder and stay level with him, so he can't escape that way.
+    const out = Math.sign(d.start.y - play.ballY) || 1;
+    const tgt = { x: play.qb.pos.x + 0.5, y: play.qb.pos.y + out * CONTAIN_WIDTH };
+    d.goal = tgt;
+    d.want = seek(d, tgt, maxSpeed(d) * 0.95, 0.3);
+    return;
+  }
   d.goal = play.qb.pos;
-  pursue(d, play.qb, 0.95);
+  // Sitting on the run or a screen, he rushes the passer a step slower.
+  pursue(d, play.qb, 0.95 * (1 - LEAN_FX.rushSoft * Math.max(0, d.lean.run, d.lean.screen)));
 }
 
 function cover(play: Play, d: Player): void {
@@ -382,7 +545,8 @@ function cover(play: Play, d: Player): void {
     return;
   }
   // Defenders react to what the receiver did a moment ago; better man coverage = shorter lag.
-  const lagFrames = Math.round((0.6 - (d.r.mcv / 100) * 0.35) * 60);
+  // Eyes in the backfield on a run he's expecting: a step late on his man.
+  const lagFrames = Math.round((0.6 - (d.r.mcv / 100) * 0.35 + LEAN_FX.eyes * Math.max(0, d.lean.run)) * 60);
   const hist = play.history.get(r.id);
   const lp = hist && hist.length ? hist[Math.max(0, hist.length - 1 - lagFrames)] : r.pos;
   const since = play.time - play.snapTime;
@@ -408,8 +572,10 @@ function deepZone(play: Play, d: Player, yMin: number, yMax: number): void {
   }
   let tx = play.los + 12;
   let ty = mid;
+  // A third or a quarter plays tighter over the top than a half or the whole field.
+  const over = yMax - yMin < FIELD_W / 2 - 1 ? DEEP_OVER_NARROW : 5;
   if (deepest) {
-    tx = Math.max(tx, deepest.pos.x + 5);
+    tx = Math.max(tx, deepest.pos.x + over);
     ty = lerp(mid, deepest.pos.y, deepest.pos.x > play.los + 10 ? 0.75 : 0.35);
   }
   d.want = seek(d, { x: Math.min(tx, 119), y: ty }, maxSpeed(d) * 0.92, 1.5);

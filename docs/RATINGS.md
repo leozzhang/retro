@@ -25,9 +25,9 @@ Every rating is a 0-99 number that some sim formula reads. The rule: **no rating
 | | `rsh` Pass Rush | 70% of a defender's power against pass blocks: push and shed rate | `Play.updateEngagements` |
 | | `bsh` Block Shedding | 70% of a defender's power against run and special-teams blocks | `runEngagement`, `sim/blocking.ts` |
 | | `mcv` Man Coverage | Reaction lag trailing a receiver in man; reaction to the throw when in man | `cover`, `Play.throwBall` |
-| | `zcv` Zone Coverage | Reaction to the throw from a zone | `Play.throwBall` |
+| | `zcv` Zone Coverage | Reaction to the throw from a zone (Cover 2, 3, 4, Tampa 2, Fire Zone: [DEFENSE.md](DEFENSE.md)) | `Play.throwBall` |
 | | `prs` Press | Winning the jam at the line (against the receiver's `rls`) | `Play.snap` |
-| | `prc` Play Recognition | Reading run, play action and pitches; run-fit timing; 40% of interception ball skills | `reactToRun`, `sellFake`, `catchOdds` |
+| | `prc` Play Recognition | Reading run, play action and pitches; run-fit timing; 40% of interception ball skills; how much of the offense's in-game tendencies he leans on ([DEFENSE.md](DEFENSE.md)) | `reactToRun`, `sellFake`, `catchOdds`, `leansFor` |
 | Kicking | `kpw` Kick Power | Leg speed: distance on kicks and punts | `legSpeed` |
 | | `kac` Kick Accuracy | Kick error and the width of the timing meter's green | `kickErrorSd`, `timingGreen` |
 

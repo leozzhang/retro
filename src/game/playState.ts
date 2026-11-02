@@ -1,4 +1,4 @@
-import type { DefCall, DefPackage } from '../data/defenses';
+import { taggedAssign, type DefCall, type DefPackage, type DefTags, type Front } from '../data/defenses';
 import { ROUTES, type PlayDef, type RunScheme } from '../data/plays';
 import { passBlockValue } from '../data/ratings';
 import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type RosterPlayer, type Team } from '../data/teams';
@@ -7,11 +7,11 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { cutKeep, facingQB, isRusher, returnerAI, seesThrow, thinkDefense, thinkOffense } from '../sim/ai';
+import { cutKeep, facingQB, isRusher, matchZones, returnerAI, seesThrow, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
 import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
-  accelOf, endurance, isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, type Player,
+  accelOf, endurance, isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import {
@@ -41,6 +41,10 @@ export interface PlaySetup {
   defCall: DefCall;
   /** Which corners press this snap (part of the pre-snap look). */
   press: Partial<Record<DefSlot, boolean>>;
+  /** The DC's tags on the call (spy, contain). */
+  tags?: DefTags;
+  /** Each defender's anticipation this snap (game/defBrain.ts); missing is neutral. */
+  reads?: Partial<Record<DefSlot, Lean>>;
   los: number;
   ballY: number;
   /** The user mirrored the play at the call. */
@@ -84,6 +88,10 @@ const QB_RUN_WAIT: Partial<Record<RunScheme, number>> = { gap: 0.35, draw: DRAW_
 export const STALK_SPLIT = 6.5;
 /** Screens: the line pass-sets this long, then lets its rushers go and releases to block. */
 export const SCREEN_SET = 0.8;
+/** A box defender with a run-first (`fit`) zone reads the run this much sooner. */
+const FIT_EARLY = 0.15;
+/** A spy reacts to his QB taking off this fast. */
+const SPY_REACT = 0.05;
 /** Routes that make a receiver the target of a screen (the others stalk-block for him). */
 const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble'];
 
@@ -207,10 +215,13 @@ export class Play {
 
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
+    const assign = taggedAssign(s.defCall, plan.assign, s.tags);
     for (const slot of DEF_SLOTS) {
-      const a = plan.assign[slot];
+      const a = assign[slot];
       const d = makePlayer('def', s.defRoster[plan.cast[slot]], defU, { x: 0, y: 0 });
       d.assign = a;
+      const lean = s.reads?.[slot];
+      if (lean) d.lean = lean;
       d.pos = this.defAlignment(slot, d, bySlot, s.press[slot] ?? false);
       d.start = { ...d.pos };
       this.def.push(d);
@@ -273,6 +284,7 @@ export class Play {
   private defAlignment(slot: DefSlot, d: Player, off: Map<string, Player>, press: boolean): Vec {
     const los = this.los;
     const by = this.ballY;
+    const front = this.defCall.front;
     // DL techniques sit on the OL splits (G 1.5, T 3): DTs shade the guards, DEs outside the tackles.
     const base: Record<DefSlot, Vec> = {
       DE1: { x: los + 1.2, y: by - 4.5 },
@@ -287,6 +299,7 @@ export class Play {
       FS: { x: los + 13, y: by - 8 },
       SS: { x: los + 13, y: by + 8 },
     };
+    if (front !== 'even') Object.assign(base, frontSet(front, los, by, this.resolved.strongSign));
     const a = d.assign!;
     let pos = base[slot];
     if (a.kind === 'man') {
@@ -295,7 +308,8 @@ export class Play {
       const inside = Math.sign(by - t.pos.y) || 1;
       if (d.role === 'CB') {
         d.press = press;
-        d.cushion = press ? 1 : slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5;
+        // A corner worried about the deep ball bails deeper.
+        d.cushion = press ? 1 : (slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5) + LEAN_FX.bail * Math.max(0, d.lean.deep);
         d.turned = press;
         pos = { x: los + d.cushion, y: t.pos.y + inside * 0.8 };
       } else if (d.role === 'LB') {
@@ -306,13 +320,36 @@ export class Play {
         pos = { x: los + 5.5, y: t.pos.y + inside };
       }
     } else if (a.kind === 'deep') {
-      pos = { x: los + 12.5 + this.rng() * 1.5, y: (a.yMin + a.yMax) / 2 };
+      // Corners in a deep third or quarter line up over the outside receiver; a backer carrying the
+      // middle (Tampa 2) shows his normal spot.
+      if (d.role === 'CB') pos = this.overWidest(slot, off, 7, 1);
+      else if (d.role === 'S') pos = { x: los + 12.5 + this.rng() * 1.5, y: (a.yMin + a.yMax) / 2 };
     } else if (a.kind === 'robber') {
       pos = { x: los + 9, y: by };
-    } else if (d.role !== 'DL') {
+    } else if (a.kind === 'zone') {
+      const z = zoneSpot(this, a);
+      if (slot === 'NB' || d.role === 'S') pos = { x: los + (a.fit ? 5 : 6), y: z.y };
+      else if (d.role === 'CB') pos = this.overWidest(slot, off, a.spot === 'flat' ? 5 : 7, 1);
+    } else if (a.kind === 'spy') {
+      if (d.role !== 'LB') pos = { x: los + 6, y: by };
+    } else if (d.role !== 'DL' && (front === 'even' || front === 'wide')) {
       pos = { x: los + 3, y: pos.y }; // walked-up blitzer: a tell for the QB
     }
+    // A backer sitting on the run creeps up: a tell, if you're watching for it.
+    if (d.role === 'LB' && d.lean.run > 0) pos = { x: Math.max(los + 1.5, pos.x - LEAN_FX.creep * d.lean.run), y: pos.y };
     return { x: Math.min(pos.x, FIELD_LEN - 0.5), y: clamp(pos.y, 1, FIELD_W - 1) };
+  }
+
+  /** A corner's spot over the outermost receiver on his side, `depth` yards deep with outside leverage. */
+  private overWidest(slot: DefSlot, off: Map<string, Player>, depth: number, lev: number): Vec {
+    const side = slot === 'CB1' ? -1 : 1;
+    let w: Player | null = null;
+    for (const o of off.values()) {
+      if (!isEligible(o) || o.role === 'OL' || (o.pos.y - this.ballY) * side <= 0) continue;
+      if (!w || (o.pos.y - w.pos.y) * side > 0) w = o;
+    }
+    const y = w ? w.pos.y + side * lev : side < 0 ? 8 : FIELD_W - 8;
+    return { x: this.los + depth, y };
   }
 
   /** The line's run-blocking rules for this play. */
@@ -350,9 +387,11 @@ export class Play {
         if (d.role === 'DL') continue;
         const t = d.manTarget;
         if (t && !t.isBlocker) continue; // still has a receiver (or the back) to mirror
+        const a = d.assign;
         const read =
-          0.35 + (1 - d.r.prc / 100) * 0.5 + (d.assign?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0);
-        d.fitAt = this.snapTime + read;
+          0.35 + (1 - d.r.prc / 100) * 0.5 + (a?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0) -
+          (a?.kind === 'zone' && a.fit ? FIT_EARLY : 0);
+        d.fitAt = this.snapTime + read * leanMul(d.lean.run);
         d.fitUntil = Infinity;
       }
     }
@@ -422,6 +461,7 @@ export class Play {
     }
 
     for (const p of this.off) if (p !== this.controlled) thinkOffense(this, p);
+    if (this.phase === 'live') matchZones(this);
     for (const d of this.def) {
       if (d === this.carrier) returnerAI(this, d);
       else thinkDefense(this, d);
@@ -481,7 +521,7 @@ export class Play {
     if (!this.scramble && qb.pos.x > this.los + 0.3) {
       this.scramble = true;
       this.aim = null;
-      for (const d of this.def) d.reactAt = this.time + 0.2 + (1 - d.r.prc / 100) * 0.4;
+      for (const d of this.def) d.reactAt = this.time + (d.assign?.kind === 'spy' ? SPY_REACT : (0.2 + (1 - d.r.prc / 100) * 0.4) * leanMul(d.lean.qb));
       this.popup('SCRAMBLE', qb.pos, '#9ad7ff');
     }
     if ((input.mouse.rpressed || input.hit('KeyF')) && this.handoffOption()) {
@@ -644,10 +684,10 @@ export class Play {
       const t = d.manTarget;
       let react: number;
       if (this.time >= d.fitAt) react = 0.05;
-      else if (d.role === 'DL' || d.role === 'LB' || t === this.rb) react = 0.1 + slow * 0.25;
+      else if (d.role === 'DL' || d.role === 'LB' || t === this.rb || d.assign?.kind === 'spy') react = 0.1 + slow * 0.25;
       else if (t && !t.isBlocker) react = 0.4 + slow * 0.4;
       else react = 0.3 + slow * 0.3;
-      d.reactAt = this.time + react + (d === fooled ? KEY_FOOLED : 0);
+      d.reactAt = this.time + react * leanMul(d.lean.run) + (d === fooled ? KEY_FOOLED : 0);
     }
   }
 
@@ -658,10 +698,10 @@ export class Play {
     for (const d of this.def) {
       if (d.role !== 'LB' && d.role !== 'S') continue;
       const a = d.assign?.kind;
-      const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.prc - 70) * 0.01;
+      const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.prc - 70) * 0.01 + LEAN_FX.paBite * d.lean.run;
       if (this.rng() >= chance) continue;
       d.fitAt = this.time;
-      d.fitUntil = this.time + 0.35 + (1 - d.r.prc / 100) * 0.6;
+      d.fitUntil = this.time + 0.35 + (1 - d.r.prc / 100) * 0.6 + LEAN_FX.biteLong * Math.max(0, d.lean.run);
     }
   }
 
@@ -753,7 +793,14 @@ export class Play {
       const isMan = !!best && d.manTarget === best;
       if (dist(d.pos, this.ballTarget) < 14 || isMan) {
         const cov = d.assign?.kind === 'man' ? d.r.mcv : d.r.zcv;
-        const react = 0.5 - (cov / 100) * 0.35 + rng() * 0.1;
+        // Sitting on screens jumps a throw behind the line and is late to one downfield; leaning deep, the
+        // reverse; not worried about the deep ball, he squats on the ones in between.
+        const air = this.ballTarget.x - this.los;
+        const lean =
+          air < LEAN_FX.shortAir ? leanMul(d.lean.screen)
+          : air > LEAN_FX.deepAir ? leanMul(d.lean.deep) * (1 + LEAN_FX.late * Math.max(0, d.lean.screen, d.lean.run))
+          : leanMul(-d.lean.deep);
+        const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean;
         d.reactAt = this.time + (seesThrow(d) ? react + 0.1 : Math.max(react, dur * 0.6));
       }
     }
@@ -1058,5 +1105,29 @@ export class Play {
       default:
         return this.carrier ? this.carrier.pos.x : this.ball.pos.x;
     }
+  }
+}
+
+/**
+ * Where a front other than `even` lines up its line and backers (`bear`, `goal`, `wide`). The
+ * goal-line front also brings the base backer (in the NB slot) down on the strong edge.
+ */
+function frontSet(front: Front, los: number, by: number, strong: number): Partial<Record<DefSlot, Vec>> {
+  switch (front) {
+    case 'bear':
+      return {
+        DE1: { x: los + 1.0, y: by - 3.2 }, DT1: { x: los + 0.9, y: by - 0.9 }, DT2: { x: los + 0.9, y: by + 0.9 },
+        DE2: { x: los + 1.0, y: by + 3.2 }, WLB: { x: los + 3.2, y: by - 2.2 }, MLB: { x: los + 3.2, y: by + 2.2 },
+      };
+    case 'goal':
+      return {
+        DE1: { x: los + 0.7, y: by - 3.6 }, DT1: { x: los + 0.6, y: by - 0.8 }, DT2: { x: los + 0.6, y: by + 0.8 },
+        DE2: { x: los + 0.7, y: by + 3.6 }, WLB: { x: los + 2.2, y: by - 1.8 }, MLB: { x: los + 2.2, y: by + 1.8 },
+        NB: { x: los + 1.2, y: by + strong * 5.8 },
+      };
+    case 'wide':
+      return { DE1: { x: los + 1.3, y: by - 6.2 }, DE2: { x: los + 1.3, y: by + 6.2 } };
+    default:
+      return {};
   }
 }

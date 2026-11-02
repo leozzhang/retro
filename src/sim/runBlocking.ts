@@ -1,6 +1,6 @@
 import { add, clamp, dist, lerp, norm, scale, sub, type Vec } from '../engine/math';
 import type { Play } from '../game/playState';
-import { maxSpeed, seek, type Player } from './player';
+import { LEAN_FX, maxSpeed, seek, type Player } from './player';
 import { runBlockValue } from '../data/ratings';
 
 /**
@@ -340,7 +340,9 @@ export function runEngagement(play: Play, d: Player): number {
   const toGoal = norm(sub(goal, d.pos));
   const blk = d.engagedBy.reduce((s, b) => s + runBlockValue(b.r), 0) / n;
   const edge = RUN_BLOCK_EDGE - (play.runScheme === 'stretch' ? REACH_PENALTY : 0);
-  const power = d.r.bsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll;
+  // A lineman sitting on the run gets off the ball into it (`LEAN_FX.surge`).
+  const surge = d.role === 'DL' ? Math.max(0, d.lean.run) * LEAN_FX.surge : 0;
+  const power = d.r.bsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll + surge;
   d.blockDir ??= norm(sub(d.engagedBy[0].pos, d.pos));
   let move: Vec;
   if (power > 0) {

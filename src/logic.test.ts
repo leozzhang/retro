@@ -757,7 +757,7 @@ describe('playbook', () => {
       for (const call of DEF_CALLS) {
         for (const flip of [false, true]) {
           const plan = matchDefense(call, p, resolvePlay(p, MID, flip));
-          expect(plan.pkg, p.id).toBe('nickel');
+          expect(plan.pkg, p.id).toBe(call.pkg ?? 'nickel');
           expect(plan.assign, `${p.id} ${call.id}`).toEqual(call.assign);
         }
       }

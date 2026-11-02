@@ -7,6 +7,40 @@ import type { Pose, Uniform } from '../render/sprites';
 
 export type Side = 'off' | 'def';
 
+/**
+ * Anticipation, from -1 (cautious) to 1 (sitting on it): the run, screens, the QB taking off, the
+ * deep ball. Set per snap by the CPU defense's brain (game/defBrain.ts); `NO_LEAN` plays as before.
+ */
+export interface Lean {
+  run: number;
+  screen: number;
+  qb: number;
+  deep: number;
+}
+export const NO_LEAN: Lean = Object.freeze({ run: 0, screen: 0, qb: 0, deep: 0 });
+
+/**
+ * What a defender's lean (`Player.lean`, game/defBrain.ts) does on the field. A lean speeds the read
+ * it's on by up to `fast` and a cautious one slows it by up to `slow` (`leanMul`). Leaning run also
+ * bites more often and longer on a play-action fake (`paBite`, `biteLong` s), puts a man defender's
+ * eyes in the backfield (`eyes` s more lag on his receiver), creeps a backer up pre-snap (`creep`),
+ * gives the line a better get-off against a run (`surge`, block power) and a softer pass rush (`rushSoft`). Throws
+ * shorter than `shortAir` read off the screen lean, longer than `deepAir` off the deep lean (and are
+ * `late` for a defender sitting on the run or screens), and the ones between off the deep lean
+ * reversed: a defender who isn't worried about the deep ball squats on the short ones. A corner leaning
+ * deep bails up to `bail` yards deeper pre-snap (a tell). Past `smell`, a defender
+ * leaning screen comes for the screen as soon as the line lets its rushers go.
+ */
+export const LEAN_FX = {
+  fast: 0.45, slow: 0.5, paBite: 0.25, biteLong: 0.6, eyes: 0.15, creep: 0.8, surge: 8, rushSoft: 0.15, shortAir: 3, deepAir: 15, late: 0.4,
+  smell: 0.3, bail: 2,
+};
+
+/** Reaction-time factor for a lean: under 1 when he's sitting on it, over 1 when he's wary of it. */
+export function leanMul(l: number): number {
+  return l >= 0 ? 1 - LEAN_FX.fast * l : 1 - LEAN_FX.slow * l;
+}
+
 export interface Player {
   id: number;
   side: Side;
@@ -76,6 +110,10 @@ export interface Player {
   // Defense
   assign: Assign | null;
   manTarget: Player | null;
+  /** Zone coverage: the receiver he's sitting on (kept a while, so he doesn't flip between two). */
+  zoneMark: Player | null;
+  /** A defender's anticipation this snap, from the game so far (game/defBrain.ts); zero is neutral. */
+  lean: Lean;
   press: boolean;
   cushion: number;
   turned: boolean;
@@ -146,6 +184,8 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     manual: false,
     assign: null,
     manTarget: null,
+    zoneMark: null,
+    lean: NO_LEAN,
     press: false,
     cushion: 0,
     turned: true,

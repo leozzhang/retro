@@ -14,7 +14,7 @@ import { FIELD_W, STEP } from './engine/constants';
 import type { Input } from './engine/input';
 import { add, clamp, dist, scale, type Rng } from './engine/math';
 import { KickPlay } from './game/kickPlay';
-import { Play } from './game/playState';
+import { Play, type PlaySetup } from './game/playState';
 import type { KickParams, Wind } from './sim/kicking';
 import { isEligible } from './sim/player';
 import { DRAW_SET } from './sim/runBlocking';
@@ -63,16 +63,19 @@ export function referenceMatchup(off = REF_OFF, def = REF_DEF): Matchup {
   return { off: teamById('georgia'), def: teamById('alabama'), offR: referenceRoster(off), defR: referenceRoster(def) };
 }
 
-export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS): Play {
+/** The DC's tags and the defenders' leans for a snap (game/defBrain.ts); none plays the call as written. */
+export type DefExtras = Pick<PlaySetup, 'tags' | 'reads'>;
+
+export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras): Play {
   return new Play({
     offTeam: m.off, defTeam: m.def, offRoster: m.offR, defRoster: m.defR, play: playDef, defCall: call,
-    press: { CB1: rng() < 0.35, CB2: rng() < 0.35 }, los, ballY: 26.6, rng,
+    press: { CB1: rng() < 0.35, CB2: rng() < 0.35 }, los, ballY: 26.6, rng, ...x,
   });
 }
 
 /** One auto-QB pass rep: throws to the receiver with the most separation after `holdTime`. `catchX` is where he caught it. */
-export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng) {
-  const play = newPlay(m, playDef, call, rng);
+export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng, x?: DefExtras, los = LOS) {
+  const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let thrown = false;
   let catchX = 0;
@@ -112,8 +115,8 @@ export const READ_AT = 0.55;
  * commits to the QB, and otherwise keeps. Designed QB runs carry it themselves.
  * `contact` = yards past the LOS when the first defender (blocked or not) gets a hand on him.
  */
-export function runRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS) {
-  const play = newPlay(m, playDef, call, rng, los);
+export function runRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras) {
+  const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let contact: number | null = null;
   for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {

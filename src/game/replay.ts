@@ -147,7 +147,7 @@ function setupFor(t: ReplayTarget, seed: number): ReplaySetup {
   const qbRun = t.slot === 'QB' && t.pass === false;
   const pass = t.want === 'int' || t.want === 'sack' || (t.pass ?? (t.gain >= 20 ? pick() < 0.8 : pick() < t.passShare));
   const play = qbRun ? any(QB_RUNS) : pass ? any(PASS_POOL) : any(RB_RUNS);
-  const call = pickDefCall(pick, situationMix(t.defIdent, t.down, t.toGo)) ?? DEF_CALLS[0];
+  const call = pickDefCall(pick, situationMix(t.defIdent, t.down, t.toGo, 100 - t.yard)) ?? DEF_CALLS[0];
   const pr = t.defIdent.press;
   const press = { CB1: pick() < pr.CB1, CB2: pick() < pr.CB2, NB: pick() < pr.NB };
   const hold = any(t.want === 'sack' ? REPLAY.sackHolds : REPLAY.holds);

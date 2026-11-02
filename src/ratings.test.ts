@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
-import { DEF_CALLS } from './data/defenses';
+import { CORE_CALLS as DEF_CALLS } from './data/defenses';
 import { PLAYBOOK } from './data/plays';
 import { RATING_INFO, RATING_KEYS, type RatingKey } from './data/ratings';
 import { kickDef } from './data/specialTeams';

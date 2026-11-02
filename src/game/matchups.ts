@@ -29,7 +29,7 @@ const ORDER: Partial<Record<Role, number>> = { CB: 0, S: 1, LB: 2 };
  * or his role's next choice. A defender with nobody left to cover plays the hole as a robber.
  */
 export function matchDefense(call: DefCall, play: PlayDef, rp: ResolvedPlay): DefensePlan {
-  const pkg = packageFor(personnelOf(play.formation));
+  const pkg = call.pkg ?? packageFor(personnelOf(play.formation));
   const cast = {} as Record<DefSlot, RosterDefSlot>;
   for (const s of DEF_SLOTS) cast[s] = PACKAGE_SUBS[pkg][s] ?? s;
 

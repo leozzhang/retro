@@ -1,7 +1,7 @@
 import type { Athlete } from '../data/athletes';
-import { coachName, type CoachRole, type Group, type Staff } from '../data/coaches';
+import { coachName, dcAdjust, type Coach, type CoachRole, type Group, type Staff } from '../data/coaches';
 import { fitRatings, healthOf, healthy, returnRating, starters, teamRatings, type Squad, type TeamRatings } from '../data/depth';
-import { defIdentity, defLabel, shellShares, situationMix, type DefIdentity } from '../data/identity';
+import { defIdentity, defLabel, manShare, pressureShare, shellShares, situationMix, type DefIdentity } from '../data/identity';
 import { PLAYBOOK, ROUTES, type PlayDef, type RouteName } from '../data/plays';
 import { overall, SLOT_POS } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
@@ -103,10 +103,12 @@ const who = (a: Athlete, slot: string) => `${slot} #${a.num} ${short(a)} (${ovrA
 
 // ------------------------------------------------------------ play traits
 
-export type Trait = 'quick' | 'screen' | 'deep' | 'manBeater' | 'runInside' | 'runOutside' | 'pa' | 'rpo';
+export type Trait = 'quick' | 'screen' | 'deep' | 'manBeater' | 'zoneBeater' | 'runInside' | 'runOutside' | 'pa' | 'rpo';
 
 const SCREEN_ROUTES = new Set<RouteName>(['smoke', 'tunnel', 'bubble', 'screen']);
 const MAN_BEATERS = new Set<RouteName>(['slant', 'drag', 'cross']);
+/** Routes that sit down in a zone's holes or split its defenders. */
+const ZONE_BEATERS = new Set<RouteName>(['hitch', 'curl', 'in', 'seam']);
 const OUTSIDE_PATHS = new Set<RouteName>(['toss', 'sweep', 'pitchPath', 'oz', 'stretch']);
 
 /** What a play is good for, read off its data (routes, scheme, read) rather than hand tags. */
@@ -127,25 +129,47 @@ export function playTraits(p: PlayDef): Set<Trait> {
   else if (pass.length && Math.max(...pass.map(depth)) <= 8) out.add('quick');
   if (pass.some((r) => depth(r) >= 25)) out.add('deep');
   if (pass.some((r) => MAN_BEATERS.has(r))) out.add('manBeater');
+  if (pass.some((r) => ZONE_BEATERS.has(r))) out.add('zoneBeater');
   return out;
 }
 
 // ------------------------------------------------------------ the report
 
-/** League averages the report compares against: the zero-blitz share on every snap and on third and long, and press. */
-function leagueNorms(): { c0: number; c0Long: number; press: number } {
-  let c0 = 0;
-  let c0Long = 0;
-  let press = 0;
+/**
+ * League averages the report compares against: pressure (5+ rushers) on every snap and on third and
+ * long, man coverage, the shells, and press.
+ */
+function leagueNorms(): { blitz: number; blitzLong: number; man: number; twoHigh: number; oneHigh: number; press: number } {
+  const n = TEAMS.length;
+  const sum = { blitz: 0, blitzLong: 0, man: 0, twoHigh: 0, oneHigh: 0, press: 0 };
   for (const t of TEAMS) {
     const id = defIdentity(t);
-    c0 += id.mix['c0-blitz'];
-    c0Long += situationMix(id, 3, 8)['c0-blitz'];
-    press += (id.press.CB1 + id.press.CB2) / 2;
+    const sh = shellShares(id.mix);
+    sum.blitz += pressureShare(id.mix) / n;
+    sum.blitzLong += pressureShare(situationMix(id, 3, 8)) / n;
+    sum.man += manShare(id.mix) / n;
+    sum.twoHigh += sh['two-high'] / n;
+    sum.oneHigh += sh['one-high'] / n;
+    sum.press += (id.press.CB1 + id.press.CB2) / 2 / n;
   }
-  const n = TEAMS.length;
-  return { c0: c0 / n, c0Long: c0Long / n, press: press / n };
+  return sum;
 }
+
+/** Their DC's in-game adjustments (ADJUST, game/defBrain.ts): how fast he'll take away what's working. */
+function adjustItem(dc: Coach): ScoutItem {
+  const a = dcAdjust(dc);
+  const word = a >= ADJUST_WORDS.fast ? 'FAST' : a <= ADJUST_WORDS.slow ? 'SLOW' : 'STEADY';
+  const tail =
+    word === 'FAST' ? " HE'LL TAKE AWAY WHAT WORKS WITHIN A DRIVE OR TWO: KEEP THE CALLS MIXED."
+    : word === 'SLOW' ? ' HE MOSTLY ADJUSTS AT HALFTIME: RIDE WHAT WORKS EARLY.'
+    : ' HE ADJUSTS AS THE GAME GOES: DON\'T LEAN ON ONE PLAY.';
+  return { tier: 2, warn: word === 'FAST', text: `THEIR DC ADJUSTS IN-GAME: ${word} (ADJ ${a}).${tail}` };
+}
+/** ADJUST at or above `fast` reads FAST, at or below `slow` SLOW. */
+const ADJUST_WORDS = { fast: 70, slow: 50 };
+
+/** How far from the league a tendency has to be before the staff plans around it. */
+const LEAN = 0.06;
 
 let norms: ReturnType<typeof leagueNorms> | null = null;
 
@@ -180,17 +204,24 @@ function averages(s: SeasonState, team: string): ScoutReport['averages'] {
 }
 
 /** The OC on their defense: what they call, when they bring it, and who to account for. */
-function ocSection(opp: Squad, id: DefIdentity, scout: number): ScoutSection {
+function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach): ScoutSection {
   const N = (norms ??= leagueNorms());
   const sh = shellShares(id.mix);
-  const longC0 = situationMix(id, 3, 8)['c0-blitz'];
+  const blitz = pressureShare(id.mix);
+  const blitzLong = pressureShare(situationMix(id, 3, 8));
+  const man = manShare(id.mix);
   const press = (id.press.CB1 + id.press.CB2) / 2;
   const items: ScoutItem[] = [
-    { tier: 1, text: `SHELLS: TWO-HIGH ${pctAt(sh['two-high'], scout)}, SINGLE-HIGH ${pctAt(sh['one-high'], scout)}, ZERO BLITZ ${pctAt(sh.zero, scout)} (FBS ~${pct(N.c0)} ZERO).` },
+    { tier: 1, text: `SHELLS: TWO-HIGH ${pctAt(sh['two-high'], scout)}, SINGLE-HIGH ${pctAt(sh['one-high'], scout)}, ZERO ${pctAt(sh.zero, scout)}.` },
     {
-      tier: 2, warn: longC0 > N.c0Long + 0.04,
-      text: `3RD AND 7+: ZERO BLITZ ${pctAt(longC0, scout)} (FBS ~${pct(N.c0Long)}).${longC0 > N.c0Long + 0.04 ? ' HAVE A HOT THROW READY.' : ''}`,
+      tier: 1, warn: blitz > N.blitz + LEAN,
+      text: `PRESSURE (5+ RUSHERS): ${pctAt(blitz, scout)} (FBS ~${pct(N.blitz)}). MAN ${pctAt(man, scout)}, ZONE ${pctAt(1 - man, scout)} (FBS ~${pct(N.man)} MAN).`,
     },
+    {
+      tier: 2, warn: blitzLong > N.blitzLong + LEAN,
+      text: `3RD AND 7+: PRESSURE ${pctAt(blitzLong, scout)} (FBS ~${pct(N.blitzLong)}).${blitzLong > N.blitzLong + LEAN ? ' HAVE A HOT THROW READY.' : ''}`,
+    },
+    adjustItem(theirDc),
     { tier: 2, text: `CORNERS PRESS: ${pctAt(press, scout)} (FBS ~${pct(N.press)}).${press >= 0.42 ? ' EXPECT JAMS: QUICK BREAKS AND RUBS.' : press <= 0.25 ? ' SOFT CUSHIONS: THE QUICK GAME IS THERE.' : ''}` },
   ];
   const on = starters(opp);
@@ -295,8 +326,9 @@ function positionSections(user: Squad, opp: Squad, m: Matchups, id: DefIdentity)
   const us = starters(user);
   if (us.QB) {
     const pac = fitRatings(us.QB).pac;
-    const blitzy = id.mix['c0-blitz'] >= 0.25;
-    const quiet = id.mix['c0-blitz'] <= 0.12;
+    const N = (norms ??= leagueNorms());
+    const blitzy = pressureShare(id.mix) >= N.blitz + LEAN;
+    const quiet = pressureShare(id.mix) <= N.blitz - LEAN;
     out.push({
       coach: 'QB COACH', role: 'QB', title: 'UNDER CENTER',
       items: [{
@@ -357,19 +389,23 @@ function stSection(opp: Squad): ScoutSection {
  * trait fills the whole list.
  */
 function suggest(id: DefIdentity, m: Matchups, starred: Set<string>, staff: Staff): Suggestion[] {
+  const N = (norms ??= leagueNorms());
   const sh = shellShares(id.mix);
+  const blitz = pressureShare(id.mix);
+  const man = manShare(id.mix);
   const press = (id.press.CB1 + id.press.CB2) / 2;
   const rules: { trait: Trait; w: number; why: string }[] = [];
   const oc2 = finds(staff, 'OC', 2);
   const wr2 = finds(staff, 'WR', 2);
-  if (sh.zero >= 0.25) {
+  if (blitz >= N.blitz + LEAN) {
     rules.push({ trait: 'quick', w: 2, why: 'BEATS THEIR BLITZ' });
     rules.push({ trait: 'screen', w: 2, why: 'SCREEN VS THE BLITZ' });
   }
-  if (sh['two-high'] >= 0.45) rules.push({ trait: 'runInside', w: 2, why: 'LIGHT BOX VS TWO-HIGH' });
-  if (sh['one-high'] >= 0.42) rules.push({ trait: 'deep', w: 1.5, why: 'SEAMS VS SINGLE-HIGH' });
+  if (sh['two-high'] >= N.twoHigh + LEAN) rules.push({ trait: 'runInside', w: 2, why: 'LIGHT BOX VS TWO-HIGH' });
+  if (sh['one-high'] >= N.oneHigh + LEAN) rules.push({ trait: 'deep', w: 1.5, why: 'SEAMS VS SINGLE-HIGH' });
+  if (man <= N.man - LEAN) rules.push({ trait: 'zoneBeater', w: 1.5, why: 'SIT DOWN IN THEIR ZONES' });
   if (oc2 && press >= 0.42) rules.push({ trait: 'manBeater', w: 2, why: 'BEATS PRESS MAN' });
-  if (sh.zero <= 0.12) rules.push({ trait: 'pa', w: 1.5, why: 'SELL RUN, THEY SIT BACK' });
+  if (blitz <= N.blitz - LEAN) rules.push({ trait: 'pa', w: 1.5, why: 'SELL RUN, THEY SIT BACK' });
   if (wr2 && m.deep) rules.push({ trait: 'deep', w: 2, why: `${m.deep.slot} HAS THE SPEED EDGE` });
   if (finds(staff, 'OL', 3) && m.runSide) rules.push({ trait: 'runInside', w: 1, why: `RUN BEHIND OUR ${m.runSide.side} SIDE` });
   if (oc2 && press <= 0.25) rules.push({ trait: 'quick', w: 1.5, why: 'SOFT CUSHIONS: GO QUICK' });
@@ -409,16 +445,18 @@ function suggestEmphasis(user: Squad, opp: Squad, id: DefIdentity, m: Matchups, 
   const set = (g: Group, sid: string, why: string) => {
     if (finds(staff, g, 2)) out[g] = { id: sid, why };
   };
-  const zero = shellShares(id.mix).zero;
+  const N = (norms ??= leagueNorms());
+  const blitz = pressureShare(id.mix);
+  const blitzy = blitz >= N.blitz + LEAN;
   const press = (id.press.CB1 + id.press.CB2) / 2;
   const ourPass = SCHEME_PASS[user.team.profile.offense.scheme] ?? 0.5;
   const prof = opp.team.profile.offense;
   const theirPass = SCHEME_PASS[prof.scheme] ?? 0.5;
   const worstOl = m.ol.reduce<Edge | null>((w, e) => (!w || e.score < w.score ? e : w), null);
-  if (zero >= 0.25) set('QB', 'qb-poise', `THEY BRING ZERO ${pct(zero)}`);
+  if (blitzy) set('QB', 'qb-poise', `THEY BRING PRESSURE ${pct(blitz)}`);
   else if (m.deep) set('QB', 'qb-deep', `${m.deep.slot} HAS THE SPEED EDGE`);
   else set('QB', 'qb-accuracy', 'TAKE WHAT THEY GIVE');
-  if (zero >= 0.25) set('RB', 'rb-protect', 'PICK UP THEIR BLITZ');
+  if (blitzy) set('RB', 'rb-protect', 'PICK UP THEIR BLITZ');
   else set('RB', 'rb-tackles', 'WIN AFTER CONTACT');
   if (press >= 0.42) set('WR', 'wr-routes', `THEY PRESS ${pct(press)}`);
   else if (m.routes) set('WR', 'wr-routes', `${m.routes.slot} WINS HIS ROUTES`);
@@ -480,7 +518,7 @@ export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<strin
     offTag: `${OFF_TAG[prof.scheme] ?? 'BALANCED'}, ${prof.qbStyle.toUpperCase()} QB`,
     recent: recentGames(s, oppId),
     averages: averages(s, oppId),
-    sections: scouted([ocSection(opp, id, st.OC.r.scout), dc, ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)], st),
+    sections: scouted([ocSection(opp, id, st.OC.r.scout, staffFor(s, oppId).DC), dc, ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)], st),
     suggestions: suggest(id, m, starred, st),
     emphasis,
   };

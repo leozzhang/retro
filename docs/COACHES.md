@@ -4,6 +4,7 @@ Every program has a staff: an OC, a DC, nine position coaches and a head trainer
 - **Scouting:** how much of the weekly scouting report each coach finds, and how precisely.
 - **Weekly emphases:** a position coach can have his group practice one thing this week.
 - **The DC's style:** the DC carries the defense's style (aggressive, balanced or soft).
+- **The DC's in-game adjustments (ADJUST):** how fast and how well the CPU defense learns your offense during a live game ([DEFENSE.md](DEFENSE.md)).
 
 Recruiting, hiring and the carousel come later (see the end).
 
@@ -110,6 +111,13 @@ Head coaches, offseason growth, and the coaching carousel (plan: [CAROUSEL_PLAN.
 | TEACH | position coaches | How hard his emphasis steers his players' level-ups (`coachFactor`: 0.8 at 30, 1 at 50, 1.45 at 95) |
 | GAME | position coaches | How much his emphasis shows up in simulated play (same factor) |
 | RECRUIT | position coaches | How much interest he builds with a transfer-portal target each round ([PORTAL.md](PORTAL.md)). Drawn on its own stream (`staff-recruit:<team>`), so every other rating is unchanged |
+
+**ADJUST** (`dcAdjust`, `data/coaches.ts`) is the DC's in-game rating:
+- It's his SCOUT plus a spread of his own (SD 0.8 × the rating SD), seeded by his id. Film study and in-game reads are the same skill.
+- It isn't stored and isn't in `Coach.r`, so his worth in the carousel (`coachWorth`), hiring and `npm run season` don't change.
+- It grows when his SCOUT does.
+- In a live game it sets how fast his defense learns your offense (`game/defBrain.ts`).
+- The prep page's OC report shows the opposing DC's ADJUST as FAST (70+), STEADY or SLOW (50 or less), a tier-2 item.
 
 **The DC owns the style.** `defIdentity` reads `buildStaff(team).DC.style`. The DC is generated with the same seeded style the program had before (`defStyle`, tested for every team), so identities, live calls and `balance.txt` are unchanged.
 

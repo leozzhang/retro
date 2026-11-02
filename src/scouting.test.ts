@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DEF_CALLS, pickDefCall } from './data/defenses';
+import { CORE_CALLS, DEF_CALLS, pickDefCall } from './data/defenses';
 import { starters } from './data/depth';
-import { defIdentity, defStyle, IDENTITY, situationMix } from './data/identity';
+import { defIdentity, defStyle, IDENTITY, manShare, pressureShare, shellShares, situationMix } from './data/identity';
 import { PLAYBOOK } from './data/plays';
 import { TEAMS, teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
@@ -14,38 +14,50 @@ const book = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
 const allText = (r: ReturnType<typeof scoutReport>) => r.sections.flatMap((s) => s.items.map((i) => i.text)).join('\n');
 
 describe('defensive identity', () => {
-  it('is deterministic, sums to 1 and keeps every call at or above the floor', () => {
+  it('is deterministic, sums to 1 and keeps every call at or above its floor', () => {
     for (const t of TEAMS) {
       const id = defIdentity(t);
       expect(defStyle(t.id)).toBe(id.style);
-      const total = Object.values(id.mix).reduce((a, b) => a + b, 0);
-      expect(total).toBeCloseTo(1, 9);
-      for (const c of DEF_CALLS) {
-        expect(id.mix[c.id]).toBeGreaterThanOrEqual(IDENTITY.floor - 1e-9);
-        expect(situationMix(id, 3, 10)[c.id]).toBeGreaterThanOrEqual(IDENTITY.floor - 1e-9);
+      for (const mix of [id.mix, situationMix(id, 3, 10), situationMix(id, 3, 1, 2), situationMix(id, 1, 10, 50, { blitz: 3, man: -3 })]) {
+        expect(Object.values(mix).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
+        const short = 'goal' in mix;
+        const priors = DEF_CALLS.filter((c) => short || !c.situational);
+        const total = priors.reduce((s, c) => s + IDENTITY.prior[c.id], 0);
+        for (const c of priors) expect(mix[c.id]).toBeGreaterThanOrEqual((IDENTITY.floor * IDENTITY.prior[c.id]) / total - 1e-9);
       }
       for (const p of Object.values(id.press)) expect(p).toBeGreaterThan(0);
     }
   });
 
-  it('averages the old fixed weights across FBS, so the league plays the same defense overall', () => {
-    for (const c of DEF_CALLS) {
-      const mean = TEAMS.reduce((s, t) => s + defIdentity(t).mix[c.id], 0) / TEAMS.length;
-      expect(Math.abs(mean - c.weight)).toBeLessThan(0.02);
-    }
-    const styles = new Set(TEAMS.map((t) => defIdentity(t).style));
-    expect(styles.size).toBe(3);
+  it('plays the league prior on average, with every shell and both coverages well used', () => {
+    const mean = (f: (m: Record<string, number>) => number) => TEAMS.reduce((s, t) => s + f(defIdentity(t).mix), 0) / TEAMS.length;
+    expect(mean(manShare)).toBeGreaterThan(0.38);
+    expect(mean(manShare)).toBeLessThan(0.55);
+    expect(mean(pressureShare)).toBeGreaterThan(0.15);
+    expect(mean(pressureShare)).toBeLessThan(0.3);
+    for (const sh of ['two-high', 'one-high', 'zero'] as const) expect(mean((m) => shellShares(m)[sh])).toBeGreaterThan(0.05);
+    expect(new Set(TEAMS.map((t) => defIdentity(t).style)).size).toBe(3);
   });
 
-  it('aggressive defenses blitz more than soft ones, and more still on third and long', () => {
+  it('aggressive defenses bring more pressure than soft ones, and more still on third and long', () => {
     const of = (style: string) => TEAMS.map(defIdentity).filter((d) => d.style === style);
-    const c0 = (ds: ReturnType<typeof of>) => ds.reduce((s, d) => s + d.mix['c0-blitz'], 0) / ds.length;
-    expect(c0(of('aggressive'))).toBeGreaterThan(c0(of('balanced')));
-    expect(c0(of('balanced'))).toBeGreaterThan(c0(of('soft')));
+    const p = (ds: ReturnType<typeof of>) => ds.reduce((s, d) => s + pressureShare(d.mix), 0) / ds.length;
+    expect(p(of('aggressive'))).toBeGreaterThan(p(of('balanced')));
+    expect(p(of('balanced'))).toBeGreaterThan(p(of('soft')));
     for (const d of of('aggressive')) {
-      expect(situationMix(d, 3, 9)['c0-blitz']).toBeGreaterThan(d.mix['c0-blitz']);
-      expect(situationMix(d, 1, 10)).toEqual(d.mix);
+      expect(pressureShare(situationMix(d, 3, 9))).toBeGreaterThan(pressureShare(d.mix));
+      expect(situationMix(d, 1, 10)).toBe(d.mix);
     }
+  });
+
+  it('only calls Goal Line in short yardage, and loads the box there', () => {
+    const d = defIdentity(TEAMS[0]);
+    expect(d.mix.goal).toBeUndefined();
+    const sy = situationMix(d, 3, 1);
+    expect(sy.goal).toBeGreaterThan(0.1);
+    const heavy = (m: Record<string, number>) => DEF_CALLS.reduce((s, c) => s + (c.box >= 8 ? m[c.id] ?? 0 : 0), 0);
+    expect(heavy(sy)).toBeGreaterThan(heavy(d.mix) + 0.1);
+    expect(situationMix(d, 1, 10, 2).goal).toBeGreaterThan(0.1);
   });
 
   it('pickDefCall without a mix draws exactly as before, and a mix uses one draw too', () => {
@@ -53,8 +65,8 @@ describe('defensive identity', () => {
     const b = mulberry32(5);
     for (let i = 0; i < 200; i++) {
       const r = a();
-      let x = r * DEF_CALLS.reduce((s, c) => s + c.weight, 0);
-      const want = DEF_CALLS.find((c) => (x -= c.weight) <= 0) ?? DEF_CALLS[0];
+      let x = r * CORE_CALLS.reduce((s, c) => s + c.weight, 0);
+      const want = CORE_CALLS.find((c) => (x -= c.weight) <= 0) ?? CORE_CALLS[0];
       expect(pickDefCall(() => r).id).toBe(want.id);
       pickDefCall(b, defIdentity(TEAMS[i % TEAMS.length]).mix);
     }
@@ -128,7 +140,7 @@ describe('scouting report', () => {
     const s = seasonVs('georgia', 'aggressive');
     const r = scoutReport(s, userGameThisWeek(s)!);
     expect(r.suggestions.some((x) => ['quick', 'screen'].some((t) => playTraits(book(x.id)).has(t as 'quick')))).toBe(true);
-    expect(allText(r)).toContain('ZERO BLITZ');
+    expect(allText(r)).toContain('PRESSURE (5+ RUSHERS)');
   });
 
   it('starred plays come first among equals', () => {

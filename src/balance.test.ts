@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
-import { DEF_CALLS, type DefCall } from './data/defenses';
+import { adaptiveRows } from './adaptive';
+import { CORE_CALLS, DEF_CALLS, type DefCall } from './data/defenses';
 import { PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
 import { kickDef, type KickDef } from './data/specialTeams';
 import { FIELD_W, STEP } from './engine/constants';
@@ -57,7 +58,7 @@ function passLine(plays: PlayDef[], call: DefCall, holdTime: number, reps: numbe
 
 function passRows(label: string, plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
-  for (const call of DEF_CALLS) {
+  for (const call of CORE_CALLS) {
     for (const holdTime of [1.2, 2.2, 3.2]) {
       rows.push(`${label} ${call.name.padEnd(15)} hold ${holdTime}s | ${passLine(plays, call, holdTime, REPS, rng)}`);
     }
@@ -69,7 +70,7 @@ function passRows(label: string, plays: PlayDef[], rng: Rng): string[] {
 function perPlayRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
   for (const p of plays) {
-    for (const call of DEF_CALLS) {
+    for (const call of CORE_CALLS) {
       for (const holdTime of [1.2, 2.2]) {
         rows.push(`PLAY ${p.name.padEnd(14)} ${call.name.padEnd(15)} hold ${holdTime}s | ${passLine([p], call, holdTime, REPS, rng)}`);
       }
@@ -110,7 +111,7 @@ function routeRows(rng: Rng): string[] {
       return Object.entries(r).some(([slot, rn]) => rn === route && slot !== 'RB' && slot !== 'FB');
     });
     if (!plays.length) continue;
-    for (const call of DEF_CALLS) {
+    for (const call of CORE_CALLS) {
       const s = { att: 0, comp: 0, int: 0, set: 0, sepT: [] as number[], sepA: [] as number[], yds: 0 };
       for (let i = 0; i < REPS; i++) {
         const play = newPlay(plays[i % plays.length], call, rng);
@@ -162,7 +163,7 @@ function runRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
   const all: number[] = [];
   for (const playDef of plays) {
-    for (const call of DEF_CALLS) {
+    for (const call of CORE_CALLS) {
       const s = { fum: 0, td: 0, none: 0, keep: 0, keepY: 0, contact: 0, list: [] as number[] };
       for (let i = 0; i < RUN_REPS; i++) {
         const { play, o, ran, yds, contact } = runRep(playDef, call, rng);
@@ -207,7 +208,7 @@ function runLine(list: number[]): string {
 function shortRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
   for (const playDef of plays) {
-    const conv = DEF_CALLS.map((call) => {
+    const conv = CORE_CALLS.map((call) => {
       let n = 0;
       let made = 0;
       for (let i = 0; i < RUN_REPS; i++) {
@@ -219,6 +220,39 @@ function shortRows(plays: PlayDef[], rng: Rng): string[] {
       return `${call.name.trim()} ${((made / Math.max(1, n)) * 100).toFixed(0)}%`;
     });
     rows.push(`SHORT ${playDef.name.padEnd(12)} 3rd & 1 | ${conv.join('  ')}`);
+  }
+  return rows;
+}
+
+/**
+ * The whole defensive playbook, one block per call: the pass book at a quick and a normal hold, the
+ * PA book, every run, and the short-yardage runs on 3rd and 1. The core rows above stay on the
+ * original three calls so they compare against the baseline.
+ */
+function defenseRows(pass: PlayDef[], pa: PlayDef[], runs: PlayDef[], rng: Rng): string[] {
+  const rows: string[] = [];
+  const short = PLAYBOOK.filter((p) => p.short);
+  for (const call of DEF_CALLS) {
+    const tag = `DEF  ${call.name.padEnd(15)}`;
+    rows.push(`${tag} pass 1.2s | ${passLine(pass, call, 1.2, REPS, rng)}`);
+    rows.push(`${tag} pass 2.2s | ${passLine(pass, call, 2.2, REPS, rng)}`);
+    rows.push(`${tag} PA   2.2s | ${passLine(pa, call, 2.2, REPS, rng)}`);
+    const all: number[] = [];
+    for (let i = 0; i < RUN_REPS * 4; i++) {
+      const r = runRep(runs[i % runs.length], call, rng);
+      if (r.o && r.ran) all.push(r.yds);
+    }
+    rows.push(`${tag} runs      | ${runLine(all)}`);
+    const conv = short.map((p) => {
+      const ys: number[] = [];
+      for (let i = 0; i < RUN_REPS / 2; i++) {
+        const r = runRep(p, call, rng);
+        if (r.o && r.ran) ys.push(r.yds);
+      }
+      const made = ys.filter((y) => y >= 1).length;
+      return `${p.name} ${((made / Math.max(1, ys.length)) * 100).toFixed(0)}% ${(ys.reduce((a, b) => a + b, 0) / Math.max(1, ys.length)).toFixed(1)}y`;
+    });
+    rows.push(`${tag} short     | ${conv.join('  ')}`);
   }
   return rows;
 }
@@ -363,5 +397,7 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   rows.push('', ...perPlayRows([...pass, ...pa].filter(picked), mulberry32(11)));
   rows.push('', ...shortRows(PLAYBOOK.filter((p) => p.short && picked(p)), mulberry32(13)));
   if (!only || only.includes('route')) rows.push('', ...routeRows(mulberry32(17)));
+  if (!only || only.includes('defense')) rows.push('', ...defenseRows(pass, pa, runs, mulberry32(19)));
+  if (!only || only.includes('adaptive')) rows.push('', ...adaptiveRows());
   writeFileSync(process.env.BAL_OUT ?? 'balance.txt', rows.join('\n'));
 }, 1_200_000);

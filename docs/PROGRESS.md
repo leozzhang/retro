@@ -1,6 +1,88 @@
 # Progress
 
-_Last updated: 2026-11-01_
+_Last updated: 2026-11-02_
+
+## Done: a learning defense: playbook, identity dials, in-game DC and player anticipation (2026-11-02)
+Design, numbers and flags are in [DEFENSE.md](DEFENSE.md).
+
+**Defensive playbook (13 calls).**
+- The 3 MVP calls are unchanged, plus:
+  - Cover 2, Tampa 2, Cover 3, Cover 3 Sky and Cover 4
+  - Cover 1 Fire, Fire Zone and Nickel Cat
+  - Bear Cover 1 and Goal Line
+- Fronts: even, bear, goal (forces the base package), and wide (not used yet).
+- SPY and CONTAIN tags go on any call that can spare the defender.
+
+**Zone coverage AI** (`sim/ai.ts`):
+- Underneath landmarks, with a unit-level pattern match each step (`matchZones`): the hook takes the slant, the curl widens to the flat.
+- Sinking under verticals, a leash toward the nearest threat, and a read step against run blocking.
+- Deep thirds and quarters play tighter over the top than halves.
+- `zcv` finally has zones to play in.
+
+**Identity as dials** (`data/identity.ts`):
+- `blitz`, `man`, `twoHigh` and `box`, as log-weights on each call's traits over a league prior, with a 15% floor.
+- Style and units shade them as before.
+- Situation dials: third and long, short yardage (opens Goal Line), and the red zone.
+- The scouting report now speaks in pressure (5+ rushers) and man/zone shares. There's a new `zoneBeater` trait and staff-pick rule.
+
+**The DC learns in live games** (`game/defBrain.ts`):
+- **The book:** decayed counts of what you've run, by bucket and by play, plus your success against blitz, man and box calls.
+- **His posture** moves toward a target built from your tendencies and from what has stopped you.
+- **Against a run you keep calling,** he adds box and opens Goal Line on any down.
+- **QB runs** bring SPY and CONTAIN.
+- **ADJUST** (`dcAdjust`: his SCOUT plus his own spread, not stored) sets how much he trusts, how fast he moves and how often he misreads. A weak DC mostly adjusts at halftime.
+- **No peeking:** the call is made before you pick yours.
+
+**Defenders anticipate** (`Player.lean`, `LEAN_FX`):
+- **The lean:** a lean on the run, screens, the QB and the deep ball, from the recent flow, by `prc`, with nerve (bolder after a right guess, careful after getting burned).
+- **Every effect is double-edged:**
+  - sitting on the run fits faster and surges, but bites on PA and is late deep
+  - sitting on screens triggers on them, but rushes softer
+- **Tells:** creeping backers and bailing corners.
+
+**What the user sees:**
+- The pre-snap read adds BEAR FRONT, GOAL LINE, 8 IN THE BOX and SPY.
+- A gold line, at most one a drive, on the call screen and pre-snap ("DEFENSE: THEY'RE SELLING OUT FOR THE QB SNEAK").
+- A halftime card of their adjustments, with as many lines as your OC's SCOUT finds.
+- A tier-2 line in the prep page's OC report on their DC's ADJUST.
+
+**DEFENSE IQ** (STATIC / NORMAL / SHARP):
+- A dynasty setting (`SeasonConfig.defIq`, missing means NORMAL) and an exhibition line (I).
+- STATIC is the old path with no brain.
+
+**Measured** (the new ADAPTIVE section of `balance.txt`, DEFENSE.md):
+- **Sneak only:** 2.7 → 1.0–1.5 yards a play.
+- **IZ only:** 3.8 → 2.2–2.7.
+- **QB runs:** 2.7 → 1.2–1.9.
+- **Screens:** 40% → 34–38% success.
+- **A balanced offense:** about level at NORMAL (0.17–0.20 TDs a drive against 0.17) and 8–15% down at SHARP.
+- **PA after 8 straight IZ:** 6.5 → 9–12 yards a play. The counter pays.
+
+**Checks:**
+- **Tests:** `npm test` passes 278, including 12 new in `defBrain.test.ts`. They cover:
+  - STATIC has no brain
+  - spam loads the box and brings Goal Line
+  - a varied offense moves the dials little
+  - the caps and floors hold
+  - spy and contain, and the one line a drive
+  - a weak DC lags, then catches up at halftime
+  - determinism and a JSON round trip
+  - nerve
+  - the old calls are unchanged under neutral leans
+  - tags
+  - every call against every formation
+  - goal-line personnel
+- **`balance.txt`:** the core rows are byte-identical; the DEF and ADAPT rows are new. The balance and ratings reports' core rows still use the three original calls (`CORE_CALLS`).
+- **`season.txt`:** identical apart from timings.
+- **Not done yet:**
+  - played by hand, or driven in the browser
+  - `npm run ratings` not rerun (its calls didn't change)
+
+**Flags:**
+- Zones at a 2.2 s hold give up 8–11 yards a play against 5.5–7 for man; Cover 2 is the softest at 11.0. Our man coverage is also too tight, so part of the gap is man's.
+- Screens against Fire Zone gain 14.4 yards a play.
+- Quick-game-only offenses are barely countered.
+- The auto-runner doesn't push the sneak like a user holding D, so check the user's sneak by playing.
 
 ## Done: gameplay MVP
 - **Project setup:** Vite and TypeScript scaffold, fixed-timestep loop, 640×360 internal canvas scaled up with pixelated rendering.
@@ -1401,12 +1483,11 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **Sack rate when holding long:** about 35% of plays at 3.2s against a 4-man rush, which may be harsh.
 - **Play diagrams are small:** cards are now 62 px tall to fit 9 per page. Each card zooms to its own play, but drags and crossers on wide pass plays still look short.
 - **No timeouts, spike, kneel or overtime yet.** Ties stand.
-- **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The defense has no run-defense calls yet.
+- **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The run fronts (Bear, Cover 3 Sky, Goal Line) and the learning DC's box dial now answer a run-heavy offense (DEFENSE.md), but 2 Man itself is unchanged.
 - **WR stalk blocks lose the matchup quickly:** in `runEngagement` the defender's side is `str*0.7 + spd*0.3`, and the WR adds only his `blk` (about 45). A fast corner wins by about 30 points and sheds at about 2.3/s. On stretch plays the WR also takes the lineman's `REACH_PENALTY`. Perimeter blocks now form and last longer than before, but they still don't hold long. Not tuned: consider a stalk-block rule (the WR only has to stay between, not drive) or no reach penalty for non-linemen.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
 - **Live games now score less than CPU-vs-CPU season games:** about 5 possessions a team at STANDARD vs about 12 in `simGame`. That lowers the user's points for and against and the margin terms in the polls (`AP_WEIGHTS`, `CFP_WEIGHTS`). Not compensated yet.
 - **Check the user's points per drive by playing.** If the live offense scores on more than 60% of drives, that's a gameplay balance issue, separate from pacing.
-- **No zone underneath coverage:** defenses are man or deep zones only.
 - **RPOs are still a run plus a tagged route.** There's no read on a defender yet, and the harness measures only the give.
 - **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB on his backside shed at once. Keeps were unchanged by the perimeter-block fix. A human steering the QB should do better; check by playing before tuning.
 - **The read key's crash is a coin flip.** It doesn't depend on the call, the down, or the key's awareness yet.
@@ -1425,7 +1506,12 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
 1. **An RPO read on a defender,** and give the harness a pull decision.
 2. Clock tools: timeouts (3 per half), spike, kneel, college overtime.
-3. Run-defense calls (8-man box, run blitzes; light boxes are currently too easy to run on) and zone coverages (Cover 2, 3, 4, and underneath zones) and smarter defensive play-calling by down and distance.
+3. Defense, round 2 ([DEFENSE.md](DEFENSE.md)):
+   - play it by hand and check the gold lines and the halftime card on screen
+   - film study (the DC's pregame prior from your past live games)
+   - tune zones at a 2.2 s hold toward man (and man's separation up), and screens against Fire Zone
+   - a counter to quick-game-only offenses
+   - a pass-rush package for the `wide` front
 4. Playbook UI, part 2: filter by situation (short yardage, red zone, 2-minute).
 5. Special teams, part 2: playable kick and punt returns, onside kicks, fakes, a real free kick after a safety, and CPU 4th-down decisions shown as actual kicks.
 6. Pre-snap reads and audibles beyond Esc (hot routes, protection slides).

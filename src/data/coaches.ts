@@ -216,6 +216,19 @@ export function generatedHeadCoach(id: string): HeadCoach | undefined {
 /** Any coach, staff or head, from his id. */
 export const anyCoach = (id: string): Coach | HeadCoach | undefined => generatedCoach(id) ?? generatedHeadCoach(id);
 
+/**
+ * A DC's in-game adjustments (ADJUST): how fast and how well his defense learns your offense during
+ * a game (game/defBrain.ts). It follows his scouting (film study is the same skill) with his own
+ * spread around it, seeded by his id, so it isn't stored and doesn't touch his other ratings or his
+ * worth in the carousel. It grows with his scouting.
+ */
+export function dcAdjust(c: Coach): number {
+  const g = gauss(mulberry32(hashString(`dc-adjust:${c.id}`)));
+  return Math.round(clamp(c.r.scout + g * STAFF.ratingSd * ADJUST_SPREAD, STAFF.min, STAFF.max));
+}
+/** How far ADJUST strays from SCOUT, as a share of the rating SD. */
+const ADJUST_SPREAD = 0.8;
+
 /** The ratings each chair uses. */
 export const ROLE_KEYS: Record<AnyRole, RatingName[]> = {
   HC: ['develop', 'recruit', 'eval'],

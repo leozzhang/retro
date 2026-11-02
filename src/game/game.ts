@@ -1,12 +1,12 @@
-import { pickDefCall, type DefCall } from '../data/defenses';
+import { pickDefCall, type DefCall, type DefTags } from '../data/defenses';
 import { defIdentity, situationMix } from '../data/identity';
-import { FORMATIONS, PLAY_TABS, playsOfKind, type Formation, type PlayDef } from '../data/plays';
+import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage } from '../data/confidence';
 import { buildSquad, onField, reorderPosition, teamConf, teamRatings, type Squad } from '../data/depth';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
-import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
+import { DEF_SLOTS, teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
@@ -36,7 +36,7 @@ import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, t
 import { careerList, careerRowAt, careerTabAt, drawCareer, modeAt, newCareerView, type CareerView } from '../render/careerScreen';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
-import { GROUPS, type Group } from '../data/coaches';
+import { buildStaff, dcAdjust, GROUPS, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
@@ -62,6 +62,9 @@ import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
+import { adjustments, callFor, halftime as brainHalftime, headline, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
+import { successful } from '../season/grades';
+import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog, INT_SHARE, simPart } from '../season/simGame';
 import { newStory, type StoryDrive } from '../season/story';
 import type { BoxScore, DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
@@ -102,6 +105,12 @@ const INJURY_OPTIONS: InjuryLevel[] = ['normal', 'light', 'off'];
 
 const KEY_LABELS = ['LEAN', 'NORMAL', 'FULL'];
 
+/** A play's name for the DC's lines. */
+const playName = (id: string) => (PLAYBOOK.find((p) => p.id === id)?.name ?? id).toUpperCase();
+
+/** How much the CPU defense learns your offense in a game (game/defBrain.ts). */
+const IQ_OPTIONS: DefenseIq[] = ['STATIC', 'NORMAL', 'SHARP'];
+
 /**
  * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
  * sets, and which option a dynasty has now (the hub's SETTINGS page). A new setting is one more entry.
@@ -131,6 +140,12 @@ const SETTINGS: {
     options: ['SUMMARY', ...KEY_LABELS], start: 2,
     apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: KEY_LEVELS[i] }),
     read: (c) => KEY_LEVELS.indexOf(keyLevels(c).defense),
+  },
+  {
+    label: 'DEFENSE IQ', help: 'HOW MUCH THE CPU DEFENSE LEARNS YOUR OFFENSE DURING A GAME',
+    options: IQ_OPTIONS, start: 1,
+    apply: (c, i) => (c.defIq = IQ_OPTIONS[i]),
+    read: (c) => IQ_OPTIONS.indexOf(c.defIq ?? 'NORMAL'),
   },
 ];
 
@@ -242,6 +257,11 @@ export class Game {
   private kickSketch = new Map<string, Vec3[]>();
   private defCall: DefCall | null = null;
   private press: Record<string, boolean> = {};
+  /** The CPU defense's in-game learning (null at STATIC), its tags on this snap, and its newest line for the user. */
+  private brain: DefBrain | null = null;
+  private defTags: DefTags = {};
+  private dcNote: string | null = null;
+  private exhibitionIq: DefenseIq = 'NORMAL';
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
@@ -442,6 +462,8 @@ export class Game {
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
     const cycleKeys = () => (this.exhibitionKeys = KEY_LEVELS[(KEY_LEVELS.indexOf(this.exhibitionKeys) + 1) % KEY_LEVELS.length]);
     if (input.hit('KeyK')) cycleKeys();
+    const cycleIq = () => (this.exhibitionIq = IQ_OPTIONS[(IQ_OPTIONS.indexOf(this.exhibitionIq) + 1) % IQ_OPTIONS.length]);
+    if (input.hit('KeyI')) cycleIq();
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -462,7 +484,8 @@ export class Game {
       } else if (y >= 262 && y < 280) {
         this.qIdx = (this.qIdx + (x < VIEW_W / 2 ? nq - 1 : 1)) % nq;
       } else if (y >= 280 && y < 290) {
-        cycleKeys();
+        if (x < VIEW_W / 2) cycleKeys();
+        else cycleIq();
       } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
@@ -665,6 +688,13 @@ export class Game {
     this.liveDrives = this.seasonGame ? [{ off: user.id, plays: [] }] : null;
     const s = this.season;
     this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
+    const dc = (this.seasonGame && s ? staffFor(s, cpu.id) : buildStaff(cpu)).DC;
+    const qbSpd = this.userRoster.QB?.r.spd ?? 70;
+    this.brain = newBrain({
+      iq: this.seasonGame && s ? s.config.defIq ?? 'NORMAL' : this.exhibitionIq,
+      adjust: dcAdjust(dc), scout: dc.r.scout, qbMobility: Math.max(0, Math.min(1, (qbSpd - 70) / 20)), seed: (this.rng() * 2 ** 31) >>> 0,
+    });
+    this.dcNote = null;
     if (from > 1 && this.seasonGame) this.simAhead(from);
     else this.toCall();
   }
@@ -1639,7 +1669,17 @@ export class Game {
     this.applied = null;
     // The CPU defense's identity: its own call mix (more zero blitz on third and long if that's who it is) and press rates.
     const ident = defIdentity(this.cpu);
-    this.defCall = pickDefCall(this.rng, situationMix(ident, this.drive.down, this.drive.firstDownX - this.drive.los));
+    const toGo = this.drive.firstDownX - this.drive.los;
+    if (this.brain && mode === 'normal') {
+      // The DC's call with what he's learned, and maybe a line about it for the user.
+      const pick = callFor(this.brain, ident, this.drive.down, toGo, OPP_GOAL - this.drive.los, this.rng);
+      this.defCall = pick.call;
+      this.defTags = pick.tags;
+      this.dcNote = headline(this.brain, playName) ?? this.dcNote;
+    } else {
+      this.defCall = pickDefCall(this.rng, situationMix(ident, this.drive.down, toGo, OPP_GOAL - this.drive.los));
+      this.defTags = {};
+    }
     const pr = ident.press;
     this.press = { CB1: this.rng() < pr.CB1, CB2: this.rng() < pr.CB2, NB: this.rng() < pr.NB };
     if (mode === 'pat' || mode === 'try') this.tab = Math.min(this.tab, 2);
@@ -1807,6 +1847,8 @@ export class Game {
       play: def,
       defCall: this.defCall!,
       press: this.press,
+      tags: this.defTags,
+      reads: this.brain && !this.drive.try ? leansFor(this.brain, this.defPrc(), this.defCall!) : undefined,
       los: this.drive.los,
       ballY: this.drive.ballY,
       flip: this.flipCall,
@@ -1814,6 +1856,25 @@ export class Game {
     });
     this.flipCall = false;
     this.screen = 'play';
+  }
+
+  /** The CPU defenders' play recognition, by slot, for their leans. */
+  private defPrc(): Partial<Record<string, number>> {
+    return Object.fromEntries(DEF_SLOTS.map((sl) => [sl, this.cpuRoster[sl]?.r.prc ?? 60]));
+  }
+
+  /** The CPU defense watches the snap the user just ran. */
+  private observeSnap(play: Play, o: PlayOutcome): void {
+    if (!this.brain) return;
+    const d = this.drive;
+    const gain = Math.round((o.type === 'td' ? OPP_GOAL : o.spot) - d.los);
+    const toGo = Math.round(d.firstDownX - d.los);
+    const turnover = o.type === 'int' || o.type === 'pick6' || o.type === 'fumble';
+    const success = successful({ gain, pass: play.playDef.kind !== 'run', down: d.down, toGo, ...(o.type === 'sack' ? { sack: true } : {}), ...(turnover ? { turnover: true } : {}) });
+    observe(this.brain, {
+      play: play.playDef, call: play.defCall, down: d.down, toGo, yardsToGoal: OPP_GOAL - d.los, gain, success,
+      scrambled: play.scramble, kept: play.kept, air: play.ballTarget && play.thrown ? play.ballTarget.x - d.los : 0,
+    });
   }
 
   private startKick(def: KickDef): void {
@@ -1896,6 +1957,7 @@ export class Game {
           this.applied = applyTry(this.drive, play.outcome);
         } else {
           this.logSnap(play.playDef.kind !== 'run', play.outcome);
+          this.observeSnap(play, play.outcome);
           this.applied = applyOutcome(this.drive, play.outcome);
           afterPlay(this.clock, play.outcome.type, this.applied.headline === 'FIRST DOWN');
           if (play.outcome.type === 'td') adminStop(this.clock); // a score stops the clock
@@ -1957,6 +2019,10 @@ export class Game {
   /** Move the game on after a play or kick: next down, try, kickoff, or a change of possession. */
   private handleChange(a: Applied): void {
     const c = a.change;
+    if (this.brain && c.kind !== 'none' && c.kind !== 'pat') {
+      newDrive(this.brain);
+      this.dcNote = null;
+    }
     switch (c.kind) {
       case 'none':
         this.drive = a.drive;
@@ -2047,6 +2113,18 @@ export class Game {
   /** The user took the opening kickoff, so the user kicks off to start the second half. */
   private halftime(): void {
     this.notify({ title: 'HALFTIME', sub: this.scoreLine(), extra: `You kick off to ${this.cpu.abbr}`, color: '#9ad7ff' });
+    if (this.brain) {
+      // Every DC closes the gap to his read at the half. Your OC sees as much of it as his scouting finds.
+      brainHalftime(this.brain);
+      const lines = adjustments(this.brain, playName);
+      const s = this.season;
+      const scout = (this.seasonGame && s ? staffFor(s, this.user.id) : buildStaff(this.user)).OC.r.scout;
+      const shown = lines.slice(0, scout >= SCOUT_TIERS[3] ? 3 : scout >= SCOUT_TIERS[2] ? 2 : 1);
+      if (shown.length) {
+        this.notify({ title: `${this.cpu.abbr} ADJUSTS`, sub: shown[0], extra: shown.slice(1).join('. '), color: '#ffd23f' });
+      }
+      this.dcNote = null;
+    }
     nextQuarter(this.clock);
     this.showNotices('kickoff');
   }
@@ -2306,6 +2384,7 @@ export class Game {
       case 'presnap':
         drawHint(g, 'SPACE/CLICK: SNAP   ESC: AUDIBLE   READ THE SAFETIES');
         this.drawShellRead(g);
+        if (this.dcNote) this.drawDcNote(g, 34);
         break;
       case 'snap':
       case 'live': {
@@ -2331,6 +2410,15 @@ export class Game {
     text(g, s, VIEW_W / 2, 21, { align: 'center', color: '#ffffff' });
   }
 
+  /** The DC's newest adjustment, as a line over the field. */
+  private drawDcNote(g: CanvasRenderingContext2D, y: number): void {
+    const s = `DEFENSE: ${this.dcNote}`;
+    const w = textWidth(g, s) + 16;
+    g.fillStyle = 'rgba(40,28,6,0.85)';
+    g.fillRect(Math.round(VIEW_W / 2 - w / 2), y - 3, Math.round(w), 14);
+    text(g, s, VIEW_W / 2, y, { align: 'center', color: '#ffd23f' });
+  }
+
   /** A light pre-snap hint so the user learns to read the shell themselves. */
   private shellRead(): string {
     const play = this.play!;
@@ -2338,7 +2426,11 @@ export class Game {
     const walked = play.def.filter((d) => d.role === 'LB' && d.pos.x < play.los + 3).length;
     const press = play.def.filter((d) => d.press).length;
     const shell = deep >= 2 ? 'TWO HIGH' : deep === 1 ? 'SINGLE HIGH' : 'NO DEEP SAFETY';
-    return `${shell}${walked ? '  LBS WALKED UP' : ''}${press ? `  ${press} PRESSED` : ''}`;
+    // The front and the box count are there to see; so is a defender sitting in the middle on the QB.
+    const front = play.defCall.front === 'goal' ? '  GOAL LINE' : play.defCall.front === 'bear' ? '  BEAR FRONT' : '';
+    const box = play.def.filter((d) => d.pos.x < play.los + 6 && Math.abs(d.pos.y - play.ballY) < 7).length;
+    const spy = play.def.some((d) => d.assign?.kind === 'spy') ? '  SPY' : '';
+    return `${shell}${front}${box >= 8 ? `  ${box} IN THE BOX` : ''}${walked ? '  LBS WALKED UP' : ''}${press ? `  ${press} PRESSED` : ''}${spy}`;
   }
 
   private renderCall(g: CanvasRenderingContext2D): void {
@@ -2354,6 +2446,7 @@ export class Game {
       : 'CHOOSE A PLAY';
     const tip = hc ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.def.tip).toUpperCase() : fallback;
     text(g, tip, VIEW_W / 2, CALL_Y + 6, { size: 8, align: 'center', color: '#ffd23f' });
+    if (this.dcNote && this.callMode === 'normal') this.drawDcNote(g, CALL_Y - 16);
     if (!tabs.length) {
       const head = this.callMode === 'pat' ? 'POINT AFTER' : 'KICKOFF';
       text(g, head, VIEW_W / 2, TAB_Y + 3, { align: 'center', color: '#ffffff' });
@@ -2498,7 +2591,7 @@ export class Game {
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
         drawExhibition(
           g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`,
-          `CPU DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : `${this.exhibitionKeys.toUpperCase()} KEY PLAYS`}  (K)`, x, y,
+          `CPU DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : `${this.exhibitionKeys.toUpperCase()} KEY PLAYS`} (K)   DEFENSE IQ: ${this.exhibitionIq} (I)`, x, y,
         );
         break;
       case 'slots':

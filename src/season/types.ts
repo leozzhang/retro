@@ -41,6 +41,8 @@ export interface SeasonConfig {
    * the result only), `defense` for the CPU's drives in games the user plays (missing: normal).
    */
   keyPlays?: { sim?: KeyLevel; defense?: KeyLevel };
+  /** How much the CPU defense learns the user's offense in live games (game/defBrain.ts). Missing means NORMAL. */
+  defIq?: 'STATIC' | 'NORMAL' | 'SHARP';
 }
 
 export type KeyLevel = 'off' | 'lean' | 'normal' | 'full';

@@ -79,7 +79,7 @@ export const RATING_INFO: Record<RatingKey, RatingInfo> = {
   mcv: { label: 'Man Coverage', blurb: 'Staying with his man in man coverage, and jumping the throw.', effect: 'Reaction lag trailing a receiver in man; reaction to the throw in man', where: 'sim/ai.ts cover, Play.throwBall' },
   zcv: { label: 'Zone Coverage', blurb: 'Reacting to the throw when playing a zone.', effect: 'Reaction to the throw from a zone', where: 'Play.throwBall' },
   prs: { label: 'Press', blurb: 'Jamming a receiver at the line to throw off his route.', effect: 'Winning the jam at the line', where: 'game/playState.ts snap' },
-  prc: { label: 'Play Recognition', blurb: 'Reading runs, play action and pitches; jumping throws.', effect: 'Reading run, play action and pitches; run-fit timing; 40% of interception ball skills', where: 'game/playState.ts reactToRun, sellFake' },
+  prc: { label: 'Play Recognition', blurb: 'Reading runs, play action and tendencies; jumping throws.', effect: 'Reading run, play action and pitches; run-fit timing; 40% of interception ball skills; how much of the offense\'s tendencies a defender leans on in a game', where: 'game/playState.ts reactToRun, sellFake; game/defBrain.ts leansFor' },
   kpw: { label: 'Kick Power', blurb: 'Leg strength: distance on field goals, punts and kickoffs.', effect: 'Leg speed: distance on kicks and punts', where: 'sim/kicking.ts legSpeed' },
   kac: { label: 'Kick Accuracy', blurb: 'Kicking accuracy, and a wider sweet spot on the timing meter.', effect: 'Kick error and the width of the timing meter\'s green', where: 'sim/kicking.ts' },
 };
