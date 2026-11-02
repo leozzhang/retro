@@ -29,7 +29,8 @@ function ballFrame(kp: KickPlay): number {
   return Math.floor(k.t * rate) % 4;
 }
 
-export function drawKickPlay(g: CanvasRenderingContext2D, cam: Camera, kp: KickPlay, debug: boolean): void {
+/** `replay`: a key-play replay, the CPU kicking, so no timing meter. */
+export function drawKickPlay(g: CanvasRenderingContext2D, cam: Camera, kp: KickPlay, debug: boolean, replay = false): void {
   const presnap = kp.phase === 'presnap';
   if (debug) drawDebug(g, cam, kp);
 
@@ -77,7 +78,7 @@ export function drawKickPlay(g: CanvasRenderingContext2D, cam: Camera, kp: KickP
     g.globalAlpha = 1;
   }
 
-  drawTimingMeter(g, kp);
+  if (!replay) drawTimingMeter(g, kp);
   if (kp.unit === 'fg' || kp.unit === 'xp') drawGoalCam(g, kp);
 }
 

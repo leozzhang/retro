@@ -33,7 +33,7 @@ const PASS_YPP = 7;
 const RUSH_YPP = 4.5;
 const COMPLETION = 0.62;
 /** Share of a team's turnovers that are interceptions (the rest are fumbles). */
-const INT_SHARE = 0.55;
+export const INT_SHARE = 0.55;
 /** Base target share by slot, scaled by the receiver's overall. */
 export const TARGETS: Record<string, number> = { X: 0.25, Z: 0.21, SL: 0.18, TE: 0.15, RB: 0.11 };
 export const QB_RUN_SHARE: Record<string, number> = { pocket: 0.08, dual: 0.2, runner: 0.33 };

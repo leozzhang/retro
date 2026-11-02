@@ -278,7 +278,8 @@ export class KickPlay {
     return { ...this.kickSpot };
   }
 
-  private release(p: KickParams): void {
+  /** Kick with `p` (the user's drag, or a replay's CPU kicker). */
+  release(p: KickParams): void {
     this.queued = p;
     this.releaseTime = this.time;
     if (this.unit === 'fg' || this.unit === 'xp') {

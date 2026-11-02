@@ -18,10 +18,12 @@ export function clampCamX(x: number): number {
 export class Camera {
   x = 0;
   private targetX = 0;
+  /** Draw the world flipped end to end, so an offense attacking +x goes left on screen (the CPU's key plays). */
+  mirror = false;
 
-  /** Keep world x at `lead` fraction of the screen width from the left edge. */
+  /** Keep world x at `lead` fraction of the screen width from the side the play is going away from. */
   follow(worldX: number, lead = 0.35): void {
-    this.targetX = clampCamX(worldX - VIEW_YARDS * lead);
+    this.targetX = this.mirror ? clampCamX(FIELD_LEN - worldX - VIEW_YARDS * (1 - lead)) : clampCamX(worldX - VIEW_YARDS * lead);
   }
 
   update(dt: number, rate = 4): void {
@@ -33,10 +35,11 @@ export class Camera {
   }
 
   toScreen(x: number, y: number, z = 0): Vec {
-    return project(this.x, x, y, z);
+    return project(this.x, this.mirror ? FIELD_LEN - x : x, y, z);
   }
 
   toWorld(sx: number, sy: number): Vec {
-    return unproject(this.x, sx, sy);
+    const w = unproject(this.x, sx, sy);
+    return this.mirror ? { x: FIELD_LEN - w.x, y: w.y } : w;
   }
 }

@@ -4,7 +4,7 @@ import { teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
 import { QUARTER_DRIVES, QUARTER_OPTIONS } from './game/clock';
 import { KEY_LEVELS, KEY_PLAYS, pickDrive, pickGame, type KeyPlay } from './game/keyPlays';
-import { matches, ReplaySearch, runReplay, targetFor } from './game/replay';
+import { FgSearch, fgTargetFor, matches, ReplaySearch, runFg, runReplay, targetFor } from './game/replay';
 import { advanceWeek, defaultConfig, newSeason } from './season/season';
 import { simGame, simPart } from './season/simGame';
 import { autoGamePlan } from './season/staff';
@@ -145,6 +145,34 @@ describe('highlights', () => {
     expect(JSON.stringify(sides)).toBe(before);
     console.log(`replays matched ${found}/${tried}`, Object.entries(kinds).map(([k, [f, n]]) => `${k} ${f}/${n}`).join('  '));
     expect(found / tried).toBeGreaterThan(0.85);
+  }, 120_000);
+
+  it('field goals: always key plays, and replayed as a kick that is good or no good like the sim', () => {
+    const sides = { georgia: { team: uga.team, roster: onField(uga) }, alabama: { team: bama.team, roster: onField(bama) } };
+    let tried = 0;
+    let found = 0;
+    let missed = 0;
+    for (let seed = 1; seed <= 12; seed++) {
+      const story = newStory('georgia', 'alabama');
+      simGame(uga, bama, mulberry32(seed), { story });
+      const kicks = story.drives.flatMap((d) => d.plays.filter((p) => p.fg));
+      const picks = pickGame(story, 'lean').filter((k) => k.play.fg);
+      expect(picks.length).toBe(kicks.length);
+      for (const k of picks) {
+        const off = k.drive.off as 'georgia' | 'alabama';
+        const t = fgTargetFor(k, sides[off], sides[off === 'georgia' ? 'alabama' : 'georgia'])!;
+        const search = new FgSearch(t, 500 + tried);
+        while (!search.done) search.step(1000);
+        tried++;
+        if (!t.made) missed++;
+        if (!search.found) continue;
+        found++;
+        expect(runFg(t, search.found).outcome?.result).toBe(t.made ? 'fgGood' : 'fgMiss');
+      }
+    }
+    console.log(`field goals matched ${found}/${tried} (${missed} misses)`);
+    expect(missed).toBeGreaterThan(0);
+    expect(found / tried).toBeGreaterThan(0.9);
   }, 120_000);
 
   it('the teams in these tests are close enough to be a fair sample', () => {

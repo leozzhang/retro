@@ -10,7 +10,7 @@ import { teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
-import type { Vec3 } from '../engine/math';
+import { mulberry32, type Vec3 } from '../engine/math';
 import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
@@ -62,7 +62,7 @@ import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
-import { driveLog, simPart } from '../season/simGame';
+import { driveLog, INT_SHARE, simPart } from '../season/simGame';
 import { newStory, type StoryDrive } from '../season/story';
 import type { BoxScore, DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
 import { drawShow, keyShow, prefetchShow, updateShow, type KeyShow, type ShowCtx } from './highlights';
@@ -773,7 +773,7 @@ export class Game {
     }
     const next = this.notices[1]?.show;
     if (next) prefetchShow(next);
-    if (updateShow(this.notices[0].show!, dt, this.cam)) this.nextNotice();
+    if (updateShow(this.notices[0].show!, dt)) this.nextNotice();
   }
 
   // ------------------------------------------------------------ season hub
@@ -2093,6 +2093,9 @@ export class Game {
         off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
         start, result: sim.result, points: sim.points, plays, credit: { catches: [], runs: [] },
       };
+      // No box score here, so a turnover is a pick or a fumble as the box score would split them, from
+      // the show's own draw: the game's random stream is untouched.
+      if (sim.result === 'TURNOVER') d.credit.int = mulberry32((start * 7919 + plays.length * 131 + this.score.user * 17 + this.score.cpu) >>> 0)() < INT_SHARE;
       this.queueShows(pickDrive(d, level, 'defense'));
     }
     const { halfOver } = advanceSim(c, sim.secs);
@@ -2202,7 +2205,7 @@ export class Game {
     }
     const show = this.screen === 'notice' ? this.notices[0]?.show : undefined;
     if (show && this.showCtx) {
-      drawShow(g, this.cam, show, this.showCtx, this.crowd!, this.debug);
+      drawShow(g, show, this.showCtx, this.crowd!, this.debug);
       return;
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);

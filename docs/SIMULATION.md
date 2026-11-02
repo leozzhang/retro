@@ -52,8 +52,8 @@ Each snap of a drive gets a priority:
 
 | Priority | Snaps |
 | --- | --- |
-| 3, always shown | touchdowns, turnovers, fourth-down stops, made field goals (simulated games only) |
-| 2 | big plays (20+), fourth-down conversions, third downs converted from 7+; on defense, also stops, sacks, red-zone stops and missed field goals |
+| 3, always shown | touchdowns, turnovers, fourth-down stops, field goals made or missed |
+| 2 | big plays (20+), fourth-down conversions, third downs converted from 7+; on defense, also stops, sacks and red-zone stops |
 | 1, FULL only | other third downs, sacks, 12+ gains |
 
 Fourth-down tries aren't logged by the drive sim, so they're rebuilt from the gaps between snaps.
@@ -88,10 +88,16 @@ It then runs the engine headless with `autoStep`, a per-step CPU QB and runner. 
 - the same kind: TD, INT (never a pick six), sack, or a gain within `max(3, 25%)` with the same first-down result
 - the ball going to the credited player's slot, so the replay names the player the box score credits
 
-**Rate:** about 98% of key plays match between close teams (the test requires 85%). The rest, kicks and lost fumbles show as a card: the ball slides the sim's yards under the same caption.
+**Field goals** replay as kicks (`FgSearch`): the CPU kicker, in calm air, tries a power and line drawn from the seed and stops the meter at a drawn spot (near the middle for a make, early or late for a miss). A try matches when it's good or no good like the sim's (never blocked). The screen hides the timing meter and keeps the goal cam.
+
+**Lost fumbles:** the play engine never loses a fumble, so the replay is a run or catch tackled on the sim's spot (`want: 'fumble'`). After the play is over, `Play.knockLoose` pops the ball out and the nearest free defender falls on it (`recoverer`); the caption names him. A CPU drive in a played game has no box score, so its turnover is split into a pick or a fumble at `INT_SHARE` by the show's own draw.
+
+**Rate:** about 97% of key plays match between close teams (the test requires 85%; fumbles 8 of 8), and every field goal in the test sample (48 of 48, 12 of them misses; it requires 90%). The rest show as a card: the ball slides the sim's yards under the same caption.
 
 **Screen:**
-- the offense always attacks right, with the end zones swapped for the CPU
+- the field is the played game's (your end zone on the left): your offense attacks right, and the CPU's attacks left through a mirrored camera (`Camera.mirror`; the replay itself still runs toward +x)
+- each key play has its own camera that starts on its spot, so the view cuts between plays instead of panning; the card's ball stays on the spot until the card shows
+- a scorer runs on a few yards into the end zone (`TD_RUN_THROUGH`, `sim/ai.ts`, after the play is over, so outcomes don't change) and the caption waits `SHOW.tdRun`
 - captions use the sim's yards
 - Space skips one, Esc skips the rest
 
@@ -99,5 +105,5 @@ It then runs the engine headless with `autoStep`, a per-step CPU QB and runner. 
 - No mid-game "sim the rest".
 - A drive continued at the quarter break starts a new set of downs.
 - Ties in a partly played game still go to `settleTie`.
-- Kicks (field goals, punts) never get replays.
+- Punts never show, and extra points aren't key plays.
 - Replays between very uneven teams match less often, so more of them are cards.

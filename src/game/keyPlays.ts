@@ -82,10 +82,8 @@ function withFourthDowns(d: StoryDrive): SimPlay[] {
 function classify(d: StoryDrive, p: SimPlay, last: boolean, view: KeyView): { kind: KeyKind; priority: number } | null {
   const T = KEY_PLAYS;
   const dfn = view === 'defense';
-  if (p.fg) {
-    if (p.fg.made) return dfn ? null : { kind: 'fg', priority: 3 };
-    return { kind: 'missedFg', priority: dfn ? 2 : 1 };
-  }
+  // Field goals are scoring plays, made or missed: always shown.
+  if (p.fg) return { kind: p.fg.made ? 'fg' : 'missedFg', priority: 3 };
   if (p.punt) return null;
   if (p.turnover) return { kind: d.credit.int === false ? 'fumble' : 'int', priority: 3 };
   if (p.yard + p.gain >= 100) return { kind: 'td', priority: 3 };
@@ -158,9 +156,6 @@ export const KEY_TITLE: Record<KeyKind, string> = {
   explosive: 'BIG PLAY', thirdConv: '3RD DOWN CONVERSION', thirdStop: 'STOPPED ON 3RD DOWN', redZoneStop: 'RED ZONE STOP',
   sack: 'SACK', fg: 'FIELD GOAL', missedFg: 'FIELD GOAL NO GOOD', gain: 'NICE GAIN',
 };
-
-/** Kinds that never get an on-field replay: kicks, and fumbles (the field can't make a lost fumble). */
-export const CARD_ONLY = new Set<KeyKind>(['fg', 'missedFg', 'fumble']);
 
 const ORD = ['1ST', '2ND', '3RD', '4TH'];
 

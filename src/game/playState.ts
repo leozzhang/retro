@@ -130,6 +130,8 @@ export class Play {
   snapTime = 0;
   overTime = 0;
   carrier: Player | null = null;
+  /** Only for show: the defender falling on a ball knocked loose after the play (`knockLoose`). */
+  recoverer: Player | null = null;
   /** The player the user is steering (QB pre-throw, ball carrier after a catch). */
   controlled: Player | null = null;
   aim: Aim | null = null;
@@ -413,6 +415,7 @@ export class Play {
       case 'over':
         this.overTime += dt;
         if (this.ball.state === 'bounce') updateBounce(this.ball, dt);
+        if (this.recoverer) this.updateRecovery();
         break;
       default:
         break;
@@ -672,6 +675,34 @@ export class Play {
       return;
     }
     this.end({ type: 'fumble', spot, spotY: at.y, text: 'FUMBLE', sub: `${sub}. Offense recovers`, color: '#ff9a5a' });
+  }
+
+  /**
+   * Only for show, after the play is over: the ball pops out of the tackled carrier and the nearest
+   * defender on his feet goes and falls on it. A key-play replay uses it to show the sim's lost
+   * fumble, which the play engine itself never produces. The outcome is already set, so nothing changes.
+   */
+  knockLoose(): void {
+    const c = this.carrier;
+    if (this.phase !== 'over' || !c || this.recoverer) return;
+    const at = this.ball.pos;
+    const up = this.def.filter((d) => !d.down && !d.engaged);
+    this.recoverer = (up.length ? up : this.def).reduce((a, b) => (dist(b.pos, at) < dist(a.pos, at) ? b : a));
+    this.carrier = null;
+    this.ball.carrier = null;
+    this.ball.state = 'bounce';
+    const ang = this.rng() * Math.PI * 2;
+    this.ball.vel = { x: Math.cos(ang) * 3, y: Math.sin(ang) * 3, z: 4 };
+    this.ball.pos = { ...at, z: Math.max(0.6, at.z) };
+  }
+
+  private updateRecovery(): void {
+    const r = this.recoverer!;
+    if (this.carrier === r || this.ball.pos.z > 0.8 || dist(r.pos, this.ball.pos) > 1) return;
+    knockDown(r);
+    this.carrier = r;
+    this.ball.carrier = r;
+    this.ball.state = 'held';
   }
 
   /** Current aim point while dragging, for the trajectory preview. */

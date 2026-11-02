@@ -57,6 +57,13 @@ Design and numbers are in [SIMULATION.md](SIMULATION.md).
     - X in watch mode (week advanced and saved, then the final and back to the hub)
     - the exhibition line
   - Not played by hand yet.
+- **Key-play fixes (same day):**
+  - The CPU's key plays now go left, as in a played game, through a mirrored camera (`Camera.mirror`). The field always has your end zone on the left.
+  - The ball no longer slides forward and jumps back while a key play looks for its replay.
+  - Each show cuts to its spot instead of panning there.
+  - A scorer now runs into the end zone before the TOUCHDOWN caption. This also applies to live games, after the play is over, and `balance.txt` is unchanged.
+  - Lost fumbles replay on the field: a tackle on the sim's spot, then the ball knocked loose and recovered (`Play.knockLoose`, after the play). The CPU's turnovers in a played game used to always show as interceptions; they're now split into picks and fumbles.
+  - Field goals, made or missed, are always key plays now (in sims and on CPU drives) and replay as a real kick by the CPU kicker, matched to the sim's result (`FgSearch`; 48/48 in the test).
 - **Flag (not tuned):** a whole game simulated on the live clock scores about 9-11 points a team, against 26 in SIM GAME. Favorites win 3-7 points less often (PARTIAL SIM in `season.txt`). It's the same gap as "live games score less" below.
 
 ## Done: UI pass 1: main menu, dynasty slots, the hub's sidebar (2026-11-01)

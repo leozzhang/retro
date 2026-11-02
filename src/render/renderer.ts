@@ -148,7 +148,7 @@ function drawAim(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
 
 export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean): void {
   const s = cam.toScreen(p.pos.x, p.pos.y);
-  const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), p.facing);
+  const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), (cam.mirror ? -p.facing : p.facing) as 1 | -1);
   g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
 }
 
