@@ -20,10 +20,11 @@ import { isEligible } from './sim/player';
 import { DRAW_SET } from './sim/runBlocking';
 import { TACKLE_RANGE } from './sim/tackling';
 
+/** No keys, except that the harness user holds sprint (a receiver after the catch runs on the sprint bar). */
 export const fakeInput = {
   mouse: { x: 0, y: 0, downX: 0, downY: 0, down: false, pressed: false, released: false, rpressed: false, wheel: 0 },
   axis: () => ({ x: 0, y: 0 }),
-  isDown: () => false,
+  isDown: (...codes: string[]) => codes.includes('ShiftLeft'),
   hit: () => false,
   endStep: () => {},
 } as unknown as Input;

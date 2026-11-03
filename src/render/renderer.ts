@@ -6,10 +6,22 @@ import { facingQB } from '../sim/ai';
 import { flightPos, passParams } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
 import { endurance, isEligible, poseOf, type Player } from '../sim/player';
+import { laneScores, levered } from '../sim/runBlocking';
 import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite } from './sprites';
 import { text } from './text';
 
 const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
+
+/** Daylight on the field for the runner (the RUN ASSIST setting): always, only until the handoff, or never. */
+export type RunAssist = 'FULL' | 'LIGHT' | 'OFF';
+
+/**
+ * Block reads under each engaged defender: past `even` rating points of edge a block shows as won
+ * (green) or lost (red), and past `shed` a losing block flickers (he's about to get off it).
+ * Daylight shows lanes no defender can get to for `laneMin` s, full at `laneFull` s, `laneLen` yd long
+ * past the LOS, eased by `laneEase` a frame.
+ */
+const BLOCK_READ = { even: 3, shed: 8, laneMin: 0.35, laneFull: 0.8, laneLen: 3, laneEase: 0.25 };
 
 export function drawLines(g: CanvasRenderingContext2D, cam: Camera, los: number, firstDownX: number): void {
   const top = cam.toScreen(0, 0).y;
@@ -104,6 +116,81 @@ function drawDebug(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
   text(g, `DEF: ${play.defCall.name} (${play.defPackage.toUpperCase()})`, 6, 330, { size: 8, color: '#ffb3b3' });
 }
 
+/** The runner the daylight is for: the back before the handoff on a run, the user's carrier at the line after it. */
+function laneRunner(play: Play, assist: RunAssist): Player | null {
+  if (assist === 'OFF') return null;
+  if (play.phase === 'live' && play.playDef.block === 'run' && !play.handedOff && play.time - play.snapTime > 0.15) return play.rb;
+  if (assist === 'LIGHT') return null;
+  const c = play.carrier;
+  if (play.phase === 'run' && c && c.side === 'off' && !play.thrown && c.pos.x < play.los + 1) return c;
+  return null;
+}
+
+/** Smoothed daylight per lane (keyed by half yards across), so lanes fade in and out instead of flickering. */
+const laneGlow = new WeakMap<Play, Map<number, number>>();
+
+function drawLanes(g: CanvasRenderingContext2D, cam: Camera, play: Play, assist: RunAssist): void {
+  let glow = laneGlow.get(play);
+  if (!glow) laneGlow.set(play, (glow = new Map()));
+  const runner = laneRunner(play, assist);
+  const now = new Map<number, number>();
+  if (runner) for (const l of laneScores(play, runner)) now.set(Math.round(l.y * 2), Math.max(0, Math.min(1, (l.open - BLOCK_READ.laneMin) / (BLOCK_READ.laneFull - BLOCK_READ.laneMin))));
+  for (const k of new Set([...glow.keys(), ...now.keys()])) {
+    const a = (glow.get(k) ?? 0) + ((now.get(k) ?? 0) - (glow.get(k) ?? 0)) * BLOCK_READ.laneEase;
+    if (a < 0.02) {
+      glow.delete(k);
+      continue;
+    }
+    glow.set(k, a);
+    const y = k / 2;
+    // A streak from the line downfield, fading out along its length.
+    for (let i = 0; i < 3; i++) {
+      const x0 = cam.toScreen(play.los + (i * BLOCK_READ.laneLen) / 3, y - 0.25);
+      const x1 = cam.toScreen(play.los + ((i + 1) * BLOCK_READ.laneLen) / 3, y + 0.25);
+      g.fillStyle = `rgba(190,255,205,${(a * 0.65 * (3 - i)) / 3})`;
+      g.fillRect(Math.round(Math.min(x0.x, x1.x)), Math.round(x0.y), Math.round(Math.abs(x1.x - x0.x)), Math.max(2, Math.round(x1.y - x0.y)));
+    }
+  }
+}
+
+/**
+ * Who's winning each block: a ring under the defender (green: the blocking is winning, gold: even,
+ * red: he's beating it, flickering when he's about to shed; two rings for a double team), and on run
+ * blocks a bar on the blocker's side of him, bright when the runner is on that side (he's walled off).
+ */
+function drawBlocks(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
+  const run = play.runBlocking() || play.phase === 'run';
+  const c = play.carrier?.side === 'off' && play.carrier !== play.qb ? play.carrier : play.rb;
+  g.lineWidth = 1;
+  for (const d of play.def) {
+    const n = d.engagedBy.length;
+    if (!n || d.down) continue;
+    const s = cam.toScreen(d.pos.x, d.pos.y);
+    const pw = d.blockPower;
+    const col = pw < -BLOCK_READ.even ? '92,255,122' : pw > BLOCK_READ.even ? '255,90,90' : '255,210,63';
+    const fade = pw > BLOCK_READ.shed && Math.floor(play.time * 8) % 2 === 0 ? 0.3 : 0.85;
+    g.strokeStyle = `rgba(${col},${fade})`;
+    for (let i = 0; i < Math.min(n, 2); i++) {
+      g.beginPath();
+      g.ellipse(Math.round(s.x), Math.round(s.y), 6 + i * 2.5, 2.2 + i, 0, 0, Math.PI * 2);
+      g.stroke();
+    }
+    if (run && d.blockDir) {
+      const bd = d.blockDir;
+      const m = { x: d.pos.x + bd.x * 0.55, y: d.pos.y + bd.y * 0.55 };
+      const a = cam.toScreen(m.x - bd.y * 0.6, m.y + bd.x * 0.6);
+      const b = cam.toScreen(m.x + bd.y * 0.6, m.y - bd.x * 0.6);
+      g.strokeStyle = levered(d, c.pos) ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.35)';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(Math.round(a.x), Math.round(a.y));
+      g.lineTo(Math.round(b.x), Math.round(b.y));
+      g.stroke();
+      g.lineWidth = 1;
+    }
+  }
+}
+
 export function drawShadow(g: CanvasRenderingContext2D, x: number, y: number, w: number): void {
   g.fillStyle = 'rgba(0,0,0,0.28)';
   g.beginPath();
@@ -149,13 +236,26 @@ function drawAim(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
 export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean): void {
   const s = cam.toScreen(p.pos.x, p.pos.y);
   const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), (cam.mirror ? -p.facing : p.facing) as 1 | -1);
+  if (p.juke > 0) {
+    // A cut leaves fading afterimages behind him.
+    for (let i = 3; i >= 1; i--) {
+      const gs = cam.toScreen(p.pos.x - p.vel.x * i * 0.05, p.pos.y - p.vel.y * i * 0.05);
+      g.globalAlpha = 0.6 - i * 0.15;
+      g.drawImage(spr, Math.round(gs.x - ANCHOR_X), Math.round(gs.y - ANCHOR_Y));
+    }
+    g.globalAlpha = 1;
+  }
   g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
 }
 
-/** `replay`: a key-play replay, the CPU on both sides, so none of the user's aids (routes, ring, handoff hint). */
-export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean, replay = false): void {
+/**
+ * `replay`: a key-play replay, the CPU on both sides, so none of the user's aids (routes, ring, handoff
+ * hint, daylight). `assist` is the RUN ASSIST setting.
+ */
+export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean, replay = false, assist: RunAssist = 'FULL'): void {
   const presnap = play.phase === 'presnap';
   if (presnap && !replay) drawRoutePreview(g, cam, play);
+  if (!replay) drawLanes(g, cam, play, assist);
   if (debug) drawDebug(g, cam, play);
 
   // Controlled player ring
@@ -200,6 +300,7 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
       g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
     }
   }
+  drawBlocks(g, cam, play);
   if (ball.state === 'dead' && !ball.carrier) {
     const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
     g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));

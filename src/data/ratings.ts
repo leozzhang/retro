@@ -57,10 +57,10 @@ export interface RatingInfo {
 
 export const RATING_INFO: Record<RatingKey, RatingInfo> = {
   spd: { label: 'Speed', blurb: 'Top speed. Also helps a defender fight through blocks.', effect: 'Top speed (4.8 + 4.2·spd/100 yd/s); 30% of a defender\'s power against blocks', where: 'sim/player.ts maxSpeed' },
-  acc: { label: 'Acceleration', blurb: 'How quickly he hits full speed off the snap and out of cuts.', effect: 'How fast he reaches top speed', where: 'sim/player.ts accelOf' },
+  acc: { label: 'Acceleration', blurb: 'How quickly he hits full speed off the snap and out of cuts.', effect: 'How fast he reaches top speed; half of a back\'s cut distance', where: 'sim/player.ts accelOf, cutSpeed' },
   str: { label: 'Strength', blurb: 'Breaking tackles, falling forward, and anchoring blocks.', effect: 'Breaking tackles (40% of the carrier side), falling forward, and 20% of a blocker\'s anchor', where: 'sim/tackling.ts, blockValue' },
   sta: { label: 'Stamina', blurb: 'How long he can hold a full sprint, and how fast it comes back.', effect: 'How long a full sprint lasts and how fast it recovers', where: 'sim/player.ts endurance' },
-  elu: { label: 'Elusiveness', blurb: 'Making tacklers miss when he has the ball.', effect: 'Making tacklers miss (60% of the carrier side)', where: 'sim/tackling.ts tackleChance' },
+  elu: { label: 'Elusiveness', blurb: 'Making tacklers miss when he has the ball.', effect: 'Making tacklers miss (60% of the carrier side, and mid-cut); half of a back\'s cut distance', where: 'sim/tackling.ts tackleChance, jukeTackleMul; sim/player.ts cutSpeed' },
   cth: { label: 'Catching', blurb: 'Hands on catches, pitches and kicks. On defense, ball skills.', effect: 'Hands on open catches, pitches and kicks; a defender\'s ball skills on interceptions', where: 'sim/catching.ts' },
   cit: { label: 'Catch in Traffic', blurb: 'Winning the ball when a defender is right there with him.', effect: 'Share of a contested ball', where: 'sim/catching.ts catchOdds' },
   rte: { label: 'Route Running', blurb: 'Sharp breaks: bursting out of cuts and settling open.', effect: 'Burst off the line and out of breaks, speed kept through cuts, settling to face the QB', where: 'sim/ai.ts runRoute, cutKeep' },

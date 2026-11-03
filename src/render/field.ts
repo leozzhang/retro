@@ -43,8 +43,8 @@ export function makeCrowd(home: Team, away: Team): HTMLCanvasElement {
 }
 
 export function drawField(g: CanvasRenderingContext2D, cam: Camera, home: Team, away: Team, crowd: HTMLCanvasElement): void {
-  const sx = (x: number) => Math.round((x - cam.x) * PPY_X);
-  const sy = (y: number) => Math.round(FIELD_TOP_PX + y * PPY_Y);
+  const sx = (x: number) => Math.round(cam.spreadX((x - cam.x) * PPY_X));
+  const sy = (y: number) => Math.round(cam.spreadY(FIELD_TOP_PX + y * PPY_Y));
   const top = sy(0);
   const bot = sy(FIELD_W);
 

@@ -279,7 +279,7 @@ export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number,
     drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER / ESC: BACK TO THE HUB');
     return;
   }
-  text(g, 'MORE OPTIONS ARE COMING', VIEW_W / 2, y + 30, { align: 'center', color: DIM, shadow: false });
+  if (y + 40 < GO_BTN.y) text(g, 'MORE OPTIONS ARE COMING', VIEW_W / 2, y + 30, { align: 'center', color: DIM, shadow: false });
   goButton(g, 'START DYNASTY', inBox(GO_BTN, mx, my));
   drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER: START   ESC: BACK');
 }

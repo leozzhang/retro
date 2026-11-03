@@ -82,6 +82,7 @@ Controls are listed in [README.md](README.md).
   - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd`; the kick timing meter `METER_HALF`, `MISTIME_DIR`, `MISTIME_CURVE`, `GREEN_BASE`, `GREEN_KAC` (`sim/kicking.ts`)
   - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `ST_SPEED_GAP`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)
   - sprint: `SPRINT_TIME`, `SPRINT_RECOVER` (`game/playState.ts`), scaled by `endurance` (`sim/player.ts`)
+  - the user's runner: `JOG_SPEED`, patience and the slide `RUN_CTRL` (`game/playState.ts`); the cut `JUKE` (`sim/player.ts`), `JUKE_WHIFF` (`sim/tackling.ts`), the auto-runner's `AUTO_JUKE` (`sim/ai.ts`); the run camera's spread and slow motion `RUN_ZOOM` (`game/game.ts`); block rings and daylight `BLOCK_READ` (`render/renderer.ts`)
   - key plays: `KEY_PLAYS` (`game/keyPlays.ts`), `REPLAY` (`game/replay.ts`), `SHOW` (`game/highlights.ts`)
   - season: `DRIVE_SIM` (`game/rules.ts`, also the live game's CPU drives), `GAME_SIM`, `TARGETS`, `QB_RUN_SHARE` (`season/simGame.ts`), all fit to real FBS scores (SEASON.md); `AP_WEIGHTS`, `CFP_WEIGHTS` (`season/polls.ts`), `AWARDS` (`season/awards.ts`), `UPSET_GAP` (`season/news.ts`), scheme pass shares (`season/staff.ts`)
   - progression: `GRADES` (including the fitted expected success rate), `TAG`, `ROTATION`, `PACKAGES`, `PAIRS` (`season/grades.ts`); `PROGRESSION` (including `atPotential`, the soft potential ceiling), `DEV_XP`, `YEAR_XP`, `GROWTH_RATE` (`season/progression.ts`); `BREAKOUT_NEWS` (`season/season.ts`)

@@ -343,6 +343,7 @@ export function runEngagement(play: Play, d: Player): number {
   // A lineman sitting on the run gets off the ball into it (`LEAN_FX.surge`).
   const surge = d.role === 'DL' ? Math.max(0, d.lean.run) * LEAN_FX.surge : 0;
   const power = d.r.bsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll + surge;
+  d.blockPower = power;
   d.blockDir ??= norm(sub(d.engagedBy[0].pos, d.pos));
   let move: Vec;
   if (power > 0) {
@@ -374,27 +375,48 @@ export function levered(d: Player, at: Vec): boolean {
 }
 
 /**
- * Auto-runner lane: scan spots just past the LOS near the designed hole and take the one with
- * the most time to spare: how long the nearest defender needs to get there (blocked defenders
- * take longer, levered ones much longer) minus how long the back needs. Lateral cost is built in.
+ * A spot just past the LOS: `open`, how long until the first defender can get there (s), and `spare`,
+ * how much sooner the back gets there than that, capped at 1.5.
  */
-export function pickLane(play: Play, c: Player): number {
+export interface Lane {
+  y: number;
+  open: number;
+  spare: number;
+}
+
+/**
+ * Lanes near the designed hole for carrier `c`: spots just past the LOS every half yard, each with
+ * the time to spare there (how long the nearest defender needs to get there, with blocked defenders
+ * taking longer and levered ones much longer, minus how long the back needs). The auto-runner picks
+ * from these (`pickLane`); the renderer shows them as daylight.
+ */
+export function laneScores(play: Play, c: Player): Lane[] {
   const h = play.hole;
   const w = play.runScheme === 'gap' || play.runScheme === 'trap' ? GAP_READ_W : ZONE_READ_W;
   const lx = play.los + 0.5;
   const sp = maxSpeed(c);
-  let bestY = h.y;
-  let bestScore = -Infinity;
+  const lanes: Lane[] = [];
   for (let y = h.y - w; y <= h.y + w + 1e-6; y += 0.5) {
     if (y < 2 || y > 51.3) continue;
     const at = { x: lx, y };
     const mine = dist(c.pos, at) / sp;
-    let spare = 1.5;
+    let open = Infinity;
     for (const d of play.def) {
       if (d.down) continue;
       const slow = d.engagedBy.length ? (levered(d, at) ? 3.5 : 1.5) : 1;
-      spare = Math.min(spare, (dist(d.pos, at) * slow) / maxSpeed(d) - mine);
+      open = Math.min(open, (dist(d.pos, at) * slow) / maxSpeed(d));
     }
+    lanes.push({ y, open, spare: Math.min(1.5, open - mine) });
+  }
+  return lanes;
+}
+
+/** Auto-runner lane: the one with the most time to spare, less a small lateral cost, sticking with the last pick on a tie. */
+export function pickLane(play: Play, c: Player): number {
+  const h = play.hole;
+  let bestY = h.y;
+  let bestScore = -Infinity;
+  for (const { y, spare } of laneScores(play, c)) {
     const score = spare - Math.abs(y - h.y) * 0.02 + (Math.abs(y - play.laneY) < 0.01 ? 0.05 : 0);
     if (score > bestScore) {
       bestScore = score;

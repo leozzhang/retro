@@ -11,13 +11,13 @@ import { cutKeep, facingQB, isRusher, matchZones, returnerAI, seesThrow, thinkDe
 import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
 import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
-  accelOf, endurance, isEligible, knockDown, makePlayer, maxSpeed, seek, setPose, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
+  accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import {
   ARM_LEVERED, assignRunBlocks, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
-import { fallForward, TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import { fallForward, jukeTackleMul, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { matchDefense } from './matchups';
 import { alignY, resolvePlay, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
@@ -66,6 +66,14 @@ const ARM_TACKLE = 0.5;
 const SPRINT_TIME = { min: 1.15, max: 3.46 };
 /** Stamina regained per second off the sprint, least to most enduring. */
 const SPRINT_RECOVER = { min: 0.12, max: 0.18 };
+/** A user-controlled player's speed off the sprint, as a share of top speed: the sprint is the gear that hits the hole. */
+const JOG_SPEED = 0.74;
+/**
+ * The user's ball carrier at the line (run phase, less than `zone` yd past the LOS). With no input
+ * he coasts at `patience` of top speed on his heading instead of auto-driving downfield, and up or
+ * down alone slides him along the line with `slideX` of forward lean. Past it, no input runs downfield.
+ */
+const RUN_CTRL = { zone: 2, patience: 0.5, slideX: 0.25 };
 /** RB this close to the QB early on a play-action call sells the fake. */
 const FAKE_RANGE = 2;
 /** Chance the zone-read key crashes on the back; otherwise he stays home on the QB. */
@@ -131,7 +139,7 @@ export class Play {
   readonly qbDrop: Vec;
   /** Zone read: the backside end, left unblocked for the QB to read. */
   readonly readKey: Player | null = null;
-  private readonly rng: Rng;
+  readonly rng: Rng;
 
   phase: Phase = 'presnap';
   time = 0;
@@ -476,6 +484,7 @@ export class Play {
       for (const o of this.off) if (o.role === 'OL') o.mark = null;
     }
     this.updateEngagements(dt);
+    this.blockCut();
     for (const p of this.players) stepPlayer(p, dt);
     this.anchorBlockers();
     this.formEngagements();
@@ -890,8 +899,16 @@ export class Play {
       c.want = seek(c, this.qbDrop, maxSpeed(c) * 0.8, 0.8);
       return;
     }
-    // After the catch the carrier keeps running downfield unless told otherwise.
-    if (this.phase === 'run' && ax.x === 0) ax = { x: 1, y: ax.y };
+    // Space with W or S held: a back's hard cut up or down the screen on a called run (once a play).
+    if (this.canCut(c) && ax.y && input.hit('Space')) startJuke(c, Math.sign(ax.y));
+    // At the line a runner (not a receiver after the catch) can wait for a hole or slide along it;
+    // after that he keeps running downfield unless told otherwise.
+    const atLine = this.phase === 'run' && c === this.carrier && !this.thrown && c.pos.x < this.los + RUN_CTRL.zone;
+    let patient = false;
+    if (this.phase === 'run' && ax.x === 0) {
+      if (atLine && ax.y === 0) patient = true;
+      else ax = { x: atLine ? RUN_CTRL.slideX : 1, y: ax.y };
+    }
 
     const moving = ax.x !== 0 || ax.y !== 0;
     const sprint = moving && input.isDown('ShiftLeft', 'ShiftRight') && c.stamina > 0.02;
@@ -899,7 +916,16 @@ export class Play {
     const drain = 1 / lerp(SPRINT_TIME.min, SPRINT_TIME.max, e * e);
     const recover = lerp(SPRINT_RECOVER.min, SPRINT_RECOVER.max, e);
     c.stamina = sprint ? Math.max(0, c.stamina - dt * drain) : Math.min(1, c.stamina + dt * recover);
-    const sp = maxSpeed(c) * (sprint ? 1 : 0.86) * (this.aim ? 0.6 : 1);
+    if (c.juke > 0) {
+      c.want = c.jukeVel;
+      return;
+    }
+    if (patient) {
+      const heading = len(c.vel) > 0.5 ? norm(c.vel) : { x: 1, y: 0 };
+      c.want = scale(heading, maxSpeed(c) * RUN_CTRL.patience);
+      return;
+    }
+    const sp = maxSpeed(c) * (sprint ? 1 : JOG_SPEED) * (this.aim ? 0.6 : 1);
     c.want = scale(norm(ax), sp);
   }
 
@@ -934,6 +960,27 @@ export class Play {
     }
   }
 
+  /** Only a back carrying on a called run can cut. */
+  canCut(c: Player): boolean {
+    return c === this.carrier && c.role === 'RB' && this.phase === 'run' && this.playDef.kind === 'run';
+  }
+
+  /** A cut stops short against anyone in its path: he can't dash through bodies (a collision, so it sets his velocity). */
+  private blockCut(): void {
+    const c = this.carrier;
+    if (!c || c.juke <= 0) return;
+    const dir = Math.sign(c.jukeVel.y);
+    for (const p of this.players) {
+      if (p === c || p.down) continue;
+      const ahead = (p.pos.y - c.pos.y) * dir;
+      if (ahead > 0 && ahead < JUKE.bump && Math.abs(p.pos.x - c.pos.x) < JUKE.bump * 0.8) {
+        c.juke = 0;
+        c.vel = { x: c.vel.x, y: c.vel.y * JUKE.exit };
+        return;
+      }
+    }
+  }
+
   private release(d: Player): void {
     for (const b of d.engagedBy) b.engaged = null;
     d.engagedBy = [];
@@ -956,6 +1003,7 @@ export class Play {
       const dir = norm(sub(d.goal ?? this.qb.pos, d.pos));
       const blk = d.engagedBy.reduce((s, b) => s + passBlockValue(b.r), 0) / n;
       const power = d.r.rsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * 15;
+      d.blockPower = power;
       const push = clamp(0.8 + power * 0.06, -0.8, 2.2);
       d.want = scale(dir, push);
       for (const b of d.engagedBy) b.want = scale(dir, push);
@@ -1009,12 +1057,22 @@ export class Play {
       const arm = t.engagedBy.length > 0;
       if (dist(t.pos, c.pos) > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
       const armOdds = arm ? ARM_TACKLE * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * armOdds) {
+      // Caught mid-cut by a man in front of him (or level): he bit on it.
+      const juked = !arm && c.juke > 0 && (t.pos.x - c.pos.x) * (c.side === 'off' ? 1 : -1) > -0.5;
+      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * armOdds * (juked ? jukeTackleMul(c.r.elu) : 1)) {
         this.tackled(c, t);
         return;
       }
       if (arm) {
         t.tackleCd = 1.0; // slipped the arm tackle; the blocker still has him
+        continue;
+      }
+      if (juked) {
+        // He whiffs and stumbles past, and the carrier keeps his legs.
+        knockDown(t, 0.6);
+        t.tackleCd = 1.6;
+        c.juke = 0;
+        this.popup('MADE HIM MISS!', c.pos, '#7dff7d');
         continue;
       }
       knockDown(t, 0.9);

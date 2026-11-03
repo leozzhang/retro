@@ -43,6 +43,8 @@ export interface SeasonConfig {
   keyPlays?: { sim?: KeyLevel; defense?: KeyLevel };
   /** How much the CPU defense learns the user's offense in live games (game/defBrain.ts). Missing means NORMAL. */
   defIq?: 'STATIC' | 'NORMAL' | 'SHARP';
+  /** Daylight for the runner in live games (render/renderer.ts `RunAssist`): always, until the handoff, or never. Missing means FULL. */
+  runAssist?: 'FULL' | 'LIGHT' | 'OFF';
 }
 
 export type KeyLevel = 'off' | 'lean' | 'normal' | 'full';

@@ -9,6 +9,16 @@ export function tackleChance(tkl: number, carrierElu: number, carrierStr: number
 }
 
 /**
+ * A tackler who closes during the carrier's juke (sim/player.ts `JUKE`) and isn't coming from behind:
+ * his odds are cut by up to `JUKE_WHIFF`, more by a more elusive carrier.
+ */
+export const JUKE_WHIFF = 0.55;
+
+export function jukeTackleMul(carrierElu: number): number {
+  return 1 - JUKE_WHIFF * clamp(0.3 + (0.7 * carrierElu) / 100, 0, 1);
+}
+
+/**
  * Open-field tackles in the kick return game. The skill gap is squeezed through a tanh, so an elite
  * returner gets a small edge, not a linear one: cover units are mostly offensive starters with
  * low tackle ratings, and the linear curve let elite returners shed them nearly every time.

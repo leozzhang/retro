@@ -2,7 +2,7 @@ import { FIELD_W, OPP_GOAL, STEP } from '../engine/constants';
 import { add, clamp, dist, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Assign } from '../data/defenses';
 import type { Play } from '../game/playState';
-import { isEligible, LEAN_FX, maxSpeed, seek, seekTimed, type Player } from './player';
+import { isEligible, LEAN_FX, maxSpeed, seek, seekTimed, startJuke, type Player } from './player';
 import { pickLane, runBlock } from './runBlocking';
 
 const ZERO: Vec = { x: 0, y: 0 };
@@ -602,10 +602,33 @@ function robber(play: Play, d: Player): void {
  * harness): read the line for the best crease near the designed hole, hit it,
  * then get downfield, sliding away from tacklers.
  */
+/**
+ * The auto-runner's cut (a back on a called run, one a play, like the user's): a free defender in front closing inside
+ * `range` yd draws it with odds `chance` (a fair user, not a perfect one); a pass on it waits `retry`
+ * s before the next look.
+ */
+export const AUTO_JUKE = { range: 2, chance: 0.5, retry: 0.5 };
+
 export function autoRun(play: Play, c: Player): void {
   if (c.down) {
     c.want = ZERO;
     return;
+  }
+  if (c.juke > 0) {
+    c.want = c.jukeVel;
+    return;
+  }
+  if (c.jukeCd <= 0 && c.pos.x > play.los - 1 && play.canCut(c)) {
+    for (const d of play.def) {
+      if (d.down || d.engagedBy.length || d.tackleCd > 0 || d.pos.x < c.pos.x - 0.5 || dist(d.pos, c.pos) > AUTO_JUKE.range) continue;
+      if (play.rng() < AUTO_JUKE.chance) startJuke(c, Math.sign(c.pos.y - d.pos.y) || 1);
+      else c.jukeCd = AUTO_JUKE.retry;
+      if (c.juke > 0) {
+        c.want = c.jukeVel;
+        return;
+      }
+      break;
+    }
   }
   let dir: Vec = { x: 1, y: 0 };
   if (c.pos.x < play.los + 1) {

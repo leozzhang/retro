@@ -2,7 +2,7 @@ import type { Assign } from '../data/defenses';
 import type { RouteName } from '../data/plays';
 import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
-import { add, clamp, len, limit, scale, sub, type Vec } from '../engine/math';
+import { add, clamp, len, lerp, limit, scale, sub, type Vec } from '../engine/math';
 import type { Pose, Uniform } from '../render/sprites';
 
 export type Side = 'off' | 'def';
@@ -106,6 +106,10 @@ export interface Player {
   stun: number;
   jam: number;
   manual: boolean;
+  /** Ball carrier: seconds left in a cut (`JUKE`), its velocity, and the cooldown until the next (the rest of the play). */
+  juke: number;
+  jukeVel: Vec;
+  jukeCd: number;
 
   // Defense
   assign: Assign | null;
@@ -123,6 +127,8 @@ export interface Player {
   blockDir: Vec | null;
   /** Run blocks: this block's luck, in rating points, rolled at contact. */
   blockRoll: number;
+  /** Run blocks: the defender's edge over his blockers last step (negative = the blockers are winning), for the renderer. */
+  blockPower: number;
   goal: Vec | null;
   /** Run fit window: from `fitAt` until `fitUntil` the defender attacks the run (run read or PA bite). */
   fitAt: number;
@@ -182,6 +188,9 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     stun: 0,
     jam: 0,
     manual: false,
+    juke: 0,
+    jukeVel: { x: 0, y: 0 },
+    jukeCd: 0,
     assign: null,
     manTarget: null,
     zoneMark: null,
@@ -193,6 +202,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     noEngage: 0,
     blockDir: null,
     blockRoll: 0,
+    blockPower: 0,
     goal: null,
     fitAt: Infinity,
     fitUntil: 0,
@@ -211,6 +221,36 @@ export function maxSpeed(p: Player): number {
  */
 export function endurance(p: Player): number {
   return clamp((p.r.sta - 60) / 35, 0, 1);
+}
+
+/**
+ * A back's cut on a called run (the user's Space with W or S): a near-instant dash sideways for `time`
+ * s, keeping `keep` of his forward speed, with `accel` times his acceleration so he's at full dash at
+ * once. Its speed runs from `speed.min` to `speed.max` yd/s over a cut skill (half `acc`, half `elu`)
+ * of `speed.lo` to `speed.hi`: about 1.5 yd for a fullback, 2 for an average back, 2.5 for an elite
+ * elusive one. When it ends he plants: his sideways speed drops to `exit` of it. It stops short
+ * against anyone within `bump` yd in its path (`Play.blockCut`). It costs `cost` of the sprint bar
+ * and can't come again for `cd` s (the rest of the play: one a play). A tackler who closes on him
+ * during it is fooled (`jukeTackleMul`, sim/tackling.ts); a cut with nobody there just loses ground.
+ */
+export const JUKE = {
+  time: 0.17, speed: { min: 9, max: 15, lo: 65, hi: 97 }, keep: 0.75, accel: 8, exit: 0.25, bump: 1, cost: 0.12, cd: Infinity,
+};
+
+/** His cut's sideways speed (yd/s), from his acceleration and elusiveness. */
+export function cutSpeed(p: Player): number {
+  const { min, max, lo, hi } = JUKE.speed;
+  return lerp(min, max, clamp(((p.r.acc + p.r.elu) / 2 - lo) / (hi - lo), 0, 1));
+}
+
+/** Start a cut to `dir` (-1 up the screen, 1 down) if he hasn't used it and has the legs. */
+export function startJuke(p: Player, dir: number): boolean {
+  if (p.down || p.jukeCd > 0 || p.stamina < JUKE.cost) return false;
+  p.juke = JUKE.time;
+  p.jukeVel = { x: Math.max(0, p.vel.x) * JUKE.keep, y: dir * cutSpeed(p) };
+  p.jukeCd = JUKE.cd;
+  p.stamina -= JUKE.cost;
+  return true;
 }
 
 export function accelOf(p: Player): number {
@@ -266,11 +306,14 @@ export function tickTimers(p: Player, dt: number): void {
   p.stun = Math.max(0, p.stun - dt);
   p.jam = Math.max(0, p.jam - dt);
   p.noEngage = Math.max(0, p.noEngage - dt);
+  if (p.juke > 0 && p.juke <= dt) p.vel = { x: p.vel.x, y: p.vel.y * JUKE.exit }; // the plant
+  p.juke = Math.max(0, p.juke - dt);
+  p.jukeCd = Math.max(0, p.jukeCd - dt);
 }
 
 export function stepPlayer(p: Player, dt: number): void {
   const want = p.down ? { x: 0, y: 0 } : p.want;
-  const decel = p.down ? 18 : accelOf(p);
+  const decel = p.down ? 18 : accelOf(p) * (p.juke > 0 ? JUKE.accel : 1);
   const dv = limit(sub(want, p.vel), decel * dt);
   p.vel = add(p.vel, dv);
   p.pos = add(p.pos, scale(p.vel, dt));
@@ -281,10 +324,17 @@ export function stepPlayer(p: Player, dt: number): void {
   p.anim += len(p.vel) * dt;
 }
 
+/** Block power (rating points) past which the winning side of a block shows the drive pose. */
+const BLOCK_POSE_WIN = 4;
+
 export function poseOf(p: Player, presnap: boolean): Pose {
   if (p.down) return 'down';
   if (p.pose) return p.pose;
   if (presnap && (p.role === 'OL' || p.role === 'DL')) return 'stance';
+  // Blocks: whoever's winning drives, an even block is locked up, a blocker who just got shed stumbles.
+  const fightingFor = p.engaged ? -p.engaged.blockPower : p.engagedBy.length ? p.blockPower : null;
+  if (fightingFor !== null) return fightingFor > BLOCK_POSE_WIN ? 'drive' : 'fight';
+  if (p.stun > 0 && p.side === 'off') return 'stumble';
   if (len(p.vel) < 0.6) return 'stand';
   const frames: Pose[] = ['run0', 'run1', 'run2', 'run3'];
   return frames[Math.floor(p.anim * 1.1) % 4];

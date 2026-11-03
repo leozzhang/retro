@@ -2,6 +2,78 @@
 
 _Last updated: 2026-11-02_
 
+## Done: run game revamp, part 1: control, reading the line (2026-11-02)
+Running was right-click, hold Shift and hope: the back got the ball already at speed and auto-driving downfield, W/S only gave a 45° drift, and the line drew as one pile.
+
+**The runner** (`userControl`, `game/playState.ts`):
+- **Jog:** off the sprint every user-controlled player runs at `JOG_SPEED` (0.74 of top speed, was 0.86), so the sprint is the gear that hits the hole.
+- **Patience:** after a handoff or on a designed QB run (not a receiver after the catch), within `RUN_CTRL.zone` (2 yd) of the LOS:
+  - with no key held he coasts at half speed on his heading instead of auto-driving downfield
+  - W or S alone slides him along the line
+- **Cut** (Space while holding W or S; only a back, RB or FB, carrying on a called run: `Play.canCut`; `JUKE`, `cutSpeed`, `sim/player.ts`):
+  - a near-instant dash sideways (9–15 yd/s for 0.17 s at 8× acceleration, by a cut skill of half `acc`, half `elu`: about 1.5 yd for a fullback, 2 for an average back, 2.5 for an elite elusive one), then a plant that kills most of the sideways speed; once a play, 12% of the sprint bar; fading afterimages show it
+  - it stops short against anyone within 1 yd in its path (`blockCut`), so it can't pass through bodies
+  - a tackler who closes mid-cut from in front or level has his odds cut by up to 55% (`jukeTackleMul`, by `elu`), stumbles, and the carrier keeps his speed (MADE HIM MISS!)
+  - a cut with nobody there just loses ground
+  - it replaced a first version on Q/E (a 6 yd/s hop with a 1.2 s cooldown), which looked like normal running
+
+**Reading the line:**
+- **Run camera** (`RUN_ZOOM`, `game/game.ts`; `Camera.setZoom`, `zoomFollow`, `spreadX/Y`): a called run (`kind: 'run'`) is zoomed for the whole snap, set when it's called with no easing in or out, and back to normal on the call screen and kicks. Positions spread 1.3× along and 1.9× across the field about a point easing after the ball. From the snap to the whistle it runs at 0.7 speed (`RUN_ZOOM.slow`, game clock included, like the aim slow-motion); this is to try out. The first version eased in at the snap and back out 5 yd past the line, which felt odd. Sprites keep their size, so the pixels stay crisp and the linemen come apart. `toScreen`, `toWorld` and the field all go through the spread. A plain magnify was tried first and still drew a pile.
+- **Block rings** (`drawBlocks`, `BLOCK_READ`; `blockPower` stored by `runEngagement` and the pass-pro step), drawn over the sprites:
+  - green under a defender the blocking is beating, gold for even, red when he's winning, flickering when he's about to shed; two rings for a double team
+  - on run blocks, a white bar on the blocker's side of him, bright when the runner is on that side (walled off, `levered`)
+- **Daylight:** `pickLane` is split into `laneScores` (each lane has `open`, how soon any defender can get there, and `spare`) and the pick, with the pick unchanged. Lanes no defender can reach for 0.35–0.8 s show as fading streaks past the LOS, smoothed per frame.
+- **RUN ASSIST setting** (FULL / LIGHT = until the handoff / OFF): `SeasonConfig.runAssist` (missing = FULL), a SETTINGS row, and L on the exhibition screen. Replays never show it.
+- **Poses:** `drive` (low, leaning in) for the winning side of a block, `fight` for an even one, `stumble` for a blocker who just got shed (`poseOf`).
+- New hint: `W/S STEER  +SPACE: CUT (ONCE)  SHIFT SPRINT  NO KEY: WAIT`. Controls are in the README.
+
+**Harness:**
+- The auto-runner cuts (once a play) on a free defender in front within 2 yd half the time (`AUTO_JUKE`), standing in for a fair user.
+- `fakeInput` now holds Shift: the harness user sprints with the ball after a catch. With the slower jog, a non-sprinting harness user dropped pass YAC from 3.7 to 1.9, which is not how anyone plays.
+
+**Measured** (`balance.txt` against the report regenerated just before; core = IZ, OZ, Power, Toss and Zone Read over the 3 core calls):
+
+| | Before | After |
+| --- | --- | --- |
+| Core runs YPC | 4.0 | 4.7 |
+| Core runs median | 2.8 | 2.8 |
+| Core runs stuffs | 12% | 13% |
+| Core runs 4+ | 28% | 31% |
+| Core runs 10+ | 10% | 12% |
+| All run rows YPC | 3.4 | 3.9 |
+| Pass rows ypp | 3.4 | 4.5 |
+| Pass rows YAC | 3.7 | 6.4 |
+
+- **The pass jump is the harness, not the game.** Old jog with a sprinting harness gives 4.8 ypp and 6.1 YAC, so for a user who sprints after the catch, the jog change is noise.
+- **ADAPT:**
+  - IZ only, STATIC: 3.8 → 4.1 (the cuts)
+  - against SHARP: 2.6, down 36%; at NORMAL DC 45: 3.1, down 24% (noisy: 31–49% the run before). Both were short of DEFENSE.md's 40% before too (−34% / −29%).
+  - quick only and screens rose with the sprinting harness (quick STATIC 4.1 → 6.6)
+  - balanced is about level with the DC (0.21 → 0.17–0.23 TDs a drive)
+- **SHORT** (3rd and 1) is within noise: Power 68–73% (was 69–78%), Iso 79–86%.
+
+**Checks:**
+- `npm test`: 284 pass, including 6 new in `runGame.test.ts`:
+  - the camera spread round trip and its fixed point
+  - the cut's odds bounds, and the cut on Space with W/S, its cost and once a play
+  - patience with no key, and the slide on W/S
+  - the auto-runner's pick coming from the shown lanes
+- Driven in headless Chrome over CDP on IZ and OZ: the rings, bars, daylight and spread render as described.
+- Not played by hand yet. `npm run season` not run (no season code changed).
+
+**Flags:**
+- **Pass rows' baseline moved** because the harness now sprints after the catch. The quick game and screens look stronger than in DEFENSE.md's tables; re-baseline or revisit.
+- **IZ spam** still loses only about 24–31% at NORMAL (target 40%+, already short before).
+- **Patience in hand play:** the CPU line closes on a back who waits too long. That's intended, but check by playing that the window feels right (`RUN_CTRL.patience`, `zone`).
+
+**Next (the rest of the plan):**
+- Visible drive and wash on winning blocks, with a puller trail and a combo-release flash (sim; rebalance).
+- A lead-blocker bonus for a back on the FB's or puller's hip, and a highlight on the nearest unblocked second-level defender.
+- A run grade popup (HIT THE HOLE, MISSED CUTBACK, INTO CONTAIN) from `laneScores`.
+- Juice: dust on cuts, shake on broken tackles.
+- Low stamina weakening cuts; carries in a row tiring the back.
+- A "skilled" auto-runner profile as a ceiling check.
+
 ## Done: a learning defense: playbook, identity dials, in-game DC and player anticipation (2026-11-02)
 Design, numbers and flags are in [DEFENSE.md](DEFENSE.md).
 

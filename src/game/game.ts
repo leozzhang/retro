@@ -14,7 +14,7 @@ import { mulberry32, type Vec3 } from '../engine/math';
 import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
-import { drawLines, drawPlay } from '../render/renderer';
+import { drawLines, drawPlay, type RunAssist } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
 import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
@@ -110,6 +110,8 @@ const playName = (id: string) => (PLAYBOOK.find((p) => p.id === id)?.name ?? id)
 
 /** How much the CPU defense learns your offense in a game (game/defBrain.ts). */
 const IQ_OPTIONS: DefenseIq[] = ['STATIC', 'NORMAL', 'SHARP'];
+/** Daylight for the runner (render/renderer.ts): always, until the handoff, or never. */
+const ASSIST_OPTIONS: RunAssist[] = ['FULL', 'LIGHT', 'OFF'];
 
 /**
  * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
@@ -147,6 +149,12 @@ const SETTINGS: {
     apply: (c, i) => (c.defIq = IQ_OPTIONS[i]),
     read: (c) => IQ_OPTIONS.indexOf(c.defIq ?? 'NORMAL'),
   },
+  {
+    label: 'RUN ASSIST', help: 'LANES SHOWN TO THE RUNNER: ALWAYS, UNTIL THE HANDOFF, OR NEVER',
+    options: ASSIST_OPTIONS, start: 0,
+    apply: (c, i) => (c.runAssist = ASSIST_OPTIONS[i]),
+    read: (c) => ASSIST_OPTIONS.indexOf(c.runAssist ?? 'FULL'),
+  },
 ];
 
 /** PLAY GAME's choices: the quarter the user takes over in (1 plays the whole game). */
@@ -166,6 +174,12 @@ interface Notice {
 
 /** Slow-motion while the QB is aiming. 1 = off. */
 const AIM_TIME_SCALE = 0.65;
+/**
+ * A called run is played zoomed in from the huddle to the whistle: the camera spreads the field `x`
+ * times along and `y` times across (sprites keep their size, so the line comes apart), and the snap
+ * runs at `slow` speed (game clock included) so the blocks can be read.
+ */
+const RUN_ZOOM = { x: 1.3, y: 1.9, slow: 0.7 };
 
 // Call screen layout: tip, playbook tabs, formation chips, then a 3x3 grid of cards.
 const CALL_Y = 92;
@@ -262,6 +276,7 @@ export class Game {
   private defTags: DefTags = {};
   private dcNote: string | null = null;
   private exhibitionIq: DefenseIq = 'NORMAL';
+  private exhibitionAssist: RunAssist = 'FULL';
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
@@ -311,6 +326,7 @@ export class Game {
 
   timeScale(): number {
     if (this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
+    if (this.screen === 'play' && this.play?.playDef.kind === 'run' && this.play.phase !== 'presnap' && this.play.phase !== 'over') return RUN_ZOOM.slow;
     if (this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
     return 1;
   }
@@ -464,6 +480,8 @@ export class Game {
     if (input.hit('KeyK')) cycleKeys();
     const cycleIq = () => (this.exhibitionIq = IQ_OPTIONS[(IQ_OPTIONS.indexOf(this.exhibitionIq) + 1) % IQ_OPTIONS.length]);
     if (input.hit('KeyI')) cycleIq();
+    const cycleAssist = () => (this.exhibitionAssist = ASSIST_OPTIONS[(ASSIST_OPTIONS.indexOf(this.exhibitionAssist) + 1) % ASSIST_OPTIONS.length]);
+    if (input.hit('KeyL')) cycleAssist();
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -484,8 +502,9 @@ export class Game {
       } else if (y >= 262 && y < 280) {
         this.qIdx = (this.qIdx + (x < VIEW_W / 2 ? nq - 1 : 1)) % nq;
       } else if (y >= 280 && y < 290) {
-        if (x < VIEW_W / 2) cycleKeys();
-        else cycleIq();
+        if (x < VIEW_W * 0.42) cycleKeys();
+        else if (x < VIEW_W * 0.62) cycleIq();
+        else cycleAssist();
       } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
@@ -1667,6 +1686,7 @@ export class Game {
     this.play = null;
     this.kick = null;
     this.applied = null;
+    this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
     // The CPU defense's identity: its own call mix (more zero blitz on third and long if that's who it is) and press rates.
     const ident = defIdentity(this.cpu);
     const toGo = this.drive.firstDownX - this.drive.los;
@@ -1693,6 +1713,11 @@ export class Game {
   }
 
   /** Where the ball sits between plays: the line of scrimmage, or the tee before a kickoff. */
+  /** The RUN ASSIST setting for this game: the dynasty's in a season game, the exhibition's otherwise. */
+  private runAssist(): RunAssist {
+    return this.seasonGame && this.season ? this.season.config.runAssist ?? 'FULL' : this.exhibitionAssist;
+  }
+
   private spotX(): number {
     return this.callMode === 'kickoff' ? KICKOFF_LINE : this.drive.los;
   }
@@ -1856,6 +1881,8 @@ export class Game {
     });
     this.flipCall = false;
     this.screen = 'play';
+    const run = def.kind === 'run';
+    this.cam.setZoom(run ? RUN_ZOOM.x : 1, run ? RUN_ZOOM.y : 1, { x: this.drive.los, y: this.drive.ballY });
   }
 
   /** The CPU defenders' play recognition, by slot, for their leans. */
@@ -1878,6 +1905,7 @@ export class Game {
   }
 
   private startKick(def: KickDef): void {
+    this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
     const kickoff = def.unit === 'kickoff';
     const place = def.unit === 'fg' || def.unit === 'xp';
     this.snapLev = place ? this.snapLeverage(true) : 0;
@@ -1950,6 +1978,7 @@ export class Game {
 
     const lead = play.aim ? 0.22 : play.phase === 'run' ? 0.4 : play.phase === 'air' ? 0.45 : 0.35;
     this.cam.follow(play.focusX(), lead);
+    if (play.playDef.kind === 'run') this.cam.zoomFollow(play.carrier?.pos ?? play.ball.pos);
 
     if (play.phase === 'over' && play.outcome) {
       if (!this.applied) {
@@ -2290,7 +2319,7 @@ export class Game {
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
     drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
     if (this.kick) drawKickPlay(g, this.cam, this.kick, this.debug);
-    else if (this.play) drawPlay(g, this.cam, this.play, this.debug);
+    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, false, this.runAssist());
     else this.drawBallSpot(g);
 
     const center = this.watchOnly ? 'FINAL' : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
@@ -2397,7 +2426,12 @@ export class Game {
         drawHint(g, play.pitch ? 'PITCH...' : 'BALL IN THE AIR...');
         break;
       case 'run':
-        drawHint(g, play.carrier?.side === 'off' ? 'W/S STEER  A SLOW  SHIFT SPRINT' : 'TACKLE HIM! (AI PURSUIT)');
+        drawHint(
+          g,
+          play.carrier?.side !== 'off' ? 'TACKLE HIM! (AI PURSUIT)'
+            : play.canCut(play.carrier) ? 'W/S STEER  +SPACE: CUT (ONCE)  SHIFT SPRINT  NO KEY: WAIT'
+            : 'W/S STEER  A SLOW  SHIFT SPRINT',
+        );
         break;
     }
   }
@@ -2591,7 +2625,7 @@ export class Game {
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
         drawExhibition(
           g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`,
-          `CPU DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : `${this.exhibitionKeys.toUpperCase()} KEY PLAYS`} (K)   DEFENSE IQ: ${this.exhibitionIq} (I)`, x, y,
+          `CPU DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : this.exhibitionKeys.toUpperCase()} (K)  DEF IQ: ${this.exhibitionIq} (I)  RUN ASSIST: ${this.exhibitionAssist} (L)`, x, y,
         );
         break;
       case 'slots':
