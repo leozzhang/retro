@@ -24,7 +24,7 @@ export type KeyView = 'defense' | 'sim';
 
 export type KeyKind =
   | 'td' | 'int' | 'fumble' | 'fourthConv' | 'fourthStop' | 'explosive' | 'thirdConv' | 'thirdStop'
-  | 'redZoneStop' | 'sack' | 'fg' | 'missedFg' | 'gain';
+  | 'redZoneStop' | 'sack' | 'fg' | 'missedFg' | 'gain' | 'twoPt' | 'twoPtStop';
 
 export interface KeyPlay {
   drive: StoryDrive;
@@ -82,6 +82,8 @@ function withFourthDowns(d: StoryDrive): SimPlay[] {
 function classify(d: StoryDrive, p: SimPlay, last: boolean, view: KeyView): { kind: KeyKind; priority: number } | null {
   const T = KEY_PLAYS;
   const dfn = view === 'defense';
+  // An overtime two-point try always shows: it can decide the game.
+  if (d.try) return { kind: d.points ? 'twoPt' : 'twoPtStop', priority: 3 };
   // Field goals are scoring plays, made or missed: always shown.
   if (p.fg) return { kind: p.fg.made ? 'fg' : 'missedFg', priority: 3 };
   if (p.punt) return null;
@@ -154,7 +156,7 @@ export function pickGame(story: GameStory, level: KeyLevel): KeyPlay[] {
 export const KEY_TITLE: Record<KeyKind, string> = {
   td: 'TOUCHDOWN', int: 'INTERCEPTION', fumble: 'FUMBLE', fourthConv: '4TH DOWN CONVERSION', fourthStop: 'STOPPED ON 4TH DOWN',
   explosive: 'BIG PLAY', thirdConv: '3RD DOWN CONVERSION', thirdStop: 'STOPPED ON 3RD DOWN', redZoneStop: 'RED ZONE STOP',
-  sack: 'SACK', fg: 'FIELD GOAL', missedFg: 'FIELD GOAL NO GOOD', gain: 'NICE GAIN',
+  sack: 'SACK', fg: 'FIELD GOAL', missedFg: 'FIELD GOAL NO GOOD', gain: 'NICE GAIN', twoPt: 'TWO-POINT TRY GOOD', twoPtStop: 'TWO-POINT TRY STOPPED',
 };
 
 const ORD = ['1ST', '2ND', '3RD', '4TH'];

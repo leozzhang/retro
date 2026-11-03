@@ -81,7 +81,7 @@ import { KickPlay } from './kickPlay';
 import { Play } from './playState';
 import { personnelOf } from './resolvePlay';
 import {
-  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, userStartAfter,
+  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, simTwoPoint, simulateDrive, startDrive, userStartAfter,
   type Applied, type Drive, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
@@ -265,6 +265,12 @@ export class Game {
   private play: Play | null = null;
   private kick: KickPlay | null = null;
   private callMode: CallMode = 'normal';
+  /**
+   * Overtime on the field (null in regulation): who has the ball first in the odd periods (the toss
+   * loser; the winner defers) and whose possession of the period this is. The period is the clock's
+   * quarter past the 4th.
+   */
+  private ot: { userFirst: boolean; turn: 0 | 1 } | null = null;
   private wind: Wind = CALM;
   private windQuarter = 1;
   /** Side-profile flight sketches for the kick cards, by kick id. */
@@ -694,6 +700,7 @@ export class Game {
     this.notices = [];
     this.partBox = null;
     this.watchOnly = false;
+    this.ot = null;
     this.score = { user: 0, cpu: 0 };
     // A dynasty's games use its own quarter length; exhibitions use the picker's.
     this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? 6 : QUARTER_OPTIONS[this.qIdx]);
@@ -796,8 +803,10 @@ export class Game {
     this.setupField(teamById(u), teamById(opp), squads);
     this.notices = [];
     this.score = { user: game.home === u ? r.home : r.away, cpu: game.home === u ? r.away : r.home };
+    this.ot = null;
     this.clock = newClock(15);
-    this.clock.quarter = 4;
+    // The final's clock: the 4th quarter, or the overtime period it ended in.
+    this.clock.quarter = 4 + r.ot;
     this.clock.time = 0;
     this.drive = startDrive(25);
     this.play = null;
@@ -805,7 +814,18 @@ export class Game {
     this.applied = null;
     this.callMode = 'normal';
     this.cam.follow(OWN_GOAL + 50, 0.5);
-    this.queueShows(pickGame(story, keyLevels(s.config).sim));
+    const picks = pickGame(story, keyLevels(s.config).sim);
+    this.queueShows(picks.filter((k) => k.drive.half < 2));
+    const firstOt = story.drives.find((d) => d.half >= 2);
+    if (firstOt) {
+      // Tied after four: say so before the overtime's plays.
+      const tied = firstOt.score[u] ?? 0;
+      this.notices.push({
+        title: 'OVERTIME', sub: `${this.user.abbr} ${tied}  -  ${this.cpu.abbr} ${tied}`, extra: 'Tied at the end of regulation',
+        color: '#9ad7ff', clock: 'OT', score: { user: tied, cpu: tied },
+      });
+    }
+    this.queueShows(picks.filter((k) => k.drive.half >= 2));
     this.showNotices('final');
   }
 
@@ -1670,7 +1690,7 @@ export class Game {
       ? { home: { ...pb.home, points: home }, away: { ...pb.away, points: away }, players: pb.players }
       : { home: blank(home), away: blank(away), players: [] };
     this.partBox = null;
-    const result: GameResult = { home, away, ot: 0, box };
+    const result: GameResult = { home, away, ot: this.otPeriods(), box };
     this.seasonGame = null;
     advanceWeek(s, result, this.liveDrives ?? undefined);
     this.liveDrives = null;
@@ -1681,6 +1701,7 @@ export class Game {
   // ------------------------------------------------------------ play call
 
   private toCall(mode: CallMode = 'normal'): void {
+    if (mode === 'pat' && this.mustGoForTwo()) mode = 'try';
     this.screen = 'call';
     this.callMode = mode;
     this.play = null;
@@ -1737,7 +1758,8 @@ export class Game {
         return KICKOFF_CALLS.map((def) => ({ kind: 'kick', def }));
       default: {
         const tab = this.tabs()[this.tab];
-        if (tab.kind === 'st') return ST_TAB.map((def) => ({ kind: 'kick', def }));
+        // Overtime has no punts: kick a field goal or go for it.
+        if (tab.kind === 'st') return ST_TAB.filter((def) => !this.ot || def.unit === 'fg').map((def) => ({ kind: 'kick', def }));
         const list = this.chipPlays();
         const page = Math.min(this.page, this.pageCount() - 1);
         return list.slice(page * PAGE, page * PAGE + PAGE).map((def) => ({ kind: 'play', def }));
@@ -1810,7 +1832,7 @@ export class Game {
       if (input.hit('KeyS')) this.page = (pg + 1) % pages;
       if (input.hit('KeyW')) this.page = (pg + pages - 1) % pages;
     }
-    if (this.callMode === 'try' && input.hit('Escape', 'Backspace')) {
+    if (this.callMode === 'try' && !this.mustGoForTwo() && input.hit('Escape', 'Backspace')) {
       this.callMode = 'pat';
       return;
     }
@@ -2052,6 +2074,10 @@ export class Game {
       newDrive(this.brain);
       this.dcNote = null;
     }
+    if (this.ot) {
+      this.otChange(a);
+      return;
+    }
     switch (c.kind) {
       case 'none':
         this.drive = a.drive;
@@ -2109,7 +2135,7 @@ export class Game {
     } else if (q === 2) {
       this.halftime();
     } else {
-      this.showNotices('final');
+      this.endRegulation();
     }
   }
 
@@ -2135,8 +2161,175 @@ export class Game {
     } else if (q === 2) {
       this.halftime();
     } else {
-      this.showNotices('final');
+      this.endRegulation();
     }
+  }
+
+  // ------------------------------------------------------------ overtime
+
+  /** Overtime periods played: the live game's, or the watched simulated game's. */
+  private otPeriods(): number {
+    return Math.max(0, this.clock.quarter - 4);
+  }
+
+  /** In overtime, a touchdown's try must be two from the 2nd period on (and the shootout is all tries). */
+  private mustGoForTwo(): boolean {
+    return !!this.ot && this.otPeriods() >= OVERTIME.mustGoForTwo;
+  }
+
+  /** Whether the user has the ball on this overtime possession. */
+  private otUserBall(): boolean {
+    const ot = this.ot!;
+    const userFirst = ot.userFirst === (this.otPeriods() % 2 === 1);
+    return ot.turn === 0 ? userFirst : !userFirst;
+  }
+
+  /** The 4th quarter is over: the final, or FBS overtime if it's tied (`OVERTIME`, game/rules.ts). */
+  private endRegulation(): void {
+    if (this.score.user !== this.score.cpu) {
+      this.showNotices('final');
+      return;
+    }
+    this.notify({ title: 'END OF REGULATION', sub: this.scoreLine(), extra: 'Tied: going to overtime', color: '#9ad7ff' });
+    // The toss winner defers, as nearly every FBS team does, and plays defense first.
+    const userToss = this.rng() < 0.5;
+    this.ot = { userFirst: !userToss, turn: 0 };
+    this.clock.quarter = 5;
+    // Untimed from here: the game clock only has to stay off zero.
+    this.clock.time = this.clock.qSecs;
+    adminStop(this.clock);
+    this.notify({
+      title: 'OVERTIME', sub: `${userToss ? this.user.abbr : this.cpu.abbr} wins the toss and will play defense first`,
+      extra: 'Each team gets the ball at the 25. No clock, no kickoffs', color: '#9ad7ff',
+    });
+    this.otTurn();
+  }
+
+  /** The next overtime possession: the user's on the field, the CPU's simulated. */
+  private otTurn(): void {
+    if (!this.otUserBall()) {
+      this.otCpuTurn();
+      return;
+    }
+    if (this.otPeriods() >= OVERTIME.shootout) {
+      this.drive = { los: OPP_GOAL - 3, ballY: FIELD_W / 2, down: 1, firstDownX: OPP_GOAL, try: true };
+      this.notify({ title: 'YOUR TWO-POINT TRY', sub: this.scoreLine(), extra: 'One play from the 3', color: '#9ad7ff' });
+      this.showNotices('pat');
+      return;
+    }
+    this.drive = startDrive(OVERTIME.start);
+    adminStop(this.clock);
+    this.notify({ title: 'YOUR BALL', sub: this.scoreLine(), extra: `At the ${fieldLabel(this.drive.los)}`, color: '#9ad7ff' });
+    this.showNotices('call');
+  }
+
+  /**
+   * The CPU's overtime possession, simulated: an untimed drive from the 25, whose touchdown takes the
+   * kick in the 1st period and goes for two after that, or one two-point play in the shootout.
+   */
+  private otCpuTurn(): void {
+    const period = this.otPeriods();
+    const second = this.ot!.turn === 1;
+    if (period >= OVERTIME.shootout) {
+      this.cpuTwoPoint();
+      this.otNext();
+      return;
+    }
+    const plays: SimPlay[] = [];
+    const cpuConf = teamConf(this.cpuSquad);
+    const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: true };
+    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, OVERTIME.start, this.rng, undefined,
+      (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
+    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, true));
+    // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
+    // otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
+    const td = sim.result === 'TOUCHDOWN';
+    const six = this.score.cpu + 6;
+    const walkOff = td && second && six > this.score.user;
+    const kick = td && !walkOff && period < OVERTIME.mustGoForTwo && !(second && this.score.user - six === 2);
+    const points = td ? (kick ? 7 : 6) : sim.points;
+    this.showCpuDrive({
+      off: this.cpu.id, half: period + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
+      start: OVERTIME.start, result: sim.result, points, plays, credit: { catches: [], runs: [] },
+    });
+    this.score.cpu += points;
+    this.notify({
+      title: `${this.cpu.abbr} DRIVE: ${sim.result}`, sub: `${sim.plays} plays, ${sim.yards} yards`,
+      extra: kick ? 'Extra point is good' : td && !walkOff ? 'Going for two' : '',
+    });
+    if (td && !walkOff && !kick) this.cpuTwoPoint();
+    this.otNext();
+  }
+
+  /** A CPU two-point try in overtime, simulated (`simTwoPoint`) and shown as a key play. */
+  private cpuTwoPoint(): void {
+    const good = simTwoPoint(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, this.rng);
+    this.showCpuDrive({
+      off: this.cpu.id, half: this.otPeriods() + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
+      start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, credit: { catches: [], runs: [] },
+      plays: [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }],
+    });
+    if (good) this.score.cpu += 2;
+    this.notify({ title: `${this.cpu.abbr} TWO-POINT TRY: ${good ? 'GOOD' : 'NO GOOD'}`, sub: this.scoreLine(), extra: '', color: good ? '#ff5a5a' : '#ffd23f' });
+  }
+
+  /** Queue a CPU drive's key plays at the defense's key-play level. */
+  private showCpuDrive(d: StoryDrive): void {
+    const level = this.keyLevel('defense');
+    if (level !== 'off') this.queueShows(pickDrive(d, level, 'defense'));
+  }
+
+  /** The user's overtime snap or kick is over: the possession goes on, ends, or ends the game. */
+  private otChange(a: Applied): void {
+    const c = a.change;
+    switch (c.kind) {
+      case 'none':
+        this.drive = a.drive;
+        this.toCall();
+        return;
+      case 'pat':
+        // Going second, a lead after the six wins it: no try.
+        if (this.ot!.turn === 1 && this.score.user > this.score.cpu) {
+          this.showNotices('final');
+          return;
+        }
+        this.drive = { los: OPP_GOAL - 3, ballY: FIELD_W / 2, down: 1, firstDownX: OPP_GOAL, try: true };
+        this.toCall('pat');
+        return;
+      case 'pick6':
+      case 'returnTd':
+        // A defensive score ends overtime.
+        this.notify({ title: `${this.cpu.abbr} SCORES`, sub: c.kind === 'pick6' ? 'Pick six' : c.sub, extra: 'A defensive score ends overtime' });
+        this.showNotices('final');
+        return;
+      default:
+        // A try or a field goal, or the ball lost on downs, a turnover, a missed kick or a safety.
+        this.otNext();
+    }
+  }
+
+  /** An overtime possession is over: the other team's, the next period, or the final. */
+  private otNext(): void {
+    const ot = this.ot!;
+    if (ot.turn === 0) {
+      ot.turn = 1;
+      this.otTurn();
+      return;
+    }
+    if (this.score.user !== this.score.cpu) {
+      this.showNotices('final');
+      return;
+    }
+    ot.turn = 0;
+    this.clock.quarter++;
+    adminStop(this.clock);
+    const p = this.otPeriods();
+    const rule = p >= OVERTIME.shootout ? 'Two-point plays from the 3 until a team leads' : 'Teams must go for two after a touchdown';
+    this.notify({
+      title: `STILL TIED: ${quarterName(this.clock.quarter)}`, sub: this.scoreLine(),
+      extra: `${rule}. ${this.otUserBall() ? 'You go' : `${this.cpu.abbr} goes`} first`, color: '#9ad7ff',
+    });
+    this.otTurn();
   }
 
   /** The user took the opening kickoff, so the user kicks off to start the second half. */
@@ -2216,7 +2409,7 @@ export class Game {
       if (c.quarter === 2) {
         this.halftime();
       } else {
-        this.showNotices('final');
+        this.endRegulation();
       }
       return;
     }
@@ -2390,7 +2583,9 @@ export class Game {
 
   private renderFinal(g: CanvasRenderingContext2D): void {
     const { user, cpu } = this.score;
-    const title = user === cpu ? 'FINAL: TIE' : user > cpu ? `FINAL: ${this.user.abbr} WINS` : `FINAL: ${this.cpu.abbr} WINS`;
+    const ot = this.otPeriods();
+    const final = ot ? `FINAL/${quarterName(4 + ot)}` : 'FINAL';
+    const title = user === cpu ? `${final}: TIE` : user > cpu ? `${final}: ${this.user.abbr} WINS` : `${final}: ${this.cpu.abbr} WINS`;
     drawBanner(g, title, this.scoreLine(), user >= cpu ? '#ffd23f' : '#ff5a5a', `${this.user.school.toUpperCase()} VS ${this.cpu.school.toUpperCase()}`);
     drawHint(g, this.seasonGame || this.watchOnly ? 'CLICK OR SPACE TO CONTINUE THE SEASON' : 'CLICK OR SPACE FOR THE EXHIBITION SCREEN');
   }
@@ -2476,7 +2671,7 @@ export class Game {
     const fallback =
       this.callMode === 'pat' ? 'TOUCHDOWN! KICK THE PAT OR GO FOR TWO'
       : this.callMode === 'kickoff' ? 'KICKOFF: CHOOSE A KICK'
-      : this.callMode === 'try' ? 'TWO-POINT TRY FROM THE 3   ESC: BACK'
+      : this.callMode === 'try' ? (this.mustGoForTwo() ? 'OVERTIME: TWO-POINT TRY FROM THE 3' : 'TWO-POINT TRY FROM THE 3   ESC: BACK')
       : 'CHOOSE A PLAY';
     const tip = hc ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.def.tip).toUpperCase() : fallback;
     text(g, tip, VIEW_W / 2, CALL_Y + 6, { size: 8, align: 'center', color: '#ffd23f' });

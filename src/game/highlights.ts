@@ -60,7 +60,7 @@ export interface KeyShow {
 }
 
 /** Kinds that are good news for the defense. */
-const DEFENSIVE = new Set<KeyKind>(['int', 'fumble', 'fourthStop', 'thirdStop', 'redZoneStop', 'sack', 'missedFg']);
+const DEFENSIVE = new Set<KeyKind>(['int', 'fumble', 'fourthStop', 'thirdStop', 'redZoneStop', 'sack', 'missedFg', 'twoPtStop']);
 
 export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number): KeyShow {
   const d = k.drive;
@@ -70,7 +70,7 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number): KeyShow {
   const target = fg ? null : targetFor(k, off, def, userBall ? ctx.userPass : ctx.cpuPass);
   const search = fg ? new FgSearch(fg, seed) : target ? new ReplaySearch(target, seed) : null;
   const before = { user: d.score[ctx.user.id] ?? 0, cpu: d.score[ctx.cpu.id] ?? 0 };
-  const pts = k.kind === 'td' ? d.points : k.kind === 'fg' ? 3 : 0;
+  const pts = k.kind === 'td' || k.kind === 'twoPt' ? d.points : k.kind === 'fg' ? 3 : 0;
   const after = { user: before.user + (userBall ? pts : 0), cpu: before.cpu + (userBall ? 0 : pts) };
   const c = storyClock(d, k.play.t);
   // Cut straight to the new spot: the camera starts there rather than panning from the last play.
@@ -80,7 +80,7 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number): KeyShow {
   cam.snap();
   return {
     k, userBall, search, setup: null, play: null, fgSetup: null, kick: null,
-    phase: 'find', t: 0, over: 0, before, after, clock: c.quarter > 4 ? 'OT' : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
+    phase: 'find', t: 0, over: 0, before, after, clock: c.quarter > 4 ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
   };
 }
 
@@ -154,7 +154,7 @@ function cardX(sh: KeyShow): number {
   if (sh.phase !== 'card') return from;
   const k = sh.k.kind;
   const still = k === 'fg' || k === 'missedFg' || k === 'int' || k === 'fumble';
-  const to = still ? from : k === 'td' ? OPP_GOAL + 3 : Math.min(OPP_GOAL, from + shownGain(sh.k.play));
+  const to = still ? from : k === 'td' || k === 'twoPt' ? OPP_GOAL + 3 : Math.min(OPP_GOAL, from + shownGain(sh.k.play));
   const f = Math.min(1, sh.t / SHOW.cardMove);
   return from + (to - from) * (1 - (1 - f) * (1 - f));
 }
@@ -175,6 +175,10 @@ function playLine(sh: KeyShow): string {
   switch (k.kind) {
     case 'td':
       return by(`${yardsWord(yds)} TOUCHDOWN ${pass ? 'CATCH' : 'RUN'}`);
+    case 'twoPt':
+      return by(`IN ON THE TWO-POINT ${pass ? 'CATCH' : 'RUN'}`);
+    case 'twoPtStop':
+      return o?.type === 'incomplete' ? 'TWO-POINT PASS FALLS INCOMPLETE' : by('STOPPED SHORT ON THE TWO-POINT TRY');
     case 'int':
       return who ? `PICKED OFF BY ${who}` : 'PICKED OFF';
     case 'fumble': {
@@ -211,7 +215,7 @@ export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx,
     g.drawImage(getBallSprite(), Math.round(s.x - 4), Math.round(s.y - 4));
   }
   const captioned = sh.over > 0;
-  const situation = `${downText(p)}  ${spotLabel(p.yard, off.abbr, def.abbr)}`;
+  const situation = `${sh.k.drive.try ? 'TWO-POINT TRY' : downText(p)}  ${spotLabel(p.yard, off.abbr, def.abbr)}`;
   drawScorebug(g, ctx.user, ctx.cpu, captioned ? sh.after : sh.before, sh.clock, situation, `${off.abbr} OFFENSE`);
   text(g, 'KEY PLAY', 8, 40, { size: 8, color: '#ffd23f' });
   if (captioned) {

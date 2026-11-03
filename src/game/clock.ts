@@ -40,7 +40,7 @@ export function newClock(qMin: number): Clock {
 /** Huddle / play call / pre-snap: play clock always counts, game clock only if running. */
 export function tickBetween(c: Clock, dt: number): void {
   c.play = Math.max(0, c.play - dt);
-  if (c.mode === 'run') c.time = Math.max(0, c.time - dt);
+  if (c.mode === 'run' && !inOvertime(c)) c.time = Math.max(0, c.time - dt);
 }
 
 /**
@@ -50,7 +50,7 @@ export function tickBetween(c: Clock, dt: number): void {
  * clock out still works by waiting. Returns the seconds burned.
  */
 export function runoffAtSnap(c: Clock, tempo: Tempo): number {
-  if (c.mode !== 'run') return 0;
+  if (c.mode !== 'run' || inOvertime(c)) return 0;
   const burn = Math.max(0, Math.min(c.play - (tempo === 'hurry' ? HURRY_AT : SNAP_AT), c.time - 1));
   c.play -= burn;
   c.time -= burn;
@@ -58,6 +58,7 @@ export function runoffAtSnap(c: Clock, tempo: Tempo): number {
 }
 
 export function tickLive(c: Clock, dt: number): void {
+  if (inOvertime(c)) return;
   c.time = Math.max(0, c.time - dt);
 }
 
@@ -67,6 +68,11 @@ export function snapClock(c: Clock): void {
 
 export function readyForPlay(c: Clock): void {
   if (c.mode === 'untilReady') c.mode = 'run';
+}
+
+/** Quarters past the 4th are overtime periods: untimed, so the game clock never moves (the play clock still runs). */
+export function inOvertime(c: Clock): boolean {
+  return c.quarter > 4;
 }
 
 export function inTwoMinute(c: Clock): boolean {
@@ -131,12 +137,14 @@ export function mmss(secs: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+/** "1ST" to "4TH", then the overtime periods: "OT", "2OT", "3OT"... */
 export function quarterName(q: number): string {
-  return QTR[Math.min(3, q - 1)];
+  if (q > 4) return q === 5 ? 'OT' : `${q - 4}OT`;
+  return QTR[Math.max(0, q - 1)];
 }
 
 export function clockText(c: Clock): string {
-  return `${quarterName(c.quarter)} ${mmss(c.time)}`;
+  return inOvertime(c) ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`;
 }
 
 export function playClockText(c: Clock): string {

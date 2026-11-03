@@ -26,7 +26,7 @@ export interface DriveCredit {
 export interface StoryDrive {
   /** The offense's team id. */
   off: string;
-  /** 0 or 1 (2 is overtime), and the seconds left in that half when the drive started. */
+  /** 0 or 1, or 1 + the overtime period (2 is the 1st overtime), and the seconds left in that half when the drive started. */
   half: number;
   left: number;
   /** Quarter length in seconds (900 in `simGame`, the setting's in `simPart`). */
@@ -39,6 +39,8 @@ export interface StoryDrive {
   points: number;
   plays: SimPlay[];
   credit: DriveCredit;
+  /** A two-point try (overtime): one snap from the 3, good for `points` 2 or none. */
+  try?: boolean;
 }
 
 export interface GameStory {
@@ -49,9 +51,9 @@ export interface GameStory {
 
 export const newStory = (home: string, away: string): GameStory => ({ home, away, drives: [] });
 
-/** The quarter (1-4, 5 for overtime) and the time left in it, `t` seconds into a drive. */
+/** The quarter (1-4, then 5 for the 1st overtime, 6 for the 2nd...) and the time left in it, `t` seconds into a drive. */
 export function storyClock(d: StoryDrive, t = 0): { quarter: number; time: number } {
-  if (d.half >= 2) return { quarter: 5, time: 0 };
+  if (d.half >= 2) return { quarter: d.half + 3, time: 0 };
   const left = Math.max(0, d.left - t);
   const second = left <= d.qSecs;
   return { quarter: d.half * 2 + (second ? 2 : 1), time: second ? left : left - d.qSecs };

@@ -13,6 +13,7 @@ import { champions, seedOrder } from './season/postseason';
 import { generateSchedule } from './season/schedule';
 import { advanceWeek, defaultConfig, newSeason, simSeason } from './season/season';
 import { settleTie, simGame } from './season/simGame';
+import { newStory } from './season/story';
 import { records, standings, winner } from './season/standings';
 import { leaders } from './season/stats';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, migrateLegacySave, packSeason, saveSlot, SEASON_KEY, slotMeta, unpackSeason } from './season/save';
@@ -84,7 +85,7 @@ describe('season', () => {
     expect(ugaWins).toBeGreaterThan(170);
     for (let i = 0; i < 100; i++) {
       const r = simGame(uga, bama, mulberry32(500 + i));
-      if (r.ot >= 8) continue; // the coin-flip safety valve
+      if (r.ot) continue; // overtime's two-point tries and walk-off sixes aren't 7-point touchdowns
       for (const side of ['home', 'away'] as const) {
         const team = side === 'home' ? 'georgia' : 'alabama';
         const lines = r.box.players.filter((p) => p.team === team);
@@ -94,6 +95,29 @@ describe('season', () => {
         expect(r.box[side].points).toBe(r[side]);
       }
     }
+  });
+
+  it('overtime follows the FBS rules: possessions from the 25, two-point plays from the 3rd period', () => {
+    const uga = buildSquad(teamById('georgia'));
+    const bama = buildSquad(teamById('alabama'));
+    let ots = 0;
+    for (let i = 0; i < 400; i++) {
+      const story = newStory('georgia', 'alabama');
+      const r = simGame(uga, bama, mulberry32(9000 + i), { story });
+      expect(r.home).not.toBe(r.away);
+      if (!r.ot) continue;
+      ots++;
+      const ot = story.drives.filter((d) => d.half >= 2);
+      expect(Math.max(...ot.map((d) => d.half))).toBe(r.ot + 1);
+      for (const d of ot) {
+        if (d.half - 1 >= 3) expect(d.try).toBe(true); // the shootout is only tries
+        if (d.try) expect([0, 2]).toContain(d.points);
+        else expect(d.start).toBe(75);
+        // From the 2nd overtime a touchdown is six and a try, unless it won the game outright.
+        if (!d.try && d.half - 1 >= 2 && d.result === 'TOUCHDOWN') expect(d.points).toBe(6);
+      }
+    }
+    expect(ots).toBeGreaterThan(0);
   });
 
   it('a live tie is settled in overtime', () => {

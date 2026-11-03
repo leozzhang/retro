@@ -132,7 +132,7 @@ export function matches(t: ReplayTarget, play: Play): boolean {
 export function targetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide, passShare: number): ReplayTarget | null {
   if (k.play.fg) return null;
   const p = k.play;
-  const want = k.kind === 'td' ? 'td' : k.kind === 'int' ? 'int' : k.kind === 'sack' ? 'sack' : k.kind === 'fumble' ? 'fumble' : 'gain';
+  const want = k.kind === 'td' || k.kind === 'twoPt' ? 'td' : k.kind === 'int' ? 'int' : k.kind === 'sack' ? 'sack' : k.kind === 'fumble' ? 'fumble' : 'gain';
   const cr = want === 'fumble' ? undefined : creditFor(k);
   return {
     off, def, defIdent: defIdentity(def.team), yard: p.yard, down: p.down, toGo: p.toGo, gain: shownGain(p), want,

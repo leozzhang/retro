@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Camera, project, unproject } from './engine/camera';
 import { dist, mulberry32 } from './engine/math';
 import {
-  advanceSim, afterPlay, clockText, newClock, nextQuarter, penaltySpot, playClockText, QUARTER_DRIVES, QUARTER_OPTIONS, readyForPlay, runoffAtSnap,
+  advanceSim, afterPlay, clockText, newClock, nextQuarter, penaltySpot, playClockText, QUARTER_DRIVES, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap,
   tickBetween, tickLive, timeLeftInHalf, type Clock,
 } from './game/clock';
 import { DEF_CALLS, packageFor, type DefCall } from './data/defenses';
@@ -285,6 +285,17 @@ describe('clock', () => {
     const q4 = at(4, 60);
     afterPlay(q4, 'oob', false);
     expect(q4.mode).toBe('untilSnap');
+  });
+  it('overtime is untimed and named by period', () => {
+    const c: Clock = { ...at(5, 300, 5), mode: 'run', play: 40 };
+    tickBetween(c, 1);
+    tickLive(c, 1);
+    expect(runoffAtSnap(c, 'normal')).toBe(0);
+    expect(c.time).toBe(300);
+    expect(c.play).toBeCloseTo(39);
+    expect(clockText(c)).toBe('OT');
+    expect(quarterName(6)).toBe('2OT');
+    expect(quarterName(4)).toBe('4TH');
   });
   it('quarters are as long as the setting', () => {
     const c = newClock(7);

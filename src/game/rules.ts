@@ -350,6 +350,25 @@ export function simulateDrive(
   return done(0, 'PUNT');
 }
 
+// ---------------------------------------------------------------- overtime
+
+/**
+ * FBS overtime (the 2021 rules): untimed periods with no kickoffs, each team getting the ball at the
+ * opponent's 25 (`start`, yards from the offense's own goal), the order alternating every period.
+ * After a touchdown the try is a kick or two in the 1st overtime and must be two from the 2nd
+ * (`mustGoForTwo`); from the 3rd (`shootout`) each team only runs a two-point play from the 3. A
+ * defensive score ends it, and so does the team going second taking the lead.
+ * - `twoPt`: a simulated two-point try's odds (FBS teams convert about 45%), plus `twoPtPerPoint`
+ *   per point of offense-minus-defense overall, within `twoPtRange`.
+ */
+export const OVERTIME = { start: 75, mustGoForTwo: 2, shootout: 3, twoPt: 0.45, twoPtPerPoint: 0.012, twoPtRange: [0.25, 0.7] };
+
+/** Whether a simulated two-point try is good. */
+export function simTwoPoint(offOvr: number, defOvr: number, rng: Rng): boolean {
+  const [lo, hi] = OVERTIME.twoPtRange;
+  return rng() < clamp(OVERTIME.twoPt + (offOvr - defOvr) * OVERTIME.twoPtPerPoint, lo, hi);
+}
+
 /** Where the user's next drive starts (yards from own goal) after a CPU possession. */
 export function userStartAfter(sim: DriveSim, rng: Rng): number {
   switch (sim.result) {

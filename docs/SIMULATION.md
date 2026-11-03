@@ -104,6 +104,5 @@ It then runs the engine headless with `autoStep`, a per-step CPU QB and runner. 
 ## Not done
 - No mid-game "sim the rest".
 - A drive continued at the quarter break starts a new set of downs.
-- Ties in a partly played game still go to `settleTie`.
 - Punts never show, and extra points aren't key plays.
 - Replays between very uneven teams match less often, so more of them are cards.

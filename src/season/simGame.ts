@@ -4,7 +4,7 @@ import { athleteName, starters, teamConf, teamRatings, type Squad } from '../dat
 import { overall, SLOT_POS } from '../data/positions';
 import { clamp, gauss, pickWeighted, type Rng } from '../engine/math';
 import { advanceSim, newClock, timeLeftInHalf, nextQuarter } from '../game/clock';
-import { simulateDrive, userStartAfter, type DriveClock, type DriveConf, type DriveSim, type SimPlay } from '../game/rules';
+import { OVERTIME, simTwoPoint, simulateDrive, userStartAfter, type DriveClock, type DriveConf, type DriveSim, type SimPlay } from '../game/rules';
 import { driveMods, type TeamMods } from './emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { DriveCredit, GameStory } from './story';
@@ -25,8 +25,7 @@ import type { BoxScore, DriveLog, GameResult, LoggedPlay, PlayerLine, TeamLine }
  */
 export const GAME_SIM = { homeEdge: 1.5, paceSd: 0.12, script: 0.15, scriptCap: 21 };
 const HALF_SECS = 1800;
-/** Where an overtime possession starts, in yards from the offense's own goal (the opponent's 25). */
-const OT_START = 75;
+/** Overtime periods before a coin flip settles it (two-point plays from the 3rd end almost every game first). */
 const OT_MAX_ROUNDS = 8;
 /** Yards per play on passes vs runs, to split a drive's yards. */
 const PASS_YPP = 7;
@@ -237,22 +236,53 @@ function tell(
   return credit;
 }
 
-/** Untimed alternating possessions from the opponent's 25 until one side leads after a round. */
+/** A two-point try (`simTwoPoint`), told as its own one-snap drive from the 3. */
+function twoPoint(o: Side, dfn: Side, rng: Rng, story: GameStory | undefined, half: number): void {
+  const good = simTwoPoint(o.off, dfn.def, rng);
+  story?.drives.push({
+    off: o.id, half, left: 0, qSecs: HALF_SECS / 2, score: { [o.id]: o.tl.points, [dfn.id]: dfn.tl.points }, start: 97,
+    result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, credit: { catches: [], runs: [] },
+    plays: [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }],
+  });
+  if (good) o.tl.points += 2;
+}
+
+/**
+ * FBS overtime (`OVERTIME`, game/rules.ts) until one side leads after a period: possessions from the
+ * opponent's 25, then two-point plays from the 3rd period. `first` has the ball first in odd periods.
+ * Returns the periods played.
+ */
 function overtime(first: Side, second: Side, rng: Rng, logs?: DriveLog[], story?: GameStory): number {
-  let rounds = 0;
+  const O = OVERTIME;
+  let period = 0;
   while (first.tl.points === second.tl.points) {
-    rounds++;
-    for (const [o, dfn] of [[first, second], [second, first]] as const) {
+    period++;
+    const half = period + 1;
+    const order = period % 2 ? [first, second] : [second, first];
+    for (let i = 0; i < 2; i++) {
+      const [o, dfn] = [order[i], order[1 - i]];
+      if (period >= O.shootout) {
+        twoPoint(o, dfn, rng, story, half);
+        continue;
+      }
       const seen = story ? [] : undefined;
-      const d = drive(o, dfn, o.off, OT_START, rng, undefined, logs, driveConf(o, dfn, true), true, seen);
-      credit(o, d, rng, tell(story, o, dfn, d, seen, OT_START, 2, 0, HALF_SECS / 2));
+      const d = drive(o, dfn, o.off, O.start, rng, undefined, logs, driveConf(o, dfn, true), true, seen);
+      // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game
+      // at once; otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
+      const td = d.result === 'TOUCHDOWN';
+      const six = o.tl.points + 6;
+      const walkOff = td && i === 1 && six > dfn.tl.points;
+      const kick = td && !walkOff && period < O.mustGoForTwo && !(i === 1 && dfn.tl.points - six === 2);
+      const scored = td ? { ...d, points: kick ? 7 : 6 } : d;
+      credit(o, scored, rng, tell(story, o, dfn, scored, seen, O.start, half, 0, HALF_SECS / 2));
+      if (td && !walkOff && !kick) twoPoint(o, dfn, rng, story, half);
     }
-    if (rounds >= OT_MAX_ROUNDS && first.tl.points === second.tl.points) {
+    if (period >= OT_MAX_ROUNDS && first.tl.points === second.tl.points) {
       // Sudden death by coin flip so the sim always ends.
       (rng() < 0.5 ? first : second).tl.points += 2;
     }
   }
-  return rounds;
+  return period;
 }
 
 export interface SimOptions {
@@ -397,8 +427,8 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
 }
 
 /**
- * A live game that ended tied (the field has no overtime yet): settle it with simulated overtime,
- * keeping the regulation box score.
+ * A live game that ended tied: settle it with simulated overtime, keeping the regulation box score.
+ * The field plays its own overtime, so this is only a guard (and for results from before it did).
  */
 export function settleTie(
   result: GameResult, home: Squad, away: Squad, rng: Rng, neutral = false, drives?: DriveLog[], emph?: SimOptions['emph'],

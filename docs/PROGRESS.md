@@ -1,6 +1,17 @@
 # Progress
 
-_Last updated: 2026-11-02_
+_Last updated: 2026-11-03_
+
+## Done: FBS overtime on the field and in the sim (2026-11-03)
+Bug: a live game tied after four showed FINAL: TIE, then `settleTie` quietly simmed an overtime after the final screen, so the hub showed a win or loss the user never saw.
+
+- **Rules** (`OVERTIME`, `simTwoPoint`, `game/rules.ts`), shared by the sim and the field: untimed periods with no kickoffs or punts; each team starts at the opponent's 25; the order alternates every period; a touchdown's try is a kick or two in the 1st OT and must be two from the 2nd; from the 3rd OT on, each team gets one two-point play from the 3; a defensive score ends it, and so does the team going second taking the lead (a walk-off six has no try). A simulated two-point try converts 45% plus 1.2% per point of overall gap (25–70%).
+- **Clock** (`clock.ts`): quarters past the 4th are OT periods (`inOvertime`). The game clock doesn't move (the play clock still does). Labels read OT, 2OT, 3OT.
+- **Live game** (`game.ts`: `endRegulation`, `otTurn`, `otCpuTurn`, `otChange`, `otNext`): tied after the 4th, there's a coin toss (the winner defers). The user's possessions are played on the field, and the call screen forces the two-point try from 2OT. The CPU's are simulated untimed, with their key plays. The final reads FINAL/OT or FINAL/2OT, and the season gets the period count (`GameResult.ot`). `settleTie` stays as a guard only.
+- **Sim** (`simGame.ts` `overtime`): the same rules. Two-point tries are their own one-snap story drives (`StoryDrive.try`, half = 1 + period), shown as key plays (TWO-POINT TRY GOOD/STOPPED). A watched SIM GAME that went to overtime shows an OVERTIME card before the OT plays and a FINAL/OT scorebug.
+- `npm run season`: within noise of before (overtime is still 3.6% against the real 5%).
+- Not checked by hand yet: playing a tied game into overtime in the app.
+- Preexisting: under full-suite load a few long season tests time out at the 5 s default (a different set each run, the same without this change).
 
 ## Done: run game revamp, part 1: control, reading the line (2026-11-02)
 Running was right-click, hold Shift and hope: the back got the ball already at speed and auto-driving downfield, W/S only gave a 45° drift, and the line drew as one pile.
@@ -1554,7 +1565,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **High YAC on quick throws:** about 13–20 yards when throwing to a wide-open receiver at 1.2s. The route burst trimmed this (a slant thrown out of its break now gives 5.4 per target). Defenders trailing in man can't close on a straight-line runner. Realism is unclear; revisit tackling and pursuit tuning.
 - **Sack rate when holding long:** about 35% of plays at 3.2s against a 4-man rush, which may be harsh.
 - **Play diagrams are small:** cards are now 62 px tall to fit 9 per page. Each card zooms to its own play, but drags and crossers on wide pass plays still look short.
-- **No timeouts, spike, kneel or overtime yet.** Ties stand.
+- **No timeouts, spike or kneel yet.**
 - **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The run fronts (Bear, Cover 3 Sky, Goal Line) and the learning DC's box dial now answer a run-heavy offense (DEFENSE.md), but 2 Man itself is unchanged.
 - **WR stalk blocks lose the matchup quickly:** in `runEngagement` the defender's side is `str*0.7 + spd*0.3`, and the WR adds only his `blk` (about 45). A fast corner wins by about 30 points and sheds at about 2.3/s. On stretch plays the WR also takes the lineman's `REACH_PENALTY`. Perimeter blocks now form and last longer than before, but they still don't hold long. Not tuned: consider a stalk-block rule (the WR only has to stay between, not drive) or no reach penalty for non-linemen.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
@@ -1577,7 +1588,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
 1. **An RPO read on a defender,** and give the harness a pull decision.
-2. Clock tools: timeouts (3 per half), spike, kneel, college overtime.
+2. Clock tools: timeouts (3 per half), spike, kneel.
 3. Defense, round 2 ([DEFENSE.md](DEFENSE.md)):
    - play it by hand and check the gold lines and the halftime card on screen
    - film study (the DC's pregame prior from your past live games)
