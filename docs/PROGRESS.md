@@ -1,6 +1,53 @@
 # Progress
 
-_Last updated: 2026-11-03_
+_Last updated: 2026-11-04_
+
+## Done: situational CPU coaching, clock-and-score defense, casting snaps to real players (2026-11-04)
+Bugs:
+- In overtime, going second and down 7, the CPU kicked a field goal on 4th down and lost. The drive sim never saw the score, so it kicked whenever a kick was 52 yards or shorter, and on the last snap even when a field goal couldn't tie.
+- The defense read only down and distance.
+- CPU drives' replays were forced to the sim's random outcomes, with whoever happened to be open.
+
+**Situational coaching** (`game/situation.ts`, `SITUATION`):
+- `simulateDrive` coaches the score and the clock when its `DriveClock` has `lead`. Every caller passes it now: `cpuDrive`, `otCpuTurn`, `simGame` and its overtime, `simPart`.
+- It covers 4th downs (kick only when the points help; overtime has no punts), the last-snap kick or heave, per-snap tempo (hurry, milk, kneel), and the pass lean. The rules are in SIMULATION.md.
+- Without `lead` a drive runs as before.
+
+**Defense** (`data/identity.ts`):
+- clock-and-score dials: prevent against a one-score team late (two-high, no pressure, plus the `prevent` tag: no press, deeper corners and deep zones, `PREVENT` in `sim/ai.ts`)
+- a sell-out against a team milking the clock
+- extra box on inches
+
+The CPU's live defense and every replay's defense (so the user's own defense on CPU drives) call them. See DEFENSE.md.
+
+**Casting** (`season/cast.ts`, `CAST`): each simulated snap goes to real players, weighted by ratings and by the gain:
+- long catches lean to fast, sharp receivers
+- picks lean to the DBs with the best hands and coverage
+- sacks lean to the best rushers
+
+The box score is now the sum of cast snaps (`credit` in simGame.ts). The story keeps the cast per snap (`DriveCredit.snaps`), `creditFor` reads it directly (the nearest-yards matching is gone), and a replayed pick has to be the cast DB's. Live CPU drives are cast on their own seeded stream. `TARGETS`, `QB_RUN_SHARE` and `INT_SHARE` moved to cast.ts (still re-exported from simGame).
+
+**Measured** (against a baseline regenerated from the last commit):
+- `npm run balance`: every core, DEF and per-play row byte-identical. Only the ADAPT rows moved by a point or two, from the inches box.
+- `npm run season`, closer to the real targets on every scoring line:
+
+| Line | Before | Now | Real |
+| --- | --- | --- | --- |
+| Points per team | 26.1 | 25.7 | 26.5 |
+| One-score games | 33.4% | 37.6% | 38% |
+| Won by 28+ | 20.1% | 18.0% | 18.9% |
+| Won by 35+ | 11.9% | 10.0% | 10% |
+| Overtime | 3.6% | 4.3% | 5% |
+| Yards per team | 428 | 417 | ~390 |
+
+- Stat leaders moved toward the stars: the receiving leader went from 1589 to 1868 yards, the rushing leader from 2551 to 3106, and the passing leader from 6689 to 5502.
+- K growth now crosses the 15% flag (1.61 against a 1.39 mean, 1.59 before). That's noise-level, next to P's existing flag.
+- PARTIAL SIM is within noise.
+- Everything else is within noise.
+
+**Not checked by hand yet:** in the app, a CPU 4th down in overtime after the user's touchdown; the CPU defense's shells when the user trails late; CPU key plays naming the star receivers and the DBs on picks.
+
+**Tests:** `situation.test.ts` (4th-down and kick rules, tempo, an OT drive down 7 never kicks, a lead kneels out; the defense's prevent and inches; the casting leans). `highlights.test.ts` now counts a two-point try as a scoring key play; seed 14 now reaches a 3rd overtime.
 
 ## Done: FBS overtime on the field and in the sim (2026-11-03)
 Bug: a live game tied after four showed FINAL: TIE, then `settleTie` quietly simmed an overtime after the final screen, so the hub showed a win or loss the user never saw.

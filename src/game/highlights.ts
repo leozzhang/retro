@@ -179,14 +179,16 @@ function playLine(sh: KeyShow): string {
       return by(`IN ON THE TWO-POINT ${pass ? 'CATCH' : 'RUN'}`);
     case 'twoPtStop':
       return o?.type === 'incomplete' ? 'TWO-POINT PASS FALLS INCOMPLETE' : by('STOPPED SHORT ON THE TWO-POINT TRY');
-    case 'int':
-      return who ? `PICKED OFF BY ${who}` : 'PICKED OFF';
+    case 'int': {
+      const picker = sh.play ? who : (credit?.by?.name ?? '').toUpperCase();
+      return picker ? `PICKED OFF BY ${picker}` : 'PICKED OFF';
+    }
     case 'fumble': {
       const rec = sh.play?.recoverer?.name.toUpperCase();
       return rec ? `FUMBLE, RECOVERED BY ${rec}` : 'FUMBLE, AND THE DEFENSE HAS IT';
     }
     case 'sack': {
-      const sacker = o?.type === 'sack' ? o.sub.split('  ')[0].toUpperCase() : '';
+      const sacker = o?.type === 'sack' ? o.sub.split('  ')[0].toUpperCase() : (credit?.by?.name ?? '').toUpperCase();
       return `${sacker ? `SACKED BY ${sacker}` : 'SACKED'}, ${yardsWord(yds)} LOSS`;
     }
     case 'fg':

@@ -1,5 +1,5 @@
-import { DEF_CALLS, pickDefCall, type DefCall } from '../data/defenses';
-import { defIdentity, situationMix, type DefIdentity } from '../data/identity';
+import { DEF_CALLS, pickDefCall, type DefCall, type DefTags } from '../data/defenses';
+import { defIdentity, preventLevel, situationMix, type DefIdentity } from '../data/identity';
 import { PLAYBOOK, type PlayDef } from '../data/plays';
 import { kickDef } from '../data/specialTeams';
 import type { RosterPlayer, Team } from '../data/teams';
@@ -11,6 +11,7 @@ import { AUTO_INPUT, autoStep, type AutoPlan } from './autopilot';
 import { creditFor, shownGain, type KeyPlay } from './keyPlays';
 import { KickPlay } from './kickPlay';
 import { Play } from './playState';
+import { passOdds, type Situation } from './situation';
 
 /**
  * Key-play replays: the real play engine, with the CPU on both sides, made to show a snap the drive
@@ -53,6 +54,10 @@ export interface ReplayTarget {
   pass?: boolean;
   /** The credited player's slot: the replay's ball goes to him. */
   slot?: string;
+  /** The defender credited with an interception: the replay's pick is his. */
+  by?: string;
+  /** The game situation (clock and score), for the defense's call. */
+  sit?: Situation;
   passShare: number;
 }
 
@@ -60,6 +65,7 @@ export interface ReplaySetup {
   seed: number;
   play: PlayDef;
   call: DefCall;
+  tags?: DefTags;
   press: { CB1: boolean; CB2: boolean; NB: boolean };
   plan: AutoPlan;
 }
@@ -72,7 +78,7 @@ const QB_RUNS = PLAYBOOK.filter((p) => p.qbRun);
 export function makeReplay(t: ReplayTarget, s: ReplaySetup): Play {
   return new Play({
     offTeam: t.off.team, defTeam: t.def.team, offRoster: t.off.roster, defRoster: t.def.roster,
-    play: s.play, defCall: s.call, press: s.press, los: OWN_GOAL + t.yard, ballY: FIELD_W / 2, rng: mulberry32(s.seed),
+    play: s.play, defCall: s.call, tags: s.tags, press: s.press, los: OWN_GOAL + t.yard, ballY: FIELD_W / 2, rng: mulberry32(s.seed),
   });
 }
 
@@ -109,7 +115,7 @@ export function matches(t: ReplayTarget, play: Play): boolean {
     case 'td':
       return o.type === 'td' && slotOk(play.carrier);
     case 'int':
-      return o.type === 'int';
+      return o.type === 'int' && (!t.by || play.carrier?.slot === t.by);
     case 'sack':
       return o.type === 'sack' && Math.abs(replayGain(play) - t.gain) <= REPLAY.tol + 1;
     case 'fumble':
@@ -134,9 +140,15 @@ export function targetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide, passShar
   const p = k.play;
   const want = k.kind === 'td' || k.kind === 'twoPt' ? 'td' : k.kind === 'int' ? 'int' : k.kind === 'sack' ? 'sack' : k.kind === 'fumble' ? 'fumble' : 'gain';
   const cr = want === 'fumble' ? undefined : creditFor(k);
+  const d = k.drive;
+  const lead = Object.entries(d.score).reduce((s, [id, pts]) => s + (id === d.off ? pts : -pts), 0);
+  const sit: Situation = {
+    down: p.down, toGo: p.toGo, yardsToGoal: 100 - p.yard, secsLeft: d.half >= 2 ? Infinity : d.left - p.t, qSecs: d.qSecs,
+    finalHalf: d.half >= 1, lead, ...(d.half >= 2 ? { ot: 'first' as const } : {}),
+  };
   return {
     off, def, defIdent: defIdentity(def.team), yard: p.yard, down: p.down, toGo: p.toGo, gain: shownGain(p), want,
-    pass: cr?.pass, slot: cr?.who?.slot, passShare,
+    pass: cr?.pass, slot: cr?.who?.slot, by: want === 'int' ? cr?.by?.slot : undefined, sit, passShare,
   };
 }
 
@@ -145,14 +157,17 @@ function setupFor(t: ReplayTarget, seed: number): ReplaySetup {
   const pick = mulberry32(seed ^ 0x5eed);
   const any = <T>(xs: T[]) => xs[Math.floor(pick() * xs.length)];
   const qbRun = t.slot === 'QB' && t.pass === false;
-  const pass = t.want === 'int' || t.want === 'sack' || (t.pass ?? (t.gain >= 20 ? pick() < 0.8 : pick() < t.passShare));
+  const share = t.sit ? passOdds(t.passShare, t.sit) : t.passShare;
+  const pass = t.want === 'int' || t.want === 'sack' || (t.pass ?? (t.gain >= 20 ? pick() < 0.8 : pick() < share));
   const play = qbRun ? any(QB_RUNS) : pass ? any(PASS_POOL) : any(RB_RUNS);
-  const call = pickDefCall(pick, situationMix(t.defIdent, t.down, t.toGo, 100 - t.yard)) ?? DEF_CALLS[0];
+  // The defense calls the situation too: prevent late against a score, a loaded box against the clock.
+  const call = pickDefCall(pick, situationMix(t.defIdent, t.down, t.toGo, 100 - t.yard, undefined, false, t.sit)) ?? DEF_CALLS[0];
+  const tags: DefTags = preventLevel(t.sit) ? { prevent: true } : {};
   const pr = t.defIdent.press;
   const press = { CB1: pick() < pr.CB1, CB2: pick() < pr.CB2, NB: pick() < pr.NB };
   const hold = any(t.want === 'sack' ? REPLAY.sackHolds : REPLAY.holds);
   const target = t.want === 'int' ? 'tight' : pass && t.slot && t.slot !== 'QB' ? t.slot : 'open';
-  return { seed, play, call, press, plan: { kind: pass ? 'pass' : 'run', hold, target } };
+  return { seed, play, call, tags, press, plan: { kind: pass ? 'pass' : 'run', hold, target } };
 }
 
 /**

@@ -164,6 +164,8 @@ export function pickDefCall(rng: () => number, mix?: Record<string, number>): De
 export interface DefTags {
   spy?: boolean;
   contain?: boolean;
+  /** Prevent: late, with a lead to protect, play soft and deep (`PREVENT`, sim/ai.ts). */
+  prevent?: boolean;
 }
 
 /** The call's assignments with its tags laid on: the spy comes from `spyFrom`, contain goes to the ends. */

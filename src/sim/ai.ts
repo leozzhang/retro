@@ -54,6 +54,11 @@ const ZONE_LEASH = 5;
 const DEEP_OVER_NARROW = 3;
 /** A zone defender sits this far under (QB side of) the receiver in his area. */
 const ZONE_UNDER = 1.5;
+/**
+ * Prevent (`DefTags.prevent`, late with a lead to protect): corners in man start `cushion` yards
+ * deeper, and deep zones sit `deep` yards deeper and stay that much farther over the top.
+ */
+export const PREVENT = { cushion: 3, deep: 4 };
 /** A spy sits this deep, mirroring the QB across the field. */
 const SPY_DEPTH = 5;
 /** A contain rusher works to this far outside the QB and doesn't take the inside lane until he's this close. */
@@ -570,10 +575,11 @@ function deepZone(play: Play, d: Player, yMin: number, yMax: number): void {
     if (o.pos.y < yMin || o.pos.y > yMax || o.pos.x < play.los + 4) continue;
     if (!deepest || o.pos.x > deepest.pos.x) deepest = o;
   }
-  let tx = play.los + 12;
+  const soft = play.prevent ? PREVENT.deep : 0;
+  let tx = play.los + 12 + soft;
   let ty = mid;
   // A third or a quarter plays tighter over the top than a half or the whole field.
-  const over = yMax - yMin < FIELD_W / 2 - 1 ? DEEP_OVER_NARROW : 5;
+  const over = (yMax - yMin < FIELD_W / 2 - 1 ? DEEP_OVER_NARROW : 5) + soft;
   if (deepest) {
     tx = Math.max(tx, deepest.pos.x + over);
     ty = lerp(mid, deepest.pos.y, deepest.pos.x > play.los + 10 ? 0.75 : 0.35);

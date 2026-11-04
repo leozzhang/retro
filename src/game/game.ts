@@ -1,5 +1,6 @@
 import { pickDefCall, type DefCall, type DefTags } from '../data/defenses';
-import { defIdentity, situationMix } from '../data/identity';
+import type { Situation } from './situation';
+import { defIdentity, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage } from '../data/confidence';
@@ -65,15 +66,16 @@ import { squadFor, staffFor } from '../season/world';
 import { adjustments, callFor, halftime as brainHalftime, headline, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
 import { successful } from '../season/grades';
 import { SCOUT_TIERS } from '../season/scouting';
-import { driveLog, INT_SHARE, simPart } from '../season/simGame';
-import { newStory, type StoryDrive } from '../season/story';
+import { driveLog, lineupOf, simPart } from '../season/simGame';
+import { castDrive } from '../season/cast';
+import { newStory, type DriveCredit, type StoryDrive } from '../season/story';
 import type { BoxScore, DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
 import { drawShow, keyShow, prefetchShow, updateShow, type KeyShow, type ShowCtx } from './highlights';
 import { KEY_LEVELS, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { text, textWidth } from '../render/text';
 import {
-  adminStop, advanceSim, afterPlay, clockText, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
+  adminStop, advanceSim, afterPlay, clockText, inOvertime, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
   QUARTER_DRIVES, QUARTER_LABELS, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap, snapClock, tickBetween, tickLive,
   timeLeftInHalf, type Clock, type Tempo,
 } from './clock';
@@ -82,7 +84,7 @@ import { Play } from './playState';
 import { personnelOf } from './resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, simTwoPoint, simulateDrive, startDrive, userStartAfter,
-  type Applied, type Drive, type KickOutcome, type PlayOutcome, type SimPlay,
+  type Applied, type Drive, type DriveClock, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
@@ -1700,6 +1702,17 @@ export class Game {
 
   // ------------------------------------------------------------ play call
 
+  /** The user's offense's situation this snap, for the CPU defense's call. */
+  private userSituation(): Situation {
+    const c = this.clock;
+    const ot = inOvertime(c);
+    return {
+      down: this.drive.down, toGo: this.drive.firstDownX - this.drive.los, yardsToGoal: OPP_GOAL - this.drive.los,
+      secsLeft: ot ? Infinity : timeLeftInHalf(c), qSecs: c.qSecs, finalHalf: c.quarter >= 3, lead: this.score.user - this.score.cpu,
+      ot: ot && this.ot ? (this.ot.turn === 1 ? 'second' : 'first') : undefined,
+    };
+  }
+
   private toCall(mode: CallMode = 'normal'): void {
     if (mode === 'pat' && this.mustGoForTwo()) mode = 'try';
     this.screen = 'call';
@@ -1711,15 +1724,17 @@ export class Game {
     // The CPU defense's identity: its own call mix (more zero blitz on third and long if that's who it is) and press rates.
     const ident = defIdentity(this.cpu);
     const toGo = this.drive.firstDownX - this.drive.los;
+    // The clock and score too: prevent against a late score, a sell-out against the clock running out.
+    const sit = this.userSituation();
     if (this.brain && mode === 'normal') {
       // The DC's call with what he's learned, and maybe a line about it for the user.
-      const pick = callFor(this.brain, ident, this.drive.down, toGo, OPP_GOAL - this.drive.los, this.rng);
+      const pick = callFor(this.brain, ident, this.drive.down, toGo, OPP_GOAL - this.drive.los, this.rng, sit);
       this.defCall = pick.call;
       this.defTags = pick.tags;
       this.dcNote = headline(this.brain, playName) ?? this.dcNote;
     } else {
-      this.defCall = pickDefCall(this.rng, situationMix(ident, this.drive.down, toGo, OPP_GOAL - this.drive.los));
-      this.defTags = {};
+      this.defCall = pickDefCall(this.rng, situationMix(ident, this.drive.down, toGo, OPP_GOAL - this.drive.los, undefined, false, sit));
+      this.defTags = preventLevel(sit) ? { prevent: true } : {};
     }
     const pr = ident.press;
     this.press = { CB1: this.rng() < pr.CB1, CB2: this.rng() < pr.CB2, NB: this.rng() < pr.NB };
@@ -2238,7 +2253,8 @@ export class Game {
     const plays: SimPlay[] = [];
     const cpuConf = teamConf(this.cpuSquad);
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: true };
-    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, OVERTIME.start, this.rng, undefined,
+    const otClock: DriveClock = { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first' };
+    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, OVERTIME.start, this.rng, otClock,
       (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, true));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
@@ -2250,7 +2266,7 @@ export class Game {
     const points = td ? (kick ? 7 : 6) : sim.points;
     this.showCpuDrive({
       off: this.cpu.id, half: period + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-      start: OVERTIME.start, result: sim.result, points, plays, credit: { catches: [], runs: [] },
+      start: OVERTIME.start, result: sim.result, points, plays, credit: this.castCpu(plays, otClock, OVERTIME.start),
     });
     this.score.cpu += points;
     this.notify({
@@ -2264,13 +2280,25 @@ export class Game {
   /** A CPU two-point try in overtime, simulated (`simTwoPoint`) and shown as a key play. */
   private cpuTwoPoint(): void {
     const good = simTwoPoint(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, this.rng);
+    const plays: SimPlay[] = [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }];
     this.showCpuDrive({
       off: this.cpu.id, half: this.otPeriods() + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-      start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, credit: { catches: [], runs: [] },
-      plays: [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }],
+      start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, plays,
+      credit: this.castCpu(plays, { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: 'second' }, 97),
     });
     if (good) this.score.cpu += 2;
     this.notify({ title: `${this.cpu.abbr} TWO-POINT TRY: ${good ? 'GOOD' : 'NO GOOD'}`, sub: this.scoreLine(), extra: '', color: good ? '#ff5a5a' : '#ffd23f' });
+  }
+
+  /**
+   * Who made each snap of a CPU drive (season/cast.ts), so its key plays show the real players: the
+   * CPU's best receivers get more of the big catches, the user's best cover men more of the picks. On
+   * a stream of its own, seeded by the drive: the game's random stream is untouched.
+   */
+  private castCpu(plays: SimPlay[], clock: DriveClock, salt: number): DriveCredit {
+    const plan = autoGamePlan(this.cpuSquad, this.userSquad);
+    const seed = (salt * 7919 + plays.length * 131 + this.score.user * 17 + this.score.cpu * 3 + this.clock.quarter * 1009) >>> 0;
+    return { snaps: castDrive(plays, lineupOf(this.cpuSquad, plan), lineupOf(this.userSquad, plan), clock, mulberry32(seed)) };
   }
 
   /** Queue a CPU drive's key plays at the defense's key-play level. */
@@ -2378,24 +2406,19 @@ export class Game {
     const c = this.clock;
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
-    const late = (c.quarter === 4 && left < Math.min(300, c.qSecs * 0.4)) || (c.quarter === 2 && left < 120);
     const plays: SimPlay[] = [];
     const cpuConf = teamConf(this.cpuSquad);
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
     // Watching the snaps (for the grades and the key plays) draws no random numbers.
-    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, {
-      timeLeft: left, hurry: diff < 0 && late, milk: diff > 0 && c.quarter === 4,
-    }, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
+    const dc: DriveClock = { timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs };
+    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, dc, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
     const level = this.keyLevel('defense');
     if (level !== 'off') {
       const d: StoryDrive = {
         off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-        start, result: sim.result, points: sim.points, plays, credit: { catches: [], runs: [] },
+        start, result: sim.result, points: sim.points, plays, credit: this.castCpu(plays, dc, start + left),
       };
-      // No box score here, so a turnover is a pick or a fumble as the box score would split them, from
-      // the show's own draw: the game's random stream is untouched.
-      if (sim.result === 'TURNOVER') d.credit.int = mulberry32((start * 7919 + plays.length * 131 + this.score.user * 17 + this.score.cpu) >>> 0)() < INT_SHARE;
       this.queueShows(pickDrive(d, level, 'defense'));
     }
     const { halfOver } = advanceSim(c, sim.secs);

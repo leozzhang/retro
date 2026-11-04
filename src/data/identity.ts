@@ -1,4 +1,5 @@
 import { clamp, hashString } from '../engine/math';
+import { desperate, tempo, type Situation } from '../game/situation';
 import { buildStaff } from './coaches';
 import { DEF_CALLS, rushers, type DefCall } from './defenses';
 import type { Team } from './teams';
@@ -46,6 +47,14 @@ export interface DefIdentity {
  *   pressure by the style's `longBlitz`; short yardage (`shortToGo` or less on third or fourth, or at
  *   the goal line) loads the box and opens the Goal Line call; the red zone plays tighter man.
  * - `floor`: the share of each call's prior that's always kept, so nothing is ever off the table.
+ * - `inchesBox`: more box on top of `shortBox` on 3rd or 4th and inches, or at the 1 (the sneak).
+ * - The clock and score (`lateDials`, with the offense's `Situation`):
+ *   - `prevent*`: the offense tied or down one score (`preventMargin`) inside `preventSecs` of the 4th,
+ *     outside the red zone, plays soft: two-high zone, no pressure, no press, deeper (`DefTags.prevent`).
+ *     It grows as the clock runs down (`preventMin` up to 1), is `preventHalf` in the last
+ *     `preventHalfSecs` of the 1st half, and `preventMax` against a last-snap heave.
+ *   - `sellout*`: the defense behind late against an offense running the clock out loads the box and
+ *     brings pressure to get the ball back.
  */
 export const IDENTITY = {
   prior: {
@@ -70,6 +79,15 @@ export const IDENTITY = {
   redMan: 0.3,
   redTwoHigh: -0.3,
   floor: 0.15,
+  inchesBox: 0.4,
+  preventMargin: 8,
+  preventSecs: 120,
+  preventMin: 0.3,
+  preventHalfSecs: 30,
+  preventHalf: 0.6,
+  preventMax: 1.5,
+  preventDials: { twoHigh: 0.9, blitz: -0.8, man: -0.6 },
+  selloutDials: { box: 0.5, blitz: 0.4 },
 };
 
 /** A call's traits the dials weigh: extra rushers, man or zone, two-high or not, and box count against 7. */
@@ -140,12 +158,38 @@ export function shortYardage(down: number, toGo: number, yardsToGoal = 99): bool
   return (down >= 3 && toGo <= IDENTITY.shortToGo) || yardsToGoal <= IDENTITY.goalLine;
 }
 
-/** The situation's dials for this snap. */
-export function situationDials(id: DefIdentity, down: number, toGo: number, yardsToGoal = 99): Dials {
+/** How far into prevent the defense plays (0: not at all), from the offense's situation. */
+export function preventLevel(s: Situation | undefined): number {
+  const I = IDENTITY;
+  if (!s || s.ot || s.yardsToGoal <= I.redZone) return 0;
+  if (desperate(s)) return I.preventMax;
+  if (!s.finalHalf) return s.secsLeft <= I.preventHalfSecs ? I.preventHalf : 0;
+  if (s.lead > 0 || s.lead < -I.preventMargin || s.secsLeft > I.preventSecs) return 0;
+  return clamp(1.2 - s.secsLeft / I.preventSecs, I.preventMin, 1);
+}
+
+/** The clock and score's dials: prevent against a team that needs a score late, a sell-out against one running the clock out. */
+export function lateDials(s: Situation): Partial<Dials> {
+  const p = preventLevel(s);
+  if (p) {
+    const P = IDENTITY.preventDials;
+    return { twoHigh: P.twoHigh * p, blitz: P.blitz * p, man: P.man * p };
+  }
+  if (tempo(s) === 'milk' && s.secsLeft <= 300) return IDENTITY.selloutDials;
+  return {};
+}
+
+/** The situation's dials for this snap; `late`, the offense's whole situation, adds the clock and score. */
+export function situationDials(id: DefIdentity, down: number, toGo: number, yardsToGoal = 99, late?: Situation): Dials {
   let d = id.dials;
   if (longYardage(down, toGo)) d = addDials(d, { blitz: Math.log(id.longBlitz), twoHigh: IDENTITY.longTwoHigh });
   if (shortYardage(down, toGo, yardsToGoal)) d = addDials(d, { box: IDENTITY.shortBox });
+  if ((down >= 3 && toGo < 1) || yardsToGoal <= 1) d = addDials(d, { box: IDENTITY.inchesBox });
   if (yardsToGoal <= IDENTITY.redZone) d = addDials(d, { man: IDENTITY.redMan, twoHigh: IDENTITY.redTwoHigh });
+  if (late) {
+    const l = lateDials(late);
+    if (Object.keys(l).length) d = addDials(d, l);
+  }
   return d;
 }
 
@@ -155,9 +199,9 @@ export function situationDials(id: DefIdentity, down: number, toGo: number, yard
  * run you keep calling). With no situation and no shift it's `id.mix`.
  */
 export function situationMix(
-  id: DefIdentity, down: number, toGo: number, yardsToGoal = 99, shift?: Partial<Dials>, heavy = false,
+  id: DefIdentity, down: number, toGo: number, yardsToGoal = 99, shift?: Partial<Dials>, heavy = false, late?: Situation,
 ): Record<string, number> {
-  const d = situationDials(id, down, toGo, yardsToGoal);
+  const d = situationDials(id, down, toGo, yardsToGoal, late);
   if (d === id.dials && !shift && !heavy) return id.mix;
   return mixFor(shift ? addDials(d, shift) : d, heavy || shortYardage(down, toGo, yardsToGoal));
 }

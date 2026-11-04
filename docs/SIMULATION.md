@@ -15,6 +15,36 @@ None of these draw random numbers. Replays run the real play engine on their own
 - `highlights.test.ts`: a week with a story gives the same JSON as one without, and `simGame` with a story gives the same result.
 - `season.txt` and `balance.txt` came out unchanged apart from the timings and the new PARTIAL SIM section.
 
+## Situational coaching (`game/situation.ts`)
+`simulateDrive` coaches the score and the clock when its `DriveClock` has the offense's `lead`. Every caller passes it: the live game's CPU drives and overtime, `simGame` and its overtime, and `simPart`. Without it, the drive runs exactly as before.
+- **4th down** (`fourthDown`): kick when the field goal is in range (52) and the points help, meaning they tie or lead, or there's time to score the rest (`cycleSecs`, 120 s, per own possession). Go for it when it has to. Otherwise there's the old 50% gamble on 4th and 2 or less past the 45, then a punt. Going for it plays a real 4th-down snap, which is logged. Overtime has no punts. Going second in overtime, it kicks only to tie or win.
+- **Last snap** (`kickNow`, inside 0:20): kick only if the field goal helps. If the offense is beyond field goal range and needs a score (or it's the end of the 1st half), it's a **heave** (`desperate`): a touchdown 7% of the time (plus 0.3% per point of gap, 2–15%), an interception 15%, otherwise incomplete.
+- **Tempo** (`tempo`), snap by snap:
+  - hurry when trailing inside 2:00 of either half, or the last 5:00 (40% of a quarter) of the 4th
+  - milk when ahead in the 4th
+  - kneel when ahead and the play clock covers the time left
+  - kneel out the 1st half from inside its own 30 with 0:40 left
+  
+  Kneels and incomplete heaves are never key plays.
+- **Pass or run** (`passOdds`): the plan's share, +0.25 on 3rd and 7+, -0.25 on 3rd and 2 or less, +0.25 in the hurry-up, -0.3 when milking. Casting and the replays read it.
+
+## Casting: who made each snap (`season/cast.ts`)
+The drive sim decides each snap's yards from team ratings. `castSnap` then gives the snap to real players, weighted by their ratings and by what the snap was, on a stream of its own. It never changes a result.
+- **Pass or run:** `passOdds` for the situation, times how likely the gain is on each. A 15+ gain leans pass (×2.5 vs ×0.6), and a 3+ loss on a pass is a sack.
+- **Receivers:** `TARGETS` share × (overall/75)² × fit^`sharp` (3). The fit is `spd` and `rte` on a deep gain, `rte` and `cth` on a short one. A receiver 15 points faster and sharper gets about 1.7× the long catches.
+- **Runners:** RB or QB by `QB_RUN_SHARE`. Long runs weigh `spd` and `elu`.
+- **Interceptions** go to a DB by `cth` and coverage. **Sacks** go to a front player by `rsh` and `spd`.
+
+**The box score** (`credit`, simGame.ts) is the sum of the cast snaps:
+- Catches and runs carry their real yards.
+- Sacks and kneels are rushes (NCAA).
+- Each catch carries 0.61 hidden incompletions on average, for a 62% completion rate, because the drive sim logs only snaps with yards.
+- The casting stream is forked once per game from the game's stream, so a story never changes the result.
+
+**Live CPU drives** cast too (`Game.castCpu`), on a stream seeded by the drive. Their key plays name the CPU's real receivers and the user's real defenders.
+
+**The story** keeps the cast per snap (`DriveCredit.snaps`, aligned with `plays`). The replay goes to the cast player (`slot`), an interception has to be the cast DB's (`by`), and the replay's defense calls the snap's situation (`ReplayTarget.sit`).
+
 ## PLAY GAME's choices
 PLAY GAME on the hub opens a choice:
 - the whole game
@@ -56,7 +86,7 @@ Each snap of a drive gets a priority:
 | 2 | big plays (20+), fourth-down conversions, third downs converted from 7+; on defense, also stops, sacks and red-zone stops |
 | 1, FULL only | other third downs, sacks, 12+ gains |
 
-Fourth-down tries aren't logged by the drive sim, so they're rebuilt from the gaps between snaps.
+Fourth-down tries are logged when the drive sim knows the score, which every caller now gives it. Without the score, they're rebuilt from the gaps between snaps.
 
 `KEY_PLAYS` sets the levels:
 
@@ -86,11 +116,11 @@ It then runs the engine headless with `autoStep`, a per-step CPU QB and runner. 
 
 **A match** needs:
 - the same kind: TD, INT (never a pick six), sack, or a gain within `max(3, 25%)` with the same first-down result
-- the ball going to the credited player's slot, so the replay names the player the box score credits
+- the ball going to the credited player's slot, so the replay names the player the box score credits, and an interception by the cast DB
 
 **Field goals** replay as kicks (`FgSearch`): the CPU kicker, in calm air, tries a power and line drawn from the seed and stops the meter at a drawn spot (near the middle for a make, early or late for a miss). A try matches when it's good or no good like the sim's (never blocked). The screen hides the timing meter and keeps the goal cam.
 
-**Lost fumbles:** the play engine never loses a fumble, so the replay is a run or catch tackled on the sim's spot (`want: 'fumble'`). After the play is over, `Play.knockLoose` pops the ball out and the nearest free defender falls on it (`recoverer`); the caption names him. A CPU drive in a played game has no box score, so its turnover is split into a pick or a fumble at `INT_SHARE` by the show's own draw.
+**Lost fumbles:** the play engine never loses a fumble, so the replay is a run or catch tackled on the sim's spot (`want: 'fumble'`). After the play is over, `Play.knockLoose` pops the ball out and the nearest free defender falls on it (`recoverer`); the caption names him. A CPU drive in a played game is cast like any other (`Game.castCpu`), so its turnover is a pick or a fumble as cast.
 
 **Rate:** about 97% of key plays match between close teams (the test requires 85%; fumbles 8 of 8), and every field goal in the test sample (48 of 48, 12 of them misses; it requires 90%). The rest show as a card: the ball slides the sim's yards under the same caption.
 

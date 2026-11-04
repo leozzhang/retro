@@ -42,7 +42,7 @@ describe('highlights', () => {
         // Snaps start where the last one ended.
         const snaps = d.plays.filter((p) => !p.fg && !p.punt);
         if (snaps.length) expect(snaps[0].yard).toBe(d.start);
-        if (d.result === 'TOUCHDOWN') expect(d.credit.td).toBeDefined();
+        if (d.result === 'TOUCHDOWN' && !d.try) expect(d.credit.snaps[d.plays.length - 1]?.who).toBeDefined();
       }
     }
   });
@@ -98,7 +98,7 @@ describe('highlights', () => {
           const dp = pickDrive(d, level, 'defense');
           expect(dp.length).toBeLessThanOrEqual(KEY_PLAYS.perDrive.defense[level]);
           if (level !== 'off' && (d.result === 'TOUCHDOWN' || d.result === 'TURNOVER')) {
-            expect(dp.some((k) => k.kind === 'td' || k.kind === 'int' || k.kind === 'fumble')).toBe(true);
+            expect(dp.some((k) => k.kind === 'td' || k.kind === 'twoPt' || k.kind === 'int' || k.kind === 'fumble')).toBe(true);
           }
         }
         // Each quarter: no more than the cap beyond its must-shows.

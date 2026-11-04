@@ -1,4 +1,5 @@
 import type { DriveSim, SimPlay } from '../game/rules';
+import type { SnapCredit } from './cast';
 
 /**
  * A simulated game told drive by drive, for the key-play highlights (game/keyPlays.ts). It's
@@ -6,21 +7,16 @@ import type { DriveSim, SimPlay } from '../game/rules';
  * so a game with a story plays exactly like one without. Plain JSON.
  */
 
-/** One player `credit()` gave part of a drive to: his slot, name and yards on that carry or catch. */
+/** A player credited with a snap: his slot, name and yards on that carry or catch. */
 export interface Credited {
   slot: string;
   name: string;
   yds: number;
 }
 
-/** Who a drive's box-score credit went to, so a highlight names the same players the box score does. */
+/** Who made each snap (season/cast.ts), aligned with the drive's `plays`, so a highlight names the players the box score does. */
 export interface DriveCredit {
-  catches: Credited[];
-  runs: Credited[];
-  /** The touchdown's scorer, and whether it was a pass. */
-  td?: Credited & { pass: boolean };
-  /** A turnover that was an interception (otherwise a fumble). */
-  int?: boolean;
+  snaps: (SnapCredit | null)[];
 }
 
 export interface StoryDrive {

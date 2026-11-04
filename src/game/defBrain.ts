@@ -1,10 +1,11 @@
 import { pickDefCall, rushers, type DefCall, type DefTags } from '../data/defenses';
-import { addDials, shortYardage, situationMix, ZERO_DIALS, type DefIdentity, type Dials } from '../data/identity';
+import { addDials, preventLevel, shortYardage, situationMix, ZERO_DIALS, type DefIdentity, type Dials } from '../data/identity';
 import type { PlayDef } from '../data/plays';
 import type { DefSlot } from '../data/teams';
 import { clamp, gauss, lerp, mulberry32, type Rng } from '../engine/math';
 import { playTraits } from '../season/scouting';
 import { NO_LEAN, type Lean } from '../sim/player';
+import type { Situation } from './situation';
 
 /**
  * The CPU defense learns your offense during a live game (docs/DEFENSE.md). Two layers read one book
@@ -333,17 +334,18 @@ function spamBox(b: DefBrain): number {
 
 /** The DC's call for this snap: one draw from the game's stream for the call, tags from the brain's own. */
 export function callFor(
-  b: DefBrain, id: DefIdentity, down: number, toGo: number, yardsToGoal: number, rng: Rng,
+  b: DefBrain, id: DefIdentity, down: number, toGo: number, yardsToGoal: number, rng: Rng, late?: Situation,
 ): { call: DefCall; tags: DefTags } {
   const short = shortYardage(down, toGo, yardsToGoal);
   const spam = spamBox(b);
   const box = Math.max(short ? shortBox(b) : 0, spam);
   const shift = box ? addDials(b.shift, { box }) : b.shift;
-  const call = pickDefCall(rng, situationMix(id, down, toGo, yardsToGoal, shift, spam > 0));
+  const call = pickDefCall(rng, situationMix(id, down, toGo, yardsToGoal, shift, spam > 0, late));
   const r = rnd(b);
   const tags: DefTags = {};
   if (call.spyFrom && r() < b.tags.spy) tags.spy = true;
   if (r() < b.tags.contain) tags.contain = true;
+  if (preventLevel(late)) tags.prevent = true;
   return { call, tags };
 }
 

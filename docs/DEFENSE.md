@@ -106,6 +106,15 @@ A call's weight is its league prior (`IDENTITY.prior`) × exp(Σ dial × trait).
 - **Third and 7+:** pressure × the style's `longBlitz`, and +0.3 two-high.
 - **Short yardage** (3rd or 4th and 2 or less, or inside the 3): +0.6 box. Goal Line becomes available.
 - **Red zone:** +0.3 man and -0.3 two-high.
+- **Inches** (3rd or 4th and under a yard, or at the 1): another +0.4 box, so Bear and Goal Line come up against the sneak.
+
+**The clock and score add dials too** (`lateDials`, from the offense's `Situation` in `game/situation.ts`):
+- **Prevent** (`preventLevel`): the offense is tied or down one score (8 or less), inside the last 2:00 of the 4th, and outside the red zone. It grows from 0.3 to 1 as the clock runs down. It's 0.6 in the last 0:30 of the 1st half at any score, and 1.5 against a last-snap heave.
+  - The dials, × the level: +0.9 two-high, -0.8 blitz, -0.6 man.
+  - The call gets the **prevent tag** (`DefTags.prevent`). On the field, the corners don't press, man corners start 3 yd deeper, and deep zones sit 4 yd deeper and stay 4 yd farther over the top (`PREVENT`, `sim/ai.ts`).
+- **Sell-out:** the defense trails late and the offense is milking the clock (inside 5:00): +0.5 box, +0.4 blitz.
+
+Three places call it: the CPU's live defense (`Game.toCall`, through `callFor`), the brainless CPU defense at DEFENSE IQ OFF, and every replay's defense (`replay.ts`), which includes the user's own defense on CPU drives. A zero lean, no tags and no situation leave every core row as it was.
 
 ## The brain (`src/game/defBrain.ts`)
 **Live games only.** CPU-vs-CPU games and the drive sim don't model calls, so season results don't change.

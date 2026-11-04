@@ -7,7 +7,7 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { cutKeep, facingQB, isRusher, matchZones, returnerAI, seesThrow, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
+import { cutKeep, facingQB, isRusher, matchZones, PREVENT, returnerAI, seesThrow, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
 import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
@@ -134,6 +134,8 @@ export class Play {
   /** The play as laid out for this snap (mirroring, personnel, concept routes). */
   readonly resolved: ResolvedPlay;
   readonly defCall: DefCall;
+  /** The defense is in prevent (`DefTags.prevent`): no press, deeper cushions and deep zones (`PREVENT`). */
+  readonly prevent: boolean;
   /** Defensive personnel for this snap, matched to the offense's. */
   readonly defPackage: DefPackage;
   readonly qbDrop: Vec;
@@ -221,6 +223,7 @@ export class Play {
           ? { x: this.los + qbPath[0], y: clamp(this.ballY + qbPath[1] * rp.strongSign, 2, FIELD_W - 2) }
           : { x: this.los + 1.5, y: this.ballY };
 
+    this.prevent = !!s.tags?.prevent;
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
     const assign = taggedAssign(s.defCall, plan.assign, s.tags);
@@ -315,9 +318,10 @@ export class Play {
       d.manTarget = t;
       const inside = Math.sign(by - t.pos.y) || 1;
       if (d.role === 'CB') {
+        press = press && !this.prevent;
         d.press = press;
         // A corner worried about the deep ball bails deeper.
-        d.cushion = press ? 1 : (slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5) + LEAN_FX.bail * Math.max(0, d.lean.deep);
+        d.cushion = press ? 1 : (slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5) + LEAN_FX.bail * Math.max(0, d.lean.deep) + (this.prevent ? PREVENT.cushion : 0);
         d.turned = press;
         pos = { x: los + d.cushion, y: t.pos.y + inside * 0.8 };
       } else if (d.role === 'LB') {
@@ -331,7 +335,7 @@ export class Play {
       // Corners in a deep third or quarter line up over the outside receiver; a backer carrying the
       // middle (Tampa 2) shows his normal spot.
       if (d.role === 'CB') pos = this.overWidest(slot, off, 7, 1);
-      else if (d.role === 'S') pos = { x: los + 12.5 + this.rng() * 1.5, y: (a.yMin + a.yMax) / 2 };
+      else if (d.role === 'S') pos = { x: los + 12.5 + this.rng() * 1.5 + (this.prevent ? PREVENT.deep : 0), y: (a.yMin + a.yMax) / 2 };
     } else if (a.kind === 'robber') {
       pos = { x: los + 9, y: by };
     } else if (a.kind === 'zone') {

@@ -2,6 +2,7 @@ import { FIELD_W, HASH_BOT, HASH_TOP, OPP_GOAL, OWN_GOAL } from '../engine/const
 import { CONF, leverage, unitEdge, type UnitConf } from '../data/confidence';
 import { clamp, gauss, type Rng } from '../engine/math';
 import { explosiveFactor, kickEdge, snapEdge, turnoverFactor, type DriveMods } from '../season/emphasis';
+import { desperate, fourthDown, kickNow, SITUATION, tempo, type Situation } from './situation';
 
 /** 'fumble' = botched exchange or pitch, recovered by the offense (spotted like a tackle). */
 export type OutcomeType = 'tackle' | 'oob' | 'incomplete' | 'td' | 'int' | 'pick6' | 'sack' | 'safety' | 'fumble';
@@ -208,9 +209,32 @@ export interface DriveClock {
    * no last-second field goal, the drive just stops and is played on from there.
    */
   quarterBreak?: boolean;
+  /** With `quarterBreak`: the half's seconds after the break, so the coaching reads the real clock. */
+  pastBreak?: number;
+  /**
+   * The offense's points minus the defense's when the drive starts. With it, the offense coaches the
+   * situation (game/situation.ts): 4th downs and last-second kicks by whether the points help, tempo
+   * by the clock and score snap by snap (in place of `hurry` and `milk`), kneeling out a lead, and a
+   * heave to the end zone on the last snap. Without it the drive runs as it always has.
+   */
+  lead?: number;
+  /** The 2nd half (or overtime): no possessions after the clock runs out. Missing is the 2nd half. */
+  finalHalf?: boolean;
+  /** Quarter length in seconds, for the 4th-quarter tempo (missing: 900). */
+  qSecs?: number;
+  /** Overtime: the offense has the period's first or second possession. */
+  ot?: 'first' | 'second';
 }
 
 const NO_CLOCK: DriveClock = { timeLeft: Infinity, hurry: false, milk: false };
+
+/** The situation `secs` into a drive on `clock`, at this down, distance and spot (yards from the offense's goal). */
+export function snapSituation(clock: DriveClock, down: number, toGo: number, yard: number, secs: number): Situation {
+  return {
+    down, toGo, yardsToGoal: 100 - yard, secsLeft: clock.timeLeft + (clock.pastBreak ?? 0) - secs, qSecs: clock.qSecs ?? 900,
+    finalHalf: clock.finalHalf ?? true, lead: clock.lead ?? 0, ot: clock.ot,
+  };
+}
 
 /** One simulated play, for whoever wants to grade it (progression). Reading it draws no random numbers. */
 export interface SimPlay {
@@ -230,6 +254,10 @@ export interface SimPlay {
   lev: number;
   /** The weekly emphases' edge on this snap or kick, in rating points (season/emphasis.ts). */
   em?: number;
+  /** A kneel-down running out the clock. */
+  kneel?: boolean;
+  /** A last-snap throw to the end zone (`desperate`). */
+  heave?: boolean;
 }
 
 /** Confidence for one drive: the offense's and defense's units and the kicker (`teamConf`), and whether it's late and close. */
@@ -243,11 +271,10 @@ export function fgOdds(dist: number, kEdge = 0): number {
 }
 
 /** Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap. */
-function simPlaySecs(c: DriveClock, rng: Rng): number {
-  const pace = c.pace ?? 1;
-  if (c.hurry) return clamp(15 + gauss(rng) * 4, 7, 25);
+function simPlaySecs(hurry: boolean, milk: boolean, pace: number, rng: Rng): number {
+  if (hurry) return clamp(15 + gauss(rng) * 4, 7, 25);
   if (rng() < 0.3) return clamp(7 + gauss(rng) * 2, 4, 12); // incompletion / out of bounds
-  return clamp(((c.milk ? 38 : 32) + gauss(rng) * 6) * pace, 14, 45);
+  return clamp(((milk ? 38 : 32) + gauss(rng) * 6) * pace, 14, 45);
 }
 
 /**
@@ -268,6 +295,12 @@ export const DRIVE_SIM = {
   explosiveMin: 15,
   explosiveTail: 12,
   turnover: 0.022,
+  /** A last-snap heave to the end zone: touchdown odds (plus `heaveTdPerPoint` per point of gap, within `heaveTdRange`) and interception odds; the rest fall incomplete. */
+  heaveTd: 0.07,
+  heaveTdPerPoint: 0.003,
+  heaveTdRange: [0.02, 0.15],
+  heaveInt: 0.15,
+  heaveSecs: 8,
 };
 
 /** Yards on one simulated play; `xf` scales the big-play odds (weekly emphases). */
@@ -298,11 +331,48 @@ export function simulateDrive(
   const done = (points: number, result: DriveSim['result'], end = yard): DriveSim => ({
     points, result, plays, yards: end - start, endYard: end, secs: Math.min(secs, clock.timeLeft),
   });
+  // The situation this snap, when the offense knows the score (`clock.lead`).
+  const sitNow = (): Situation | null => clock.lead === undefined ? null : snapSituation(clock, down, toGo, yard, secs);
+  const pace = clock.pace ?? 1;
   while (plays < 25) {
     if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
+    const sit = sitNow();
+    const tmp = sit ? tempo(sit) : null;
+    if (tmp === 'kneel' && !clock.quarterBreak) {
+      // Victory formation: kneel until the clock runs out.
+      while (secs < clock.timeLeft) {
+        plays++;
+        onPlay?.({ gain: -1, explosive: false, turnover: false, down, toGo, yard, t: secs, lev: 0, kneel: true });
+        yard -= 1;
+        toGo += 1;
+        down++;
+        secs += SITUATION.kneelSecs;
+      }
+      return done(0, 'END OF HALF');
+    }
+    if (sit && desperate(sit) && !clock.quarterBreak) {
+      // One snap left and a field goal won't do: throw it to the end zone.
+      plays++;
+      const at = { yard, t: secs };
+      secs += DRIVE_SIM.heaveSecs;
+      const lev = leverage(down, 100 - yard, conf?.late ?? false);
+      const [lo, hi] = DRIVE_SIM.heaveTdRange;
+      const r = rng();
+      if (r < clamp(DRIVE_SIM.heaveTd + diff * DRIVE_SIM.heaveTdPerPoint, lo, hi)) {
+        onPlay?.({ gain: 100 - yard, explosive: true, turnover: false, down, toGo, ...at, lev, heave: true });
+        return done(7, 'TOUCHDOWN', 100);
+      }
+      if (r > 1 - DRIVE_SIM.heaveInt) {
+        onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, ...at, lev, heave: true });
+        return done(0, 'TURNOVER');
+      }
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, ...at, lev, heave: true });
+      if (++down > 4) return done(0, 'DOWNS');
+      continue;
+    }
     plays++;
     const at = { yard, t: secs };
-    secs += simPlaySecs(clock, rng);
+    secs += sit ? simPlaySecs(tmp === 'hurry', tmp === 'milk', pace, rng) : simPlaySecs(clock.hurry, clock.milk, pace, rng);
     const lev = leverage(down, 100 - yard, conf?.late ?? false);
     const em = mods ? snapEdge(mods, down, toGo, yard) : 0;
     const emp = em ? { em } : {};
@@ -322,16 +392,32 @@ export function simulateDrive(
     }
     down++;
     const fgDist = 100 - yard + 17;
+    const kick = (): DriveSim => {
+      const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);
+      const kEm = mods ? kickEdge(mods, fgDist) : 0;
+      const made = rng() < fgOdds(fgDist, (conf ? unitEdge(conf.k, fgLev) : 0) + kEm);
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
+      return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
+    };
+    const punt = (): DriveSim => {
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
+      return done(0, 'PUNT');
+    };
+    const next = sitNow();
+    if (next) {
+      // The coach reads the situation: 4th down, or out of time before it.
+      if (down > 4) return done(0, 'DOWNS');
+      if (!clock.quarterBreak && kickNow(next)) return kick();
+      if (down < 4) continue;
+      const call = fourthDown(next, rng);
+      if (call === 'fg') return kick();
+      if (call === 'punt') return punt();
+      continue; // go for it: play the snap
+    }
     // Out of time with a makeable kick: line up for the field goal now.
     const lastPlay = !clock.quarterBreak && secs + 20 >= clock.timeLeft && fgDist <= 52;
     if (down === 4 || lastPlay) {
-      if (fgDist <= 52) {
-        const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);
-        const kEm = mods ? kickEdge(mods, fgDist) : 0;
-        const made = rng() < fgOdds(fgDist, (conf ? unitEdge(conf.k, fgLev) : 0) + kEm);
-        onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
-        return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
-      }
+      if (fgDist <= 52) return kick();
       if (toGo <= 2 && yard > 45 && rng() < 0.5) {
         const conv = rng() < 0.55 + edge * 0.02;
         if (conv) {
@@ -342,8 +428,7 @@ export function simulateDrive(
         }
         return done(0, 'DOWNS');
       }
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
-      return done(0, 'PUNT');
+      return punt();
     }
   }
   onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });

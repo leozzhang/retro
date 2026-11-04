@@ -1,5 +1,6 @@
 import type { SimPlay } from './rules';
-import { storyClock, type Credited, type GameStory, type StoryDrive } from '../season/story';
+import type { SnapCredit } from '../season/cast';
+import { storyClock, type GameStory, type StoryDrive } from '../season/story';
 import type { KeyLevel } from '../season/types';
 
 /**
@@ -28,8 +29,10 @@ export type KeyKind =
 
 export interface KeyPlay {
   drive: StoryDrive;
-  /** The snap. Fourth-down tries aren't logged by the drive sim, so those are rebuilt here. */
+  /** The snap. A drive sim without the score doesn't log its fourth-down tries, so those are rebuilt here. */
   play: SimPlay;
+  /** Who made the snap (season/cast.ts); missing for a rebuilt fourth down or a drive without casting. */
+  snap?: SnapCredit;
   kind: KeyKind;
   /** 3 always shows, 2 from NORMAL, 1 only on FULL. */
   priority: number;
@@ -61,33 +64,35 @@ export const KEY_PLAYS = {
 const isKick = (p: SimPlay) => !!(p.fg || p.punt);
 
 /** The fourth-down tries `simulateDrive` resolves without a logged snap, rebuilt from the gaps between snaps. */
-function withFourthDowns(d: StoryDrive): SimPlay[] {
-  const out: SimPlay[] = [];
+function withFourthDowns(d: StoryDrive): [SimPlay, SnapCredit | undefined][] {
+  const out: [SimPlay, SnapCredit | undefined][] = [];
   const snaps = d.plays;
   for (let i = 0; i < snaps.length; i++) {
     const a = snaps[i];
-    out.push(a);
-    if (isKick(a) || a.turnover) continue;
+    out.push([a, d.credit.snaps[i] ?? undefined]);
+    // A logged 4th-down snap (a coach going for it) needs no rebuilding.
+    if (isKick(a) || a.turnover || a.down === 4 || a.kneel) continue;
     const at = a.yard + a.gain;
     const toGo = a.toGo - a.gain;
     const b = snaps[i + 1];
     const go = { explosive: false, turnover: false, down: 4, toGo, yard: at, lev: 0 };
-    if (b && !isKick(b) && b.yard > at && toGo > 0) out.push({ ...go, gain: b.yard - at, t: b.t });
-    else if (!b && d.result === 'DOWNS') out.push({ ...go, gain: 0, t: a.t + 6 });
+    if (b && !isKick(b) && b.yard > at && toGo > 0) out.push([{ ...go, gain: b.yard - at, t: b.t }, undefined]);
+    else if (!b && d.result === 'DOWNS') out.push([{ ...go, gain: 0, t: a.t + 6 }, undefined]);
   }
   return out;
 }
 
 /** What a snap was, and how much it matters from this view (0: nothing to show). */
-function classify(d: StoryDrive, p: SimPlay, last: boolean, view: KeyView): { kind: KeyKind; priority: number } | null {
+function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last: boolean, view: KeyView): { kind: KeyKind; priority: number } | null {
   const T = KEY_PLAYS;
   const dfn = view === 'defense';
   // An overtime two-point try always shows: it can decide the game.
   if (d.try) return { kind: d.points ? 'twoPt' : 'twoPtStop', priority: 3 };
   // Field goals are scoring plays, made or missed: always shown.
   if (p.fg) return { kind: p.fg.made ? 'fg' : 'missedFg', priority: 3 };
-  if (p.punt) return null;
-  if (p.turnover) return { kind: d.credit.int === false ? 'fumble' : 'int', priority: 3 };
+  if (p.punt || p.kneel) return null;
+  if (p.heave && !p.turnover && p.gain < 100 - p.yard) return null;
+  if (p.turnover) return { kind: snap?.kind === 'fumble' ? 'fumble' : 'int', priority: 3 };
   if (p.yard + p.gain >= 100) return { kind: 'td', priority: 3 };
   const conv = p.gain >= p.toGo;
   if (p.down === 4) return conv ? { kind: 'fourthConv', priority: 2 } : { kind: 'fourthStop', priority: 3 };
@@ -108,13 +113,13 @@ export function driveEvents(d: StoryDrive, view: KeyView): KeyPlay[] {
   const plays = withFourthDowns(d);
   // The last snap before the drive's kick or end, for red-zone stops.
   let lastSnap = -1;
-  plays.forEach((p, i) => {
+  plays.forEach(([p], i) => {
     if (!isKick(p)) lastSnap = i;
   });
   const out: KeyPlay[] = [];
-  plays.forEach((p, i) => {
-    const c = classify(d, p, i === lastSnap, view);
-    if (c) out.push({ drive: d, play: p, ...c });
+  plays.forEach(([p, snap], i) => {
+    const c = classify(d, p, snap, i === lastSnap, view);
+    if (c) out.push({ drive: d, play: p, ...(snap ? { snap } : {}), ...c });
   });
   return out;
 }
@@ -180,20 +185,7 @@ export function shownGain(p: SimPlay): number {
   return Math.min(p.gain, 100 - p.yard);
 }
 
-/**
- * Who the box score says made the play: the scorer of a touchdown, else the credited catch or carry
- * on the drive closest to the snap's yards (catches first on a big gain). `pass` tells the replay
- * which kind of play to look for; undefined when the drive has no credit (a CPU drive in a played game).
- */
-export function creditFor(k: KeyPlay): { pass: boolean; who?: Credited } | undefined {
-  const c = k.drive.credit;
-  if (k.kind === 'td' && c.td) return { pass: c.td.pass, who: c.td };
-  if (k.kind === 'int' || k.kind === 'sack') return { pass: true };
-  const g = k.play.gain;
-  const near = (list: Credited[]) => [...list].sort((a, b) => Math.abs(a.yds - g) - Math.abs(b.yds - g))[0];
-  const cat = near(c.catches);
-  const run = near(c.runs);
-  if (!cat && !run) return undefined;
-  if (cat && (!run || g >= KEY_PLAYS.explosive || Math.abs(cat.yds - g) <= Math.abs(run.yds - g))) return { pass: true, who: cat };
-  return { pass: false, who: run };
+/** Who made the play, as cast: the carrier or target and, for an interception or sack, the defender. */
+export function creditFor(k: KeyPlay): SnapCredit | undefined {
+  return k.snap;
 }
