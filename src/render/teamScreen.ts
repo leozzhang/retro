@@ -15,6 +15,7 @@ import { records, recordText } from '../season/standings';
 import type { Progress, SeasonState } from '../season/types';
 import { drawHint } from './hud';
 import { ovrColor, shortName, stars } from './rosterScreen';
+import { linkText, playerLink } from './links';
 import { text } from './text';
 
 /**
@@ -185,7 +186,7 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
   const sel = view.rows[Math.min(v.sel, view.rows.length - 1)];
   if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), mc, v);
 
-  drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  C: CAREER  ESC: BACK');
+  drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  C OR NAME: REGISTRY  ESC: BACK');
 }
 
 function drawDepth(
@@ -415,7 +416,8 @@ function drawCard(
   const ovr = overall(a.r, a.pos);
 
   // Bio.
-  text(g, athleteName(a).toUpperCase().slice(0, 34), x, CARD_TOP + 6, { color: a.real ? GOLD : '#ffffff' });
+  // His name opens his page in the PLAYER REGISTRY.
+  linkText(g, athleteName(a).toUpperCase().slice(0, 34), x, CARD_TOP + 6, { color: a.real ? GOLD : '#ffffff' }, playerLink(s.config.userTeamId, a.id));
   text(g, `#${a.num}  ${a.pos}  ${archetypeLabel(a).toUpperCase()}`, x, CARD_TOP + 18, { color: ACCENT });
   text(g, `${classLabel(a)}   ${heightLabel(a.heightIn)}  ${a.weightLb} LB`, x, CARD_TOP + 30, { color: '#cfd6df' });
   text(g, `${a.hometown.city}, ${a.hometown.state}`.toUpperCase().slice(0, 34), x, CARD_TOP + 42, { color: '#cfd6df' });

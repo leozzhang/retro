@@ -7,14 +7,13 @@ import { VIEW_W } from '../engine/constants';
 import { careerGains, careerOf, careerRows, careerTotals, headline } from '../season/career';
 import type { StatKey } from '../season/stats';
 import type { CareerRole, CareerSeason, SeasonState, StoryEvent } from '../season/types';
-import { drawHint } from './hud';
 import { ovrColor, shortName } from './rosterScreen';
 import { inBox, tabAt, wrap } from './teamScreen';
 import { text } from './text';
 
 /**
- * The STATS page: the user's roster by position on the left, the selected player's career on the
- * right. SEASONS shows a row per season (archived, then this one live) and his story, newest first;
+ * The PLAYER REGISTRY: the REGISTRY tab of a program page (render/programScreen.ts), for any team.
+ * Its roster by position on the left, the selected player's career on the right. SEASONS shows a row per season (archived, then this one live) and his story, newest first;
  * GROWTH shows all-time gains at each rating in his overall, season by season. History only: see
  * season/career.ts.
  */
@@ -27,8 +26,6 @@ export interface CareerView {
   mode: number;
   /** Story lines scrolled past. */
   scroll: number;
-  /** Where Esc goes. */
-  back: 'season' | 'team';
   mx: number;
   my: number;
 }
@@ -68,8 +65,8 @@ export function careerList(squad: Squad, pos: Position): Athlete[] {
 }
 
 /** A fresh view, on a player if one is given (his position, his row). */
-export function newCareerView(squad: Squad, back: CareerView['back'], id?: string): CareerView {
-  const v: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, back, mx: 0, my: 0 };
+export function newCareerView(squad: Squad, id?: string): CareerView {
+  const v: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, mx: 0, my: 0 };
   const a = id ? squad.athletes.find((x) => x.id === id) : undefined;
   if (a) {
     v.pos = POSITIONS.indexOf(a.pos);
@@ -114,15 +111,9 @@ function totalsText(pos: Position, st: Partial<Record<StatKey, number>>): string
 
 const when = (e: StoryEvent) => (e.week === undefined ? `${e.year} OFF` : `${e.year} WK${e.week}`);
 
+/** The registry under the program page's header (which the program page draws, with the hint). */
 export function drawCareer(g: CanvasRenderingContext2D, s: SeasonState, squad: Squad, v: CareerView): void {
-  g.fillStyle = '#0d1117';
-  g.fillRect(0, 0, VIEW_W, 360);
   const t = squad.team;
-  g.fillStyle = t.colors.primary;
-  g.fillRect(0, 0, VIEW_W, 30);
-  text(g, `${t.school.toUpperCase()} CAREERS`, 10, 6, { size: 8 });
-  text(g, 'EVERY SEASON, EVERY STORY', 10, 18, { color: '#e6e6e6' });
-  text(g, String(s.year), VIEW_W - 10, 6, { align: 'right', color: GOLD });
 
   POSITIONS.forEach((p, i) => {
     const on = i === v.pos;
@@ -158,8 +149,9 @@ export function drawCareer(g: CanvasRenderingContext2D, s: SeasonState, squad: S
 
   const a = list[Math.min(v.sel, list.length - 1)];
   if (a) drawCard(g, s, a, t.id, v);
-  drawHint(g, 'A/D: POSITION  W/S: PLAYER  G: SEASONS/GROWTH  WHEEL: STORY  ESC: BACK');
 }
+
+export const CAREER_HINT = 'A/D POSITION  W/S PLAYER  G SEASONS/GROWTH  WHEEL STORY  1-5 PAGE  ESC BACK';
 
 function drawCard(g: CanvasRenderingContext2D, s: SeasonState, a: Athlete, team: string, v: CareerView): void {
   g.fillStyle = '#151d29';

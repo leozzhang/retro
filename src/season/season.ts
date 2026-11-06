@@ -11,6 +11,7 @@ import { DEV_LABEL } from '../data/athletes';
 import type { Group } from '../data/coaches';
 import { athleteName, generatedAthlete, type Squad } from '../data/depth';
 import { archiveSeason, storyWeek } from './career';
+import { archiveChronicle, seasonRows } from './program';
 import { archiveCoaches, programXp, progressCoaches } from './coaching';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
 import { carryMorale, moraleOf, moraleStep } from './morale';
@@ -60,6 +61,7 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     state.teamState[id] = next;
   }
   if (prev?.phase === 'offseason') growOffseason(prev, state);
+  if (prev) archiveChronicle(prev, state);
   state.games = generateSchedule(TEAMS, year, seasonRng(state, 'schedule'));
   const pre = apPoll(state, 0).poll;
   state.polls.push(pre);
@@ -317,9 +319,10 @@ const transition: WeekStep = (state, ctx) => {
     if (champ) {
       state.phase = 'complete';
       state.news.push({ week, kind: 'postseason', teams: [champ], text: `${teamById(champ).school} wins the ${state.year} national championship` });
+      const heisman = state.awards.find((a) => a.id === 'heisman')?.finalists[0];
       state.history.push({
-        year: state.year, champion: champ, heisman: state.awards.find((a) => a.id === 'heisman')?.finalists[0]?.name,
-        ...yearRecord(state),
+        year: state.year, champion: champ, heisman: heisman?.name, heismanTeam: heisman?.team,
+        ...yearRecord(state), teams: seasonRows(state),
       });
       archiveSeason(state);
       archiveCoaches(state);

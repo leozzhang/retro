@@ -1,0 +1,1499 @@
+[
+  {
+    "id": "georgia",
+    "natTitles": [
+      1942,
+      1980,
+      2021,
+      2022
+    ],
+    "confTitles": 18,
+    "lastConf": 2025,
+    "playoffs": [
+      2017,
+      2021,
+      2022,
+      2024,
+      2025
+    ],
+    "bowls": {
+      "apps": 64,
+      "w": 38,
+      "l": 23,
+      "t": 3,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Frank Sinkwich",
+        "year": 1942
+      },
+      {
+        "name": "Herschel Walker",
+        "year": 1982
+      }
+    ],
+    "allTime": {
+      "w": 904,
+      "l": 434,
+      "t": 54
+    },
+    "coachSince": 2016,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 14,
+        "l": 1,
+        "cw": 8,
+        "cl": 0,
+        "ap": 1,
+        "post": "W NATIONAL TITLE"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 15,
+        "l": 0,
+        "cw": 8,
+        "cl": 0,
+        "ap": 1,
+        "post": "W NATIONAL TITLE"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 13,
+        "l": 1,
+        "cw": 8,
+        "cl": 0,
+        "ap": 4,
+        "post": "W ORANGE BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 11,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 6,
+        "post": "W SEC TITLE, L CFP QF"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 12,
+        "l": 2,
+        "cw": 7,
+        "cl": 1,
+        "ap": 6,
+        "post": "W SEC TITLE, L CFP QF"
+      }
+    ],
+    "notes": "All-time 904-434-54 through 2025 (900th win came at Mississippi State in Nov 2025; Wikipedia's seasons-list total of 890 disagrees). Conf titles: 16 SEC + 2 SIAA. 2021 lost SEC title game, 2022 also won SEC title (not shown in post for length).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Georgia_Bulldogs_football",
+      "https://en.wikipedia.org/wiki/List_of_Georgia_Bulldogs_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://www.saturdaydownsouth.com/news/college-football/georgia-hits-all-time-wins-milestone-with-victory-over-mississippi-state"
+    ]
+  },
+  {
+    "id": "olemiss",
+    "natTitles": [
+      1959,
+      1960,
+      1962
+    ],
+    "confTitles": 6,
+    "lastConf": 1963,
+    "playoffs": [
+      2025
+    ],
+    "bowls": {
+      "apps": 45,
+      "w": 29,
+      "l": 16,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 724,
+      "l": 550,
+      "t": 35
+    },
+    "coachSince": 2025,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 11,
+        "post": "L SUGAR BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 8,
+        "l": 5,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "L TEXAS BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 11,
+        "l": 2,
+        "cw": 6,
+        "cl": 2,
+        "ap": 9,
+        "post": "W PEACH BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 5,
+        "cl": 3,
+        "ap": 11,
+        "post": "W GATOR BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 13,
+        "l": 2,
+        "cw": 7,
+        "cl": 1,
+        "ap": 3,
+        "post": "L CFP SEMI"
+      }
+    ],
+    "notes": "All-time is the Wikipedia seasons-list total (on-field rows); 33 wins from 2010-2016 were vacated, and official figures elsewhere run ~700-707 wins, so this number is uncertain. Bowls count the 2025 CFP first-round game and the vacated 2012 Compass Bowl win (official 28-16). Pete Golding was named head coach Nov 30, 2025 after Lane Kiffin left for LSU and coached the 2025 CFP games.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Ole_Miss_Rebels_football",
+      "https://en.wikipedia.org/wiki/List_of_Ole_Miss_Rebels_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://en.wikipedia.org/wiki/List_of_Ole_Miss_Rebels_bowl_games",
+      "https://www.winsipedia.com/ole-miss"
+    ]
+  },
+  {
+    "id": "texas",
+    "natTitles": [
+      1963,
+      1969,
+      1970,
+      2005
+    ],
+    "confTitles": 33,
+    "lastConf": 2023,
+    "playoffs": [
+      2023,
+      2024
+    ],
+    "bowls": {
+      "apps": 63,
+      "w": 34,
+      "l": 27,
+      "t": 2,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Earl Campbell",
+        "year": 1977
+      },
+      {
+        "name": "Ricky Williams",
+        "year": 1998
+      }
+    ],
+    "allTime": {
+      "w": 968,
+      "l": 396,
+      "t": 33
+    },
+    "coachSince": 2021,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 5,
+        "cw": 6,
+        "cl": 3,
+        "ap": 25,
+        "post": "L ALAMO BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 12,
+        "l": 2,
+        "cw": 8,
+        "cl": 1,
+        "ap": 3,
+        "post": "W BIG 12 TITLE, L CFP SEMI"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 13,
+        "l": 3,
+        "cw": 7,
+        "cl": 1,
+        "ap": 4,
+        "post": "L CFP SEMI"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 12,
+        "post": "W CITRUS BOWL"
+      }
+    ],
+    "notes": "Conf titles 33 = 2 TIAA + 27 SWC + 4 Big 12 (Wikipedia text elsewhere says 31-34). 2024 lost SEC title game; bowls include 2024 CFP first round.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Texas_Longhorns_football",
+      "https://en.wikipedia.org/wiki/List_of_Texas_Longhorns_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://en.wikipedia.org/wiki/List_of_Texas_Longhorns_bowl_games"
+    ]
+  },
+  {
+    "id": "alabama",
+    "natTitles": [
+      1925,
+      1926,
+      1930,
+      1934,
+      1941,
+      1961,
+      1964,
+      1965,
+      1973,
+      1978,
+      1979,
+      1992,
+      2009,
+      2011,
+      2012,
+      2015,
+      2017,
+      2020
+    ],
+    "confTitles": 34,
+    "lastConf": 2023,
+    "playoffs": [
+      2014,
+      2015,
+      2016,
+      2017,
+      2018,
+      2020,
+      2021,
+      2023,
+      2025
+    ],
+    "bowls": {
+      "apps": 80,
+      "w": 47,
+      "l": 30,
+      "t": 3,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Mark Ingram II",
+        "year": 2009
+      },
+      {
+        "name": "Derrick Henry",
+        "year": 2015
+      },
+      {
+        "name": "DeVonta Smith",
+        "year": 2020
+      },
+      {
+        "name": "Bryce Young",
+        "year": 2021
+      }
+    ],
+    "allTime": {
+      "w": 964,
+      "l": 341,
+      "t": 43
+    },
+    "coachSince": 2024,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 13,
+        "l": 2,
+        "cw": 7,
+        "cl": 1,
+        "ap": 2,
+        "post": "L NATIONAL TITLE"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 11,
+        "l": 2,
+        "cw": 6,
+        "cl": 2,
+        "ap": 5,
+        "post": "W SUGAR BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 12,
+        "l": 2,
+        "cw": 8,
+        "cl": 0,
+        "ap": 5,
+        "post": "W SEC TITLE, L CFP SEMI"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 3,
+        "ap": 17,
+        "post": "L RELIAQUEST BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 11,
+        "l": 4,
+        "cw": 7,
+        "cl": 1,
+        "ap": 9,
+        "post": "L CFP QF"
+      }
+    ],
+    "notes": "All-time 964-341-43 is the official figure, excluding 21 wins vacated 2005-07 and the 1993 forfeits (on-field ~985 wins). Conf titles = 30 SEC + 4 SoCon (count from memory/Wikipedia, verify). 2021 also won SEC title; 2025 lost SEC title game. Bowls include 2025 CFP first round and the vacated 2006 Cotton Bowl win.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Alabama_Crimson_Tide_football",
+      "https://en.wikipedia.org/wiki/List_of_Alabama_Crimson_Tide_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://en.wikipedia.org/wiki/List_of_Alabama_Crimson_Tide_bowl_games"
+    ]
+  },
+  {
+    "id": "lsu",
+    "natTitles": [
+      1958,
+      2003,
+      2007,
+      2019
+    ],
+    "confTitles": 16,
+    "lastConf": 2019,
+    "playoffs": [
+      2019
+    ],
+    "bowls": {
+      "apps": 57,
+      "w": 31,
+      "l": 25,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Billy Cannon",
+        "year": 1959
+      },
+      {
+        "name": "Joe Burrow",
+        "year": 2019
+      },
+      {
+        "name": "Jayden Daniels",
+        "year": 2023
+      }
+    ],
+    "allTime": {
+      "w": 821,
+      "l": 441,
+      "t": 47
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L TEXAS BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 10,
+        "l": 4,
+        "cw": 6,
+        "cl": 2,
+        "ap": 16,
+        "post": "W CITRUS BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 13,
+        "post": "W RELIAQUEST BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 3,
+        "ap": null,
+        "post": "W TEXAS BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L TEXAS BOWL"
+      }
+    ],
+    "notes": "All-time uncertain: 821-441-47 (secondary source, official) vs. Wikipedia seasons-list sum ~845-441-47; Wikipedia notes wins vacated from 2012-15. Bowls on-field excluding the 1907 Bacardi Bowl (official after vacatur 29-25-1). Conf titles 16 = 3 SIAA + 1 SoCon + 12 SEC. 2022 lost SEC title game. Brian Kelly fired Oct 2025; Lane Kiffin hired for 2026.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/LSU_Tigers_football",
+      "https://en.wikipedia.org/wiki/List_of_LSU_Tigers_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://en.wikipedia.org/wiki/List_of_LSU_Tigers_bowl_games"
+    ]
+  },
+  {
+    "id": "tennessee",
+    "natTitles": [
+      1938,
+      1940,
+      1950,
+      1951,
+      1967,
+      1998
+    ],
+    "confTitles": 16,
+    "lastConf": 1998,
+    "playoffs": [
+      2024
+    ],
+    "bowls": {
+      "apps": 57,
+      "w": 30,
+      "l": 27,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 883,
+      "l": 422,
+      "t": 53
+    },
+    "coachSince": 2021,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "L MUSIC CITY BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 11,
+        "l": 2,
+        "cw": 6,
+        "cl": 2,
+        "ap": 6,
+        "post": "W ORANGE BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 9,
+        "l": 4,
+        "cw": 4,
+        "cl": 4,
+        "ap": 19,
+        "post": "W CITRUS BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 9,
+        "post": "L CFP FIRST ROUND"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 8,
+        "l": 5,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "L MUSIC CITY BOWL"
+      }
+    ],
+    "notes": "All-time official (11 wins from 2019-20 vacated; on-field ~894); sources range 883-893 wins and 53-57 ties. Bowls exclude the vacated 2019 Gator Bowl win and include the 2024 CFP first round. Final AP 2023 (19 vs 17) and 2024 (9) read from Wikipedia columns, verify. Infobox 'Heisman' entry is vandalism; Tennessee has none.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Tennessee_Volunteers_football",
+      "https://en.wikipedia.org/wiki/List_of_Tennessee_Volunteers_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://www.winsipedia.com/tennessee"
+    ]
+  },
+  {
+    "id": "kentucky",
+    "natTitles": [
+      1950
+    ],
+    "confTitles": 2,
+    "lastConf": 1976,
+    "playoffs": [],
+    "bowls": {
+      "apps": 23,
+      "w": 12,
+      "l": 11,
+      "t": 0,
+      "last": 2023
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 660,
+      "l": 662,
+      "t": 44
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 5,
+        "cl": 3,
+        "ap": 18,
+        "post": "W CITRUS BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L MUSIC CITY BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L GATOR BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 4,
+        "l": 8,
+        "cw": 1,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "All 2021 wins (10, incl. Citrus Bowl) vacated in Aug 2024; record and bowls shown on-field (official bowls 11-11). All-time = Wikipedia total minus 2026, approx. Mark Stoops fired after 2025; Will Stein hired for 2026.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Kentucky_Wildcats_football",
+      "https://en.wikipedia.org/wiki/List_of_Kentucky_Wildcats_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "florida",
+    "natTitles": [
+      1996,
+      2006,
+      2008
+    ],
+    "confTitles": 8,
+    "lastConf": 2008,
+    "playoffs": [],
+    "bowls": {
+      "apps": 49,
+      "w": 25,
+      "l": 24,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [
+      {
+        "name": "Steve Spurrier",
+        "year": 1966
+      },
+      {
+        "name": "Danny Wuerffel",
+        "year": 1996
+      },
+      {
+        "name": "Tim Tebow",
+        "year": 2007
+      }
+    ],
+    "allTime": {
+      "w": 776,
+      "l": 462,
+      "t": 40
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": "L GASPARILLA BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L LAS VEGAS BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 8,
+        "l": 5,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "W GASPARILLA BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 4,
+        "l": 8,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "All-time from infobox (seasons list minus 2026 gives ~777-463-40). Billy Napier fired Oct 2025; Jon Sumrall hired for 2026.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Florida_Gators_football",
+      "https://en.wikipedia.org/wiki/List_of_Florida_Gators_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "missouri",
+    "natTitles": [],
+    "confTitles": 15,
+    "lastConf": 1969,
+    "playoffs": [],
+    "bowls": {
+      "apps": 38,
+      "w": 17,
+      "l": 21,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 721,
+      "l": 593,
+      "t": 52
+    },
+    "coachSince": 2020,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L ARMED FORCES BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L GASPARILLA BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 11,
+        "l": 2,
+        "cw": 6,
+        "cl": 2,
+        "ap": 8,
+        "post": "W COTTON BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 5,
+        "cl": 3,
+        "ap": 22,
+        "post": "W MUSIC CITY BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 8,
+        "l": 5,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "L GATOR BOWL"
+      }
+    ],
+    "notes": "Wikipedia infobox lists 1960 as a claimed national title (Poling); Missouri does not generally celebrate it, so left empty. Conf titles 15 (WIUFA, MVIAA, Big Six/Seven/Eight; last 1969); 2007-08/2010 Big 12 North and 2013-14 SEC East are division titles only. All-time uncertain (~721-726 wins); NCAA vacated some 2015-16 wins. Bowl apps exclude the canceled 2020 Music City Bowl.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Missouri_Tigers_football",
+      "https://en.wikipedia.org/wiki/List_of_Missouri_Tigers_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "oklahoma",
+    "natTitles": [
+      1950,
+      1955,
+      1956,
+      1974,
+      1975,
+      1985,
+      2000
+    ],
+    "confTitles": 50,
+    "lastConf": 2020,
+    "playoffs": [
+      2015,
+      2017,
+      2018,
+      2019,
+      2025
+    ],
+    "bowls": {
+      "apps": 58,
+      "w": 31,
+      "l": 26,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Billy Vessels",
+        "year": 1952
+      },
+      {
+        "name": "Steve Owens",
+        "year": 1969
+      },
+      {
+        "name": "Billy Sims",
+        "year": 1978
+      },
+      {
+        "name": "Jason White",
+        "year": 2003
+      },
+      {
+        "name": "Sam Bradford",
+        "year": 2008
+      },
+      {
+        "name": "Baker Mayfield",
+        "year": 2017
+      },
+      {
+        "name": "Kyler Murray",
+        "year": 2018
+      }
+    ],
+    "allTime": {
+      "w": 959,
+      "l": 351,
+      "t": 53
+    },
+    "coachSince": 2022,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 11,
+        "l": 2,
+        "cw": 7,
+        "cl": 2,
+        "ap": 10,
+        "post": "W ALAMO BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": "L CHEEZ-IT BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 10,
+        "l": 3,
+        "cw": 7,
+        "cl": 2,
+        "ap": 15,
+        "post": "L ALAMO BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": "L ARMED FORCES BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 13,
+        "post": "L CFP FIRST ROUND"
+      }
+    ],
+    "notes": "Bowl totals include the 2025 CFP first-round loss. All-time 959-351-53 (seasons list; infobox minus 2026 gives 960). 2021 bowl coached by interim Bob Stoops.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Oklahoma_Sooners_football",
+      "https://en.wikipedia.org/wiki/List_of_Oklahoma_Sooners_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "mississippistate",
+    "natTitles": [],
+    "confTitles": 1,
+    "lastConf": 1941,
+    "playoffs": [],
+    "bowls": {
+      "apps": 27,
+      "w": 15,
+      "l": 12,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 593,
+      "l": 627,
+      "t": 39
+    },
+    "coachSince": 2024,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "L LIBERTY BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 9,
+        "l": 4,
+        "cw": 4,
+        "cl": 4,
+        "ap": 20,
+        "post": "W RELIAQUEST BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 1,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 2,
+        "l": 10,
+        "cw": 0,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 5,
+        "l": 8,
+        "cw": 1,
+        "cl": 7,
+        "ap": null,
+        "post": "L DUKE'S MAYO BOWL"
+      }
+    ],
+    "notes": "All-time is the official figure (1975-77 forfeits, 8 wins vacated in 2018). 2022 final AP 20 (coaches 19), verify.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Mississippi_State_Bulldogs_football",
+      "https://en.wikipedia.org/wiki/List_of_Mississippi_State_Bulldogs_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "auburn",
+    "natTitles": [
+      1910,
+      1913,
+      1914,
+      1957,
+      1958,
+      1983,
+      1993,
+      2004,
+      2010
+    ],
+    "confTitles": 16,
+    "lastConf": 2013,
+    "playoffs": [],
+    "bowls": {
+      "apps": 47,
+      "w": 24,
+      "l": 21,
+      "t": 2,
+      "last": 2023
+    },
+    "heisman": [
+      {
+        "name": "Pat Sullivan",
+        "year": 1971
+      },
+      {
+        "name": "Bo Jackson",
+        "year": 1985
+      },
+      {
+        "name": "Cam Newton",
+        "year": 2010
+      }
+    ],
+    "allTime": {
+      "w": 807,
+      "l": 481,
+      "t": 47
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L BIRMINGHAM BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "L MUSIC CITY BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 1,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Auburn expanded its claimed national titles to nine in Aug 2025 (AP credits only 1957, 2010). Conf titles 16 = 7 SIAA + 1 SoCon + 8 SEC (an On3 report says the school claims 15). All-time from seasons list (infobox minus 2026 gives ~819-485). Hugh Freeze fired Nov 2025; Alex Golesh hired for 2026.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Auburn_Tigers_football",
+      "https://en.wikipedia.org/wiki/List_of_Auburn_Tigers_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season",
+      "https://www.on3.com/teams/auburn-tigers/news/auburn-football-now-claims-nine-national-championships-15-conference-titles"
+    ]
+  },
+  {
+    "id": "texasam",
+    "natTitles": [
+      1919,
+      1927,
+      1939
+    ],
+    "confTitles": 18,
+    "lastConf": 1998,
+    "playoffs": [
+      2025
+    ],
+    "bowls": {
+      "apps": 45,
+      "w": 20,
+      "l": 25,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "John David Crow",
+        "year": 1957
+      },
+      {
+        "name": "Johnny Manziel",
+        "year": 2012
+      }
+    ],
+    "allTime": {
+      "w": 797,
+      "l": 511,
+      "t": 48
+    },
+    "coachSince": 2024,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 8,
+        "l": 4,
+        "cw": 4,
+        "cl": 4,
+        "ap": 25,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 4,
+        "cl": 4,
+        "ap": null,
+        "post": "L TEXAS BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 8,
+        "l": 5,
+        "cw": 5,
+        "cl": 3,
+        "ap": null,
+        "post": "L LAS VEGAS BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 11,
+        "l": 2,
+        "cw": 7,
+        "cl": 1,
+        "ap": 8,
+        "post": "L CFP FIRST ROUND"
+      }
+    ],
+    "notes": "2021 Gator Bowl withdrawn (COVID). Bowls include the 2025 CFP first round (infobox shows 20-24, excluding it). Conf titles = 17 SWC + 1998 Big 12.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Texas_A%26M_Aggies_football",
+      "https://en.wikipedia.org/wiki/List_of_Texas_A%26M_Aggies_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "southcarolina",
+    "natTitles": [],
+    "confTitles": 1,
+    "lastConf": 1969,
+    "playoffs": [],
+    "bowls": {
+      "apps": 26,
+      "w": 10,
+      "l": 16,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [
+      {
+        "name": "George Rogers",
+        "year": 1980
+      }
+    ],
+    "allTime": {
+      "w": 653,
+      "l": 621,
+      "t": 44
+    },
+    "coachSince": 2021,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "W DUKE'S MAYO BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 8,
+        "l": 5,
+        "cw": 4,
+        "cl": 4,
+        "ap": 23,
+        "post": "L GATOR BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 3,
+        "ap": 19,
+        "post": "L CITRUS BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 4,
+        "l": 8,
+        "cw": 1,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Only the 1969 ACC title is recognized; Wikipedia also lists unrecognized SoCon 1933/1941 and the forfeited 1965 ACC share. 2010 SEC East is a division title. All-time from seasons list (infobox shows 653-628 incl. part of 2026).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/South_Carolina_Gamecocks_football",
+      "https://en.wikipedia.org/wiki/List_of_South_Carolina_Gamecocks_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "arkansas",
+    "natTitles": [
+      1964
+    ],
+    "confTitles": 13,
+    "lastConf": 1989,
+    "playoffs": [],
+    "bowls": {
+      "apps": 45,
+      "w": 18,
+      "l": 24,
+      "t": 3,
+      "last": 2024
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 748,
+      "l": 557,
+      "t": 40
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 9,
+        "l": 4,
+        "cw": 4,
+        "cl": 4,
+        "ap": 21,
+        "post": "W OUTBACK BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "W LIBERTY BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 4,
+        "l": 8,
+        "cw": 1,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "W LIBERTY BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 2,
+        "l": 10,
+        "cw": 0,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Conf titles 13 SWC (SEC West 1995/1998/2002/2006 are division titles). Bowl apps exclude the canceled 2020 Texas Bowl. All-time from seasons list; other Wikipedia figures disagree. Sam Pittman fired Sept 2025 (Bobby Petrino interim); Ryan Silverfield hired for 2026.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Arkansas_Razorbacks_football",
+      "https://en.wikipedia.org/wiki/List_of_Arkansas_Razorbacks_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  },
+  {
+    "id": "vanderbilt",
+    "natTitles": [],
+    "confTitles": 14,
+    "lastConf": 1923,
+    "playoffs": [],
+    "bowls": {
+      "apps": 11,
+      "w": 5,
+      "l": 5,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 635,
+      "l": 674,
+      "t": 50
+    },
+    "coachSince": 2021,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "SEC",
+        "w": 2,
+        "l": 10,
+        "cw": 0,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "SEC",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "SEC",
+        "w": 2,
+        "l": 10,
+        "cw": 0,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "SEC",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 5,
+        "ap": null,
+        "post": "W BIRMINGHAM BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "SEC",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 2,
+        "ap": 15,
+        "post": "L RELIAQUEST BOWL"
+      }
+    ],
+    "notes": "Conf titles 14 (SIAA and SoCon, last shared 1923 SoCon). All-time uncertain within a few games (Wikipedia figures 635-674 to 637-673).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Vanderbilt_Commodores_football",
+      "https://en.wikipedia.org/wiki/List_of_Vanderbilt_Commodores_football_seasons",
+      "https://en.wikipedia.org/wiki/2025_Southeastern_Conference_football_season"
+    ]
+  }
+]

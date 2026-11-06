@@ -1,0 +1,1308 @@
+[
+  {
+    "id": "byu",
+    "natTitles": [
+      1984
+    ],
+    "confTitles": 23,
+    "lastConf": 2007,
+    "playoffs": [],
+    "bowls": {
+      "apps": 42,
+      "w": 19,
+      "l": 22,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Ty Detmer",
+        "year": 1990
+      }
+    ],
+    "allTime": {
+      "w": 629,
+      "l": 445,
+      "t": 26
+    },
+    "coachSince": 2016,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Independent",
+        "w": 10,
+        "l": 3,
+        "cw": 0,
+        "cl": 0,
+        "ap": 19,
+        "post": "L INDEPENDENCE BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Independent",
+        "w": 8,
+        "l": 5,
+        "cw": 0,
+        "cl": 0,
+        "ap": null,
+        "post": "W NEW MEXICO BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 11,
+        "l": 2,
+        "cw": 7,
+        "cl": 2,
+        "ap": 13,
+        "post": "W ALAMO BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 12,
+        "l": 2,
+        "cw": 8,
+        "cl": 1,
+        "ap": 11,
+        "post": "W POP-TARTS BOWL"
+      }
+    ],
+    "notes": "2025: lost Big 12 title game to Texas Tech, then won Pop-Tarts Bowl. All-time 629-445-26 from the seasons list (live infobox shows higher figures that appear to include 2026 games).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/BYU_Cougars_football",
+      "https://en.wikipedia.org/wiki/List_of_BYU_Cougars_football_seasons"
+    ]
+  },
+  {
+    "id": "texastech",
+    "natTitles": [],
+    "confTitles": 12,
+    "lastConf": 2025,
+    "playoffs": [
+      2025
+    ],
+    "bowls": {
+      "apps": 43,
+      "w": 17,
+      "l": 25,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 617,
+      "l": 488,
+      "t": 32
+    },
+    "coachSince": 2022,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 7,
+        "l": 6,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": "W LIBERTY BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 5,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "W TEXAS BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 7,
+        "l": 6,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "W INDEPENDENCE BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 5,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "L LIBERTY BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 12,
+        "l": 2,
+        "cw": 8,
+        "cl": 1,
+        "ap": 7,
+        "post": "W BIG 12 TITLE, L CFP QF"
+      }
+    ],
+    "notes": "Conf titles: 9 Border, 2 SWC (1976, 1994 shared), 1 Big 12 (2025). All-time record uncertain: sources range 605-486-32 (seasons list) to 617-488-32 (Winsipedia); 617 wins matches counting from the documented 500th win in Nov 2008. Bowl record 17-25-1 assumed to include the 2025 Orange Bowl CFP QF loss to Oregon (0-23). 2025 final AP rank 7 per seasons list.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Texas_Tech_Red_Raiders_football",
+      "https://en.wikipedia.org/wiki/List_of_Texas_Tech_Red_Raiders_football_seasons",
+      "https://www.winsipedia.com/texas-tech"
+    ]
+  },
+  {
+    "id": "utah",
+    "natTitles": [],
+    "confTitles": 27,
+    "lastConf": 2022,
+    "playoffs": [],
+    "bowls": {
+      "apps": 27,
+      "w": 18,
+      "l": 9,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 735,
+      "l": 491,
+      "t": 31
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Pac-12",
+        "w": 10,
+        "l": 4,
+        "cw": 8,
+        "cl": 1,
+        "ap": 12,
+        "post": "L ROSE BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Pac-12",
+        "w": 10,
+        "l": 4,
+        "cw": 7,
+        "cl": 2,
+        "ap": 10,
+        "post": "L ROSE BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Pac-12",
+        "w": 8,
+        "l": 5,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "L LAS VEGAS BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 11,
+        "l": 2,
+        "cw": 7,
+        "cl": 2,
+        "ap": 14,
+        "post": "W LAS VEGAS BOWL"
+      }
+    ],
+    "notes": "Won Pac-12 title games in 2021 and 2022 (prefix omitted for length). 2008 title (Anderson & Hester etc.) not claimed. Morgan Scalley succeeds Kyle Whittingham for 2026. All-time 735-491-31 per school/Wikipedia text; the seasons list total (729-451-31) disagrees. Bowl record excludes the unsanctioned 1947 Pineapple Bowl.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Utah_Utes_football",
+      "https://en.wikipedia.org/wiki/List_of_Utah_Utes_football_seasons",
+      "https://utahutes.com/sports/2016/6/10/trads-ute-trads-success-html"
+    ]
+  },
+  {
+    "id": "houston",
+    "natTitles": [],
+    "confTitles": 11,
+    "lastConf": 2015,
+    "playoffs": [],
+    "bowls": {
+      "apps": 31,
+      "w": 14,
+      "l": 16,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Andre Ware",
+        "year": 1989
+      }
+    ],
+    "allTime": {
+      "w": 486,
+      "l": 405,
+      "t": 15
+    },
+    "coachSince": 2024,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "American",
+        "w": 12,
+        "l": 2,
+        "cw": 8,
+        "cl": 0,
+        "ap": 17,
+        "post": "W BIRMINGHAM BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "American",
+        "w": 8,
+        "l": 5,
+        "cw": 5,
+        "cl": 3,
+        "ap": null,
+        "post": "W INDEPENDENCE BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 4,
+        "l": 8,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 4,
+        "l": 8,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 10,
+        "l": 3,
+        "cw": 6,
+        "cl": 3,
+        "ap": 22,
+        "post": "W TEXAS BOWL"
+      }
+    ],
+    "notes": "2021 lost the AAC title game. Conf titles 11 (won or tied) incl. SWC and C-USA/AAC.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Houston_Cougars_football",
+      "https://en.wikipedia.org/wiki/List_of_Houston_Cougars_football_seasons"
+    ]
+  },
+  {
+    "id": "arizona",
+    "natTitles": [],
+    "confTitles": 6,
+    "lastConf": 1993,
+    "playoffs": [],
+    "bowls": {
+      "apps": 23,
+      "w": 10,
+      "l": 12,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 645,
+      "l": 506,
+      "t": 33
+    },
+    "coachSince": 2024,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Pac-12",
+        "w": 1,
+        "l": 11,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "Pac-12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "Pac-12",
+        "w": 10,
+        "l": 3,
+        "cw": 7,
+        "cl": 2,
+        "ap": 11,
+        "post": "W ALAMO BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 4,
+        "l": 8,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "L HOLIDAY BOWL"
+      }
+    ],
+    "notes": "Conf titles: Border 1935, 1936, 1941; WAC 1964, 1973; Pac-10 1993 (several shared). Bowl total includes the 2025 Holiday Bowl loss to SMU.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Arizona_Wildcats_football",
+      "https://en.wikipedia.org/wiki/List_of_Arizona_Wildcats_football_seasons"
+    ]
+  },
+  {
+    "id": "oklahomastate",
+    "natTitles": [
+      1945
+    ],
+    "confTitles": 11,
+    "lastConf": 2011,
+    "playoffs": [],
+    "bowls": {
+      "apps": 34,
+      "w": 22,
+      "l": 12,
+      "t": 0,
+      "last": 2023
+    },
+    "heisman": [
+      {
+        "name": "Barry Sanders",
+        "year": 1988
+      }
+    ],
+    "allTime": {
+      "w": 641,
+      "l": 592,
+      "t": 48
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 12,
+        "l": 2,
+        "cw": 8,
+        "cl": 1,
+        "ap": 7,
+        "post": "W FIESTA BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 7,
+        "l": 6,
+        "cw": 4,
+        "cl": 5,
+        "ap": null,
+        "post": "L GUARANTEED RATE BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 10,
+        "l": 4,
+        "cw": 7,
+        "cl": 2,
+        "ap": 16,
+        "post": "W TEXAS BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 3,
+        "l": 9,
+        "cw": 0,
+        "cl": 9,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 1,
+        "l": 11,
+        "cw": 0,
+        "cl": 9,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "1945 title claimed (AFCA). Mike Gundy fired 3 games into 2025 (Doug Meacham interim); Eric Morris hired for 2026. All-time figures disagree across Wikipedia (641-592-48 lead text vs 648-575-49 seasons list); 641-592-48 used. Lost Big 12 title games in 2021 and 2023.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Oklahoma_State_Cowboys_football",
+      "https://en.wikipedia.org/wiki/List_of_Oklahoma_State_Cowboys_football_seasons"
+    ]
+  },
+  {
+    "id": "baylor",
+    "natTitles": [],
+    "confTitles": 10,
+    "lastConf": 2021,
+    "playoffs": [],
+    "bowls": {
+      "apps": 28,
+      "w": 14,
+      "l": 14,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [
+      {
+        "name": "Robert Griffin III",
+        "year": 2011
+      }
+    ],
+    "allTime": {
+      "w": 631,
+      "l": 605,
+      "t": 44
+    },
+    "coachSince": 2020,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 12,
+        "l": 2,
+        "cw": 7,
+        "cl": 2,
+        "ap": 6,
+        "post": "W SUGAR BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 7,
+        "cw": 4,
+        "cl": 5,
+        "ap": null,
+        "post": "L ARMED FORCES BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 3,
+        "l": 9,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 5,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "L TEXAS BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "2021 won Big 12 title game (prefix omitted for length). Dave Aranda (since 2020) began 2026 but Wikipedia reports him fired Oct 25, 2026 (Joe Klanderman interim). All-time ties uncertain (41 vs 44 across sources).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Baylor_Bears_football",
+      "https://en.wikipedia.org/wiki/List_of_Baylor_Bears_football_seasons"
+    ]
+  },
+  {
+    "id": "cincinnati",
+    "natTitles": [],
+    "confTitles": 16,
+    "lastConf": 2021,
+    "playoffs": [
+      2021
+    ],
+    "bowls": {
+      "apps": 23,
+      "w": 10,
+      "l": 13,
+      "t": 0,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 674,
+      "l": 621,
+      "t": 50
+    },
+    "coachSince": 2023,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "American",
+        "w": 13,
+        "l": 1,
+        "cw": 8,
+        "cl": 0,
+        "ap": 4,
+        "post": "W AAC TITLE, L CFP SEMI"
+      },
+      {
+        "year": 2022,
+        "conf": "American",
+        "w": 9,
+        "l": 4,
+        "cw": 6,
+        "cl": 2,
+        "ap": null,
+        "post": "L FENWAY BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 3,
+        "l": 9,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 7,
+        "l": 6,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "L LIBERTY BOWL"
+      }
+    ],
+    "notes": "Conf titles: infobox lists 16 (Buckeye 2, MAC 4, MVC 2, C-USA 2002, Big East 4, AAC 3) but the text says 15. 2022 bowl coached by interim Kerry Coombs. 2025 conf record 5-4 from memory, not confirmed.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Cincinnati_Bearcats_football",
+      "https://en.wikipedia.org/wiki/List_of_Cincinnati_Bearcats_football_seasons"
+    ]
+  },
+  {
+    "id": "westvirginia",
+    "natTitles": [],
+    "confTitles": 15,
+    "lastConf": 2011,
+    "playoffs": [],
+    "bowls": {
+      "apps": 41,
+      "w": 17,
+      "l": 24,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 791,
+      "l": 541,
+      "t": 45
+    },
+    "coachSince": 2025,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 7,
+        "cw": 4,
+        "cl": 5,
+        "ap": null,
+        "post": "L GUARANTEED RATE BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 6,
+        "cl": 3,
+        "ap": 25,
+        "post": "W DUKE'S MAYO BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 7,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "L FRISCO BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 4,
+        "l": 8,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Conf titles: 8 SoCon, 7 Big East. All-time = official 787-533-45 through 2024 plus 4-8 in 2025. Rich Rodriguez's second stint began 2025 (also coached 2001-07).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/West_Virginia_Mountaineers_football",
+      "https://en.wikipedia.org/wiki/List_of_West_Virginia_Mountaineers_football_seasons"
+    ]
+  },
+  {
+    "id": "kansasstate",
+    "natTitles": [],
+    "confTitles": 7,
+    "lastConf": 2022,
+    "playoffs": [],
+    "bowls": {
+      "apps": 26,
+      "w": 12,
+      "l": 14,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 585,
+      "l": 680,
+      "t": 42
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 5,
+        "cw": 4,
+        "cl": 5,
+        "ap": null,
+        "post": "W TEXAS BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 10,
+        "l": 4,
+        "cw": 7,
+        "cl": 2,
+        "ap": 14,
+        "post": "L SUGAR BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 6,
+        "cl": 3,
+        "ap": 18,
+        "post": "W POP-TARTS BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "W RATE BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 6,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "2022 won Big 12 title game (prefix omitted for length). 2025: bowl eligible but Klieman declined a bowl; Collin Klein head coach from 2026. All-time 585-680-42 (Wikipedia-derived, end of 2025); seasons list total includes 2026 games.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Kansas_State_Wildcats_football",
+      "https://en.wikipedia.org/wiki/List_of_Kansas_State_Wildcats_football_seasons"
+    ]
+  },
+  {
+    "id": "arizonastate",
+    "natTitles": [],
+    "confTitles": 18,
+    "lastConf": 2024,
+    "playoffs": [
+      2024
+    ],
+    "bowls": {
+      "apps": 34,
+      "w": 15,
+      "l": 18,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 648,
+      "l": 428,
+      "t": 24
+    },
+    "coachSince": 2023,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Pac-12",
+        "w": 8,
+        "l": 5,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "L LAS VEGAS BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Pac-12",
+        "w": 3,
+        "l": 9,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "Pac-12",
+        "w": 3,
+        "l": 9,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 11,
+        "l": 3,
+        "cw": 7,
+        "cl": 2,
+        "ap": 7,
+        "post": "W BIG 12 TITLE, L CFP QF"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 5,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "L SUN BOWL"
+      }
+    ],
+    "notes": "2021 and 2022 shown on-field; NCAA vacated wins (8 in 2021, 2 in 2022) and the 2021 bowl. All-time 648-428-24 from the seasons list; unclear whether it includes vacated wins (official could be ~10 lower). 1970 and 1975 national titles not claimed.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Arizona_State_Sun_Devils_football",
+      "https://en.wikipedia.org/wiki/List_of_Arizona_State_Sun_Devils_football_seasons"
+    ]
+  },
+  {
+    "id": "iowastate",
+    "natTitles": [],
+    "confTitles": 2,
+    "lastConf": 1912,
+    "playoffs": [],
+    "bowls": {
+      "apps": 19,
+      "w": 6,
+      "l": 13,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 585,
+      "l": 685,
+      "t": 46
+    },
+    "coachSince": 2026,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 7,
+        "l": 6,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": "L CHEEZ-IT BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 4,
+        "l": 8,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 7,
+        "l": 6,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "L LIBERTY BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 11,
+        "l": 3,
+        "cw": 7,
+        "cl": 2,
+        "ap": 15,
+        "post": "W POP-TARTS BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 8,
+        "l": 4,
+        "cw": 5,
+        "cl": 4,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Conf titles: MVIAA 1911, 1912 only. Declined a bowl after 2025 when Matt Campbell left for Penn State; Jimmy Rogers coaches 2026. All-time record uncertain (seasons list 585-685-46; other sources differ). 2024 lost Big 12 title game.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Iowa_State_Cyclones_football",
+      "https://en.wikipedia.org/wiki/List_of_Iowa_State_Cyclones_football_seasons",
+      "https://www.on3.com/college/iowa-state-cyclones/news/iowa-state-declines-bowl-bid-to-conclude-2025-season"
+    ]
+  },
+  {
+    "id": "ucf",
+    "natTitles": [
+      2017
+    ],
+    "fcsTitles": [],
+    "confTitles": 6,
+    "lastConf": 2018,
+    "playoffs": [],
+    "bowls": {
+      "apps": 15,
+      "w": 6,
+      "l": 9,
+      "t": 0,
+      "last": 2023
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 304,
+      "l": 248,
+      "t": 1
+    },
+    "coachSince": 2025,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "American",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 3,
+        "ap": null,
+        "post": "W GASPARILLA BOWL"
+      },
+      {
+        "year": 2022,
+        "conf": "American",
+        "w": 9,
+        "l": 5,
+        "cw": 6,
+        "cl": 2,
+        "ap": null,
+        "post": "L MILITARY BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": "L GASPARILLA BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 4,
+        "l": 8,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 2,
+        "cl": 7,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "UCF claims the 2017 national title (Colley Matrix). D-II 1982-89 and I-AA 1990-95, no titles at those levels. All-time includes D-II/I-AA seasons (300th win was the 2025 opener). FBS conf titles: C-USA 2007, 2010; AAC 2013, 2014 (shared), 2017, 2018. Scott Frost's second stint began 2025.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/UCF_Knights_football",
+      "https://en.wikipedia.org/wiki/List_of_UCF_Knights_football_seasons",
+      "https://ucfknights.com/news/2025/08/28/knights-earn-300th-program-win-with-a-triumph-over-jacksonville-state"
+    ]
+  },
+  {
+    "id": "tcu",
+    "natTitles": [
+      1935,
+      1938
+    ],
+    "confTitles": 18,
+    "lastConf": 2014,
+    "playoffs": [
+      2022
+    ],
+    "bowls": {
+      "apps": 38,
+      "w": 20,
+      "l": 17,
+      "t": 1,
+      "last": 2025
+    },
+    "heisman": [
+      {
+        "name": "Davey O'Brien",
+        "year": 1938
+      }
+    ],
+    "allTime": {
+      "w": 688,
+      "l": 571,
+      "t": 57
+    },
+    "coachSince": 2022,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 13,
+        "l": 2,
+        "cw": 9,
+        "cl": 0,
+        "ap": 2,
+        "post": "L NATIONAL TITLE"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 6,
+        "cl": 3,
+        "ap": null,
+        "post": "W NEW MEXICO BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 4,
+        "ap": 25,
+        "post": "W ALAMO BOWL"
+      }
+    ],
+    "notes": "18 conf titles incl. 2014 Big 12 co-title (Wikipedia's list shows 17 without it). 2022: lost Big 12 title game, won Fiesta (CFP semi), lost the title game. 2010 title not claimed. All-time uncertain (seasons list 688-571-57; infobox 682-562-57). 2025 final rank 25 is unlabeled in the source.",
+    "sources": [
+      "https://en.wikipedia.org/wiki/TCU_Horned_Frogs_football",
+      "https://en.wikipedia.org/wiki/List_of_TCU_Horned_Frogs_football_seasons"
+    ]
+  },
+  {
+    "id": "kansas",
+    "natTitles": [],
+    "confTitles": 6,
+    "lastConf": 1968,
+    "playoffs": [],
+    "bowls": {
+      "apps": 14,
+      "w": 7,
+      "l": 7,
+      "t": 0,
+      "last": 2023
+    },
+    "heisman": [],
+    "allTime": {
+      "w": 615,
+      "l": 693,
+      "t": 58
+    },
+    "coachSince": 2021,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Big 12",
+        "w": 2,
+        "l": 10,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "Big 12",
+        "w": 6,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": "L LIBERTY BOWL"
+      },
+      {
+        "year": 2023,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 5,
+        "cl": 4,
+        "ap": 23,
+        "post": "W GUARANTEED RATE BOWL"
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 4,
+        "cl": 5,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 5,
+        "l": 7,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Conf titles: MVIAA 1908, 1923; Big Six/Eight 1930, 1946, 1947, 1968. All-time = 610-686-58 through 2024 (Wikipedia) plus 5-7 in 2025 (subject to forfeit/vacate conventions).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Kansas_Jayhawks_football",
+      "https://en.wikipedia.org/wiki/List_of_Kansas_Jayhawks_football_seasons"
+    ]
+  },
+  {
+    "id": "colorado",
+    "natTitles": [
+      1990
+    ],
+    "confTitles": 26,
+    "lastConf": 2001,
+    "playoffs": [],
+    "bowls": {
+      "apps": 31,
+      "w": 12,
+      "l": 19,
+      "t": 0,
+      "last": 2024
+    },
+    "heisman": [
+      {
+        "name": "Rashaan Salaam",
+        "year": 1994
+      },
+      {
+        "name": "Travis Hunter",
+        "year": 2024
+      }
+    ],
+    "allTime": {
+      "w": 735,
+      "l": 556,
+      "t": 36
+    },
+    "coachSince": 2023,
+    "recent": [
+      {
+        "year": 2021,
+        "conf": "Pac-12",
+        "w": 4,
+        "l": 8,
+        "cw": 3,
+        "cl": 6,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2022,
+        "conf": "Pac-12",
+        "w": 1,
+        "l": 11,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2023,
+        "conf": "Pac-12",
+        "w": 4,
+        "l": 8,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      },
+      {
+        "year": 2024,
+        "conf": "Big 12",
+        "w": 9,
+        "l": 4,
+        "cw": 7,
+        "cl": 2,
+        "ap": 25,
+        "post": "L ALAMO BOWL"
+      },
+      {
+        "year": 2025,
+        "conf": "Big 12",
+        "w": 3,
+        "l": 9,
+        "cw": 1,
+        "cl": 8,
+        "ap": null,
+        "post": null
+      }
+    ],
+    "notes": "Conf title count varies (26 in infobox, 27-28 in text). All-time uncertain: 735-556-36 (Wikipedia text) vs 727-552-36 (seasons list).",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Colorado_Buffaloes_football",
+      "https://en.wikipedia.org/wiki/List_of_Colorado_Buffaloes_football_seasons"
+    ]
+  }
+]

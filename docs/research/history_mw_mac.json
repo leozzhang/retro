@@ -1,0 +1,1830 @@
+[
+ {
+  "id": "newmexico",
+  "natTitles": [],
+  "confTitles": 4,
+  "lastConf": 1964,
+  "playoffs": [],
+  "bowls": {
+   "apps": 14,
+   "w": 4,
+   "l": 9,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 503,
+   "l": 633,
+   "t": 31
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L RATE BOWL"
+   }
+  ],
+  "notes": "Conf titles: Border 1938, WAC 1962-64 (1964 shared). Winsipedia counts 13 bowls 4-9 (omits the 1946 Harbor Bowl tie) and 518-656-31 all-time; Wikipedia season list used. 2025 was a four-way tie for 1st in MW play but not a title (Boise State won the title game).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/New_Mexico_Lobos_football",
+   "https://en.wikipedia.org/wiki/List_of_New_Mexico_Lobos_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Mountain_West_Conference_football_season"
+  ]
+ },
+ {
+  "id": "northdakotastate",
+  "natTitles": [],
+  "fcsTitles": [
+   1965,
+   1968,
+   1969,
+   1983,
+   1985,
+   1986,
+   1988,
+   1990,
+   2011,
+   2012,
+   2013,
+   2014,
+   2015,
+   2017,
+   2018,
+   2019,
+   2021,
+   2024
+  ],
+  "confTitles": 39,
+  "lastConf": 2025,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 5,
+   "l": 1,
+   "t": 0,
+   "last": 1970
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 809,
+   "l": 385,
+   "t": 34
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MVFC",
+    "w": 14,
+    "l": 1,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W FCS NATIONAL TITLE"
+   },
+   {
+    "year": 2022,
+    "conf": "MVFC",
+    "w": 12,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L FCS NATIONAL TITLE"
+   },
+   {
+    "year": 2023,
+    "conf": "MVFC",
+    "w": 11,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L FCS SEMIFINAL"
+   },
+   {
+    "year": 2024,
+    "conf": "MVFC",
+    "w": 14,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W FCS NATIONAL TITLE"
+   },
+   {
+    "year": 2025,
+    "conf": "MVFC",
+    "w": 12,
+    "l": 1,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "L FCS SECOND ROUND"
+   }
+  ],
+  "notes": "FCS through 2025 (joins the Mountain West in 2026). fcsTitles lists 10 FCS (2011-15, 2017-19, 2021, 2024), 5 Division II (1983, 85, 86, 88, 90) and 3 pre-1973 small-college titles (1965, 68, 69); drop the last three if only NCAA-division titles are wanted. Conf titles 39 = 26 NCC + 1 Great West + 12 MVFC per Wikipedia (its own list sums to 38). ap is null (FCS has no AP poll); Stats Perform/AP FCS final ranks: 2021 #1, 2022 #2, 2023 #3, 2024 #1, 2025 #5. Bowls are pre-playoff College Division bowls (Mineral Water, Pecan, Camellia); FCS playoff record 51-6. All-time from the season list (main infobox shows 812-385-34).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/North_Dakota_State_Bison_football",
+   "https://en.wikipedia.org/wiki/List_of_North_Dakota_State_Bison_football_seasons"
+  ]
+ },
+ {
+  "id": "wyoming",
+  "natTitles": [],
+  "confTitles": 14,
+  "lastConf": 1993,
+  "playoffs": [],
+  "bowls": {
+   "apps": 19,
+   "w": 10,
+   "l": 9,
+   "t": 0,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 572,
+   "l": 616,
+   "t": 28
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 6,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": "W FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L ARIZONA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W ARIZONA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: Skyline 1949-50, 1956, 1958-61; WAC 1966-68, 1976, 1987-88, 1993. Bowl count from the 19 bowls listed (10-9, matches Winsipedia); the Wikipedia season-list totals row says 9-9. Winsipedia all-time 580-620-28 vs Wikipedia 572-616-28 (used).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Wyoming_Cowboys_football",
+   "https://en.wikipedia.org/wiki/List_of_Wyoming_Cowboys_football_seasons",
+   "https://www.winsipedia.com/wyoming"
+  ]
+ },
+ {
+  "id": "unlv",
+  "natTitles": [],
+  "confTitles": 1,
+  "lastConf": 1994,
+  "playoffs": [],
+  "bowls": {
+   "apps": 7,
+   "w": 4,
+   "l": 3,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 279,
+   "l": 383,
+   "t": 4
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 2,
+    "l": 10,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L GUARANTEED RATE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 11,
+    "l": 3,
+    "cw": 6,
+    "cl": 1,
+    "ap": 23,
+    "post": "W LA BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 10,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L FRISCO BOWL"
+   }
+  ],
+  "notes": "1994 Big West co-title only; the 1984 PCAA title and the 1983-84 wins (incl. 1984 California Bowl) were forfeited/vacated - on-field bowl record 4-3 used (official 3-4 / 3-3). All-time is uncertain: season list 279-383-4 (used), main infobox 273-394-4, Winsipedia 286-389-4. 2024 final AP #23 (Coaches #24). Lost MW title games in 2023, 2024 and 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UNLV_Rebels_football",
+   "https://en.wikipedia.org/wiki/List_of_UNLV_Rebels_football_seasons",
+   "https://www.winsipedia.com/unlv"
+  ]
+ },
+ {
+  "id": "airforce",
+  "natTitles": [],
+  "confTitles": 3,
+  "lastConf": 1998,
+  "playoffs": [],
+  "bowls": {
+   "apps": 30,
+   "w": 16,
+   "l": 13,
+   "t": 1,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 442,
+   "l": 357,
+   "t": 13
+  },
+  "coachSince": 2007,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 10,
+    "l": 3,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W ARMED FORCES BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W ARMED FORCES BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: WAC 1985 (shared), 1995 (shared), 1998. All-time = season-list total through 2024 (438-349-13) plus 4-8 in 2025, matching the main infobox; Winsipedia shows 449-358-13.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Air_Force_Falcons_football",
+   "https://en.wikipedia.org/wiki/List_of_Air_Force_Falcons_football_seasons",
+   "https://www.winsipedia.com/air-force"
+  ]
+ },
+ {
+  "id": "sanjosestate",
+  "natTitles": [],
+  "confTitles": 17,
+  "lastConf": 2020,
+  "playoffs": [],
+  "bowls": {
+   "apps": 14,
+   "w": 7,
+   "l": 7,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 528,
+   "l": 554,
+   "t": 38
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 6,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L HAWAII BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 4,
+    "ap": null,
+    "post": "L HAWAII BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles 17 per the infobox list (FWC 2, CCAA 6, PCAA 3, Big West 5, MW 2020); the article lead says 18. All-time uncertain: season list 528-554-38 (used), main infobox 520-539-38, Winsipedia 529-547-35.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/San_Jose_State_Spartans_football",
+   "https://en.wikipedia.org/wiki/List_of_San_Jose_State_Spartans_football_seasons"
+  ]
+ },
+ {
+  "id": "nevada",
+  "natTitles": [],
+  "confTitles": 14,
+  "lastConf": 2010,
+  "playoffs": [],
+  "bowls": {
+   "apps": 19,
+   "w": 7,
+   "l": 12,
+   "t": 0,
+   "last": 2021
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 580,
+   "l": 531,
+   "t": 33
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L QUICK LANE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 2,
+    "l": 10,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 10,
+    "cw": 0,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: FWC 1932-33, 1939; Big Sky 1983, 86, 90, 91; Big West 1992, 94-97; WAC 2005, 2010. All-time uncertain: season list 580-531-33 (used), main infobox 583-540-33, Winsipedia 587-549-34. 2021 bowl coached by interim Vai Taua.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Nevada_Wolf_Pack_football",
+   "https://en.wikipedia.org/wiki/List_of_Nevada_Wolf_Pack_football_seasons"
+  ]
+ },
+ {
+  "id": "hawaii",
+  "natTitles": [],
+  "confTitles": 4,
+  "lastConf": 2010,
+  "playoffs": [],
+  "bowls": {
+   "apps": 15,
+   "w": 9,
+   "l": 6,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 598,
+   "l": 503,
+   "t": 25
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 10,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W HAWAII BOWL"
+   }
+  ],
+  "notes": "WAC titles 1992, 1999, 2007, 2010 (only 2007 outright). 2021: bowl-eligible but withdrew from the Hawaii Bowl. Winsipedia shows 16 bowls 10-6 and 608-512-26; Wikipedia season list 598-503-25 (incl. bowls) used.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Hawaii_Rainbow_Warriors_football",
+   "https://en.wikipedia.org/wiki/List_of_Hawaii_Rainbow_Warriors_football_seasons"
+  ]
+ },
+ {
+  "id": "northernillinois",
+  "natTitles": [],
+  "confTitles": 12,
+  "lastConf": 2021,
+  "playoffs": [],
+  "bowls": {
+   "apps": 16,
+   "w": 6,
+   "l": 10,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 622,
+   "l": 541,
+   "t": 51
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W MAC TITLE, L CURE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W CAMELLIA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: IIAC 1938, 44, 51, 63, 64, 65; MAC 1983, 2011, 2012, 2014, 2018, 2021. Claims a 1963 small-college national title (not major-college, so left out). Thomas Hammock (2019-25) resigned Feb 2026 for the Seahawks; DC Rob Harley is interim coach for 2026 (coachSince 2026). Moves to the Mountain West (football only) in 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Northern_Illinois_Huskies_football",
+   "https://en.wikipedia.org/wiki/List_of_Northern_Illinois_Huskies_football_seasons",
+   "https://wtop.com/ncaa-football/2026/02/northern-illinois-coach-thomas-hammock-resigns-to-take-job-in-nfl/"
+  ]
+ },
+ {
+  "id": "utep",
+  "natTitles": [],
+  "confTitles": 2,
+  "lastConf": 2000,
+  "playoffs": [],
+  "bowls": {
+   "apps": 15,
+   "w": 5,
+   "l": 10,
+   "t": 0,
+   "last": 2021
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 411,
+   "l": 642,
+   "t": 38
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L NEW MEXICO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: Border 1956, WAC 2000 (shared). All-time uncertain: season list 411-642-38 (used) vs main infobox 415-654-30. 2024 conf record 3-5 per CUSA standings (season list shows 3-6). Joins the Mountain West in 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UTEP_Miners_football",
+   "https://en.wikipedia.org/wiki/List_of_UTEP_Miners_football_seasons"
+  ]
+ },
+ {
+  "id": "toledo",
+  "natTitles": [],
+  "confTitles": 15,
+  "lastConf": 2022,
+  "playoffs": [],
+  "bowls": {
+   "apps": 23,
+   "w": 12,
+   "l": 11,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 597,
+   "l": 461,
+   "t": 24
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L BAHAMAS BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 9,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W BOCA RATON BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "L ARIZONA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W GAMEABOVE SPORTS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 8,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L BOCA RATON BOWL"
+   }
+  ],
+  "notes": "Conf titles: Northwest Ohio League 1923, 27, 29; MAC 1967, 69, 70, 71, 81, 84, 90, 95, 2001, 2004, 2017, 2022. Won the 2022 MAC title game (post string would exceed 26 chars, so only the bowl is shown); lost the 2023 MAC title game. Jason Candle left for UConn after 2025; Mike Jacobs (from Mercer) hired Dec 2025; interim Robert Weiner coached the Boca Raton Bowl.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Toledo_Rockets_football",
+   "https://en.wikipedia.org/wiki/List_of_Toledo_Rockets_football_seasons",
+   "https://www.cbssports.com/college-football/news/college-football-coaching-carousel-tracker-grades-analysis-on-coach-changes-2025-26-firings-and-hirings"
+  ]
+ },
+ {
+  "id": "ohio",
+  "natTitles": [],
+  "confTitles": 12,
+  "lastConf": 2024,
+  "playoffs": [],
+  "bowls": {
+   "apps": 17,
+   "w": 9,
+   "l": 8,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 623,
+   "l": 591,
+   "t": 48
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 3,
+    "l": 9,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W ARIZONA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W MAC TITLE, W CURE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W FRISCO BOWL"
+   }
+  ],
+  "notes": "Conf titles: Buckeye 1929-31, 1935, 1936 (shared), 1938; MAC 1953, 60, 63, 67, 68, 2024. Claims the 1960 small-college national title (left out of natTitles). Lost the 2022 MAC title game. Brian Smith was fired Dec 17, 2025; DC John Hauser coached the Frisco Bowl and was named head coach for 2026. All-time: season list 623-591-48 (main infobox 626-593-48 appears to include part of 2026).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Ohio_Bobcats_football",
+   "https://en.wikipedia.org/wiki/List_of_Ohio_Bobcats_football_seasons"
+  ]
+ },
+ {
+  "id": "westernmichigan",
+  "natTitles": [],
+  "confTitles": 5,
+  "lastConf": 2025,
+  "playoffs": [],
+  "bowls": {
+   "apps": 13,
+   "w": 3,
+   "l": 10,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 613,
+   "l": 492,
+   "t": 24
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W QUICK LANE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L SALUTE TO VETERANS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W MYRTLE BEACH BOWL"
+   }
+  ],
+  "notes": "Conf titles: Michigan Collegiate 1929; MAC 1966 (shared), 1988, 2016, 2025. Won the 2025 MAC title game 23-13 over Miami (OH) (post string would exceed 26 chars, so only the bowl is shown).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Western_Michigan_Broncos_football",
+   "https://en.wikipedia.org/wiki/List_of_Western_Michigan_Broncos_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Mid-American_Conference_football_season"
+  ]
+ },
+ {
+  "id": "miamioh",
+  "natTitles": [],
+  "confTitles": 24,
+  "lastConf": 2023,
+  "playoffs": [],
+  "bowls": {
+   "apps": 17,
+   "w": 9,
+   "l": 8,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 740,
+   "l": 496,
+   "t": 44
+  },
+  "coachSince": 2014,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W FRISCO FOOTBALL CLASSIC"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L BAHAMAS BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W MAC TITLE, L CURE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 9,
+    "l": 5,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W ARIZONA BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 7,
+    "l": 7,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L ARIZONA BOWL"
+   }
+  ],
+  "notes": "Conf title count uncertain: Wikipedia says 23 but lists 24 (OAC 4, Buckeye 3, MAC 17: 1948, 50, 54, 55, 57, 58, 65, 66, 73, 74, 75, 77, 86, 2003, 2010, 2019, 2023); 24 used. Lost the 2024 and 2025 MAC title games.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Miami_RedHawks_football",
+   "https://en.wikipedia.org/wiki/List_of_Miami_RedHawks_football_seasons"
+  ]
+ },
+ {
+  "id": "buffalo",
+  "natTitles": [],
+  "confTitles": 1,
+  "lastConf": 2008,
+  "playoffs": [],
+  "bowls": {
+   "apps": 7,
+   "w": 4,
+   "l": 3,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 422,
+   "l": 568,
+   "t": 28
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W CAMELLIA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 3,
+    "l": 9,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W BAHAMAS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "1 MAC title (2008). Declined the 1958 Tangerine Bowl (not counted). All-time uncertain: main infobox 422-568-28 (used) vs season-list totals 412-555-28, which do not add up to its own game count.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Buffalo_Bulls_football",
+   "https://en.wikipedia.org/wiki/List_of_Buffalo_Bulls_football_seasons"
+  ]
+ },
+ {
+  "id": "easternmichigan",
+  "natTitles": [],
+  "confTitles": 10,
+  "lastConf": 1987,
+  "playoffs": [],
+  "bowls": {
+   "apps": 8,
+   "w": 2,
+   "l": 6,
+   "t": 0,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 499,
+   "l": 638,
+   "t": 47
+  },
+  "coachSince": 2014,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L LENDINGTREE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L 68 VENTURES BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: MIAA 1896, 1925; MCC 1927-30; IIAC 1954, 55, 57; MAC 1987. Bowls include the 1971 Pioneer Bowl (College Division). All-time: season list 499-638-47 (infobox 500-638-47, article lead 490-622-47).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Eastern_Michigan_Eagles_football",
+   "https://en.wikipedia.org/wiki/List_of_Eastern_Michigan_Eagles_football_seasons"
+  ]
+ },
+ {
+  "id": "kentstate",
+  "natTitles": [],
+  "confTitles": 1,
+  "lastConf": 1972,
+  "playoffs": [],
+  "bowls": {
+   "apps": 5,
+   "w": 1,
+   "l": 4,
+   "t": 0,
+   "last": 2021
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 371,
+   "l": 614,
+   "t": 28
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 7,
+    "l": 7,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 0,
+    "l": 12,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "1 MAC title (1972). Lost the 2021 MAC title game. Mark Carney was interim for all of 2025 (Kenni Burns fired April 2025) and was made permanent Oct 30, 2025. All-time from the main infobox (season list's regular-season-only total is 369-604-28).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Kent_State_Golden_Flashes_football",
+   "https://en.wikipedia.org/wiki/List_of_Kent_State_Golden_Flashes_football_seasons"
+  ]
+ },
+ {
+  "id": "ballstate",
+  "natTitles": [],
+  "confTitles": 11,
+  "lastConf": 2020,
+  "playoffs": [],
+  "bowls": {
+   "apps": 11,
+   "w": 1,
+   "l": 9,
+   "t": 1,
+   "last": 2021
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 483,
+   "l": 473,
+   "t": 32
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L CAMELLIA BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: IIC 1942; ICC 1964-67; MAC 1976, 78, 89, 93, 96, 2020 (no 1975 title). Bowls count 9 Division I bowls (1-8) plus two College Division Grantland Rice Bowls (1965 tie, 1967 loss). Article text gives 476-455-32 all-time; infobox/season list 483-473-32 used.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Ball_State_Cardinals_football",
+   "https://en.wikipedia.org/wiki/List_of_Ball_State_Cardinals_football_seasons"
+  ]
+ },
+ {
+  "id": "bowlinggreen",
+  "natTitles": [],
+  "confTitles": 17,
+  "lastConf": 2015,
+  "playoffs": [],
+  "bowls": {
+   "apps": 16,
+   "w": 5,
+   "l": 11,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 574,
+   "l": 440,
+   "t": 52
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L QUICK LANE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L QUICK LANE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L 68 VENTURES BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: Northwest Ohio League 1921, 22, 25, 28, 29; MAC 1956, 59, 61, 62, 64, 65, 82, 85, 91, 92, 2013, 2015. Claims a 1959 small-college national title (left out). Bowl count includes the 1961 Mercy Bowl (16 apps, 5-11); main infobox shows 15 apps, 5-10. Eddie George hired March 2025 after Scot Loeffler left for the Eagles.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Bowling_Green_Falcons_football",
+   "https://en.wikipedia.org/wiki/List_of_Bowling_Green_Falcons_football_seasons"
+  ]
+ },
+ {
+  "id": "umass",
+  "natTitles": [],
+  "fcsTitles": [
+   1998
+  ],
+  "confTitles": 22,
+  "lastConf": 2007,
+  "playoffs": [],
+  "bowls": {
+   "apps": 3,
+   "w": 1,
+   "l": 2,
+   "t": 0,
+   "last": 1978
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 583,
+   "l": 661,
+   "t": 50
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Independent",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Independent",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Independent",
+    "w": 3,
+    "l": 9,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Independent",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 0,
+    "l": 12,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "No FBS conference titles; 22 pre-FBS titles (Yankee 17, Atlantic 10 1998, 99, 2003, 06, CAA 2007). fcsTitles = 1998 I-AA title. Bowls: 1964 Tangerine (L), 1972 Boardwalk (W), 1978 Pioneer Bowl (the I-AA title game, L). All-time 583-661-50 from the main infobox, which may already include a few 2026 games (its coach record shows 3-12 vs 0-12 through 2025).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UMass_Minutemen_football",
+   "https://en.wikipedia.org/wiki/2025_Mid-American_Conference_football_season"
+  ]
+ },
+ {
+  "id": "centralmichigan",
+  "natTitles": [],
+  "fcsTitles": [
+   1974
+  ],
+  "confTitles": 16,
+  "lastConf": 2009,
+  "playoffs": [],
+  "bowls": {
+   "apps": 14,
+   "w": 4,
+   "l": 10,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 658,
+   "l": 464,
+   "t": 36
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W SUN BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L GAMEABOVE SPORTS BOWL"
+   }
+  ],
+  "notes": "Conf titles: IIAC 1952-56, 1962, 1966-68; MAC 1979, 80, 90, 94, 2006, 07, 09. fcsTitles = 1974 Division II title (its Camellia Bowl title game is not in the bowl count).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Central_Michigan_Chippewas_football",
+   "https://en.wikipedia.org/wiki/List_of_Central_Michigan_Chippewas_football_seasons"
+  ]
+ },
+ {
+  "id": "akron",
+  "natTitles": [],
+  "confTitles": 1,
+  "lastConf": 2005,
+  "playoffs": [],
+  "bowls": {
+   "apps": 3,
+   "w": 1,
+   "l": 2,
+   "t": 0,
+   "last": 2017
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 534,
+   "l": 608,
+   "t": 36
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MAC",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "MAC",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MAC",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MAC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "MAC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "1 MAC title (2005); pre-MAC Ohio Athletic Conference titles are not counted by Akron. All-time from the main infobox (article body: 528-584-36 through 2023, which does not reconcile). 2025: postseason-ineligible (APR) anyway at 5-7.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Akron_Zips_football",
+   "https://en.wikipedia.org/wiki/2025_Mid-American_Conference_football_season"
+  ]
+ },
+ {
+  "id": "sacramentostate",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 7,
+  "lastConf": 2022,
+  "playoffs": [],
+  "bowls": {
+   "apps": 2,
+   "w": 0,
+   "l": 2,
+   "t": 0,
+   "last": 1968
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 330,
+   "l": 414,
+   "t": 8
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Sky",
+    "w": 9,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "L FCS SECOND ROUND"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Sky",
+    "w": 12,
+    "l": 1,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "L FCS QUARTERFINAL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Sky",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L FCS SECOND ROUND"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Sky",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Sky",
+    "w": 7,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "FCS (Big Sky) through 2025; joins the MAC (football only, FBS) in 2026. No national titles (fcsTitles []). Conf titles: FWC 1964, 66; WFC 1986; AWC 1995; Big Sky 2019, 2021, 2022 (several shared). ap null (FCS); FCS final ranks ~#10 2021, #5 2022, #13 2023. Bowls: 1964 Camellia, 1968 Pasadena (both L). Brennan Marion coached 2025; Alonzo Carter is the 2026 head coach (coachSince 2026) per Wikipedia. 2023 conf record 4-4 per Wikipedia (verify).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Sacramento_State_Hornets_football",
+   "https://en.wikipedia.org/wiki/List_of_Sacramento_State_Hornets_football_seasons"
+  ]
+ }
+]

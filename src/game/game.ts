@@ -34,7 +34,9 @@ import {
   recruitRowRect, recruitRows, recruitTabAt, SEARCH_FILTERS, type RecruitView,
 } from '../render/recruitScreen';
 import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, toggleVisit } from '../season/recruiting';
-import { careerList, careerRowAt, careerTabAt, drawCareer, modeAt, newCareerView, type CareerView } from '../render/careerScreen';
+import { careerList, careerRowAt, careerTabAt, modeAt, newCareerView } from '../render/careerScreen';
+import { beginLinks, linkAt, type Link } from '../render/links';
+import { drawProgram, programScrollMax, programTabAt, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
 import { buildStaff, dcAdjust, GROUPS, type Group } from '../data/coaches';
@@ -88,7 +90,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'career' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -121,6 +123,8 @@ const ASSIST_OPTIONS: RunAssist[] = ['FULL', 'LIGHT', 'OFF'];
  */
 const SETTINGS: {
   label: string; help: string; options: string[]; start: number; apply: (c: SeasonConfig, i: number) => void; read: (c: SeasonConfig) => number;
+  /** Set when the dynasty starts: shown on the hub's page, but fixed. */
+  newOnly?: boolean;
 }[] = [
   {
     label: 'INJURIES', help: 'HOW OFTEN PLAYERS GET HURT', options: INJURY_OPTIONS.map((o) => o.toUpperCase()), start: 0,
@@ -162,6 +166,12 @@ const SETTINGS: {
     options: ['OFF', 'ON'], start: 0,
     apply: (c, i) => (c.aimSlow = i === 1),
     read: (c) => (c.aimSlow ? 1 : 0),
+  },
+  {
+    label: 'HISTORY', help: 'REAL PROGRAM HISTORY TO 2025, OR EVERY TEAM STARTS FROM NOTHING',
+    options: ['REAL', 'FRESH START'], start: 0, newOnly: true,
+    apply: (c, i) => (c.history = i === 1 ? 'fresh' : 'real'),
+    read: (c) => (c.history === 'fresh' ? 1 : 0),
   },
 ];
 
@@ -320,7 +330,9 @@ export class Game {
   private watchOnly = false;
   private seasonView: SeasonView = newSeasonView();
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
-  private careerView: CareerView = { pos: 0, sel: 0, mode: 0, scroll: 0, back: 'season', mx: 0, my: 0 };
+  private programView?: ProgramView;
+  /** Where Esc goes from a program page: the screen it was opened from, or the program page before. */
+  private programBack: ({ screen: Screen } | { view: ProgramView })[] = [];
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
   private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
   private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
@@ -392,8 +404,8 @@ export class Game {
       case 'team':
         this.updateTeam(input);
         break;
-      case 'career':
-        this.updateCareer(input);
+      case 'program':
+        this.updateProgram(input);
         break;
       case 'playbook':
         this.updateBook(input);
@@ -634,8 +646,9 @@ export class Game {
     this.screen = 'newSettings';
   }
 
-  private settingRows(): SettingRow[] {
-    return SETTINGS.map((r, i) => ({ label: r.label, value: r.options[this.settingIdx[i]], help: r.help }));
+  /** `hub`: a started dynasty, where the settings fixed at the start can't change. */
+  private settingRows(hub = false): SettingRow[] {
+    return SETTINGS.map((r, i) => ({ label: r.label, value: r.options[this.settingIdx[i]], help: hub && r.newOnly ? 'SET WHEN THE DYNASTY STARTED: IT CAN\'T CHANGE NOW' : r.help }));
   }
 
   /** The new dynasty's settings: W/S or a click picks a row, A/D or the picked row's arrows change it; Enter starts the dynasty. */
@@ -892,7 +905,7 @@ export class Game {
     else if (item.page === 'playbook') this.toBook();
     else if (item.page === 'prep') this.toPrep();
     else if (item.page === 'recruit') this.toRecruit();
-    else if (item.page === 'career') this.toCareer('season');
+    else if (item.page === 'program') this.toProgram(this.season!.config.userTeamId);
     else if (item.page === 'settings') this.toSettings();
   }
 
@@ -941,7 +954,7 @@ export class Game {
       const step = m.wheel * 3 + (input.hit('KeyE') ? 3 : 0) - (input.hit('KeyQ') ? 3 : 0);
       if (step) v.scroll = Math.max(0, Math.min(newsMaxScroll(s, v.sub), v.scroll + step));
     }
-    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'career', KeyR: 'recruit' };
+    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'program', KeyR: 'recruit' };
     for (const [key, id] of Object.entries(hot)) {
       const it = items.find((x) => x.id === id);
       if (it && !it.off && input.hit(key)) {
@@ -956,6 +969,11 @@ export class Game {
           select(it.id);
           this.openPage(it);
         } else select(it.id);
+        return;
+      }
+      const link = linkAt(m.x, m.y);
+      if (link) {
+        this.followLink(link);
         return;
       }
     }
@@ -1050,6 +1068,7 @@ export class Game {
     if (input.hit('KeyW', 'ArrowUp')) this.settingSel = (this.settingSel + n - 1) % n;
     if (input.hit('KeyS', 'ArrowDown')) this.settingSel = (this.settingSel + 1) % n;
     const change = (row: number, d: number) => {
+      if (SETTINGS[row].newOnly) return;
       const k = SETTINGS[row].options.length;
       this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
       SETTINGS[row].apply(c, this.settingIdx[row]);
@@ -1073,9 +1092,16 @@ export class Game {
 
   // ------------------------------------------------------------ team page
 
-  private toTeam(): void {
+  /** The roster, on a player's card if one is given. */
+  private toTeam(id?: string): void {
     this.screen = 'team';
     this.teamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
+    const s = this.season!;
+    const squad = squadFor(s, s.config.userTeamId);
+    const a = id ? squad.athletes.find((x) => x.id === id) : undefined;
+    if (!a) return;
+    this.teamView.pos = POSITIONS.indexOf(a.pos);
+    this.teamView.sel = Math.max(0, depthView(squad, a.pos).rows.findIndex((x) => x.id === id));
   }
 
   private setTeamPos(i: number): void {
@@ -1109,7 +1135,7 @@ export class Game {
     const pos = POSITIONS[v.pos];
     const view = depthView(squad, pos);
     if (input.hit('KeyC') && view.rows.length) {
-      this.toCareer('team', view.rows[Math.min(v.sel, view.rows.length - 1)].id);
+      this.toRegistry(view.rows[Math.min(v.sel, view.rows.length - 1)].id);
       return;
     }
     const rows = view.rows.length;
@@ -1118,6 +1144,12 @@ export class Game {
     if (input.mouse.pressed) {
       const tab = tabAt(x, y);
       const row = rowAt(x, y, view);
+      const link = linkAt(x, y);
+      if (link?.kind === 'player') {
+        // The name on the card: his page in the registry.
+        this.toRegistry(link.id);
+        return;
+      }
       if (tab >= 0) this.setTeamPos(tab);
       else if (inBox(DEPTH_BTN, x, y)) this.toggleStaffDepth();
       else if (row >= 0) v.drag = { from: row, y0: y, moved: false };
@@ -1143,31 +1175,94 @@ export class Game {
     this.save();
   }
 
-  // ------------------------------------------------------------ stats page
+  // ------------------------------------------------------------ program pages
 
-  /** The STATS page, on a player if one is given; Esc goes back to `back`. */
-  private toCareer(back: CareerView['back'], id?: string): void {
+  /** A team's program page from wherever the user is; Esc comes back here. */
+  private toProgram(team: string, tab = 0, player?: string): void {
     const s = this.season!;
-    this.screen = 'career';
-    this.careerView = newCareerView(squadFor(s, s.config.userTeamId), back, id);
+    if (this.screen === 'program' && this.programView) {
+      if (this.programView.team === team && player === undefined) {
+        this.programView.tab = tab;
+        return;
+      }
+      this.programBack.push({ view: this.programView });
+    } else this.programBack = [{ screen: this.screen }];
+    this.programView = { team, tab, scroll: 0, career: newCareerView(squadFor(s, team), player), mx: 0, my: 0 };
+    this.screen = 'program';
   }
 
-  /** Careers: position tabs and rows pick a player; G or the toggles switch SEASONS and GROWTH; the wheel scrolls his story. */
-  private updateCareer(input: Input): void {
+  /** The user's PLAYER REGISTRY on one of his players. */
+  private toRegistry(id: string): void {
+    this.toProgram(this.season!.config.userTeamId, PROGRAM_TABS.indexOf('REGISTRY'), id);
+  }
+
+  /** A clicked name: a team's page, the user's player's roster card, or another team's player in its registry. */
+  private followLink(l: Link): void {
     const s = this.season!;
-    const v = this.careerView;
-    const { x, y } = input.mouse;
-    v.mx = x;
-    v.my = y;
-    if (input.hit('Escape', 'Backspace', 'KeyH')) {
-      this.screen = v.back;
+    if (l.kind === 'team') this.toProgram(l.id);
+    else if (l.team === s.config.userTeamId) this.toTeam(l.id);
+    else this.toProgram(l.team, PROGRAM_TABS.indexOf('REGISTRY'), l.id);
+  }
+
+  private programBackOut(): void {
+    const b = this.programBack.pop();
+    if (b && 'view' in b) {
+      this.programView = b.view;
       return;
     }
+    this.screen = b?.screen ?? 'season';
+    this.programView = undefined;
+  }
+
+  /**
+   * A program page: 1-5 or the tabs pick the page, Tab steps through them, the wheel or W/S scroll
+   * HISTORY and NEWS, names are links, Esc goes back. On REGISTRY the registry's keys work (A/D
+   * position, W/S player, G seasons or growth).
+   */
+  private updateProgram(input: Input): void {
+    const s = this.season!;
+    const v = this.programView!;
+    const { x, y } = input.mouse;
+    v.mx = v.career.mx = x;
+    v.my = v.career.my = y;
+    if (input.hit('Escape', 'Backspace') || (input.hit('KeyH') && v.team === s.config.userTeamId && this.programBack.length <= 1)) {
+      this.programBackOut();
+      return;
+    }
+    const n = PROGRAM_TABS.length;
+    const setTab = (i: number) => Object.assign(v, { tab: i, scroll: 0 });
+    ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].forEach((k, i) => input.hit(k) && setTab(i));
+    if (input.hit('Tab')) setTab((v.tab + 1) % n);
+    if (input.mouse.pressed) {
+      const tab = programTabAt(x, y);
+      if (tab >= 0) {
+        setTab(tab);
+        return;
+      }
+      const link = linkAt(x, y);
+      if (link) {
+        this.followLink(link);
+        return;
+      }
+    }
+    if (v.tab === n - 1) {
+      this.updateRegistry(input, v);
+      return;
+    }
+    const step = input.mouse.wheel * 3 + (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0);
+    if (step) v.scroll = Math.max(0, Math.min(programScrollMax(s, v), v.scroll + step));
+  }
+
+  /** The REGISTRY tab: position tabs and rows pick a player; G or the toggles switch SEASONS and GROWTH; the wheel scrolls his story. */
+  private updateRegistry(input: Input, pv: ProgramView): void {
+    const s = this.season!;
+    const v = pv.career;
+    const { x, y } = input.mouse;
     const setPos = (i: number) => Object.assign(v, { pos: i, sel: 0, scroll: 0 });
     const n = POSITIONS.length;
     if (input.hit('KeyA', 'ArrowLeft')) setPos((v.pos + n - 1) % n);
     if (input.hit('KeyD', 'ArrowRight')) setPos((v.pos + 1) % n);
-    const rows = Math.max(1, careerList(squadFor(s, s.config.userTeamId), POSITIONS[v.pos]).length);
+    const rows = Math.max(1, careerList(squadFor(s, pv.team), POSITIONS[v.pos]).length);
     const pick = (i: number) => Object.assign(v, { sel: i, scroll: 0 });
     if (input.hit('KeyW', 'ArrowUp')) pick((v.sel + rows - 1) % rows);
     if (input.hit('KeyS', 'ArrowDown')) pick((v.sel + 1) % rows);
@@ -2507,6 +2602,7 @@ export class Game {
 
   render(g: CanvasRenderingContext2D): void {
     g.imageSmoothingEnabled = false;
+    beginLinks(this.menuMouse.x, this.menuMouse.y);
     if (
       this.screen === 'title' || this.screen === 'exhibition' || this.screen === 'slots' || this.screen === 'newTeam' || this.screen === 'newSettings' ||
       this.screen === 'settings'
@@ -2527,9 +2623,8 @@ export class Game {
       drawTeam(g, s, squadFor(s, s.config.userTeamId), this.teamView);
       return;
     }
-    if (this.screen === 'career') {
-      const s = this.season!;
-      drawCareer(g, s, squadFor(s, s.config.userTeamId), this.careerView);
+    if (this.screen === 'program') {
+      drawProgram(g, this.season!, this.programView!);
       return;
     }
     if (this.screen === 'playbook') {
@@ -2894,7 +2989,7 @@ export class Game {
         break;
       case 'settings':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'CHANGES SAVE AS YOU MAKE THEM');
-        drawSettings(g, user, this.slot, this.settingRows(), this.settingSel, x, y, true);
+        drawSettings(g, user, this.slot, this.settingRows(true), this.settingSel, x, y, true);
         break;
     }
   }

@@ -1,6 +1,6 @@
 # Careers
 
-A player's history across seasons and teams: a row for each finished season, plus a story made of the moments that shaped it. The code is in `season/career.ts` and the STATS page is `render/careerScreen.ts`.
+A player's history across seasons and teams: a row for each finished season, plus a story made of the moments that shaped it. The code is in `season/career.ts` and the PLAYER REGISTRY (the REGISTRY tab of every program page, `render/programScreen.ts`) is `render/careerScreen.ts`.
 
 ## The separation rule
 Gameplay state is what a player **is**: `TeamState.progress` (XP, levels, rating changes, confidence, sparks, promises), morale and health. The sim reads all of it.

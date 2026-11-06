@@ -1,0 +1,1642 @@
+[
+ {
+  "id": "miami",
+  "natTitles": [
+   1983,
+   1987,
+   1989,
+   1991,
+   2001
+  ],
+  "confTitles": 9,
+  "lastConf": 2003,
+  "playoffs": [
+   2025
+  ],
+  "bowls": {
+   "apps": 49,
+   "w": 22,
+   "l": 27,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Vinny Testaverde",
+    "year": 1986
+   },
+   {
+    "name": "Gino Torretta",
+    "year": 1992
+   }
+  ],
+  "allTime": {
+   "w": 686,
+   "l": 394,
+   "t": 19
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 7,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L PINSTRIPE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": 18,
+    "post": "L POP-TARTS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 13,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": 2,
+    "post": "L NATIONAL TITLE"
+   }
+  ],
+  "notes": "Conf titles are 9 Big East (1991-2003). Bowls count all four 2025 CFP games (First Round W at Texas A&M, Cotton W, Fiesta W, title game L to Indiana) and exclude the 1932 Palm Festival; bowl total is +/-1 depending on how the school counts early games. All-time is the sum of Wikipedia's season list (+/-1). 2021 Sun Bowl was cancelled (Miami withdrew, COVID).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Miami_Hurricanes_football",
+   "https://en.wikipedia.org/wiki/List_of_Miami_Hurricanes_football_seasons"
+  ]
+ },
+ {
+  "id": "smu",
+  "natTitles": [
+   1935,
+   1981,
+   1982
+  ],
+  "confTitles": 12,
+  "lastConf": 2023,
+  "playoffs": [
+   2024
+  ],
+  "bowls": {
+   "apps": 21,
+   "w": 8,
+   "l": 12,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Doak Walker",
+    "year": 1948
+   }
+  ],
+  "allTime": {
+   "w": 558,
+   "l": 573,
+   "t": 54
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "AAC",
+    "w": 8,
+    "l": 4,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "AAC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L NEW MEXICO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "AAC",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": 22,
+    "post": "W AAC TITLE, L FENWAY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": 12,
+    "post": "L CFP FIRST ROUND"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W HOLIDAY BOWL"
+   }
+  ],
+  "notes": "Conf titles: 11 SWC + 2023 AAC. 2024: lost ACC title game to Clemson, then CFP first round at Penn State. 2021 Fenway Bowl cancelled. All-time on-field, +/-1 (SMU's record includes the 1987-88 death-penalty gap). Lashlee's first season was 2022.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/SMU_Mustangs_football",
+   "https://en.wikipedia.org/wiki/List_of_SMU_Mustangs_football_seasons"
+  ]
+ },
+ {
+  "id": "wakeforest",
+  "natTitles": [],
+  "confTitles": 2,
+  "lastConf": 2006,
+  "playoffs": [],
+  "bowls": {
+   "apps": 18,
+   "w": 12,
+   "l": 6,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 497,
+   "l": 694,
+   "t": 33
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": 15,
+    "post": "W GATOR BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "W GASPARILLA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W DUKE'S MAYO BOWL"
+   }
+  ],
+  "notes": "ACC titles 1970, 2006. 2021: Atlantic Division champion, lost the ACC title game to Pitt. Jake Dickert's first season was 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Wake_Forest_Demon_Deacons_football",
+   "https://en.wikipedia.org/wiki/List_of_Wake_Forest_Demon_Deacons_football_seasons"
+  ]
+ },
+ {
+  "id": "clemson",
+  "natTitles": [
+   1981,
+   2016,
+   2018
+  ],
+  "confTitles": 28,
+  "lastConf": 2024,
+  "playoffs": [
+   2015,
+   2016,
+   2017,
+   2018,
+   2019,
+   2020,
+   2024
+  ],
+  "bowls": {
+   "apps": 52,
+   "w": 27,
+   "l": 25,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 815,
+   "l": 482,
+   "t": 45
+  },
+  "coachSince": 2008,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": 14,
+    "post": "W CHEEZ-IT BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": 13,
+    "post": "W ACC TITLE, L ORANGE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 4,
+    "cl": 4,
+    "ap": 20,
+    "post": "W GATOR BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": 14,
+    "post": "L CFP FIRST ROUND"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L PINSTRIPE BOWL"
+   }
+  ],
+  "notes": "Conf titles: 4 SIAA, 2 SoCon, 22 ACC. 2024 won the ACC title (prefix left off for length). Bowls count every CFP game (6-5 in the CFP). Swinney took over as interim in mid-2008. All-time is the sum of Wikipedia's season list.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Clemson_Tigers_football",
+   "https://en.wikipedia.org/wiki/List_of_Clemson_Tigers_football_seasons"
+  ]
+ },
+ {
+  "id": "northcarolina",
+  "natTitles": [],
+  "confTitles": 8,
+  "lastConf": 1980,
+  "playoffs": [],
+  "bowls": {
+   "apps": 39,
+   "w": 15,
+   "l": 24,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 739,
+   "l": 584,
+   "t": 54
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L DUKE'S MAYO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L HOLIDAY BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L DUKE'S MAYO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L FENWAY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: SoCon 1922, 1946, 1949; ACC 1963 (shared), 1971, 1972, 1977, 1980. Some sources add a 1934 SoCon title. All-time on-field (UNC vacated 16 wins from 2008-09; infobox figures differ by a few). 2022: Coastal champion, lost the ACC title game. Belichick's first season was 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/North_Carolina_Tar_Heels_football",
+   "https://en.wikipedia.org/wiki/List_of_North_Carolina_Tar_Heels_football_seasons"
+  ]
+ },
+ {
+  "id": "louisville",
+  "natTitles": [],
+  "confTitles": 8,
+  "lastConf": 2012,
+  "playoffs": [],
+  "bowls": {
+   "apps": 28,
+   "w": 14,
+   "l": 13,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Lamar Jackson",
+    "year": 2016
+   }
+  ],
+  "allTime": {
+   "w": 568,
+   "l": 505,
+   "t": 17
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W FENWAY BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": 19,
+    "post": "L HOLIDAY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W SUN BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BOCA RATON BOWL"
+   }
+  ],
+  "notes": "Conf titles: MVC 1970, 1972; C-USA 2000, 2001, 2004; Big East 2006, 2011, 2012 (a 1947 small-college title not counted). 2023: lost the ACC title game to FSU.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Louisville_Cardinals_football",
+   "https://en.wikipedia.org/wiki/List_of_Louisville_Cardinals_football_seasons"
+  ]
+ },
+ {
+  "id": "duke",
+  "natTitles": [],
+  "confTitles": 18,
+  "lastConf": 2025,
+  "playoffs": [],
+  "bowls": {
+   "apps": 18,
+   "w": 9,
+   "l": 9,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 559,
+   "l": 567,
+   "t": 31
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W MILITARY BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BIRMINGHAM BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L GATOR BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W ACC TITLE, W SUN BOWL"
+   }
+  ],
+  "notes": "Conf titles: 10 SoCon + 8 ACC (1953-55, 1960-62, 1989, 2025); 2025 beat Virginia in OT in the ACC title game. Duke claims no national titles (1938 selector picks not claimed). All-time = Wikipedia's figure through Dec 7, 2025, plus the Sun Bowl win.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Duke_Blue_Devils_football",
+   "https://en.wikipedia.org/wiki/List_of_Duke_Blue_Devils_football_seasons"
+  ]
+ },
+ {
+  "id": "virginiatech",
+  "natTitles": [],
+  "confTitles": 11,
+  "lastConf": 2010,
+  "playoffs": [],
+  "bowls": {
+   "apps": 36,
+   "w": 14,
+   "l": 22,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 781,
+   "l": 519,
+   "t": 46
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L PINSTRIPE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 3,
+    "l": 8,
+    "cw": 1,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W MILITARY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L DUKE'S MAYO BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: SAIAA 1909, 1916, 1918; SoCon 1963; Big East 1995, 1996, 1999; ACC 2004, 2007, 2008, 2010. All-time is the Wikipedia infobox minus the 2026 games so far (6-2), so it may be off by 1-2. 2025: Brent Pry fired after 3 games, Philip Montgomery interim; James Franklin's first season is 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Virginia_Tech_Hokies_football",
+   "https://en.wikipedia.org/wiki/List_of_Virginia_Tech_Hokies_football_seasons"
+  ]
+ },
+ {
+  "id": "bostoncollege",
+  "natTitles": [
+   1940
+  ],
+  "confTitles": 1,
+  "lastConf": 2004,
+  "playoffs": [],
+  "bowls": {
+   "apps": 29,
+   "w": 15,
+   "l": 14,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [
+   {
+    "name": "Doug Flutie",
+    "year": 1984
+   }
+  ],
+  "allTime": {
+   "w": 703,
+   "l": 541,
+   "t": 37
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 6,
+    "l": 6,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "W FENWAY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L PINSTRIPE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Only conference title is the shared 2004 Big East. The 1940 national title is claimed. 2021 Military Bowl cancelled (COVID). Bill O'Brien's first season was 2024.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Boston_College_Eagles_football",
+   "https://en.wikipedia.org/wiki/List_of_Boston_College_Eagles_football_seasons"
+  ]
+ },
+ {
+  "id": "pittsburgh",
+  "natTitles": [
+   1915,
+   1916,
+   1918,
+   1929,
+   1931,
+   1934,
+   1936,
+   1937,
+   1976
+  ],
+  "confTitles": 3,
+  "lastConf": 2021,
+  "playoffs": [],
+  "bowls": {
+   "apps": 39,
+   "w": 15,
+   "l": 24,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Tony Dorsett",
+    "year": 1976
+   }
+  ],
+  "allTime": {
+   "w": 776,
+   "l": 571,
+   "t": 42
+  },
+  "coachSince": 2015,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": 13,
+    "post": "W ACC TITLE, L PEACH BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": 22,
+    "post": "W SUN BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L GAMEABOVE SPORTS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L MILITARY BOWL"
+   }
+  ],
+  "notes": "Pitt claims 9 national titles. Conf titles: Big East 2004 (shared), 2010 (shared), ACC 2021. All-time is the sum of Wikipedia's season table (matches Winsipedia).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Pittsburgh_Panthers_football",
+   "https://en.wikipedia.org/wiki/List_of_Pittsburgh_Panthers_football_seasons"
+  ]
+ },
+ {
+  "id": "stanford",
+  "natTitles": [
+   1926,
+   1940
+  ],
+  "confTitles": 16,
+  "lastConf": 2015,
+  "playoffs": [],
+  "bowls": {
+   "apps": 30,
+   "w": 15,
+   "l": 14,
+   "t": 1,
+   "last": 2018
+  },
+  "heisman": [
+   {
+    "name": "Jim Plunkett",
+    "year": 1970
+   }
+  ],
+  "allTime": {
+   "w": 674,
+   "l": 504,
+   "t": 49
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: 9 PCC + 7 Pac-8/10/12. All-time excludes the 1906-17 rugby seasons (94-20-3), which Stanford counts in its own records; estimated from Wikipedia's total through Sept 2025 plus the rest of 2025, +/-2. Frank Reich was interim in 2025; Tavita Pritchard's first season is 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Stanford_Cardinal_football",
+   "https://en.wikipedia.org/wiki/List_of_Stanford_Cardinal_football_seasons"
+  ]
+ },
+ {
+  "id": "virginia",
+  "natTitles": [],
+  "confTitles": 4,
+  "lastConf": 1995,
+  "playoffs": [],
+  "bowls": {
+   "apps": 22,
+   "w": 9,
+   "l": 13,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 701,
+   "l": 651,
+   "t": 49
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 6,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 3,
+    "l": 7,
+    "cw": 1,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": 16,
+    "post": "W GATOR BOWL"
+   }
+  ],
+  "notes": "Conf titles: SAIAA 1914, 1915; ACC 1989, 1995 (both shared). 2025: lost the ACC title game to Duke in OT. 2021 Fenway Bowl cancelled. The 2022 season ended after 10 games (shooting). All-time +/-1.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Virginia_Cavaliers_football",
+   "https://en.wikipedia.org/wiki/List_of_Virginia_Cavaliers_football_seasons"
+  ]
+ },
+ {
+  "id": "california",
+  "natTitles": [
+   1920,
+   1921,
+   1922,
+   1923,
+   1937
+  ],
+  "confTitles": 16,
+  "lastConf": 2006,
+  "playoffs": [],
+  "bowls": {
+   "apps": 27,
+   "w": 12,
+   "l": 14,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 707,
+   "l": 584,
+   "t": 51
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "L INDEPENDENCE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": "L LA BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L HAWAII BOWL"
+   }
+  ],
+  "notes": "Cal claims 5 national titles. Conf titles: 14 PCC + Pac-8 1975, Pac-10 2006 (shared). Justin Wilcox fired Nov 2025, Nick Rolovich interim for the bowl; Tosh Lupoi's first season is 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/California_Golden_Bears_football",
+   "https://en.wikipedia.org/wiki/List_of_California_Golden_Bears_football_seasons"
+  ]
+ },
+ {
+  "id": "floridastate",
+  "natTitles": [
+   1993,
+   1999,
+   2013
+  ],
+  "confTitles": 19,
+  "lastConf": 2023,
+  "playoffs": [
+   2014
+  ],
+  "bowls": {
+   "apps": 51,
+   "w": 30,
+   "l": 18,
+   "t": 3,
+   "last": 2023
+  },
+  "heisman": [
+   {
+    "name": "Charlie Ward",
+    "year": 1993
+   },
+   {
+    "name": "Chris Weinke",
+    "year": 2000
+   },
+   {
+    "name": "Jameis Winston",
+    "year": 2013
+   }
+  ],
+  "allTime": {
+   "w": 601,
+   "l": 298,
+   "t": 17
+  },
+  "coachSince": 2020,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 10,
+    "l": 3,
+    "cw": 5,
+    "cl": 3,
+    "ap": 11,
+    "post": "W CHEEZ-IT BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 13,
+    "l": 1,
+    "cw": 8,
+    "cl": 0,
+    "ap": 6,
+    "post": "W ACC TITLE, L ORANGE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 5,
+    "l": 7,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: Dixie 1948-50 + 16 ACC. All-time on-field (official is about 589-298-17 after 12 vacated wins from 2006-07; estimated from the Wikipedia infobox minus 2026 games, +/-2). Bowls on-field include the vacated 2006 Emerald Bowl win (official 29-18-3). Mike Norvell (since 2020) started 2026 but was fired mid-season; Rick Stockstill is interim.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Florida_State_Seminoles_football",
+   "https://en.wikipedia.org/wiki/List_of_Florida_State_Seminoles_football_seasons"
+  ]
+ },
+ {
+  "id": "ncstate",
+  "natTitles": [],
+  "confTitles": 11,
+  "lastConf": 1979,
+  "playoffs": [],
+  "bowls": {
+   "apps": 37,
+   "w": 18,
+   "l": 18,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 652,
+   "l": 612,
+   "t": 55
+  },
+  "coachSince": 2013,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 9,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": 20,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L DUKE'S MAYO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": 21,
+    "post": "L POP-TARTS BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L MILITARY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W GASPARILLA BOWL"
+   }
+  ],
+  "notes": "Conf titles: SAIAA 1907, 1910, 1913; SoCon 1927; ACC 1957, 1963 (shared), 1964 (shared), 1965 (shared), 1968, 1973, 1979. 2021 conf record per ACC standings 6-2 (Wikipedia infobox did not show it); the 2021 Holiday Bowl was cancelled (NC State counts 10 wins). All-time from the NCAA-based Wikipedia infobox, +/-2. Dave Doeren (since 2013) started 2026 but was fired mid-season; Todd Goebbel is interim.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/NC_State_Wolfpack_football",
+   "https://en.wikipedia.org/wiki/List_of_NC_State_Wolfpack_football_seasons"
+  ]
+ },
+ {
+  "id": "georgiatech",
+  "natTitles": [
+   1917,
+   1928,
+   1952,
+   1990
+  ],
+  "confTitles": 15,
+  "lastConf": 1998,
+  "playoffs": [],
+  "bowls": {
+   "apps": 48,
+   "w": 26,
+   "l": 22,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 772,
+   "l": 550,
+   "t": 43
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W GASPARILLA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L BIRMINGHAM BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L POP-TARTS BOWL"
+   }
+  ],
+  "notes": "Conf titles: SIAA 5, SoCon 3, SEC 5, ACC 1990 and 1998 (shared); the 2009 ACC title was vacated by the NCAA and isn't counted (16 with it). 2025 final rank: Coaches #24, unranked in AP. Brent Key took over as interim mid-2022, so his first season is 2022.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Georgia_Tech_Yellow_Jackets_football",
+   "https://en.wikipedia.org/wiki/List_of_Georgia_Tech_Yellow_Jackets_football_seasons"
+  ]
+ },
+ {
+  "id": "syracuse",
+  "natTitles": [
+   1959
+  ],
+  "confTitles": 5,
+  "lastConf": 2012,
+  "playoffs": [],
+  "bowls": {
+   "apps": 29,
+   "w": 17,
+   "l": 11,
+   "t": 1,
+   "last": 2024
+  },
+  "heisman": [
+   {
+    "name": "Ernie Davis",
+    "year": 1961
+   }
+  ],
+  "allTime": {
+   "w": 756,
+   "l": 589,
+   "t": 49
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ACC",
+    "w": 5,
+    "l": 7,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ACC",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L PINSTRIPE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "ACC",
+    "w": 6,
+    "l": 7,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": "L BOCA RATON BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "ACC",
+    "w": 10,
+    "l": 3,
+    "cw": 5,
+    "cl": 3,
+    "ap": 20,
+    "post": "W HOLIDAY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "ACC",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conf titles: Big East 1996, 1997, 1998, 2004, 2012 (several shared). All-time from Wikipedia's season list total (as of Mar 2026).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Syracuse_Orange_football",
+   "https://en.wikipedia.org/wiki/List_of_Syracuse_Orange_football_seasons"
+  ]
+ },
+ {
+  "id": "notredame",
+  "natTitles": [
+   1924,
+   1929,
+   1930,
+   1943,
+   1946,
+   1947,
+   1949,
+   1966,
+   1973,
+   1977,
+   1988
+  ],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [
+   2018,
+   2020,
+   2024
+  ],
+  "bowls": {
+   "apps": 46,
+   "w": 24,
+   "l": 22,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [
+   {
+    "name": "Angelo Bertelli",
+    "year": 1943
+   },
+   {
+    "name": "Johnny Lujack",
+    "year": 1947
+   },
+   {
+    "name": "Leon Hart",
+    "year": 1949
+   },
+   {
+    "name": "Johnny Lattner",
+    "year": 1953
+   },
+   {
+    "name": "Paul Hornung",
+    "year": 1956
+   },
+   {
+    "name": "John Huarte",
+    "year": 1964
+   },
+   {
+    "name": "Tim Brown",
+    "year": 1987
+   }
+  ],
+  "allTime": {
+   "w": 992,
+   "l": 346,
+   "t": 42
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Independent",
+    "w": 11,
+    "l": 2,
+    "cw": 0,
+    "cl": 0,
+    "ap": 8,
+    "post": "L FIESTA BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Independent",
+    "w": 9,
+    "l": 4,
+    "cw": 0,
+    "cl": 0,
+    "ap": 18,
+    "post": "W GATOR BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Independent",
+    "w": 10,
+    "l": 3,
+    "cw": 0,
+    "cl": 0,
+    "ap": 14,
+    "post": "W SUN BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Independent",
+    "w": 14,
+    "l": 2,
+    "cw": 0,
+    "cl": 0,
+    "ap": 2,
+    "post": "L NATIONAL TITLE"
+   },
+   {
+    "year": 2025,
+    "conf": "Independent",
+    "w": 10,
+    "l": 2,
+    "cw": 0,
+    "cl": 0,
+    "ap": 10,
+    "post": null
+   }
+  ],
+  "notes": "Independent; it played the 2020 season in the ACC (10-2 overall, lost the ACC title game) with no conference title. All-time is on-field; the official figure is about 971 wins after 21 vacated wins (2012-13). Bowls count each CFP game (3-3 in the CFP). 2025: left out of the CFP and declined a bowl. Freeman coached the 2021 Fiesta Bowl; his first full season was 2022.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Notre_Dame_Fighting_Irish_football",
+   "https://en.wikipedia.org/wiki/List_of_Notre_Dame_Fighting_Irish_football_seasons"
+  ]
+ },
+ {
+  "id": "uconn",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 2,
+  "lastConf": 2010,
+  "playoffs": [],
+  "bowls": {
+   "apps": 8,
+   "w": 4,
+   "l": 4,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 530,
+   "l": 613,
+   "t": 38
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Independent",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Independent",
+    "w": 6,
+    "l": 7,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "L MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Independent",
+    "w": 3,
+    "l": 9,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Independent",
+    "w": 9,
+    "l": 4,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "W FENWAY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Independent",
+    "w": 9,
+    "l": 4,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "L FENWAY BOWL"
+   }
+  ],
+  "notes": "FBS-level conf titles: Big East 2007 and 2010 (both shared). Earlier New England/Yankee titles were at lower levels. Division I-AA through 1999 with no titles (1998 I-AA playoff quarterfinal). All-time includes the I-AA era, from Wikipedia's season list (+/-1). Jim Mora left after 2025; Jason Candle's first season is 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UConn_Huskies_football",
+   "https://en.wikipedia.org/wiki/List_of_UConn_Huskies_football_seasons"
+  ]
+ }
+]

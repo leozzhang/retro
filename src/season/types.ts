@@ -47,6 +47,11 @@ export interface SeasonConfig {
   runAssist?: 'FULL' | 'LIGHT' | 'OFF';
   /** Slow motion while the QB aims a pass or the punter aims a punt in live games. Missing means off. */
   aimSlow?: boolean;
+  /**
+   * Program history on the team pages (season/program.ts): the real history through 2025
+   * (data/fbs/history.ts), or every team starting from nothing. Set when the dynasty starts. Missing means real.
+   */
+  history?: 'real' | 'fresh';
 }
 
 export type KeyLevel = 'off' | 'lean' | 'normal' | 'full';
@@ -441,6 +446,8 @@ export interface SeasonSummary {
   year: number;
   champion: string;
   heisman?: string;
+  /** The Heisman winner's team. */
+  heismanTeam?: string;
   /** The final AP top 25, best first. */
   ap?: string[];
   /** Win share by team, postseason included. */
@@ -449,6 +456,42 @@ export interface SeasonSummary {
   dev?: Record<string, number>;
   /** The NFL draft that followed it (season/draft.ts), in pick order. */
   draft?: DraftPick[];
+  /** Every team's season, for the program pages (season/program.ts). History only. */
+  teams?: Record<string, TeamYear>;
+}
+
+/** One team's finished season (season/season.ts `yearRecord`). Missing fields are zero or none. */
+export interface TeamYear {
+  conf: string;
+  w: number;
+  l: number;
+  cw: number;
+  cl: number;
+  /** Final AP rank. */
+  ap?: number;
+  /** Won the conference title game; played in it. */
+  cc?: 1;
+  cg?: 1;
+  /** Playoff seed, and the last round played (0 first round .. 3 the final). */
+  seed?: number;
+  rd?: number;
+  /** National champion. */
+  nc?: 1;
+  /** A non-playoff bowl: its name, and whether they won it. */
+  bowl?: string;
+  bw?: 1;
+  /** The head coach's name ('YOU' for the user's program). */
+  hc?: string;
+}
+
+/** A news item kept past its season for a team's page (season/program.ts `archiveChronicle`). */
+export interface ChronItem {
+  year: number;
+  week: number;
+  kind: NewsItem['kind'];
+  text: string;
+  /** Salience, from `newsWeight`. */
+  w: number;
 }
 
 /** One NFL draft pick. Name, position and overall are copied in, since he's gone from FBS. */
@@ -636,4 +679,6 @@ export interface SeasonState {
   departures?: DeparturesState;
   /** This season's HS recruiting cycle, through national signing day in its offseason. */
   recruiting?: RecruitingState;
+  /** Each team's big news from past seasons, newest year last (season/program.ts). History only. */
+  chronicle?: Record<string, ChronItem[]>;
 }

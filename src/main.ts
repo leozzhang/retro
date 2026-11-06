@@ -4,6 +4,7 @@ import { Input } from './engine/input';
 import { initStore, onStoreError } from './engine/storage';
 import { Game } from './game/game';
 import { STARRED_KEY } from './game/starred';
+import { overLink } from './render/links';
 import { text } from './render/text';
 import { BOOT_KEYS, migrateLegacySave } from './season/save';
 
@@ -47,6 +48,7 @@ async function boot(): Promise<void> {
       acc -= STEP;
     }
     game.render(g);
+    canvas.style.cursor = overLink() ? 'pointer' : '';
     if (now - saveFailed < SAVE_ERROR_MS) drawSaveError(g);
     requestAnimationFrame(frame);
   };

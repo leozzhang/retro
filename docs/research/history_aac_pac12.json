@@ -1,0 +1,1812 @@
+[
+ {
+  "id": "utsa",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 2,
+  "lastConf": 2022,
+  "playoffs": [],
+  "bowls": {
+   "apps": 7,
+   "w": 3,
+   "l": 4,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 98,
+   "l": 87,
+   "t": 0
+  },
+  "coachSince": 2020,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L FRISCO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "W C-USA TITLE, L CURE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 9,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W FRISCO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W FIRST RESPONDER BOWL"
+   }
+  ],
+  "notes": "Program began 2011 (FCS transitional year). 2021: also won the C-USA title game (prefix omitted for length). Conf titles: C-USA 2021, 2022.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UTSA_Roadrunners_football",
+   "https://en.wikipedia.org/wiki/List_of_UTSA_Roadrunners_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_UTSA_Roadrunners_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "northtexas",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 9,
+  "lastConf": 2004,
+  "playoffs": [],
+  "bowls": {
+   "apps": 16,
+   "w": 4,
+   "l": 12,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 561,
+   "l": 550,
+   "t": 33
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L FRISCO FOOTBALL CLASSIC"
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 7,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L FRISCO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": 24,
+    "post": "W NEW MEXICO BOWL"
+   }
+  ],
+  "notes": "confTitles counts top-division titles only: MVC 1958, 1959, 1966, 1967, 1973 and Sun Belt 2001-2004; 24 incl. TIAA/LSC/GCC small-college and Southland (I-AA 1983, 1994) titles. All-time: Wikipedia infobox 558-549-33 as of 11/16/25 plus 3-1 after (season-list sum gives 561-550-34); +-1 tie uncertain. Bowls include the 1946 Optimist Bowl. 2022 and 2025 lost the conference title game. Neal Brown hired for 2026 (Eric Morris left).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/North_Texas_Mean_Green_football",
+   "https://en.wikipedia.org/wiki/List_of_North_Texas_Mean_Green_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_North_Texas_Mean_Green_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "army",
+  "natTitles": [
+   1944,
+   1945,
+   1946
+  ],
+  "confTitles": 1,
+  "lastConf": 2024,
+  "playoffs": [],
+  "bowls": {
+   "apps": 12,
+   "w": 9,
+   "l": 3,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Doc Blanchard",
+    "year": 1945
+   },
+   {
+    "name": "Glenn Davis",
+    "year": 1946
+   },
+   {
+    "name": "Pete Dawkins",
+    "year": 1958
+   }
+  ],
+  "allTime": {
+   "w": 746,
+   "l": 553,
+   "t": 51
+  },
+  "coachSince": 2014,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Independent",
+    "w": 9,
+    "l": 4,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "W ARMED FORCES BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Independent",
+    "w": 6,
+    "l": 6,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Independent",
+    "w": 6,
+    "l": 6,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 12,
+    "l": 2,
+    "cw": 8,
+    "cl": 0,
+    "ap": 21,
+    "post": "W INDEPENDENCE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W FENWAY BOWL"
+   }
+  ],
+  "notes": "Army media guide claims 3 national titles (1944-46); some selectors also credit 1914 and 1916. 2024: won the AAC title game over Tulane (prefix omitted for length).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Army_Black_Knights_football",
+   "https://en.wikipedia.org/wiki/List_of_Army_Black_Knights_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Army_Black_Knights_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "memphis",
+  "natTitles": [],
+  "confTitles": 5,
+  "lastConf": 2019,
+  "playoffs": [],
+  "bowls": {
+   "apps": 18,
+   "w": 9,
+   "l": 9,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 551,
+   "l": 546,
+   "t": 33
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 6,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "W FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W LIBERTY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 11,
+    "l": 2,
+    "cw": 6,
+    "cl": 2,
+    "ap": 24,
+    "post": "W FRISCO BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L GASPARILLA BOWL"
+   }
+  ],
+  "notes": "confTitles counts top-division titles: MVC 1968, 1969, 1971, American 2014 (shared), 2019; 9 incl. small-college MVC/SIAA titles 1929-38. All-time from season-by-season sum (coach table gives 551-545-33; infobox 553-543-33): +-1-2 uncertain. Bowls 9-9 incl. 1956 Burley Bowl; 2021 Hawaii Bowl canceled. Charles Huff hired for 2026 (Silverfield left).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Memphis_Tigers_football",
+   "https://en.wikipedia.org/wiki/List_of_Memphis_Tigers_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Memphis_Tigers_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "fau",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 3,
+  "lastConf": 2019,
+  "playoffs": [],
+  "bowls": {
+   "apps": 5,
+   "w": 4,
+   "l": 1,
+   "t": 0,
+   "last": 2020
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 129,
+   "l": 172,
+   "t": 0
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Program began 2001 in I-AA. Conf titles: Sun Belt 2007, C-USA 2017, 2019. All-time verified by summing seasons.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Florida_Atlantic_Owls_football",
+   "https://en.wikipedia.org/wiki/List_of_Florida_Atlantic_Owls_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Florida_Atlantic_Owls_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "uab",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 2,
+  "lastConf": 2020,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 3,
+   "l": 3,
+   "t": 0,
+   "last": 2022
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 179,
+   "l": 204,
+   "t": 2
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W INDEPENDENCE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BAHAMAS BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Began 1991 (D-III), I-AA 1993-95; no team 2015-16. All-time from season sum (infobox 179-205-2 is stale). Alex Mortensen was interim from Oct 2025 and named permanent Dec 2025 (2026 is his first full season).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UAB_Blazers_football",
+   "https://en.wikipedia.org/wiki/List_of_UAB_Blazers_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_UAB_Blazers_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "tulane",
+  "natTitles": [],
+  "confTitles": 11,
+  "lastConf": 2025,
+  "playoffs": [
+   2025
+  ],
+  "bowls": {
+   "apps": 17,
+   "w": 7,
+   "l": 10,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 581,
+   "l": 683,
+   "t": 38
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": 9,
+    "post": "W AAC TITLE, W COTTON BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "L MILITARY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 9,
+    "l": 5,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L GASPARILLA BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": 18,
+    "post": "L CFP FIRST ROUND"
+   }
+  ],
+  "notes": "Bowls: 17 official bowls 7-10 (school count, excludes the 1909 Bacardi Bowl); the 2025 CFP first-round game at Ole Miss is not counted as a bowl here (with it: 18 apps, 7-11). 2025: also won the American title game (prefix omitted for length). Conf titles: SIAA 1920, SoCon 1925/29/30/31, SEC 1934/39/49, C-USA 1998, American 2022, 2025. Will Hall hired for 2026 (Sumrall left).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Tulane_Green_Wave_football",
+   "https://en.wikipedia.org/wiki/List_of_Tulane_Green_Wave_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Tulane_Green_Wave_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "southflorida",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 13,
+   "w": 8,
+   "l": 5,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 184,
+   "l": 164,
+   "t": 0
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BOCA RATON BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W HAWAII BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L CURE BOWL"
+   }
+  ],
+  "notes": "Began 1997 in I-AA. All-time verified by season sum (infobox 190-166 includes 2026 games). Brian Hartline hired for 2026 (Golesh left).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/South_Florida_Bulls_football",
+   "https://en.wikipedia.org/wiki/List_of_South_Florida_Bulls_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_South_Florida_Bulls_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "eastcarolina",
+  "natTitles": [],
+  "confTitles": 6,
+  "lastConf": 2009,
+  "playoffs": [],
+  "bowls": {
+   "apps": 23,
+   "w": 12,
+   "l": 11,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 481,
+   "l": 463,
+   "t": 11
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 7,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BIRMINGHAM BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W MILITARY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W MILITARY BOWL"
+   }
+  ],
+  "notes": "confTitles: SoCon 1966, 1972, 1973, 1976 and C-USA 2008, 2009 (7 incl. small-college NSC 1953). All-time from season sum; infobox says 477-463-12, so +-4 wins uncertain. Bowls 12-11 include small-college 1952 Lions and 1954 Elks bowls and 1963 Eastern Bowl. 2021 Military Bowl canceled. Blake Harrell was interim from Oct 2024, permanent from 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/East_Carolina_Pirates_football",
+   "https://en.wikipedia.org/wiki/List_of_East_Carolina_Pirates_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_East_Carolina_Pirates_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "temple",
+  "natTitles": [],
+  "confTitles": 2,
+  "lastConf": 2016,
+  "playoffs": [],
+  "bowls": {
+   "apps": 9,
+   "w": 3,
+   "l": 6,
+   "t": 0,
+   "last": 2019
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 502,
+   "l": 632,
+   "t": 52
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "All-time is on-field (infobox 502-632-52); the school/official figure with forfeits is about 495-639-52. Conf titles: Middle Atlantic 1967, American 2016.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Temple_Owls_football",
+   "https://en.wikipedia.org/wiki/List_of_Temple_Owls_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Temple_Owls_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "charlotte",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 1,
+   "w": 0,
+   "l": 1,
+   "t": 0,
+   "last": 2019
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 51,
+   "l": 113,
+   "t": 0
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Modern program began 2013 (FCS 2013-14); the 51-113 total (Wikipedia season sum) also includes 1946-48 Charlotte College seasons.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Charlotte_49ers_football",
+   "https://en.wikipedia.org/wiki/List_of_Charlotte_49ers_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Charlotte_49ers_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "tulsa",
+  "natTitles": [],
+  "confTitles": 27,
+  "lastConf": 2012,
+  "playoffs": [],
+  "bowls": {
+   "apps": 23,
+   "w": 11,
+   "l": 12,
+   "t": 0,
+   "last": 2021
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 654,
+   "l": 551,
+   "t": 27
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "confTitles counts MVC (25, 1935-1985) and C-USA 2005, 2012; 35 incl. early OCC/Big Four small-college titles. All-time 654-551-27 is the Wikipedia figure; older snapshots (650-543-27 through 2024) support it as through 2025, but it may include early 2026 games. Bowls include the 2003 Humanitarian Bowl.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Tulsa_Golden_Hurricane_football",
+   "https://en.wikipedia.org/wiki/List_of_Tulsa_Golden_Hurricane_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Tulsa_Golden_Hurricane_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "navy",
+  "natTitles": [
+   1926
+  ],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 26,
+   "w": 14,
+   "l": 11,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Joe Bellino",
+    "year": 1960
+   },
+   {
+    "name": "Roger Staubach",
+    "year": 1963
+   }
+  ],
+  "allTime": {
+   "w": 758,
+   "l": 605,
+   "t": 57
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W ARMED FORCES BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 11,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": 23,
+    "post": "W LIBERTY BOWL"
+   }
+  ],
+  "notes": "Navy claims the 1926 national title. All-time per Wikipedia infobox (through 2025); season sum gives 759-605-57. 1924 Rose Bowl was a tie.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Navy_Midshipmen_football",
+   "https://en.wikipedia.org/wiki/List_of_Navy_Midshipmen_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Navy_Midshipmen_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "rice",
+  "natTitles": [],
+  "confTitles": 8,
+  "lastConf": 2013,
+  "playoffs": [],
+  "bowls": {
+   "apps": 15,
+   "w": 7,
+   "l": 8,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 501,
+   "l": 668,
+   "t": 32
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 5,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L LENDINGTREE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "American",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "American",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "American",
+    "w": 5,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": "L ARMED FORCES BOWL"
+   }
+  ],
+  "notes": "All-time varies by source (500-669-32 season sum, 501-667-32 infobox, 501-668-32 season-list total); +-1. Conf titles: SWC 1934/37/46/49/53/57/94 (1994 shared), C-USA 2013.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Rice_Owls_football",
+   "https://en.wikipedia.org/wiki/List_of_Rice_Owls_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Rice_Owls_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "boisestate",
+  "natTitles": [],
+  "fcsTitles": [
+   1980
+  ],
+  "confTitles": 17,
+  "lastConf": 2025,
+  "playoffs": [
+   2024
+  ],
+  "bowls": {
+   "apps": 23,
+   "w": 13,
+   "l": 10,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 712,
+   "l": 255,
+   "t": 12
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 10,
+    "l": 4,
+    "cw": 8,
+    "cl": 0,
+    "ap": null,
+    "post": "W FRISCO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 8,
+    "l": 6,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W MW TITLE, L LA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 0,
+    "ap": 8,
+    "post": "W MW TITLE, L CFP QF"
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W MW TITLE, L LA BOWL"
+   }
+  ],
+  "notes": "confTitles counts FBS-era titles only: Big West 1999-2000, WAC 2002-06/08-10, MW 2012/14/17/19/23/24/25 (school says 36 all-time incl. Big Sky/junior-college eras). Bowls are FBS-era only (school record 13-10). All-time incl. junior-college years: infobox 719-256-12 minus 2026 games (7-1); season sum gives 708-254-12, so uncertain. 2024 CFP QF was the Fiesta Bowl. 2021 Arizona Bowl canceled. Danielson was interim from Nov 2023; first full season 2024.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Boise_State_Broncos_football",
+   "https://en.wikipedia.org/wiki/List_of_Boise_State_Broncos_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Boise_State_Broncos_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "oregonstate",
+  "natTitles": [],
+  "confTitles": 7,
+  "lastConf": 2000,
+  "playoffs": [],
+  "bowls": {
+   "apps": 20,
+   "w": 12,
+   "l": 8,
+   "t": 0,
+   "last": 2023
+  },
+  "heisman": [
+   {
+    "name": "Terry Baker",
+    "year": 1962
+   }
+  ],
+  "allTime": {
+   "w": 571,
+   "l": 634,
+   "t": 50
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "L LA BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 3,
+    "ap": 17,
+    "post": "W LAS VEGAS BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "L SUN BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Pac-12",
+    "w": 5,
+    "l": 7,
+    "cw": 1,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Pac-12",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 1,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "2024-25 Pac-12 had only Oregon State and Washington State; their game is counted as the lone conference game. All-time per infobox (as of 11/28/25); season-list totals vary (574-635-50). Conf titles: OIFA 1893, 1897; PCC 1941, 1956, 1957, 1964; Pac-10 2000 (shared). JaMarcus Shephard hired for 2026 (Bray fired).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Oregon_State_Beavers_football",
+   "https://en.wikipedia.org/wiki/List_of_Oregon_State_Beavers_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Oregon_State_Beavers_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "sandiegostate",
+  "natTitles": [],
+  "confTitles": 9,
+  "lastConf": 2016,
+  "playoffs": [],
+  "bowls": {
+   "apps": 21,
+   "w": 10,
+   "l": 11,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 604,
+   "l": 460,
+   "t": 32
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": 25,
+    "post": "W FRISCO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L HAWAII BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L NEW MEXICO BOWL"
+   }
+  ],
+  "notes": "confTitles counts University Division/FBS-era titles: PCAA 1969, 1970, 1972, 1973, 1974, WAC 1986, MW 2012, 2015, 2016 (18 incl. junior-college/SCIAC/CCAA titles). Bowls include the 1966-67 Camellia and 1969 Pasadena bowls (school count). 2021 lost the MW title game. 1966-68 small-college poll titles not counted.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/San_Diego_State_Aztecs_football",
+   "https://en.wikipedia.org/wiki/List_of_San_Diego_State_Aztecs_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_San_Diego_State_Aztecs_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "texasstate",
+  "natTitles": [],
+  "fcsTitles": [
+   1981,
+   1982
+  ],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 3,
+   "w": 3,
+   "l": 0,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 548,
+   "l": 511,
+   "t": 25
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "W ARMED FORCES BOWL"
+   }
+  ],
+  "notes": "FBS since 2012; no FBS conference titles (lower-division: TIAA 1929, LSC x9, Southland 2005, 2008). fcsTitles are NCAA Division II titles 1981, 1982. All-time per Wikipedia (548-511-25); it may include early 2026 games, uncertain by a few. Joins the Pac-12 in 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Texas_State_Bobcats_football",
+   "https://en.wikipedia.org/wiki/List_of_Texas_State_Bobcats_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Texas_State_Bobcats_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "utahstate",
+  "natTitles": [],
+  "confTitles": 13,
+  "lastConf": 2021,
+  "playoffs": [],
+  "bowls": {
+   "apps": 18,
+   "w": 6,
+   "l": 12,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 592,
+   "l": 583,
+   "t": 31
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 11,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": 24,
+    "post": "W MW TITLE, W LA BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L FIRST RESPONDER BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L FAMOUS IDAHO POTATO BOWL"
+   }
+  ],
+  "notes": "All-time from season sum (586-576-31 through 2024 per Winsipedia hidden figure, plus 6-7); sources vary (infobox 583-582-31). Conf titles: RMAC 1921/35/36, Skyline 1946/60/61, PCAA/Big West 1978/79/93/96/97, WAC 2012, MW 2021. 18 bowls (17 NCAA-sanctioned, per Wikipedia).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Utah_State_Aggies_football",
+   "https://en.wikipedia.org/wiki/List_of_Utah_State_Aggies_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Utah_State_Aggies_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "fresnostate",
+  "natTitles": [],
+  "confTitles": 13,
+  "lastConf": 2022,
+  "playoffs": [],
+  "bowls": {
+   "apps": 33,
+   "w": 18,
+   "l": 15,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 661,
+   "l": 458,
+   "t": 27
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W NEW MEXICO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": 24,
+    "post": "W MW TITLE, W LA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W NEW MEXICO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 3,
+    "ap": null,
+    "post": "L FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W ARIZONA BOWL"
+   }
+  ],
+  "notes": "confTitles counts Division I-era titles: PCAA/Big West 1977/82/85/88/89/91, WAC 1992/93/99, MW 2012/13/18/22 (28 incl. CCC/FWC/CCAA small-college titles). All-time = season-list total through 2024 (652-454-27) plus 2025 (9-4). Bowl total includes small-college-era bowls (school count 18-15).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Fresno_State_Bulldogs_football",
+   "https://en.wikipedia.org/wiki/List_of_Fresno_State_Bulldogs_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Fresno_State_Bulldogs_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "coloradostate",
+  "natTitles": [],
+  "confTitles": 15,
+  "lastConf": 2002,
+  "playoffs": [],
+  "bowls": {
+   "apps": 18,
+   "w": 6,
+   "l": 12,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 550,
+   "l": 632,
+   "t": 33
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Mountain West",
+    "w": 3,
+    "l": 9,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Mountain West",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Mountain West",
+    "w": 8,
+    "l": 5,
+    "cw": 6,
+    "cl": 1,
+    "ap": null,
+    "post": "L ARIZONA BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Mountain West",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "All-time from season sum; sources differ by 1-2 (infobox 549-631-33). Conf titles: RMAC x8 (1915-34), Skyline 1955, WAC 1994/95/97, MW 1999/2000/02. Jim Mora hired for 2026 (Norvell fired in 2025).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Colorado_State_Rams_football",
+   "https://en.wikipedia.org/wiki/List_of_Colorado_State_Rams_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Colorado_State_Rams_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ },
+ {
+  "id": "washingtonstate",
+  "natTitles": [],
+  "confTitles": 4,
+  "lastConf": 2002,
+  "playoffs": [],
+  "bowls": {
+   "apps": 20,
+   "w": 9,
+   "l": 11,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 588,
+   "l": 594,
+   "t": 45
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 7,
+    "l": 6,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": "L SUN BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "L LA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 5,
+    "l": 7,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Pac-12",
+    "w": 8,
+    "l": 5,
+    "cw": 0,
+    "cl": 1,
+    "ap": null,
+    "post": "L HOLIDAY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Pac-12",
+    "w": 7,
+    "l": 6,
+    "cw": 1,
+    "cl": 0,
+    "ap": null,
+    "post": "W FAMOUS IDAHO POTATO BOWL"
+   }
+  ],
+  "notes": "All-time from season sum; sources differ (season list 580-591-45 through 2024 implies 587-597-45; infobox 514-560-38 is a different count). 2024-25 Pac-12 conference record is the lone game vs Oregon State. 2021: Rolovich fired midseason, Dickert interim. Jimmy Rogers coached 2025 then left; Kirby Moore hired for 2026. Conf titles: PCC 1917, 1930; Pac-10 1997, 2002.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Washington_State_Cougars_football",
+   "https://en.wikipedia.org/wiki/List_of_Washington_State_Cougars_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Washington_State_Cougars_football_team",
+   "https://en.wikipedia.org/wiki/2025_NCAA_Division_I_FBS_football_rankings"
+  ]
+ }
+]

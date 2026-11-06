@@ -237,9 +237,9 @@ export interface SettingRow {
 
 const SET_X = 120;
 const SET_W = VIEW_W - 2 * SET_X;
-const SET_Y = 92;
-const SET_H = 22;
-const SET_STEP = 26;
+const SET_Y = 88;
+const SET_H = 20;
+const SET_STEP = 23;
 
 export function settingRect(i: number): Box {
   return { x: SET_X, y: SET_Y + i * SET_STEP, w: SET_W, h: SET_H };
@@ -254,9 +254,9 @@ export function settingArrows(i: number): { prev: Box; next: Box } {
 /** `hub`: the dynasty's SETTINGS page (changes save as they're made) instead of a new dynasty's. */
 export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number, rows: SettingRow[], sel: number, mx: number, my: number, hub = false): void {
   g.fillStyle = t.colors.primary;
-  g.fillRect(SET_X, 68, SET_W, 20);
-  text(g, `${t.school.toUpperCase()} ${t.mascot.toUpperCase()}`.slice(0, 40), SET_X + 8, 74);
-  text(g, `SLOT ${slot}`, SET_X + SET_W - 8, 74, { align: 'right', color: '#e6e6e6' });
+  g.fillRect(SET_X, 64, SET_W, 20);
+  text(g, `${t.school.toUpperCase()} ${t.mascot.toUpperCase()}`.slice(0, 40), SET_X + 8, 70);
+  text(g, `SLOT ${slot}`, SET_X + SET_W - 8, 70, { align: 'right', color: '#e6e6e6' });
   rows.forEach((row, i) => {
     const r = settingRect(i);
     const hot = i === sel;
@@ -266,11 +266,11 @@ export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number,
       g.fillStyle = GOLD;
       g.fillRect(r.x, r.y, 3, r.h);
     }
-    text(g, row.label, r.x + 12, r.y + 7, { color: hot ? GOLD : '#ffffff' });
+    text(g, row.label, r.x + 12, r.y + 6, { color: hot ? GOLD : '#ffffff' });
     const a = settingArrows(i);
-    text(g, '<', a.prev.x + 10, r.y + 7, { align: 'center', color: inBox(a.prev, mx, my) ? GOLD : ACCENT });
-    text(g, row.value, (a.prev.x + a.next.x + 20) / 2, r.y + 7, { align: 'center', color: '#ffffff' });
-    text(g, '>', a.next.x + 10, r.y + 7, { align: 'center', color: inBox(a.next, mx, my) ? GOLD : ACCENT });
+    text(g, '<', a.prev.x + 10, r.y + 6, { align: 'center', color: inBox(a.prev, mx, my) ? GOLD : ACCENT });
+    text(g, row.value, (a.prev.x + a.next.x + 20) / 2, r.y + 6, { align: 'center', color: '#ffffff' });
+    text(g, '>', a.next.x + 10, r.y + 6, { align: 'center', color: inBox(a.next, mx, my) ? GOLD : ACCENT });
   });
   const y = SET_Y + rows.length * SET_STEP + 6;
   if (rows[sel]) text(g, rows[sel].help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });

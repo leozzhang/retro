@@ -17,7 +17,8 @@ npm run ratings     # what each rating is worth per position -> ratings.txt (~10
 npm run season      # headless full-season sims -> season.txt (SEASONS=n, default 5)
 npm run app         # the desktop app on the Vite dev server (hot reload); `-- --remote-debugging-port=9222` for CDP
 npm run app:build   # release/: portable .exe, installer, and win-unpacked/ (the folder Steam would take)
-python scripts/build_profiles.py   # rebuild src/data/fbs/profiles.ts from docs/research/*.json
+python scripts/build_profiles.py   # rebuild src/data/fbs/profiles.ts from docs/research/profiles_*.json
+python scripts/build_history.py    # rebuild src/data/fbs/history.ts from docs/research/history_*.json
 ```
 Controls are listed in [README.md](README.md).
 
@@ -50,11 +51,12 @@ Controls are listed in [README.md](README.md).
   - weekly emphases: practice tags and the simulated game-day edge (`emphasis.ts`). See [docs/COACHES.md](docs/COACHES.md)
   - coaches over time: chairs and rating changes laid over the generated staffs by `staffFor` (`world.ts`), head coaches (`headCoachFor`), coach career rows and offseason growth by hidden arc, age and work (`coaching.ts`), and the coaching carousel, the offseason's first stage: reputation, motives, firings, retirements, the head coach chain, hiring rounds, and the user's fog and interviews (`carousel.ts`, screen `render/carouselScreen.ts`). The carousel is planned in [docs/CAROUSEL_PLAN.md](docs/CAROUSEL_PLAN.md); graduation, the draft and HS recruiting in [docs/RECRUITING_PLAN.md](docs/RECRUITING_PLAN.md)
   - HS recruiting (open-ended careers): the class (`data/recruits.ts`: a seeded pool by id, stars and the services' read, hidden makeup and wants) and the cycle (`recruiting.ts`: the summer, weekly contacts, home-game visits, offers, commits, flips and decommits, early signing, the carousel's reactions, national signing day, pipelines, the position coaches' worded evaluations), screen `render/recruitScreen.ts`. See [docs/RECRUITING.md](docs/RECRUITING.md)
+  - program pages: each team's seasons (`SeasonSummary.teams`), trophies, coach tenure and its big news kept past each season (`program.ts`, the chronicle), and the fan pulse (`fanPulse.ts`), over the real history to 2025 (`data/fbs/history.ts`, built by `scripts/build_history.py` from `docs/research/history_*.json`). Display only. See [docs/PROGRAM.md](docs/PROGRAM.md)
   - careers: every player's season rows and story across seasons and teams, history only (nothing in the sim reads it) (`career.ts`). See [docs/CAREERS.md](docs/CAREERS.md)
   - class years from the season and redshirts (`classes.ts`); departures, the offseason stage before the portal: redshirts, graduation, early declarations and the declare watch (`departures.ts`), and the NFL draft by city (`draft.ts`). See [docs/RECRUITING.md](docs/RECRUITING.md)
   - the offseason's stages (`offseason.ts`) and the transfer portal (`portal.ts`: motives, appeal, entries, rounds, the CPU staffs, placement, promises). Rosters change through `TeamState.roster`, laid over the generated roster by `baseRoster` (`world.ts`). See [docs/PORTAL.md](docs/PORTAL.md)
 - `analysis/` (repo root, Python): NFL Big Data Bowl tracking analysis for route geometry, splits and concepts. See [analysis/README.md](analysis/README.md)
-- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the menus before a game or dynasty (`menuScreen.ts`: main menu, exhibition, save slots, new dynasty), the season hub (`seasonScreen.ts`: sidebar, HOME, panels, the week's action button), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`), the portal (`portalScreen.ts`), departures and the draft (`departuresScreen.ts`), recruiting and signing day (`recruitScreen.ts`), the STATS page of careers (`careerScreen.ts`) and the shared play diagrams (`playDiagram.ts`)
+- `render/`: procedural pixel sprites with team-color swaps, the field and goal posts, HUD, the play renderer, the kick renderer (aim preview, goal cam), the roster screen, the menus before a game or dynasty (`menuScreen.ts`: main menu, exhibition, save slots, new dynasty), the season hub (`seasonScreen.ts`: sidebar, HOME, panels, the week's action button), the team page (`teamScreen.ts`), the playbook page (`playbookScreen.ts`), the weekly prep page (`prepScreen.ts`), the portal (`portalScreen.ts`), departures and the draft (`departuresScreen.ts`), recruiting and signing day (`recruitScreen.ts`), program pages for every team (`programScreen.ts`: OVERVIEW, SEASON, HISTORY, NEWS, and the PLAYER REGISTRY `careerScreen.ts`), clickable names (`links.ts`) and the shared play diagrams (`playDiagram.ts`)
 - `harness.ts`: the headless auto-QB, auto-runner and auto-kicker shared by the balance and ratings reports; `adaptive.ts`: the balance report's ADAPTIVE section (scripted offenses against the learning defense)
 
 ## Conventions
@@ -92,6 +94,7 @@ Controls are listed in [README.md](README.md).
   - morale: `MORALE` (`season/morale.ts`); its XP factor `moraleXp` (`PROGRESSION`)
   - defensive identity: `IDENTITY` (league prior, style dials, situation dials; `data/identity.ts`); the staff picks' rules in `suggest`, `LEAN`, `ADJUST_WORDS` (`season/scouting.ts`)
   - coaches: `STAFF` (`data/coaches.ts`), `SCOUT_TIERS` and `pctAt` (`season/scouting.ts`), `EMPHASIS` (`season/emphasis.ts`), offseason growth `COACH_GROWTH`, head coaches' and position coaches' development effects `HEAD_EFFECT` (`season/coaching.ts`); the carousel's `CAROUSEL`, `TURNOVER`, `WILL` (`season/carousel.ts`); head coach and outside-hire generation `HEAD`, graduate assistants `GA` (`data/coaches.ts`)
+  - program pages: `PROGRAM` (the chronicle, `season/program.ts`), `PULSE` (`season/fanPulse.ts`)
   - transfer portal: `PORTAL`, `MIN_COUNT` (`season/portal.ts`); careers: `CAREER` (`season/career.ts`); walk-ons `WALK_ON`, placeholder freshmen `makeFreshman` (`data/rosterGen.ts`)
   - departures: `DEPARTURES` (`season/departures.ts`), `DRAFT` (`season/draft.ts`); offseason growth `OFFSEASON` (`season/progression.ts`)
   - recruiting: `RECRUITS` (the class's size, calibration, composite noise, stars, makeup; `data/recruits.ts`), `RECRUITING` (`season/recruiting.ts`)

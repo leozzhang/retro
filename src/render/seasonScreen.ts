@@ -13,17 +13,19 @@ import { LEADER_CATEGORIES, leaders, seasonStats } from '../season/stats';
 import type { SeasonGame, SeasonState } from '../season/types';
 import { squadFor } from '../season/world';
 import { drawHint } from './hud';
+import { drawRich, linkText, newsRich, playerLink, teamLink, type RichLine } from './links';
 import { getSprite, teamUniform } from './sprites';
 import { text } from './text';
 
 /**
  * The season hub: the program up top, a sidebar on the left with every place to go, and the
  * selected panel on the right. Sidebar items are panels (shown in place: HOME, the schedule and the
- * national views) or pages (opened as their own screen: roster, playbook, prep, recruiting, stats).
+ * national views) or pages (opened as their own screen: the program page, roster, playbook, prep,
+ * recruiting). Team names and the user's players' names are links (render/links.ts).
  * The week's main action (play, sim, advance, the offseason stage) is the button under the sidebar.
  */
 
-export type Page = 'team' | 'playbook' | 'prep' | 'recruit' | 'career' | 'settings';
+export type Page = 'team' | 'playbook' | 'prep' | 'recruit' | 'program' | 'settings';
 
 export interface NavItem {
   /** A panel's name, or the page it opens. */
@@ -86,12 +88,12 @@ function navGroups(s: SeasonState): { head: string; items: NavItem[] }[] {
     {
       head: 'MY PROGRAM',
       items: [
+        { id: 'program', label: 'PROGRAM', page: 'program', key: 'H' },
         panel('SCHEDULE'),
         { id: 'team', label: 'ROSTER', page: 'team', key: 'T' },
         { id: 'playbook', label: 'PLAYBOOK', page: 'playbook', key: 'P' },
         { id: 'prep', label: 'GAME PREP', page: 'prep', key: 'O', off: s.phase === 'offseason' },
         ...(s.recruiting ? [{ id: 'recruit', label: 'RECRUITING', page: 'recruit', key: 'R' } as NavItem] : []),
-        { id: 'career', label: 'PLAYER STATS', page: 'career', key: 'H' },
         { id: 'settings', label: 'SETTINGS', page: 'settings' },
       ],
     },
@@ -197,6 +199,11 @@ function drawSubHeader(g: CanvasRenderingContext2D, label: string, v: SeasonView
     text(g, c, b.x + b.w / 2, TOP - 6, { align: 'center', color: inBox(b, v.mx, v.my) ? GOLD : ACCENT });
   }
   text(g, label, PCX, TOP - 6, { align: 'center', color: ACCENT });
+}
+
+/** A line with one name in it linked: `name` at `at` characters in. */
+function lineWith(t: string, at: number, len: number, link: ReturnType<typeof teamLink>): RichLine {
+  return { t, spans: len > 0 ? [{ start: at, len, link }] : [] };
 }
 
 function resultText(g: SeasonGame, team: string): string {
@@ -369,7 +376,7 @@ function teamSide(g: CanvasRenderingContext2D, s: SeasonState, id: string, cx: n
   const rec = records(s).get(id)!;
   const ovr = teamRatings(squadFor(s, id)).ovr;
   g.drawImage(getSprite(teamUniform(t, home), '#c68a5e', 'stand', home ? 1 : -1), cx - 30, CARD_Y + 18, 60, 66);
-  text(g, `${rank ? `#${rank} ` : ''}${t.school.toUpperCase()}`.slice(0, 19), cx, CARD_Y + 88, { align: 'center', color: '#ffffff' });
+  linkText(g, `${rank ? `#${rank} ` : ''}${t.school.toUpperCase()}`.slice(0, 19), cx, CARD_Y + 88, { align: 'center', color: '#ffffff' }, teamLink(id));
   text(g, `${recordText(rec)}  OVR ${ovr}`, cx, CARD_Y + 99, { align: 'center', color: SOFT, shadow: false });
 }
 
@@ -435,7 +442,7 @@ function drawChampion(g: CanvasRenderingContext2D, s: SeasonState): void {
   if (!champ) return;
   const t = teamById(champ);
   g.drawImage(getSprite(teamUniform(t, true), '#c68a5e', 'stand', 1), PCX - 30, CARD_Y + 18, 60, 66);
-  text(g, t.school.toUpperCase(), PCX, CARD_Y + 88, { align: 'center', color: '#ffffff' });
+  linkText(g, t.school.toUpperCase(), PCX, CARD_Y + 88, { align: 'center', color: '#ffffff' }, teamLink(champ));
   const next = s.config.length === 'open' ? 'SPACE: START THE OFFSEASON' : 'THIS SEASON IS OVER';
   text(g, next, PCX, CARD_Y + 99, { align: 'center', color: SOFT, shadow: false });
 }
@@ -474,30 +481,33 @@ function drawLastWeek(g: CanvasRenderingContext2D, s: SeasonState): void {
   const u = s.config.userTeamId;
   box(g, PX, LOW_Y, HALF_W, LOW_H, 'LAST GAME');
   const chars = Math.floor((HALF_W - 16) / 8);
-  const lines: { t: string; c: string }[] = [];
+  const lines: { l: RichLine; c: string }[] = [];
+  const plain = (t: string, c: string) => lines.push({ l: { t, spans: [] }, c });
   const last = s.games.filter((x) => x.result && (x.home === u || x.away === u)).sort((a, b) => b.week - a.week)[0];
   if (last) {
     const res = resultText(last, u);
-    const opp = teamById(last.home === u ? last.away : last.home);
-    lines.push({ t: `${res} ${vsText(last, u)} ${opp.abbr}`, c: res.startsWith('W') ? GREEN : res.startsWith('L') ? RED : '#ffffff' });
-  } else lines.push({ t: 'NO GAMES PLAYED YET', c: DIM });
+    const oppId = last.home === u ? last.away : last.home;
+    const head = `${res} ${vsText(last, u)} `;
+    const abbr = teamById(oppId).abbr;
+    lines.push({ l: lineWith(head + abbr, head.length, abbr.length, teamLink(oppId)), c: res.startsWith('W') ? GREEN : res.startsWith('L') ? RED : '#ffffff' });
+  } else plain('NO GAMES PLAYED YET', DIM);
   const prog = progressLine(s);
-  if (prog) wrap(prog, chars).forEach((t) => lines.push({ t, c: GREEN }));
+  if (prog) for (const l of newsRich(s, { text: prog, teams: [u] }, chars)) lines.push({ l, c: GREEN });
   // The newest week of news about the user's team, apart from the progress items above.
   const mine = s.news.filter((n) => n.teams.includes(u) && n.kind !== 'progress');
   const week = mine.length ? mine[mine.length - 1].week : undefined;
   if (week !== undefined) {
-    lines.push({ t: '', c: DIM });
-    lines.push({ t: week === 0 ? 'PRESEASON NEWS' : `WEEK ${week} NEWS`, c: ACCENT });
+    plain('', DIM);
+    plain(week === 0 ? 'PRESEASON NEWS' : `WEEK ${week} NEWS`, ACCENT);
   }
   const max = Math.floor((LOW_H - 22) / 10);
   // Whole items only: one that doesn't fit is left for the NEWS panel.
   for (const n of [...mine].reverse().filter((x) => x.week === week)) {
-    const w = wrap(n.text.toUpperCase(), chars);
+    const w = newsRich(s, n, chars);
     if (lines.length + w.length > max) break;
-    w.forEach((t) => lines.push({ t, c: '#ffffff' }));
+    w.forEach((l) => lines.push({ l, c: '#ffffff' }));
   }
-  lines.slice(0, max).forEach((l, i) => text(g, l.t, PX + 8, LOW_Y + 20 + i * 10, { color: l.c, shadow: false }));
+  lines.slice(0, max).forEach((x, i) => drawRich(g, x.l, PX + 8, LOW_Y + 20 + i * 10, { color: x.c, shadow: false }));
 }
 
 function drawConfMini(g: CanvasRenderingContext2D, s: SeasonState): void {
@@ -516,7 +526,8 @@ function drawConfMini(g: CanvasRenderingContext2D, s: SeasonState): void {
     const me = row.team === u;
     const y = LOW_Y + 32 + k * 10;
     const r = row.rec;
-    text(g, `${String(i + 1).padStart(2)} ${teamById(row.team).abbr}`, x + 8, y, { color: me ? GOLD : '#ffffff', shadow: false });
+    const abbr = teamById(row.team).abbr;
+    drawRich(g, lineWith(`${String(i + 1).padStart(2)} ${abbr}`, 3, abbr.length, teamLink(row.team)), x + 8, y, { color: me ? GOLD : '#ffffff', shadow: false });
     text(g, `${`${r.cw}-${r.cl}`.padEnd(5)} ${recordText(r).padStart(5)}`, x + HALF_W - 8, y, { align: 'right', color: me ? GOLD : SOFT, shadow: false });
   });
 }
@@ -533,7 +544,9 @@ function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {
     const opp = x.home === u ? x.away : x.home;
     const cur = x.week === s.week && !x.result;
     text(g, String(x.week).padStart(2), PX, y, { color: cur ? GOLD : SOFT });
-    text(g, `${vsText(x, u).padEnd(3)}${teamLabel(opp, ap).toUpperCase()}`, PX + 32, y, { color: cur ? GOLD : '#ffffff' });
+    const label = teamLabel(opp, ap).toUpperCase();
+    const school = teamById(opp).school.toUpperCase();
+    drawRich(g, lineWith(`${vsText(x, u).padEnd(3)}${label}`, 3 + label.length - school.length, school.length, teamLink(opp)), PX + 32, y, { color: cur ? GOLD : '#ffffff' });
     const res = resultText(x, u);
     text(g, res, PX + 262, y, { color: res.startsWith('W') ? GREEN : RED });
     if (x.name) text(g, x.name.toUpperCase().slice(0, 16), PX + 352, y, { color: ACCENT });
@@ -553,8 +566,14 @@ function drawScores(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView):
     const r = x.result!;
     const hw = r.home > r.away;
     const label = (id: string) => teamLabel(id, before).toUpperCase().slice(0, 15);
-    text(g, `${label(x.away).padEnd(15)} ${String(r.away).padStart(2)}`, PX + 40, y, { color: hw ? SOFT : '#ffffff' });
-    text(g, `@ ${label(x.home).padEnd(15)} ${String(r.home).padStart(2)}${r.ot ? ' OT' : ''}`, PX + 192, y, { color: hw ? '#ffffff' : SOFT });
+    // The school after any "#5 " in front.
+    const span = (id: string, off: number) => {
+      const l = label(id);
+      const at = l.startsWith('#') ? l.indexOf(' ') + 1 : 0;
+      return lineWith('', off + at, l.length - at, teamLink(id)).spans;
+    };
+    drawRich(g, { t: `${label(x.away).padEnd(15)} ${String(r.away).padStart(2)}`, spans: span(x.away, 0) }, PX + 40, y, { color: hw ? SOFT : '#ffffff' });
+    drawRich(g, { t: `@ ${label(x.home).padEnd(15)} ${String(r.home).padStart(2)}${r.ot ? ' OT' : ''}`, spans: span(x.home, 2) }, PX + 192, y, { color: hw ? '#ffffff' : SOFT });
   });
 }
 
@@ -568,9 +587,9 @@ function drawStandings(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVie
     const y = TOP + 18 + i * LINE;
     const me = row.team === s.config.userTeamId;
     const r = row.rec;
-    text(g, `${String(i + 1).padStart(2)}. ${teamLabel(row.team, ap).toUpperCase().padEnd(22)} ${`${r.cw}-${r.cl}`.padEnd(6)} ${recordText(r).padEnd(5)} ${String(r.pf).padStart(4)} ${String(r.pa).padStart(4)}`, PX + 20, y, {
-      color: me ? GOLD : '#ffffff',
-    });
+    const label = teamLabel(row.team, ap).toUpperCase();
+    const line = `${String(i + 1).padStart(2)}. ${label.padEnd(22)} ${`${r.cw}-${r.cl}`.padEnd(6)} ${recordText(r).padEnd(5)} ${String(r.pf).padStart(4)} ${String(r.pa).padStart(4)}`;
+    drawRich(g, lineWith(line, 4, Math.min(22, label.length), teamLink(row.team)), PX + 20, y, { color: me ? GOLD : '#ffffff' });
   });
 }
 
@@ -589,24 +608,12 @@ function drawPolls(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): 
     const was = rankIn(prev, e.team);
     const move = !prev ? '' : !was ? 'NEW' : was === i + 1 ? '' : was > i + 1 ? `+${was - i - 1}` : `-${i + 1 - was}`;
     const me = e.team === s.config.userTeamId;
-    text(g, `${String(i + 1).padStart(2)}. ${teamById(e.team).school.toUpperCase().slice(0, 17)}`, x, y, { color: me ? GOLD : '#ffffff' });
+    const school = teamById(e.team).school.toUpperCase().slice(0, 17);
+    drawRich(g, lineWith(`${String(i + 1).padStart(2)}. ${school}`, 4, school.length, teamLink(e.team)), x, y, { color: me ? GOLD : '#ffffff' });
     text(g, recordText(recs.get(e.team)!), x + 176, y, { color: me ? GOLD : '#ffffff' });
     if (kind === 'ap') text(g, String(e.points), x + 294, y, { align: 'right', color: DIM, shadow: false });
     text(g, move, x + 304, y, { color: move.startsWith('-') ? RED : GREEN });
   });
-}
-
-function wrap(s: string, n: number): string[] {
-  const out: string[] = [];
-  let line = '';
-  for (const w of s.split(' ')) {
-    if (line && (line + ' ' + w).length > n) {
-      out.push(line);
-      line = `  ${w}`;
-    } else line = line ? `${line} ${w}` : w;
-  }
-  if (line) out.push(line);
-  return out;
 }
 
 /** The weeks with news, newest first; `sub` steps back through them. */
@@ -618,15 +625,15 @@ function newsWeek(s: SeasonState, sub: number): number | undefined {
 /** Characters per NEWS line, inside the panel and clear of the scrollbar. */
 const NEWS_CHARS = Math.floor((PW - 12) / 8);
 
-/** One week's news as wrapped lines, newest first. */
-function newsLines(s: SeasonState, sub: number): { t: string; c: string }[] {
+/** One week's news as wrapped lines with their names linked, newest first. */
+function newsLines(s: SeasonState, sub: number): { l: RichLine; c: string }[] {
   const week = newsWeek(s, sub);
-  const lines: { t: string; c: string }[] = [];
+  const lines: { l: RichLine; c: string }[] = [];
   const u = s.config.userTeamId;
   for (const n of [...s.news].reverse()) {
     if (n.week !== week) continue;
     const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : n.kind === 'injury' ? RED : n.kind === 'portal' ? '#c9a0ff' : n.kind === 'carousel' ? '#8fd4ff' : '#ffffff';
-    wrap(n.text.toUpperCase(), NEWS_CHARS).forEach((t) => lines.push({ t, c }));
+    newsRich(s, n, NEWS_CHARS).forEach((l) => lines.push({ l, c }));
   }
   return lines;
 }
@@ -648,7 +655,7 @@ function drawNews(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): v
   drawSubHeader(g, week === 0 ? 'PRESEASON' : `WEEK ${week}`, v);
   const lines = newsLines(s, v.sub);
   const top = Math.min(v.scroll, Math.max(0, lines.length - NEWS_ROWS));
-  lines.slice(top, top + NEWS_ROWS).forEach((l, i) => text(g, l.t, PX, TOP + 8 + i * LINE, { color: l.c }));
+  lines.slice(top, top + NEWS_ROWS).forEach((l, i) => drawRich(g, l.l, PX, TOP + 8 + i * LINE, { color: l.c }));
   if (lines.length > NEWS_ROWS) {
     // The scrollbar: the track, and the thumb for the lines in view.
     const h = NEWS_ROWS * LINE;
@@ -666,7 +673,9 @@ function drawLeaders(g: CanvasRenderingContext2D, s: SeasonState): void {
     const y0 = TOP - 6 + Math.floor(i / 2) * (LINE * 7);
     text(g, c.label, cx, y0, { color: ACCENT });
     leaders(s, c.key, 5, stats).forEach((l, j) => {
-      text(g, `${l.name.toUpperCase().slice(0, 18).padEnd(18)} ${teamById(l.team).abbr.padEnd(5)} ${l[c.key]}`, cx, y0 + (j + 1) * LINE, {
+      const name = l.name.toUpperCase().slice(0, 18);
+      const abbr = teamById(l.team).abbr;
+      drawRich(g, { t: `${name.padEnd(18)} ${abbr.padEnd(5)} ${l[c.key]}`, spans: [{ start: 0, len: name.length, link: playerLink(l.team, l.id) }, { start: 19, len: abbr.length, link: teamLink(l.team) }] }, cx, y0 + (j + 1) * LINE, {
         color: l.team === s.config.userTeamId ? GOLD : '#ffffff',
       });
     });
@@ -682,7 +691,10 @@ function drawAwards(g: CanvasRenderingContext2D, s: SeasonState): void {
     text(g, a.name.toUpperCase(), PX, y, { color: GOLD });
     y += LINE;
     for (const [i, f] of a.finalists.slice(0, s.awards.length ? 3 : 10).entries()) {
-      text(g, `${i + 1}. ${f.name.toUpperCase().slice(0, 21).padEnd(21)} ${f.pos.padEnd(3)} ${teamById(f.team).school.toUpperCase().slice(0, 18).padEnd(18)} ${f.score}`, PX + 8, y, {
+      const name = f.name.toUpperCase().slice(0, 21);
+      const school = teamById(f.team).school.toUpperCase().slice(0, 18);
+      const spans = [{ start: 3, len: name.length, link: playerLink(f.team, f.id) }, { start: 29, len: school.length, link: teamLink(f.team) }];
+      drawRich(g, { t: `${i + 1}. ${name.padEnd(21)} ${f.pos.padEnd(3)} ${school.padEnd(18)} ${f.score}`, spans }, PX + 8, y, {
         color: f.team === s.config.userTeamId ? GOLD : '#ffffff',
       });
       y += LINE;
@@ -698,7 +710,10 @@ function drawPlayoff(g: CanvasRenderingContext2D, s: SeasonState): void {
     text(g, 'THE FIELD IS SET AFTER CHAMPIONSHIP WEEK', PCX, TOP - 6, { align: 'center', color: ACCENT });
     if (!cfp) return;
     text(g, `CURRENT CFP TOP 12 (WEEK ${cfp.week})`, PCX, TOP + 10, { align: 'center', color: SOFT });
-    cfp.ranks.slice(0, 12).forEach((e, i) => text(g, `${String(i + 1).padStart(2)}. ${teamById(e.team).school.toUpperCase()}`, PCX - 90, TOP + 26 + i * LINE));
+    cfp.ranks.slice(0, 12).forEach((e, i) => {
+      const school = teamById(e.team).school.toUpperCase();
+      drawRich(g, lineWith(`${String(i + 1).padStart(2)}. ${school}`, 4, school.length, teamLink(e.team)), PCX - 90, TOP + 26 + i * LINE, {});
+    });
     return;
   }
   const cw = PW / (Math.log2(b.rounds[0].length) + 1);
@@ -715,7 +730,8 @@ function drawPlayoff(g: CanvasRenderingContext2D, s: SeasonState): void {
       }
       const seed = b.seeds.indexOf(id) + 1;
       const won = r + 1 < b.rounds.length && b.rounds[r + 1][Math.floor(i / 2)] === id;
-      text(g, `${String(seed).padStart(2)} ${teamById(id).abbr}`, cx, y, {
+      const abbr = teamById(id).abbr;
+      drawRich(g, lineWith(`${String(seed).padStart(2)} ${abbr}`, 3, abbr.length, teamLink(id)), cx, y, {
         color: id === s.config.userTeamId ? GOLD : won || id === b.champion ? '#ffffff' : SOFT,
       });
     });

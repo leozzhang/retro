@@ -1,0 +1,1650 @@
+[
+ {
+  "id": "ohiostate",
+  "natTitles": [
+   1942,
+   1954,
+   1957,
+   1961,
+   1968,
+   1970,
+   2002,
+   2014,
+   2024
+  ],
+  "confTitles": 41,
+  "lastConf": 2020,
+  "playoffs": [
+   2014,
+   2016,
+   2019,
+   2020,
+   2022,
+   2024,
+   2025
+  ],
+  "bowls": {
+   "apps": 60,
+   "w": 30,
+   "l": 30,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Les Horvath",
+    "year": 1944
+   },
+   {
+    "name": "Vic Janowicz",
+    "year": 1950
+   },
+   {
+    "name": "Howard Cassady",
+    "year": 1955
+   },
+   {
+    "name": "Archie Griffin",
+    "year": 1974
+   },
+   {
+    "name": "Archie Griffin",
+    "year": 1975
+   },
+   {
+    "name": "Eddie George",
+    "year": 1995
+   },
+   {
+    "name": "Troy Smith",
+    "year": 2006
+   }
+  ],
+  "allTime": {
+   "w": 1002,
+   "l": 337,
+   "t": 53
+  },
+  "coachSince": 2019,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 11,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 6,
+    "post": "W ROSE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 11,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 4,
+    "post": "L CFP SEMI"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 11,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 10,
+    "post": "L COTTON BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 14,
+    "l": 2,
+    "cw": 7,
+    "cl": 2,
+    "ap": 1,
+    "post": "W NATIONAL TITLE"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 12,
+    "l": 2,
+    "cw": 9,
+    "cl": 0,
+    "ap": 5,
+    "post": "L CFP QF"
+   }
+  ],
+  "notes": "All-time is on-field (1,000th win incl. 12 vacated 2010 wins came vs UCLA Nov 2025); official record with 2010 vacated is 990-337-53. confTitles 41 = 39 Big Ten + 2 OAC. Bowl record 30-30 per Wikipedia season list (infobox says 29-29); includes vacated 2011 Sugar Bowl, excludes CFP first-round games. 2025: lost Big Ten title game to Indiana. Ryan Day was 3-0 acting coach in 2018; full-time since 2019.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Ohio_State_Buckeyes_football",
+   "https://en.wikipedia.org/wiki/List_of_Ohio_State_Buckeyes_football_seasons",
+   "https://en.wikipedia.org/wiki/List_of_Ohio_State_Buckeyes_bowl_games",
+   "https://www.elevenwarriors.com/ohio-state-football/2025/11/159506/ohio-state-becomes-second-team-ever-to-reach-1000-wins-including-the-12-vacated-after-tattoogate"
+  ]
+ },
+ {
+  "id": "indiana",
+  "natTitles": [
+   2025
+  ],
+  "confTitles": 3,
+  "lastConf": 2025,
+  "playoffs": [
+   2024,
+   2025
+  ],
+  "bowls": {
+   "apps": 17,
+   "w": 6,
+   "l": 11,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Fernando Mendoza",
+    "year": 2025
+   }
+  ],
+  "allTime": {
+   "w": 535,
+   "l": 715,
+   "t": 44
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 9,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 11,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 10,
+    "post": "L CFP FIRST ROUND"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 16,
+    "l": 0,
+    "cw": 9,
+    "cl": 0,
+    "ap": 1,
+    "post": "W NATIONAL TITLE"
+   }
+  ],
+  "notes": "All-time: 519-715-44 entering 2025 (Pro Football Network) + 16-0; Wikipedia figures conflict (515-719-46 list, ties 46 vs 44). Bowl record 6-11 counts the 2024 CFP first-round loss. 2025: also won Big Ten title game over Ohio State (prefix omitted for length). Conf titles 1945, 1967, 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Indiana_Hoosiers_football",
+   "https://en.wikipedia.org/wiki/List_of_Indiana_Hoosiers_football_seasons",
+   "https://www.winsipedia.com/indiana",
+   "https://www.profootballnetwork.com/cfb/most-losses-college-football-history-everything-to-know/"
+  ]
+ },
+ {
+  "id": "ucla",
+  "natTitles": [
+   1954
+  ],
+  "confTitles": 17,
+  "lastConf": 1998,
+  "playoffs": [],
+  "bowls": {
+   "apps": 38,
+   "w": 17,
+   "l": 20,
+   "t": 1,
+   "last": 2023
+  },
+  "heisman": [
+   {
+    "name": "Gary Beban",
+    "year": 1967
+   }
+  ],
+  "allTime": {
+   "w": 629,
+   "l": 438,
+   "t": 37
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 8,
+    "l": 4,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 3,
+    "ap": 21,
+    "post": "L SUN BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "W LA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 3,
+    "l": 9,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "2021 Holiday Bowl canceled (UCLA withdrew, COVID). Bowl record 17-20-1 per Wikipedia infobox; a tally of the seasons table gives 18-20-1. All-time from Wikipedia seasons list; other Wikipedia figures disagree. 2025: DeShaun Foster fired after 0-3, Tim Skipper interim; Bob Chesney hired for 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/UCLA_Bruins_football",
+   "https://en.wikipedia.org/wiki/List_of_UCLA_Bruins_football_seasons"
+  ]
+ },
+ {
+  "id": "usc",
+  "natTitles": [
+   1928,
+   1931,
+   1932,
+   1939,
+   1962,
+   1967,
+   1972,
+   1974,
+   1978,
+   2003,
+   2004
+  ],
+  "confTitles": 37,
+  "lastConf": 2017,
+  "playoffs": [],
+  "bowls": {
+   "apps": 59,
+   "w": 38,
+   "l": 21,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Mike Garrett",
+    "year": 1965
+   },
+   {
+    "name": "O. J. Simpson",
+    "year": 1968
+   },
+   {
+    "name": "Charles White",
+    "year": 1979
+   },
+   {
+    "name": "Marcus Allen",
+    "year": 1981
+   },
+   {
+    "name": "Carson Palmer",
+    "year": 2002
+   },
+   {
+    "name": "Matt Leinart",
+    "year": 2004
+   },
+   {
+    "name": "Reggie Bush",
+    "year": 2005
+   },
+   {
+    "name": "Caleb Williams",
+    "year": 2022
+   }
+  ],
+  "allTime": {
+   "w": 888,
+   "l": 376,
+   "t": 54
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 11,
+    "l": 3,
+    "cw": 8,
+    "cl": 1,
+    "ap": 12,
+    "post": "L COTTON BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W HOLIDAY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "W LAS VEGAS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 7,
+    "cl": 2,
+    "ap": 20,
+    "post": "L ALAMO BOWL"
+   }
+  ],
+  "notes": "NCAA vacated 14 wins (2004-05) and the 2004/2005 Pac-10 titles; confTitles 37 excludes those. Unclear whether 888-376-54 (Wikipedia seasons list) includes the vacated wins. Bowl record 38-21 is a tally of the Wikipedia bowl list (its intro, outdated, says 36-20). Bush's Heisman was reinstated in 2024. 2022: lost Pac-12 title game.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/USC_Trojans_football",
+   "https://en.wikipedia.org/wiki/List_of_USC_Trojans_football_seasons",
+   "https://en.wikipedia.org/wiki/List_of_USC_Trojans_bowl_games"
+  ]
+ },
+ {
+  "id": "oregon",
+  "natTitles": [],
+  "confTitles": 17,
+  "lastConf": 2024,
+  "playoffs": [
+   2014,
+   2024,
+   2025
+  ],
+  "bowls": {
+   "apps": 40,
+   "w": 18,
+   "l": 22,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Marcus Mariota",
+    "year": 2014
+   }
+  ],
+  "allTime": {
+   "w": 732,
+   "l": 515,
+   "t": 46
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 2,
+    "ap": 22,
+    "post": "L ALAMO BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 10,
+    "l": 3,
+    "cw": 7,
+    "cl": 2,
+    "ap": 15,
+    "post": "W HOLIDAY BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 12,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 6,
+    "post": "W FIESTA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 13,
+    "l": 1,
+    "cw": 9,
+    "cl": 0,
+    "ap": 3,
+    "post": "W B1G TITLE, L CFP QF"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 13,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 4,
+    "post": "L CFP SEMI"
+   }
+  ],
+  "notes": "confTitles 17 per infobox (OIFA 1895, Northwest 1916/1919, 4 PCC, 9 Pac-12, Big Ten 2024); article prose says 16. Bowl record 18-22 per Wikipedia; its table also lists the 2025 CFP first-round win, which would make 19-22 if counted. 2021 and 2023 lost Pac-12 title games. Final AP 2023 tied 6th.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Oregon_Ducks_football",
+   "https://en.wikipedia.org/wiki/List_of_Oregon_Ducks_football_seasons",
+   "https://en.wikipedia.org/wiki/List_of_Oregon_Ducks_bowl_games"
+  ]
+ },
+ {
+  "id": "iowa",
+  "natTitles": [
+   1921,
+   1922,
+   1956,
+   1958,
+   1960
+  ],
+  "confTitles": 13,
+  "lastConf": 2004,
+  "playoffs": [],
+  "bowls": {
+   "apps": 38,
+   "w": 19,
+   "l": 18,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Nile Kinnick",
+    "year": 1939
+   }
+  ],
+  "allTime": {
+   "w": 709,
+   "l": 585,
+   "t": 39
+  },
+  "coachSince": 1999,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 2,
+    "ap": 23,
+    "post": "L CITRUS BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W MUSIC CITY BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 2,
+    "ap": 24,
+    "post": "L CITRUS BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": "L MUSIC CITY BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 3,
+    "ap": 17,
+    "post": "W RELIAQUEST BOWL"
+   }
+  ],
+  "notes": "National titles as listed in the Wikipedia infobox; Iowa's own emphasis is mainly 1958 (FWAA), so this list may be generous. confTitles 13 per article (11 Big Ten + early WIUFA/MVIAA titles). Lost Big Ten title games in 2021 and 2023.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Iowa_Hawkeyes_football",
+   "https://en.wikipedia.org/wiki/List_of_Iowa_Hawkeyes_football_seasons"
+  ]
+ },
+ {
+  "id": "northwestern",
+  "natTitles": [],
+  "confTitles": 8,
+  "lastConf": 2000,
+  "playoffs": [],
+  "bowls": {
+   "apps": 18,
+   "w": 8,
+   "l": 10,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 578,
+   "l": 718,
+   "t": 44
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 1,
+    "l": 11,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W LAS VEGAS BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "W GAMEABOVE SPORTS BOWL"
+   }
+  ],
+  "notes": "All-time: 571-712-44 entering 2025 (Pro Football Network) + 7-6; Northwestern passed Indiana for most all-time losses in Nov 2025 (718 at season end). Wikipedia lists conflict (570-709, 573-713). Braun was interim in 2023, then named permanent.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Northwestern_Wildcats_football",
+   "https://en.wikipedia.org/wiki/List_of_Northwestern_Wildcats_football_seasons",
+   "https://www.profootballnetwork.com/cfb/most-losses-college-football-history-everything-to-know/"
+  ]
+ },
+ {
+  "id": "minnesota",
+  "natTitles": [
+   1904,
+   1934,
+   1935,
+   1936,
+   1940,
+   1941,
+   1960
+  ],
+  "confTitles": 20,
+  "lastConf": 1967,
+  "playoffs": [],
+  "bowls": {
+   "apps": 26,
+   "w": 14,
+   "l": 12,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Bruce Smith",
+    "year": 1941
+   }
+  ],
+  "allTime": {
+   "w": 738,
+   "l": 544,
+   "t": 44
+  },
+  "coachSince": 2017,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": "W GUARANTEED RATE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W PINSTRIPE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": "W QUICK LANE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W DUKE'S MAYO BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W RATE BOWL"
+   }
+  ],
+  "notes": "confTitles 20 = 18 Big Ten + 2 IAAN (body text says 18). Bowl record 14-12 is a tally of the Wikipedia seasons table (intro says 20 bowl games). All-time from the seasons list; the infobox gives 738-539-44.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Minnesota_Golden_Gophers_football",
+   "https://en.wikipedia.org/wiki/List_of_Minnesota_Golden_Gophers_football_seasons"
+  ]
+ },
+ {
+  "id": "wisconsin",
+  "natTitles": [],
+  "confTitles": 14,
+  "lastConf": 2012,
+  "playoffs": [],
+  "bowls": {
+   "apps": 35,
+   "w": 19,
+   "l": 16,
+   "t": 0,
+   "last": 2023
+  },
+  "heisman": [
+   {
+    "name": "Alan Ameche",
+    "year": 1954
+   },
+   {
+    "name": "Ron Dayne",
+    "year": 1999
+   }
+  ],
+  "allTime": {
+   "w": 747,
+   "l": 525,
+   "t": 53
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": "W LAS VEGAS BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "W GUARANTEED RATE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "L RELIAQUEST BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "1912 and 1942 national titles are unclaimed. Bowl record 19-16 per infobox (seasons list says 34 bowl games). 2022: Chryst fired Oct., Leonhard interim.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Wisconsin_Badgers_football",
+   "https://en.wikipedia.org/wiki/List_of_Wisconsin_Badgers_football_seasons"
+  ]
+ },
+ {
+  "id": "nebraska",
+  "natTitles": [
+   1970,
+   1971,
+   1994,
+   1995,
+   1997
+  ],
+  "confTitles": 46,
+  "lastConf": 1999,
+  "playoffs": [],
+  "bowls": {
+   "apps": 55,
+   "w": 27,
+   "l": 28,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Johnny Rodgers",
+    "year": 1972
+   },
+   {
+    "name": "Mike Rozier",
+    "year": 1983
+   },
+   {
+    "name": "Eric Crouch",
+    "year": 2001
+   }
+  ],
+  "allTime": {
+   "w": 931,
+   "l": 436,
+   "t": 40
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": "W PINSTRIPE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "L LAS VEGAS BOWL"
+   }
+  ],
+  "notes": "All-time = Wikipedia total 936-439-40 (which includes 2026 games to date, 5-3) minus 2026. confTitles 46 across Big Eight/Big 12 and earlier leagues, last 1999 Big 12.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Nebraska_Cornhuskers_football",
+   "https://en.wikipedia.org/wiki/List_of_Nebraska_Cornhuskers_football_seasons"
+  ]
+ },
+ {
+  "id": "purdue",
+  "natTitles": [],
+  "confTitles": 12,
+  "lastConf": 2000,
+  "playoffs": [],
+  "bowls": {
+   "apps": 21,
+   "w": 11,
+   "l": 10,
+   "t": 0,
+   "last": 2022
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 644,
+   "l": 618,
+   "t": 48
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": "W MUSIC CITY BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 6,
+    "cw": 6,
+    "cl": 3,
+    "ap": null,
+    "post": "L CITRUS BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 9,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 9,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "confTitles 12 = 8 Big Ten + 4 IIAA. 1931 national title unclaimed. 2022: won Big Ten West, lost Big Ten title game.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Purdue_Boilermakers_football",
+   "https://en.wikipedia.org/wiki/List_of_Purdue_Boilermakers_football_seasons"
+  ]
+ },
+ {
+  "id": "michigan",
+  "natTitles": [
+   1901,
+   1902,
+   1903,
+   1904,
+   1918,
+   1923,
+   1932,
+   1933,
+   1947,
+   1948,
+   1997,
+   2023
+  ],
+  "confTitles": 45,
+  "lastConf": 2023,
+  "playoffs": [
+   2021,
+   2022,
+   2023
+  ],
+  "bowls": {
+   "apps": 54,
+   "w": 24,
+   "l": 30,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "Tom Harmon",
+    "year": 1940
+   },
+   {
+    "name": "Desmond Howard",
+    "year": 1991
+   },
+   {
+    "name": "Charles Woodson",
+    "year": 1997
+   }
+  ],
+  "allTime": {
+   "w": 1021,
+   "l": 362,
+   "t": 36
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 12,
+    "l": 2,
+    "cw": 8,
+    "cl": 1,
+    "ap": 3,
+    "post": "W B1G TITLE, L CFP SEMI"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 13,
+    "l": 1,
+    "cw": 9,
+    "cl": 0,
+    "ap": 3,
+    "post": "W B1G TITLE, L CFP SEMI"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 15,
+    "l": 0,
+    "cw": 9,
+    "cl": 0,
+    "ap": 1,
+    "post": "W NATIONAL TITLE"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W RELIAQUEST BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 7,
+    "cl": 2,
+    "ap": 21,
+    "post": "L CITRUS BOWL"
+   }
+  ],
+  "notes": "Sherrone Moore (2024-25) was fired Dec 2025; Kyle Whittingham hired for 2026. 2023 also won Big Ten title (prefix omitted for length).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Michigan_Wolverines_football",
+   "https://en.wikipedia.org/wiki/List_of_Michigan_Wolverines_football_seasons"
+  ]
+ },
+ {
+  "id": "illinois",
+  "natTitles": [
+   1914,
+   1919,
+   1923,
+   1927,
+   1951
+  ],
+  "confTitles": 15,
+  "lastConf": 2001,
+  "playoffs": [],
+  "bowls": {
+   "apps": 22,
+   "w": 10,
+   "l": 12,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 646,
+   "l": 625,
+   "t": 50
+  },
+  "coachSince": 2021,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "L RELIAQUEST BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 3,
+    "ap": 16,
+    "post": "W CITRUS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W MUSIC CITY BOWL"
+   }
+  ],
+  "notes": "Not in the final 2025 AP top 25.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Illinois_Fighting_Illini_football",
+   "https://en.wikipedia.org/wiki/List_of_Illinois_Fighting_Illini_football_seasons"
+  ]
+ },
+ {
+  "id": "rutgers",
+  "natTitles": [
+   1869
+  ],
+  "confTitles": 1,
+  "lastConf": 2012,
+  "playoffs": [],
+  "bowls": {
+   "apps": 13,
+   "w": 7,
+   "l": 6,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 686,
+   "l": 708,
+   "t": 42
+  },
+  "coachSince": 2020,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 8,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": "L GATOR BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": "W PINSTRIPE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "L RATE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "All-time 686-708-42 after 2025 per Pro Football Network (Wikipedia list says 679-702-42). 1869 title is a retroactive claim. Only conf title: 2012 Big East co-champions. Schiano's second stint began 2020 (first 2001-11).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Rutgers_Scarlet_Knights_football",
+   "https://en.wikipedia.org/wiki/List_of_Rutgers_Scarlet_Knights_football_seasons",
+   "https://www.profootballnetwork.com/cfb/most-losses-college-football-history-everything-to-know/"
+  ]
+ },
+ {
+  "id": "washington",
+  "natTitles": [
+   1960,
+   1991
+  ],
+  "confTitles": 18,
+  "lastConf": 2023,
+  "playoffs": [
+   2016,
+   2023
+  ],
+  "bowls": {
+   "apps": 45,
+   "w": 22,
+   "l": 22,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 790,
+   "l": 477,
+   "t": 50
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Pac-12",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Pac-12",
+    "w": 11,
+    "l": 2,
+    "cw": 7,
+    "cl": 2,
+    "ap": 8,
+    "post": "W ALAMO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Pac-12",
+    "w": 14,
+    "l": 1,
+    "cw": 9,
+    "cl": 0,
+    "ap": 2,
+    "post": "L NATIONAL TITLE"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "L SUN BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 4,
+    "ap": null,
+    "post": "W LA BOWL"
+   }
+  ],
+  "notes": "All-time = 781-473-50 through 2024 (Wikipedia) + 9-4. Bowl record counts CFP games (21-21-1 through 2023 + Sun L + LA W). 2023: also won Pac-12 title game (prefix omitted for length). confTitles 18 = 4 PCC + 14 Pac-8/10/12.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Washington_Huskies_football",
+   "https://en.wikipedia.org/wiki/List_of_Washington_Huskies_football_seasons",
+   "https://en.wikipedia.org/wiki/List_of_Washington_Huskies_bowl_games"
+  ]
+ },
+ {
+  "id": "pennstate",
+  "natTitles": [
+   1982,
+   1986
+  ],
+  "confTitles": 5,
+  "lastConf": 2016,
+  "playoffs": [
+   2024
+  ],
+  "bowls": {
+   "apps": 57,
+   "w": 34,
+   "l": 21,
+   "t": 2,
+   "last": 2025
+  },
+  "heisman": [
+   {
+    "name": "John Cappelletti",
+    "year": 1973
+   }
+  ],
+  "allTime": {
+   "w": 950,
+   "l": 418,
+   "t": 42
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "L OUTBACK BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 11,
+    "l": 2,
+    "cw": 7,
+    "cl": 2,
+    "ap": 7,
+    "post": "W ROSE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 10,
+    "l": 3,
+    "cw": 7,
+    "cl": 2,
+    "ap": 13,
+    "post": "L PEACH BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 13,
+    "l": 3,
+    "cw": 8,
+    "cl": 1,
+    "ap": 5,
+    "post": "L CFP SEMI"
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": "W PINSTRIPE BOWL"
+   }
+  ],
+  "notes": "Bowl record 34-21-2 per infobox (body says 33-21-2; the difference looks like the 2024 CFP first-round win). confTitles 5 = PIFA 1891 + Big Ten 1994, 2005, 2008, 2016. James Franklin fired Oct 2025 (Terry Smith interim); Matt Campbell hired for 2026. 2024: lost Big Ten title game.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Penn_State_Nittany_Lions_football",
+   "https://en.wikipedia.org/wiki/List_of_Penn_State_Nittany_Lions_football_seasons"
+  ]
+ },
+ {
+  "id": "maryland",
+  "natTitles": [
+   1953
+  ],
+  "confTitles": 11,
+  "lastConf": 2001,
+  "playoffs": [],
+  "bowls": {
+   "apps": 30,
+   "w": 14,
+   "l": 14,
+   "t": 2,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 674,
+   "l": 627,
+   "t": 43
+  },
+  "coachSince": 2019,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": "W PINSTRIPE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "W DUKE'S MAYO BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 5,
+    "ap": null,
+    "post": "W MUSIC CITY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "confTitles 11 = 2 Southern Conference (1937, 1951) + 9 ACC. Bowl record 14-14-2 per infobox (intro cites 28 appearances). coachSince is Mike Locksley (2019), who started 2026; Wikipedia now lists Aazaar Abdul-Rahim as interim, so Locksley appears to have been let go during the 2026 season.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Maryland_Terrapins_football",
+   "https://en.wikipedia.org/wiki/List_of_Maryland_Terrapins_football_seasons"
+  ]
+ },
+ {
+  "id": "michiganstate",
+  "natTitles": [
+   1951,
+   1952,
+   1955,
+   1957,
+   1965,
+   1966
+  ],
+  "confTitles": 12,
+  "lastConf": 2015,
+  "playoffs": [
+   2015
+  ],
+  "bowls": {
+   "apps": 30,
+   "w": 14,
+   "l": 16,
+   "t": 0,
+   "last": 2021
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 739,
+   "l": 502,
+   "t": 44
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big Ten",
+    "w": 11,
+    "l": 2,
+    "cw": 7,
+    "cl": 2,
+    "ap": 9,
+    "post": "W PEACH BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Big Ten",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Big Ten",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "MSU vacated all 14 wins from 2022-24; recent rows and allTime are on-field (official all-time 725-502-44). confTitles 12 = 3 MIAA + 9 Big Ten (lead says eleven). Jonathan Smith fired after 2025; Pat Fitzgerald hired for 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Michigan_State_Spartans_football",
+   "https://en.wikipedia.org/wiki/List_of_Michigan_State_Spartans_football_seasons"
+  ]
+ }
+]

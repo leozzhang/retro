@@ -2,6 +2,51 @@
 
 _Last updated: 2026-11-05_
 
+## Done: program pages for every team, clickable names, the PLAYER REGISTRY (2026-11-05)
+Design and numbers are in [PROGRAM.md](PROGRAM.md).
+
+**Real history** for all 138 teams through 2025 (`docs/research/history_*.json` → `scripts/build_history.py` → `data/fbs/history.ts`). Each team has its title years (FCS/DII too), conference titles, CFP trips, bowl record, Heismans, all-time record, its 2026 coach's first season, and its 2021–25 seasons.
+- **Sources.** Mostly Wikipedia; sports-reference blocked the research. Spot-checked by hand: Alabama, Ohio State, Georgia, Michigan, Indiana, Notre Dame, Texas, LSU, Clemson, USC, Oklahoma, Oregon, Boise State, JMU and NDSU.
+- **Weakest numbers.** All-time records (off by a few games, and vacated wins are counted differently) and a few bowl counts. Each team's `notes` field lists them.
+- **HISTORY setting.** A new-dynasty-only setting, REAL or FRESH START, where every team starts empty. The hub's SETTINGS page shows it but can't change it. The settings rows are 3 px closer so eight fit.
+
+**Dynasty history** (`season/program.ts`):
+- `SeasonSummary.teams`: every team's season when it completes (record, AP, conference title, playoff seed and round, bowl, coach). The Heisman winner's team is kept too.
+- The chronicle: each team's big news kept past the season (salience `newsWeight`, at most 12 a team a year, 10 years).
+- Trophies, season rows and coach tenure.
+
+**Fan pulse** (`season/fanPulse.ts`): about 15 signals become a mood (FURIOUS to EUPHORIC) and the top 4 talking points. Among them:
+- results against the pregame odds
+- the coach's year crossed with results, and the hot seat
+- the QB's line and class
+- the Heisman race, and starters lost for the season
+- the polls and the race, the rivalry, last week
+- the trend and droughts, recruiting, the draft, portal losses
+
+**The page** (`render/programScreen.ts`, screen `program`): OVERVIEW, SEASON, HISTORY, NEWS and REGISTRY, for any team.
+- **PROGRAM (H)** replaces PLAYER STATS on the sidebar.
+- **PLAYER REGISTRY** is the renamed stats page. It's now the REGISTRY tab and works for any team.
+- **Esc** walks back through the pages opened.
+
+**Links** (`render/links.ts`): team names on the hub panels and the program pages open the team's page.
+- **Hub panels:** STANDINGS, SCORES, POLLS, NEWS, HOME, SCHEDULE, LEADERS, AWARDS and PLAYOFF.
+- **Player names:** news, leaders, awards and the pages. The user's players open their roster card; other players open their team's REGISTRY.
+- **Roster card:** a click on the name (or C) opens the player in the registry.
+- **Feel:** a pointer cursor and a gold underline on hover.
+
+**Checks:**
+- `npm test`: the new `program.test.ts` has 7 tests: season rows against `records()`, baseline plus dynasty trophies, FRESH, the chronicle across `nextSeason`, tenure, pulse determinism and its worry/hope cases, and link matching and wrapping. One long existing test (`season.test.ts`, the save round trip) timed out under full-suite load once and passed on rerun; that's the preexisting flake.
+- `npm run season` (2 seasons): identical to the last commit apart from timing lines. `npm run balance` wasn't run, since gameplay didn't change.
+- Driven in headless Chrome over CDP:
+  - every tab for Georgia, Alabama, Michigan, Kent State and NDSU
+  - hover and click on a STANDINGS row (opened Texas), and a click on the roster card's name (opened REGISTRY)
+  - a year-two Ole Miss page after its sim title (trophy case, HISTORY, chronicle)
+
+**Not done yet / next:**
+- Links on the portal, recruiting, carousel and departures screens.
+- Not played by hand.
+- The pulse is flavor only. Hooking it into morale or recruiting would be a design call.
+
 ## Done: aim slow motion is a setting, off by default (2026-11-05)
 - Aiming a pass or a punt no longer slows the game. The SLOW AIM setting (OFF / ON) turns `AIM_TIME_SCALE` (0.65) back on: `SeasonConfig.aimSlow` (missing = off, so existing dynasties lose the slow motion until they turn it on), a SETTINGS row, and M on the exhibition screen.
 - The exhibition options line is shortened to fit four options (DRIVES, IQ, ASSIST, SLOW AIM); a click picks the segment under it. The settings rows are 2 px closer so seven fit above the button.

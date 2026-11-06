@@ -1,0 +1,1948 @@
+[
+ {
+  "id": "jamesmadison",
+  "natTitles": [],
+  "fcsTitles": [
+   2004,
+   2016
+  ],
+  "confTitles": 1,
+  "lastConf": 2025,
+  "playoffs": [
+   2025
+  ],
+  "bowls": {
+   "apps": 3,
+   "w": 1,
+   "l": 2,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 390,
+   "l": 231,
+   "t": 4
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "CAA",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L FCS SEMIFINAL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 11,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L ARMED FORCES BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 9,
+    "l": 4,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BOCA RATON BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 12,
+    "l": 2,
+    "cw": 8,
+    "cl": 0,
+    "ap": 19,
+    "post": "L CFP FIRST ROUND"
+   }
+  ],
+  "notes": "FBS since 2022. confTitles counts FBS-level only (2025 Sun Belt); also 9 FCS-era titles (VCAA 1975, A-10 1999/2004, CAA 2008/15/16/17/19/21). Bowls include the 2025 CFP first-round loss at Oregon (Wikipedia lists bowls 1-1 plus CFP 0-1). All-time summed from the head coach table excluding Napier's 2026 games; Wikipedia infobox figures conflict (395-227-4 with 2026). 2022 ineligible for postseason (transition). Final 2025 AP rank 19 per season list (could be 20). Billy Napier hired Dec 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/James_Madison_Dukes_football",
+   "https://en.wikipedia.org/wiki/List_of_James_Madison_Dukes_football_seasons",
+   "https://en.wikipedia.org/wiki/List_of_James_Madison_Dukes_head_football_coaches",
+   "https://en.wikipedia.org/wiki/2025_Sun_Belt_Conference_football_season"
+  ]
+ },
+ {
+  "id": "appstate",
+  "natTitles": [],
+  "fcsTitles": [
+   2005,
+   2006,
+   2007
+  ],
+  "confTitles": 4,
+  "lastConf": 2019,
+  "playoffs": [],
+  "bowls": {
+   "apps": 9,
+   "w": 7,
+   "l": 2,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 674,
+   "l": 369,
+   "t": 29
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L BOCA RATON BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W CURE BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": "L BIRMINGHAM BOWL"
+   }
+  ],
+  "notes": "FBS since 2014. confTitles = Sun Belt 2016-2019 (2016, 2017 shared); 18 earlier North State/SoCon titles not counted. Bowls are FBS only (NAIA-era bowls 3-6 excluded). All-time from current infobox (674-369-29); the seasons list shows an older 616-337-28. Lost SBC title games 2021 and 2023. 2024 had 11 games (Helene cancellation). 2025 bowl at 5-7.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Appalachian_State_Mountaineers_football",
+   "https://en.wikipedia.org/wiki/List_of_Appalachian_State_Mountaineers_football_seasons"
+  ]
+ },
+ {
+  "id": "georgiasouthern",
+  "natTitles": [],
+  "fcsTitles": [
+   1985,
+   1986,
+   1989,
+   1990,
+   1999,
+   2000
+  ],
+  "confTitles": 1,
+  "lastConf": 2014,
+  "playoffs": [],
+  "bowls": {
+   "apps": 8,
+   "w": 4,
+   "l": 4,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 430,
+   "l": 265,
+   "t": 9
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L CAMELLIA BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BIRMINGHAM BOWL"
+   }
+  ],
+  "notes": "FBS since 2014; confTitles counts only the 2014 Sun Belt title (11 Southern Conference titles not counted). All-time 430-265-9 is the season list's all-games total including FCS playoffs; the article intro shows an older figure. Clay Helton since 2022.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Georgia_Southern_Eagles_football",
+   "https://en.wikipedia.org/wiki/List_of_Georgia_Southern_Eagles_football_seasons"
+  ]
+ },
+ {
+  "id": "georgiastate",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 4,
+   "l": 2,
+   "t": 0,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 65,
+   "l": 126,
+   "t": 0
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W CAMELLIA BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "W FAMOUS IDAHO POTATO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Program began 2010 (FCS until 2013). Dell McGee retained for 2026 (infobox lists him in his 3rd season).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Georgia_State_Panthers_football",
+   "https://en.wikipedia.org/wiki/List_of_Georgia_State_Panthers_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Georgia_State_Panthers_football_team"
+  ]
+ },
+ {
+  "id": "coastalcarolina",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 1,
+  "lastConf": 2020,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 2,
+   "l": 4,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 178,
+   "l": 103,
+   "t": 0
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 11,
+    "l": 2,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W CURE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L BIRMINGHAM BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W HAWAII BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L INDEPENDENCE BOWL"
+   }
+  ],
+  "notes": "FBS since 2017; confTitles counts only the 2020 Sun Belt co-title (title game canceled); Big South titles not counted. Lost 2022 SBC title game. 2021 final AP likely unranked (received votes). Ryan Beard hired from Missouri State Dec 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Coastal_Carolina_Chanticleers_football",
+   "https://en.wikipedia.org/wiki/List_of_Coastal_Carolina_Chanticleers_football_seasons"
+  ]
+ },
+ {
+  "id": "marshall",
+  "natTitles": [],
+  "fcsTitles": [
+   1992,
+   1996
+  ],
+  "confTitles": 7,
+  "lastConf": 2024,
+  "playoffs": [],
+  "bowls": {
+   "apps": 20,
+   "w": 13,
+   "l": 7,
+   "t": 0,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 640,
+   "l": 578,
+   "t": 47
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 9,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L FRISCO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 10,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W SUN BELT TITLE"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "confTitles counts I-A/FBS titles: MAC 1997-2000, 2002; C-USA 2014; Sun Belt 2024 (Southern Conference and earlier titles not counted). Bowls 13-7 include the 1948 Tangerine Bowl (NCAA lists 13-6). 2024 team declined its Independence Bowl bid. All-time is the infobox 643-581-47 minus an inferred 3-3 in 2026 (Gibson's infobox record); the seasons list intro gives 638-574-47, so this is approximate.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Marshall_Thundering_Herd_football",
+   "https://en.wikipedia.org/wiki/List_of_Marshall_Thundering_Herd_football_seasons"
+  ]
+ },
+ {
+  "id": "olddominion",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 4,
+   "w": 2,
+   "l": 2,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 104,
+   "l": 89,
+   "t": 0
+  },
+  "coachSince": 2020,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L MYRTLE BEACH BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L FAMOUS TOASTERY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W CURE BOWL"
+   }
+  ],
+  "notes": "Modern program since 2009 (FBS 2014). All-time 104-89 covers 2009-2025; the 1930-1940 program is not included. No FBS conference titles. Ricky Rahne since 2020 (2020 season canceled).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Old_Dominion_Monarchs_football",
+   "https://en.wikipedia.org/wiki/List_of_Old_Dominion_Monarchs_football_seasons"
+  ]
+ },
+ {
+  "id": "louisianatech",
+  "natTitles": [],
+  "fcsTitles": [
+   1972,
+   1973,
+   1974
+  ],
+  "confTitles": 2,
+  "lastConf": 2011,
+  "playoffs": [],
+  "bowls": {
+   "apps": 15,
+   "w": 9,
+   "l": 5,
+   "t": 1,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 654,
+   "l": 508,
+   "t": 37
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 5,
+    "l": 8,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L INDEPENDENCE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W INDEPENDENCE BOWL"
+   }
+  ],
+  "notes": "confTitles counts I-A/FBS titles (WAC 2001, 2011); 23 earlier titles not counted. 1972-74 small-college/Division II titles are in fcsTitles. Bowls are Division I-A only (1977 onward). The all-time total's components on the seasons list don't fully reconcile. Moves to the Sun Belt in 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Louisiana_Tech_Bulldogs_football",
+   "https://en.wikipedia.org/wiki/List_of_Louisiana_Tech_Bulldogs_football_seasons"
+  ]
+ },
+ {
+  "id": "louisiana",
+  "natTitles": [],
+  "confTitles": 5,
+  "lastConf": 2021,
+  "playoffs": [],
+  "bowls": {
+   "apps": 13,
+   "w": 7,
+   "l": 6,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 604,
+   "l": 566,
+   "t": 34
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 13,
+    "l": 1,
+    "cw": 8,
+    "cl": 0,
+    "ap": 16,
+    "post": "W NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L INDEPENDENCE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": "L NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L NEW MEXICO BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L 68 VENTURES BOWL"
+   }
+  ],
+  "notes": "confTitles: Big West 1993, 1994; Sun Belt 2005, 2020, 2021 (the 2013 title was vacated; Gulf States titles not counted). Won the 2021 SBC title game; lost the 2024 one. Bowls 7-6 on the field (FBS era); the 2011 and 2013 New Orleans Bowl wins were vacated (5-6 officially). All-time is the infobox 609-568-34 minus an inferred 5-2 in 2026; the seasons list shows 588-575-34 (probably net of vacated wins). Desormeaux coached the 2021 bowl and has been full-time since 2022.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Louisiana_Ragin%27_Cajuns_football",
+   "https://en.wikipedia.org/wiki/List_of_Louisiana_Ragin%27_Cajuns_football_seasons"
+  ]
+ },
+ {
+  "id": "southalabama",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 5,
+   "w": 2,
+   "l": 3,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 94,
+   "l": 106,
+   "t": 0
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 7,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 10,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W 68 VENTURES BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W SALUTE TO VETERANS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Program began 2009. 2022 shared the West Division but lost the tiebreaker to Troy. Major Applewhite retained for 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/South_Alabama_Jaguars_football",
+   "https://en.wikipedia.org/wiki/List_of_South_Alabama_Jaguars_football_seasons"
+  ]
+ },
+ {
+  "id": "troy",
+  "natTitles": [],
+  "fcsTitles": [
+   1968,
+   1984,
+   1987
+  ],
+  "confTitles": 8,
+  "lastConf": 2023,
+  "playoffs": [],
+  "bowls": {
+   "apps": 11,
+   "w": 6,
+   "l": 5,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 583,
+   "l": 442,
+   "t": 28
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 12,
+    "l": 2,
+    "cw": 7,
+    "cl": 1,
+    "ap": 19,
+    "post": "W SBC TITLE, W CURE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 11,
+    "l": 3,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L BIRMINGHAM BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 6,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L SALUTE TO VETERANS BOWL"
+   }
+  ],
+  "notes": "confTitles counts FBS Sun Belt titles (2006-2010, 2017, 2022, 2023); 15 earlier titles not counted. fcsTitles has the lower-division titles: NAIA 1968, Division II 1984 and 1987. Won the 2023 SBC title too (didn't fit in post); lost the 2025 title game. Bowls FBS only. All-time is the infobox 587-446-28 minus an inferred 4-4 in 2026 (from Parker's 16-18). 2022 final AP 19 (one page says 24).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Troy_Trojans_football",
+   "https://en.wikipedia.org/wiki/List_of_Troy_Trojans_football_seasons"
+  ]
+ },
+ {
+  "id": "arkansasstate",
+  "natTitles": [],
+  "fcsTitles": [
+   1970
+  ],
+  "confTitles": 6,
+  "lastConf": 2016,
+  "playoffs": [],
+  "bowls": {
+   "apps": 13,
+   "w": 6,
+   "l": 7,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 511,
+   "l": 536,
+   "t": 37
+  },
+  "coachSince": 2021,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 6,
+    "l": 7,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L CAMELLIA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W 68 VENTURES BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W XBOX BOWL"
+   }
+  ],
+  "notes": "confTitles = Sun Belt 2005 (co), 2011, 2012, 2013, 2015, 2016 (Wikipedia lists five and omits 2005); Southland titles not counted (1975 and 1978 came at the Division I level and could arguably count). fcsTitles has the 1970 College Division title. Bowls FBS only (College Division bowls 3-3-1 excluded).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Arkansas_State_Red_Wolves_football",
+   "https://en.wikipedia.org/wiki/List_of_Arkansas_State_Red_Wolves_football_seasons"
+  ]
+ },
+ {
+  "id": "southernmiss",
+  "natTitles": [],
+  "fcsTitles": [
+   1958,
+   1962
+  ],
+  "confTitles": 5,
+  "lastConf": 2011,
+  "playoffs": [],
+  "bowls": {
+   "apps": 28,
+   "w": 12,
+   "l": 16,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 621,
+   "l": 472,
+   "t": 26
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W LENDINGTREE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L NEW ORLEANS BOWL"
+   }
+  ],
+  "notes": "confTitles = C-USA 1996 (co), 1997, 1999, 2003, 2011; Gulf States titles (1948-51) not counted. fcsTitles has the 1958 and 1962 College Division titles. Bowl count uncertain: the infobox says 12-13 major plus 0-2 minor, and the seasons list 13-16; 28 apps, 12-16 is my reconciliation. All-time is the infobox 622-476-26 minus an inferred 1-4 in 2026; the seasons list shows 604-440-27 (likely stale). Blake Anderson hired Dec 2025 after Charles Huff left for Memphis.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Southern_Miss_Golden_Eagles_football",
+   "https://en.wikipedia.org/wiki/List_of_Southern_Miss_Golden_Eagles_football_seasons"
+  ]
+ },
+ {
+  "id": "ulm",
+  "natTitles": [],
+  "fcsTitles": [
+   1987
+  ],
+  "confTitles": 1,
+  "lastConf": 2005,
+  "playoffs": [],
+  "bowls": {
+   "apps": 1,
+   "w": 0,
+   "l": 1,
+   "t": 0,
+   "last": 2012
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 420,
+   "l": 540,
+   "t": 24
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Sun Belt",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Sun Belt",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "Sun Belt",
+    "w": 5,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "Sun Belt",
+    "w": 3,
+    "l": 9,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "confTitles counts only the 2005 Sun Belt co-title; Southland and other I-AA titles not counted. fcsTitles = 1987 I-AA. All-time = seasons list through 2024 (417-531-24) plus 3-9 in 2025. Only bowl: 2012 Independence Bowl loss.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Louisiana%E2%80%93Monroe_Warhawks_football",
+   "https://en.wikipedia.org/wiki/List_of_Louisiana%E2%80%93Monroe_Warhawks_football_seasons"
+  ]
+ },
+ {
+  "id": "liberty",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 1,
+  "lastConf": 2023,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 3,
+   "l": 3,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 310,
+   "l": 267,
+   "t": 4
+  },
+  "coachSince": 2023,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Independent",
+    "w": 8,
+    "l": 5,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "W LENDINGTREE BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "Independent",
+    "w": 8,
+    "l": 5,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "L BOCA RATON BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 13,
+    "l": 1,
+    "cw": 8,
+    "cl": 0,
+    "ap": 25,
+    "post": "L FIESTA BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 8,
+    "l": 4,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L BAHAMAS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "FBS since 2018; confTitles counts the 2023 C-USA title only (won the title game; prefix did not fit in post; Big South titles not counted). The 2023 final AP rank of 25 comes from the seasons list; it was unranked in some lists, so it's uncertain. Jamey Chadwell retained for 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Liberty_Flames_football",
+   "https://en.wikipedia.org/wiki/List_of_Liberty_Flames_football_seasons"
+  ]
+ },
+ {
+  "id": "jacksonvillestate",
+  "natTitles": [],
+  "fcsTitles": [
+   1992
+  ],
+  "confTitles": 1,
+  "lastConf": 2024,
+  "playoffs": [],
+  "bowls": {
+   "apps": 3,
+   "w": 2,
+   "l": 1,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 629,
+   "l": 432,
+   "t": 40
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "ASUN",
+    "w": 5,
+    "l": 6,
+    "cw": 3,
+    "cl": 3,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "ASUN",
+    "w": 9,
+    "l": 2,
+    "cw": 5,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 5,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W CUSA TITLE, L CURE BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 5,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W SALUTE TO VETERANS BOWL"
+   }
+  ],
+  "notes": "FBS since 2023; confTitles counts the 2024 C-USA title only (Gulf South, OVC, ASUN titles not counted). Lost the 2025 C-USA title game to Kennesaw State. fcsTitles has the 1992 Division II title. 2021 conference was the ASUN-WAC alliance. 2022 was ineligible for the FCS playoffs (transition). All-time 629-432-40 from the seasons list (row sum verified); the infobox implies about 626-431-39 through 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Jacksonville_State_Gamecocks_football",
+   "https://en.wikipedia.org/wiki/List_of_Jacksonville_State_Gamecocks_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Conference_USA_football_season"
+  ]
+ },
+ {
+  "id": "middletennessee",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 2,
+  "lastConf": 2006,
+  "playoffs": [],
+  "bowls": {
+   "apps": 10,
+   "w": 4,
+   "l": 6,
+   "t": 0,
+   "last": 2022
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 614,
+   "l": 481,
+   "t": 28
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W BAHAMAS BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W HAWAII BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "confTitles counts FBS Sun Belt 2001 and 2006 (co); 11 OVC and earlier titles not counted. Bowls are FBS-era only; the overall postseason including I-AA playoffs and old bowls is 11-15. Derek Mason retained for 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Middle_Tennessee_Blue_Raiders_football",
+   "https://en.wikipedia.org/wiki/List_of_Middle_Tennessee_Blue_Raiders_football_seasons"
+  ]
+ },
+ {
+  "id": "newmexicostate",
+  "natTitles": [],
+  "confTitles": 4,
+  "lastConf": 1978,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 4,
+   "l": 1,
+   "t": 1,
+   "last": 2023
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 462,
+   "l": 688,
+   "t": 30
+  },
+  "coachSince": 2024,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Independent",
+    "w": 2,
+    "l": 10,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "Independent",
+    "w": 7,
+    "l": 6,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": "W QUICK LANE BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 10,
+    "l": 5,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L NEW MEXICO BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "Conference titles uncertain: Border 1938 (co) and 1960, Missouri Valley 1976 (co) and 1978, inferred from 1st-place finishes (the 1971 finish was ineligible). Lost the 2023 C-USA title game. Bowls 4-1-1 include the 1936 Sun Bowl tie. Tony Sanchez is in his 3rd season in 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/New_Mexico_State_Aggies_football",
+   "https://en.wikipedia.org/wiki/List_of_New_Mexico_State_Aggies_football_seasons"
+  ]
+ },
+ {
+  "id": "westernkentucky",
+  "natTitles": [],
+  "fcsTitles": [
+   2002
+  ],
+  "confTitles": 2,
+  "lastConf": 2016,
+  "playoffs": [],
+  "bowls": {
+   "apps": 12,
+   "w": 8,
+   "l": 4,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 632,
+   "l": 436,
+   "t": 30
+  },
+  "coachSince": 2019,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 5,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "W BOCA RATON BOWL"
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 5,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 8,
+    "l": 5,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "W FAMOUS TOASTERY BOWL"
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 8,
+    "l": 6,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L BOCA RATON BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W NEW ORLEANS BOWL"
+   }
+  ],
+  "notes": "FBS since 2008/09; confTitles = C-USA 2015, 2016 (OVC/Gateway titles not counted). Lost the C-USA title games in 2021 and 2024. Bowls FBS only; pre-FBS bowls (e.g. 1952 Refrigerator, 1963 Tangerine) excluded. fcsTitles = 2002 I-AA.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Western_Kentucky_Hilltoppers_football",
+   "https://en.wikipedia.org/wiki/List_of_Western_Kentucky_Hilltoppers_football_seasons"
+  ]
+ },
+ {
+  "id": "delaware",
+  "natTitles": [],
+  "fcsTitles": [
+   1946,
+   1963,
+   1971,
+   1972,
+   1979,
+   2003
+  ],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 1,
+   "w": 1,
+   "l": 0,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 748,
+   "l": 491,
+   "t": 44
+  },
+  "coachSince": 2022,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "CAA",
+    "w": 5,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "CAA",
+    "w": 8,
+    "l": 5,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "L FCS SECOND ROUND"
+   },
+   {
+    "year": 2023,
+    "conf": "CAA",
+    "w": 9,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L FCS SECOND ROUND"
+   },
+   {
+    "year": 2024,
+    "conf": "CAA",
+    "w": 9,
+    "l": 2,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 4,
+    "cl": 4,
+    "ap": null,
+    "post": "W 68 VENTURES BOWL"
+   }
+  ],
+  "notes": "FBS since 2025 (bowl eligible by waiver); no FBS conference titles (17 earlier titles not counted). fcsTitles includes the small-college titles 1946, 1963, 1971, 1972, the 1979 Division II title, and the 2003 I-AA title. Older small-college bowls (9-3 overall) excluded. 2024 was ineligible for the FCS playoffs (transition). All-time 748-491-44 from the seasons list (infobox 747-491-44).",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Delaware_Fightin%27_Blue_Hens_football",
+   "https://en.wikipedia.org/wiki/List_of_Delaware_Fightin%27_Blue_Hens_football_seasons"
+  ]
+ },
+ {
+  "id": "fiu",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 1,
+  "lastConf": 2010,
+  "playoffs": [],
+  "bowls": {
+   "apps": 6,
+   "w": 2,
+   "l": 4,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 85,
+   "l": 176,
+   "t": 0
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "C-USA",
+    "w": 1,
+    "l": 11,
+    "cw": 0,
+    "cl": 8,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2022,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 4,
+    "l": 8,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L FIRST RESPONDER BOWL"
+   }
+  ],
+  "notes": "Program began 2002. confTitles counts the 2010 Sun Belt co-title (with Troy). Willie Simmons since 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/FIU_Panthers_football",
+   "https://en.wikipedia.org/wiki/List_of_FIU_Panthers_football_seasons"
+  ]
+ },
+ {
+  "id": "missouristate",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 1,
+   "w": 0,
+   "l": 1,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 502,
+   "l": 550,
+   "t": 39
+  },
+  "coachSince": 2026,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "MVFC",
+    "w": 8,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "L FCS FIRST ROUND"
+   },
+   {
+    "year": 2022,
+    "conf": "MVFC",
+    "w": 5,
+    "l": 6,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "MVFC",
+    "w": 4,
+    "l": 7,
+    "cw": 3,
+    "cl": 5,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "MVFC",
+    "w": 8,
+    "l": 4,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 7,
+    "l": 6,
+    "cw": 5,
+    "cl": 3,
+    "ap": null,
+    "post": "L XBOX BOWL"
+   }
+  ],
+  "notes": "FBS since 2025 (bowl by waiver); no FBS conference titles (MIAA/Gateway/MVFC titles not counted). Bowls FBS only (older bowls 0-4). All-time sources conflict: seasons list 502-550-39, infobox 508-549-39, text 492-532-39. 2024 was ineligible for the FCS playoffs (transition). Casey Woods hired Dec 2025 after Ryan Beard left for Coastal Carolina.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Missouri_State_Bears_football",
+   "https://en.wikipedia.org/wiki/List_of_Missouri_State_Bears_football_seasons"
+  ]
+ },
+ {
+  "id": "kennesawstate",
+  "natTitles": [],
+  "fcsTitles": [],
+  "confTitles": 1,
+  "lastConf": 2025,
+  "playoffs": [],
+  "bowls": {
+   "apps": 1,
+   "w": 0,
+   "l": 1,
+   "t": 0,
+   "last": 2025
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 82,
+   "l": 41,
+   "t": 0
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "Big South",
+    "w": 11,
+    "l": 2,
+    "cw": 7,
+    "cl": 0,
+    "ap": null,
+    "post": "L FCS SECOND ROUND"
+   },
+   {
+    "year": 2022,
+    "conf": "ASUN",
+    "w": 5,
+    "l": 6,
+    "cw": 1,
+    "cl": 4,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "Independent",
+    "w": 3,
+    "l": 6,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 2,
+    "l": 10,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 10,
+    "l": 4,
+    "cw": 7,
+    "cl": 1,
+    "ap": null,
+    "post": "L MYRTLE BEACH BOWL"
+   }
+  ],
+  "notes": "Program began 2015; FBS since 2024. Won the 2025 C-USA title game 19-15 over Jacksonville State (the prefix didn't fit in post). Big South titles 2017, 2018, 2021 not counted. 2023 was a transition year as an FCS independent. All-time: seasons list 82-41, infobox 83-44. Jerry Mack since 2025.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Kennesaw_State_Owls_football",
+   "https://en.wikipedia.org/wiki/List_of_Kennesaw_State_Owls_football_seasons",
+   "https://en.wikipedia.org/wiki/2025_Conference_USA_football_season"
+  ]
+ },
+ {
+  "id": "samhouston",
+  "natTitles": [],
+  "fcsTitles": [
+   2020
+  ],
+  "confTitles": 0,
+  "lastConf": null,
+  "playoffs": [],
+  "bowls": {
+   "apps": 1,
+   "w": 1,
+   "l": 0,
+   "t": 0,
+   "last": 2024
+  },
+  "heisman": [],
+  "allTime": {
+   "w": 576,
+   "l": 501,
+   "t": 36
+  },
+  "coachSince": 2025,
+  "recent": [
+   {
+    "year": 2021,
+    "conf": "WAC",
+    "w": 11,
+    "l": 1,
+    "cw": 5,
+    "cl": 0,
+    "ap": null,
+    "post": "L FCS QUARTERFINAL"
+   },
+   {
+    "year": 2022,
+    "conf": "WAC",
+    "w": 5,
+    "l": 4,
+    "cw": 0,
+    "cl": 0,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2023,
+    "conf": "C-USA",
+    "w": 3,
+    "l": 9,
+    "cw": 2,
+    "cl": 6,
+    "ap": null,
+    "post": null
+   },
+   {
+    "year": 2024,
+    "conf": "C-USA",
+    "w": 10,
+    "l": 3,
+    "cw": 6,
+    "cl": 2,
+    "ap": null,
+    "post": "W NEW ORLEANS BOWL"
+   },
+   {
+    "year": 2025,
+    "conf": "C-USA",
+    "w": 2,
+    "l": 10,
+    "cw": 1,
+    "cl": 7,
+    "ap": null,
+    "post": null
+   }
+  ],
+  "notes": "FBS since 2023. fcsTitles = 2020 FCS (played spring 2021); also a 1964 NAIA co-title, not listed. Southland/WAC titles not counted. Bowls FBS only (older small-college bowls 3-1-1 excluded). The 2022 WAC games didn't count in the standings (transition), so cw/cl are 0/0. All-time sources conflict: seasons list 576-501-36 (may include a 2026 game), infobox 583-502-34. Phil Longo started 2025; the infobox now lists interim coaches, so he may have been let go during 2026.",
+  "sources": [
+   "https://en.wikipedia.org/wiki/Sam_Houston_Bearkats_football",
+   "https://en.wikipedia.org/wiki/List_of_Sam_Houston_Bearkats_football_seasons"
+  ]
+ }
+]
