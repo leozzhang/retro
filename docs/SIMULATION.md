@@ -118,11 +118,13 @@ It then runs the engine headless with `autoStep`, a per-step CPU QB and runner. 
 - the same kind: TD, INT (never a pick six), sack, or a gain within `max(3, 25%)` with the same first-down result
 - the ball going to the credited player's slot, so the replay names the player the box score credits, and an interception by the cast DB
 
+As tries run out the match loosens (`REPLAY.relaxAt`): after 45% of them, anyone may have the ball or make the pick, and the caption names the replay's player. After 75%, the yards may miss by twice as much, and a credited pass or run may show as either. `ReplaySetup.relax` records the level.
+
 **Field goals** replay as kicks (`FgSearch`): the CPU kicker, in calm air, tries a power and line drawn from the seed and stops the meter at a drawn spot (near the middle for a make, early or late for a miss). A try matches when it's good or no good like the sim's (never blocked). The screen hides the timing meter and keeps the goal cam.
 
 **Lost fumbles:** the play engine never loses a fumble, so the replay is a run or catch tackled on the sim's spot (`want: 'fumble'`). After the play is over, `Play.knockLoose` pops the ball out and the nearest free defender falls on it (`recoverer`); the caption names him. A CPU drive in a played game is cast like any other (`Game.castCpu`), so its turnover is a pick or a fumble as cast.
 
-**Rate:** about 97% of key plays match between close teams (the test requires 85%; fumbles 8 of 8), and every field goal in the test sample (48 of 48, 12 of them misses; it requires 90%). The rest show as a card: the ball slides the sim's yards under the same caption.
+**Rate:** about 99% of key plays match, between close teams and lopsided ones (the test requires 85%), and every field goal in the test sample (48 of 48, 12 of them misses; it requires 90%). The rest, mostly 40+ yard plays, show as a card: the ball slides the sim's yards under the same caption.
 
 **Screen:**
 - the field is the played game's (your end zone on the left): your offense attacks right, and the CPU's attacks left through a mirrored camera (`Camera.mirror`; the replay itself still runs toward +x)
@@ -135,4 +137,4 @@ It then runs the engine headless with `autoStep`, a per-step CPU QB and runner. 
 - No mid-game "sim the rest".
 - A drive continued at the quarter break starts a new set of downs.
 - Punts never show, and extra points aren't key plays.
-- Replays between very uneven teams match less often, so more of them are cards.
+- The longest plays (40+ yards) sometimes find no replay and show as cards.

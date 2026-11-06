@@ -1,6 +1,13 @@
 # Progress
 
-_Last updated: 2026-11-04_
+_Last updated: 2026-11-05_
+
+## Done: fewer ball-only key plays (2026-11-05)
+Bug: some key plays showed just the ball sliding, with no players, under BIG PLAY or FUMBLE. That's the card, shown when no seed in `REPLAY.maxTries` replays like the sim's snap. Since snaps are cast to real players, the match also needs the cast slot (and the cast DB on a pick), and about 8% of key plays found none: QB runs most of all (only 3 designed QB runs to try), then long runs, picks, and long catches by one receiver.
+- `REPLAY.relaxAt`: the search loosens as tries run out. After 45% of them, anyone may have the ball (the caption names the replay's player). After 75%, the yards may miss by twice as much, and a pass or run credit may show as either. Strict tries draw exactly as before. `ReplaySetup.relax` records the level so a found replay replays identically.
+- QB runs also try the zone reads and options the QB can keep.
+- Cards went from 60 of 781 to 6 between close teams, and 4 of 618 in lopsided games. The cards left are 40 to 50+ yard plays.
+
 
 ## Done: situational CPU coaching, clock-and-score defense, casting snaps to real players (2026-11-04)
 Bugs:

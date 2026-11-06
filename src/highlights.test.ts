@@ -139,7 +139,7 @@ describe('highlights', () => {
         row[0]++;
         // The same setup plays out the same way again.
         const again = runReplay(t, search.found);
-        expect(matches(t, again)).toBe(true);
+        expect(matches(t, again, search.found.relax)).toBe(true);
       }
     }
     expect(JSON.stringify(sides)).toBe(before);
