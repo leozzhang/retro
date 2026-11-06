@@ -53,7 +53,7 @@ The .exe isn't code-signed, so Windows SmartScreen warns on first launch: click 
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
 | Audible (pre-snap) | Esc |
 | Snap | Space or click |
-| Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, and the game goes into slight slow motion while you aim. Space cancels the aim without throwing |
+| Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, with no slow motion unless you turn on SLOW AIM (a dynasty setting; M on the exhibition screen), which also covers aiming a punt. Space cancels the aim without throwing |
 | Hand off / pitch to the RB | Right-click (or F) while he's in the backfield and not blocking. Works on any play, so you can call a draw |
 | Move QB / steer runner | WASD or arrow keys. After a catch the runner keeps going downfield automatically. A runner at the line (within 2 yards of it after a handoff) waits for the hole when you hold nothing, and W or S alone slides him along the line; past it, he runs downfield on his own |
 | Sprint | Shift (drains stamina). Off the sprint a player jogs at about three quarters of his top speed. How long the sprint lasts depends on the player's stamina, so a pocket QB's bar is shorter than a receiver's |

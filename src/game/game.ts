@@ -157,6 +157,12 @@ const SETTINGS: {
     apply: (c, i) => (c.runAssist = ASSIST_OPTIONS[i]),
     read: (c) => ASSIST_OPTIONS.indexOf(c.runAssist ?? 'FULL'),
   },
+  {
+    label: 'SLOW AIM', help: 'SLOW MOTION WHILE AIMING A PASS OR A PUNT',
+    options: ['OFF', 'ON'], start: 0,
+    apply: (c, i) => (c.aimSlow = i === 1),
+    read: (c) => (c.aimSlow ? 1 : 0),
+  },
 ];
 
 /** PLAY GAME's choices: the quarter the user takes over in (1 plays the whole game). */
@@ -174,7 +180,7 @@ interface Notice {
   show?: KeyShow;
 }
 
-/** Slow-motion while the QB is aiming. 1 = off. */
+/** Slow motion while the QB (or a punter) aims, when the SLOW AIM setting is on. */
 const AIM_TIME_SCALE = 0.65;
 /**
  * A called run is played zoomed in from the huddle to the whistle: the camera spreads the field `x`
@@ -285,6 +291,7 @@ export class Game {
   private dcNote: string | null = null;
   private exhibitionIq: DefenseIq = 'NORMAL';
   private exhibitionAssist: RunAssist = 'FULL';
+  private exhibitionAimSlow = false;
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
@@ -332,10 +339,26 @@ export class Game {
     return this.screen === 'call' || this.screen === 'play' || this.screen === 'kick' || this.screen === 'notice' || this.screen === 'final';
   }
 
+  /** The SLOW AIM setting: the dynasty's in a season game, the exhibition's otherwise. */
+  private aimSlow(): boolean {
+    return this.seasonGame && this.season ? this.season.config.aimSlow ?? false : this.exhibitionAimSlow;
+  }
+
+  /** The exhibition setup's options line, one segment per key (clicks pick a segment). */
+  private exhibitionOptions(): string[] {
+    return [
+      `DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : this.exhibitionKeys.toUpperCase()} (K)`,
+      `IQ: ${this.exhibitionIq} (I)`,
+      `ASSIST: ${this.exhibitionAssist} (L)`,
+      `SLOW AIM: ${this.exhibitionAimSlow ? 'ON' : 'OFF'} (M)`,
+    ];
+  }
+
   timeScale(): number {
-    if (this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
+    const slow = this.aimSlow();
+    if (slow && this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
     if (this.screen === 'play' && this.play?.playDef.kind === 'run' && this.play.phase !== 'presnap' && this.play.phase !== 'over') return RUN_ZOOM.slow;
-    if (this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
+    if (slow && this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
     return 1;
   }
 
@@ -490,6 +513,8 @@ export class Game {
     if (input.hit('KeyI')) cycleIq();
     const cycleAssist = () => (this.exhibitionAssist = ASSIST_OPTIONS[(ASSIST_OPTIONS.indexOf(this.exhibitionAssist) + 1) % ASSIST_OPTIONS.length]);
     if (input.hit('KeyL')) cycleAssist();
+    const toggleAim = () => (this.exhibitionAimSlow = !this.exhibitionAimSlow);
+    if (input.hit('KeyM')) toggleAim();
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -510,9 +535,12 @@ export class Game {
       } else if (y >= 262 && y < 280) {
         this.qIdx = (this.qIdx + (x < VIEW_W / 2 ? nq - 1 : 1)) % nq;
       } else if (y >= 280 && y < 290) {
-        if (x < VIEW_W * 0.42) cycleKeys();
-        else if (x < VIEW_W * 0.62) cycleIq();
-        else cycleAssist();
+        // The options line's four segments, centered: which one the click lands in.
+        const segs = this.exhibitionOptions();
+        const gap = 2 * 8;
+        let at = VIEW_W / 2 - (segs.reduce((n, s) => n + s.length * 8, 0) + gap * (segs.length - 1)) / 2;
+        const hit = segs.findIndex((s) => x < (at += s.length * 8 + gap) - gap / 2);
+        [cycleKeys, cycleIq, cycleAssist, toggleAim][hit < 0 ? segs.length - 1 : hit]();
       } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
@@ -610,7 +638,7 @@ export class Game {
     return SETTINGS.map((r, i) => ({ label: r.label, value: r.options[this.settingIdx[i]], help: r.help }));
   }
 
-  /** The new dynasty's settings: W/S a row, A/D or its arrows change it; Enter starts the dynasty. */
+  /** The new dynasty's settings: W/S or a click picks a row, A/D or the picked row's arrows change it; Enter starts the dynasty. */
   private updateNewSettings(input: Input): void {
     const m = input.mouse;
     if (input.hit('Escape', 'Backspace')) {
@@ -631,10 +659,13 @@ export class Game {
       if (inRect(m.x, m.y, GO_BTN)) start = true;
       for (let i = 0; i < n; i++) {
         if (!inRect(m.x, m.y, settingRect(i))) continue;
+        // A click picks the card (its help shows); only the arrows of the picked card change it.
+        const picked = this.settingSel === i;
         this.settingSel = i;
+        if (!picked) continue;
         const a = settingArrows(i);
         if (inRect(m.x, m.y, a.prev)) change(i, -1);
-        else if (inRect(m.x, m.y, a.next) || m.x < a.prev.x) change(i, 1);
+        else if (inRect(m.x, m.y, a.next)) change(i, 1);
       }
     }
     if (!start) return;
@@ -1029,10 +1060,13 @@ export class Game {
     if (m.pressed) {
       for (let i = 0; i < n; i++) {
         if (!inRect(m.x, m.y, settingRect(i))) continue;
+        // A click picks the card (its help shows); only the arrows of the picked card change it.
+        const picked = this.settingSel === i;
         this.settingSel = i;
+        if (!picked) continue;
         const a = settingArrows(i);
         if (inRect(m.x, m.y, a.prev)) change(i, -1);
-        else if (inRect(m.x, m.y, a.next) || m.x < a.prev.x) change(i, 1);
+        else if (inRect(m.x, m.y, a.next)) change(i, 1);
       }
     }
   }
@@ -2843,7 +2877,7 @@ export class Game {
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
         drawExhibition(
           g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`,
-          `CPU DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : this.exhibitionKeys.toUpperCase()} (K)  DEF IQ: ${this.exhibitionIq} (I)  RUN ASSIST: ${this.exhibitionAssist} (L)`, x, y,
+          this.exhibitionOptions().join('  '), x, y,
         );
         break;
       case 'slots':

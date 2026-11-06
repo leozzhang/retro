@@ -2,6 +2,12 @@
 
 _Last updated: 2026-11-05_
 
+## Done: aim slow motion is a setting, off by default (2026-11-05)
+- Aiming a pass or a punt no longer slows the game. The SLOW AIM setting (OFF / ON) turns `AIM_TIME_SCALE` (0.65) back on: `SeasonConfig.aimSlow` (missing = off, so existing dynasties lose the slow motion until they turn it on), a SETTINGS row, and M on the exhibition screen.
+- The exhibition options line is shortened to fit four options (DRIVES, IQ, ASSIST, SLOW AIM); a click picks the segment under it. The settings rows are 2 px closer so seven fit above the button.
+- Settings cards (new dynasty and the hub): a click only picks the card so its help text shows. Its < and > change it once it's picked; clicking the card's body no longer cycles it. Keys are unchanged.
+- The run's slow motion (`RUN_ZOOM.slow`) is unchanged. The headless harness never used the time scale, so the balance report doesn't move.
+
 ## Done: fewer ball-only key plays (2026-11-05)
 Bug: some key plays showed just the ball sliding, with no players, under BIG PLAY or FUMBLE. That's the card, shown when no seed in `REPLAY.maxTries` replays like the sim's snap. Since snaps are cast to real players, the match also needs the cast slot (and the cast DB on a pick), and about 8% of key plays found none: QB runs most of all (only 3 designed QB runs to try), then long runs, picks, and long catches by one receiver.
 - `REPLAY.relaxAt`: the search loosens as tries run out. After 45% of them, anyone may have the ball (the caption names the replay's player). After 75%, the yards may miss by twice as much, and a pass or run credit may show as either. Strict tries draw exactly as before. `ReplaySetup.relax` records the level so a found replay replays identically.
@@ -228,7 +234,7 @@ Design, numbers and flags are in [DEFENSE.md](DEFENSE.md).
 - **Teams:** 8 FBS teams (UGA, BAMA, OSU, TEX, ORE, MICH, ND, CLEM) with real colors and conferences. Off/def ratings are rough estimates. Rosters are generated and seeded per team, scaled by team strength. (Now all 138 FBS teams with researched rosters; see the ratings and rosters section.)
 - **Playbook:** 6 plays from 2 shotgun formations (Four Verts, Slant Flat, Smash, Mesh, Dagger, Curl Flat). The play-call screen shows a route diagram for each.
 - **Defensive calls:** 2 Man Under, Cover 1 Robber and Cover 0 Blitz, each with a distinct pre-snap look. Corners press at random. There's a pre-snap coverage read hint, and Esc lets you audible.
-- **Passing:** slingshot drag-and-release with an arc preview and slow motion while aiming. Throw error depends on distance, the QB's accuracy, pressure and movement.
+- **Passing:** slingshot drag-and-release with an arc preview (slow motion while aiming with the SLOW AIM setting). Throw error depends on distance, the QB's accuracy, pressure and movement.
 - **AI:**
   - receivers run routes
   - man coverage uses a reaction lag based on awareness, with off-coverage backpedal and press jams
@@ -374,7 +380,7 @@ Design and numbers are in [SIMULATION.md](SIMULATION.md).
   - Only the first 45% of the arc is previewed, Retro Bowl style.
   - A **goal cam** inset (from behind the kicker) shows the ball going through, wide, short, or off the upright ("DOINK!", with a 30% chance it bounces in).
   - Small rating-based block chance.
-- **Punt:** snap first, then aim while the rush comes. The game is in slow motion while aiming, and a get-off bar sits under the punter. A rusher who reaches the punter blocks it.
+- **Punt:** snap first, then aim while the rush comes. The game is in slow motion while aiming (with SLOW AIM on), and a get-off bar sits under the punter. A rusher who reaches the punter blocks it.
 - **Kickoff:** happens after every user score and to start the second half. Types: Deep, Sky, Squib, Corner. The kicker's run-up and the coverage lanes are timed to the kick line.
 - **PAT:** a TD is now worth 6, then you choose:
   - EXTRA POINT: a 20-yard kick.

@@ -45,6 +45,8 @@ export interface SeasonConfig {
   defIq?: 'STATIC' | 'NORMAL' | 'SHARP';
   /** Daylight for the runner in live games (render/renderer.ts `RunAssist`): always, until the handoff, or never. Missing means FULL. */
   runAssist?: 'FULL' | 'LIGHT' | 'OFF';
+  /** Slow motion while the QB aims a pass or the punter aims a punt in live games. Missing means off. */
+  aimSlow?: boolean;
 }
 
 export type KeyLevel = 'off' | 'lean' | 'normal' | 'full';
