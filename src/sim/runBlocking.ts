@@ -1,7 +1,10 @@
+import { STEP } from '../engine/constants';
 import { add, clamp, dist, lerp, norm, scale, sub, type Vec } from '../engine/math';
 import type { Play } from '../game/playState';
 import { LEAN_FX, maxSpeed, seek, type Player } from './player';
-import { runBlockValue } from '../data/ratings';
+import { templateValue } from '../data/athletes';
+import { SLOT_POS } from '../data/positions';
+import { runBlockValue, type Ratings } from '../data/ratings';
 
 /**
  * Run blocking: who blocks whom at the snap (by scheme), how a run block moves
@@ -17,6 +20,31 @@ export const REACH_PENALTY = 4;
 export const BLOCK_ROLL_SD = 8;
 /** A double team's advantage over a one-on-one, in rating points. */
 const DOUBLE_TEAM = 15;
+/**
+ * The talent part of a run block, squeezed: a defender's rating edge over his blocker counts at `k`
+ * near even and flattens out (tanh) past `soft`, measured from what equal-talent players at those two
+ * positions would give (so a WR stalking a corner still plays as before). Real lines' run-block
+ * win rates span only about ±6 points from the best to the worst (ESPN, TARGETS.md); a linear edge
+ * let a 5-point better DL win half his blocks and a 10-point one stuff 43% of runs.
+ */
+export const RUN_GAP = { k: 0.5, soft: 10 };
+/**
+ * How much of a defender his run blocker still has (`Player.blockControl`): 1 at contact, worn down each
+ * second while the defender is winning (`base` plus `perPower` a point of power; losing, he still wears it
+ * by `losing`, and the blocker wins it back by `regain` a point of his margin), split by a double team.
+ * He's off the block at 0. With the ball carrier within `nearDist`, the fight speeds up (`near`, or
+ * `nearLevered` when the blocker has him walled off), and even a losing defender fights to get off
+ * and make the play, at least `nearFloor` a second (`nearFloorLevered` walled off). A defender still on his block can only reach out:
+ * he can reach a carrier within `armReach`, and his arm tackle is `armFloor` plus `arm` times the
+ * control he's won back (`armOdds`).
+ * A block is a gradient, not a switch: a worse line gets beaten more often and sooner, but a beaten
+ * blocker still on his man still slows him and spoils his tackle.
+ */
+export const RUN_CONTROL = {
+  base: 0.75, perPower: 0.06, losing: 0.1, regain: 0.04,
+  nearDist: 2.5, near: 2.5, nearLevered: 0.6, nearFloor: 1.2, nearFloorLevered: 0.3,
+  arm: 0.5, armFloor: 0.06, armReach: 1.2,
+};
 /** Yards/s of movement per point of power the blocker wins by. */
 const DRIVE_RATE = 0.08;
 /** Sideways part of a winning run block's push, relative to the downfield part (moving him off the hole). */
@@ -29,10 +57,8 @@ export const COMBO_CLIMB: Record<'zone' | 'stretch' | 'gap', number> = { zone: 0
 const CLIMB_TRIGGER = 3;
 /** Blocker counts as between his man and the ball (leverage) above this alignment (cosine). */
 export const LEVERAGE_DOT = 0.35;
-/** Shed rate (per second) for a defender winning his run block, before his margin. */
-export const SHED_WIN = 0.4;
-/** Shed rate (per second) for a levered defender the ball carrier runs past. */
-export const SHED_LEVERED = 0.6;
+/** Shed rate (per second) for a blocked defender on the far side of the play, peeling off to pursue. */
+const PEEL_RATE = 2.5;
 /** Arm-tackle odds multiplier for a defender his blocker still has leverage on. */
 export const ARM_LEVERED = 0.3;
 /** A run blocker gets his hands on his assigned man from this far (pass pro and loose blocks use 1 yd). */
@@ -328,6 +354,29 @@ function washSign(play: Play, d: Player): number {
   return -Math.sign(d.blockDir?.y ?? 0) || 1;
 }
 
+const defPower = (r: Ratings) => r.bsh * 0.7 + r.spd * 0.3;
+const evenCache = new Map<string, number>();
+
+/** What a defender's raw edge over a blocker would be with both players at the same level (position templates). */
+function evenEdge(d: Player, b: Player): number {
+  const dp = SLOT_POS[d.slot];
+  const bp = SLOT_POS[b.slot];
+  if (!dp || !bp) return 0;
+  const key = `${dp}|${bp}`;
+  let v = evenCache.get(key);
+  if (v === undefined) {
+    const t = (pos: typeof dp) => Object.fromEntries(['bsh', 'spd', 'rbk', 'str'].map((k) => [k, templateValue(pos, k as any, 75)])) as unknown as Ratings;
+    v = defPower(t(dp)) - runBlockValue(t(bp));
+    evenCache.set(key, v);
+  }
+  return v;
+}
+
+/** The squeezed talent part of a run block: the raw rating edge, pulled toward the equal-talent edge (`RUN_GAP`). */
+export function runTalent(raw: number, even: number): number {
+  return even + RUN_GAP.k * RUN_GAP.soft * Math.tanh((raw - even) / RUN_GAP.soft);
+}
+
 /**
  * One step of a run block. The blocker's edge over the defender (`power`, negative = the
  * blocker is winning) sets where the pile goes: a winning block drives the defender back
@@ -339,10 +388,12 @@ export function runEngagement(play: Play, d: Player): number {
   const goal = d.goal ?? play.qb.pos;
   const toGoal = norm(sub(goal, d.pos));
   const blk = d.engagedBy.reduce((s, b) => s + runBlockValue(b.r), 0) / n;
+  const even = d.engagedBy.reduce((s, b) => s + evenEdge(d, b), 0) / n;
+  const talent = runTalent(defPower(d.r) - blk, even);
   const edge = RUN_BLOCK_EDGE - (play.runScheme === 'stretch' ? REACH_PENALTY : 0);
   // A lineman sitting on the run gets off the ball into it (`LEAN_FX.surge`).
   const surge = d.role === 'DL' ? Math.max(0, d.lean.run) * LEAN_FX.surge : 0;
-  const power = d.r.bsh * 0.7 + d.r.spd * 0.3 - blk - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll + surge;
+  const power = talent - (n - 1) * DOUBLE_TEAM - edge + d.blockRoll + surge;
   d.blockPower = power;
   d.blockDir ??= norm(sub(d.engagedBy[0].pos, d.pos));
   let move: Vec;
@@ -355,18 +406,54 @@ export function runEngagement(play: Play, d: Player): number {
   d.want = move;
   for (const b of d.engagedBy) b.want = move;
 
-  // A defender who's winning gets off the block; one who's losing mostly stays on it.
-  let shed = (power > 0 ? SHED_WIN + power * 0.06 : 0.08) / Math.pow(n, 1.5);
+  // A defender who's winning wears the block down; one who's losing mostly stays on it (`RUN_CONTROL`).
+  const k = RUN_CONTROL;
+  let wear = (power > 0 ? k.base + power * k.perPower : k.losing + power * k.regain) / Math.pow(n, 1.5);
   const c = play.carrier;
   if (c && c.side === 'off' && play.phase === 'run') {
     const dc = dist(d.pos, c.pos);
     // The far side of the play peels off to pursue. Playside perimeter blocks (WRs on DBs) are far from
     // the back too while he gets to the edge, but they hold or break on the matchup.
     const backside = (d.pos.y - c.pos.y) * playSide(play) < -PEEL_BACKSIDE || d.pos.x < c.pos.x - PEEL_BACKSIDE;
-    if (dc > PEEL_DIST && backside) shed = 2.5;
-    else if (dc < 2.5) shed = levered(d, c.pos) ? (SHED_LEVERED * (power > 0 ? 2 : 1)) / n : clamp(2.2 + power * 0.05, 0.8, 5);
+    if (dc > PEEL_DIST && backside) return PEEL_RATE;
+    // At the point of attack he fights to get off and make the play.
+    if (dc < k.nearDist) {
+      const lev = levered(d, c.pos);
+      wear = Math.max(Math.max(0, wear) * (lev ? k.nearLevered : k.near), (lev ? k.nearFloorLevered : k.nearFloor) / n);
+    }
   }
-  return shed;
+  d.blockControl = clamp(d.blockControl - wear * STEP, 0, 1);
+  return d.blockControl <= 0 ? Infinity : 0;
+}
+
+/** A blocked defender's arm-tackle odds: the more of his block he's won back, the better (`RUN_CONTROL`). */
+export function armOdds(d: Player): number {
+  return RUN_CONTROL.armFloor + RUN_CONTROL.arm * (1 - d.blockControl);
+}
+
+/**
+ * The pile: a blocked defender and his blocker are bodies, not ghosts. A ball carrier near the line with
+ * an engaged pair right in front of him (`depth` ahead, `width` across) moves forward no faster than
+ * the pile does, plus his own push (`push`, by strength: `strBase` + the rest by `str`). Where the line
+ * drives its man back he rides the push; where the defender surges (short yardage, a beaten block) he's
+ * held up or driven back, and can bounce to another lane. Only within `zone` of the LOS. A lane with a
+ * pile in it reads as all but shut (`lane` s of time to spare at most): holes are the gaps between blocks.
+ */
+export const PILE = { zone: 3, depth: 1.0, width: 0.7, push: 0.9, strBase: 0.4, lane: 0.15 };
+
+/** The cap the pile in front of carrier `c` puts on his forward speed (yd/s), or null with nothing there. */
+export function pileCap(play: Play, c: Player): number | null {
+  if (c.pos.x > play.los + PILE.zone) return null;
+  let cap: number | null = null;
+  const push = PILE.push * (PILE.strBase + (1 - PILE.strBase) * (c.r.str / 100));
+  for (const d of play.def) {
+    if (d.down || !d.engagedBy.length) continue;
+    const ahead = d.pos.x - c.pos.x;
+    if (ahead <= 0 || ahead > PILE.depth || Math.abs(d.pos.y - c.pos.y) > PILE.width) continue;
+    const v = d.vel.x + push;
+    if (cap === null || v < cap) cap = v;
+  }
+  return cap;
 }
 
 /** His blocker is between him and `at` (the ball carrier, or a spot the carrier is heading for). */
@@ -405,6 +492,8 @@ export function laneScores(play: Play, c: Player): Lane[] {
       if (d.down) continue;
       const slow = d.engagedBy.length ? (levered(d, at) ? 3.5 : 1.5) : 1;
       open = Math.min(open, (dist(d.pos, at) * slow) / maxSpeed(d));
+      // A blocked pair standing in the lane is a wall, not daylight (`PILE`).
+      if (d.engagedBy.length && Math.abs(d.pos.y - y) < PILE.width && d.pos.x > lx - 1.5 && d.pos.x < lx + 1) open = Math.min(open, PILE.lane);
     }
     lanes.push({ y, open, spare: Math.min(1.5, open - mine) });
   }

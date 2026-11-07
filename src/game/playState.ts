@@ -15,7 +15,7 @@ import {
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import {
-  ARM_LEVERED, assignRunBlocks, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
+  ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, pileCap, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
 import { fallForward, jukeTackleMul, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { matchDefense } from './matchups';
@@ -479,6 +479,7 @@ export class Play {
       else thinkDefense(this, d);
     }
     if (this.controlled) this.userControl(input, dt);
+    this.pile();
 
     if (this.runBlocking()) releaseClimbers(this);
     if (this.playDef.screen && !this.screenReleased && this.phase !== 'presnap' && this.time - this.snapTime >= SCREEN_SET) {
@@ -955,6 +956,7 @@ export class Play {
             // A new run block: note which side the blocker has him from, and roll how it goes.
             d.blockDir = norm(sub(b.pos, d.pos));
             d.blockRoll = gauss(this.rng) * BLOCK_ROLL_SD;
+            d.blockControl = 1;
           }
           b.engaged = d;
           d.engagedBy.push(b);
@@ -962,6 +964,14 @@ export class Play {
         }
       }
     }
+  }
+
+  /** The ball carrier can't run through a blocked pair in front of him (`PILE`): he moves with the pile. */
+  private pile(): void {
+    const c = this.carrier;
+    if (!c || c.side !== 'off' || this.phase !== 'run' || !this.runBlocking() || c.juke > 0) return;
+    const cap = pileCap(this, c);
+    if (cap !== null && c.want.x > cap) c.want = { x: cap, y: c.want.y };
   }
 
   /** Only a back carrying on a called run can cut. */
@@ -1059,8 +1069,9 @@ export class Play {
     for (const t of tacklers) {
       if (t.down || t.tackleCd > 0 || t.engaged || t.role === 'QB') continue;
       const arm = t.engagedBy.length > 0;
-      if (dist(t.pos, c.pos) > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
-      const armOdds = arm ? ARM_TACKLE * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
+      if (dist(t.pos, c.pos) > (!arm ? TACKLE_RANGE : this.runBlocking() ? RUN_CONTROL.armReach : TACKLE_RANGE * 0.8)) continue;
+      // A run-blocked defender's reach depends on how much of the block he's won (`armOdds`); pass pro's is flat.
+      const armOdds = arm ? (this.runBlocking() ? runArmOdds(t) : ARM_TACKLE) * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
       // Caught mid-cut by a man in front of him (or level): he bit on it.
       const juked = !arm && c.juke > 0 && (t.pos.x - c.pos.x) * (c.side === 'off' ? 1 : -1) > -0.5;
       if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * armOdds * (juked ? jukeTackleMul(c.r.elu) : 1)) {

@@ -25,9 +25,22 @@ These targets are for the harness auto-runner, which doesn't steer, so a human s
 | Light box (2 Man Under, Cover 1 Robber) | 4.5–5.5 | ~3 | 15–22% | 45–50% | 10–14% |
 | Loaded box (Cover 0 Blitz) | 2.5–3.5 | ~1.5 | 28–35% | — | ~5% |
 
+**Against a talent gap** (the `GAP` rows: the core runs over the core calls, reference offense 70 against a better or worse defense, then real generated rosters). The rating level alone doesn't move the run game; the gap between the two sides does.
+- **Sources:** ESPN's NFL team run-stop win rate spans only about 24–36% and run-block win rate about 66–77%, from the best line to the worst. A run-stop "win" includes a disrupted lane or a tackle within 3 yd, not just a TFL. FBS teams' season YPC spans roughly 3 to 6.
+- **What it means for us:** a better line should win a few more of its blocks, not all of them. A mismatch should show up as a worse median and fewer explosive runs, with stuffs rising slowly.
+
+| Gap (defense − offense) | YPC | Stuffs (≤0) |
+| --- | --- | --- |
+| −10 (much better offense) | 5.5–8 | ≤10% |
+| 0 | as the light-box row above | 12–22% |
+| +5 | 3–4 | ≤20% |
+| +10 | 2.5–3.5 | ≤25% |
+| +20 and more (a bottom G5 offense against an elite defense) | 1.5–2.5 | 30–40% |
+
 | Other | Target |
 | --- | --- |
-| Short yardage, 3rd and 1 (`SHORT` rows: Power, Iso, QB Sneak, QB Power) | ~70% converted (FBS power success about 65–72%) |
+| Short yardage, 3rd and 1, against the short-yardage package (the `DEF` short rows for Goal Line and Bear Cover 1: the calls a defense actually shows on 3rd and short) | runs ~65–70% converted, the QB sneak ~83–87% (NFL 3rd/4th and 1: sneaks 84–87% by PFF, SIS and WSJ, other runs about 65–68%; no FBS-wide figure found) |
+| Short yardage against the base calls (`SHORT` rows) | higher is fine: a light box on 3rd and 1 should give it up |
 | Yards after contact (`fallForward`, broken tackles) | ~3 per carry for starting backs |
 | Fumbles per carry | Not targeted. Botched exchanges are 1% (`HANDOFF_ODDS`), plus pitch drops |
 

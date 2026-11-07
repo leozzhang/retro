@@ -995,10 +995,17 @@ describe('run blocking', () => {
     d.pos = { x: p.los + 1, y: MID };
     d.blockRoll = 0;
     d.blockDir = { x: 0, y: 1 }; // the guard has him from the +y side
+    // How much of the block he wins back in one step (`blockControl` wears from 1).
+    const wear = () => {
+      d.blockControl = 1;
+      runEngagement(p, d);
+      return 1 - d.blockControl;
+    };
     rb.pos = { x: p.los + 1, y: MID + 1.5 }; // the back runs past on the blocker's side
-    const levered = runEngagement(p, d);
+    const levered = wear();
     rb.pos = { x: p.los + 1, y: MID - 1.5 }; // ...or past his free shoulder
-    const free = runEngagement(p, d);
+    const free = wear();
+    expect(levered).toBeGreaterThan(0);
     expect(free).toBeGreaterThan(levered * 2);
   });
 

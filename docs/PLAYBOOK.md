@@ -82,7 +82,7 @@ A play is **formation + a concept on each side + backfield jobs + read + blockin
 - **Winning block:** drives the defender back and **washes** him away from the hole (`WASH_RATE`).
 - **Losing block:** the defender works around it toward the ball and the pile moves back.
 - **Leverage:** the blocker stays on the side he got (`blockDir`).
-  - If he's between his man and the ball carrier (`LEVERAGE_DOT`), the defender rarely sheds (`SHED_LEVERED`) and only gets a weak arm tackle (`ARM_LEVERED`).
+  - If he's between his man and the ball carrier (`LEVERAGE_DOT`), the defender's fight to get off the block slows (`RUN_CONTROL.nearLevered`) and his arm tackle is weaker (`ARM_LEVERED`). A block is a gradient: `Player.blockControl` wears from 1 toward 0 while he's winning, and his arm tackle grows as it does (`RUN_CONTROL`).
   - A back who runs past a defender's free shoulder lets him off the block fast.
 - **Getting on the block:** assigned blockers engage their man from `RUN_ENGAGE`, lead their man's movement, and wall him off from the carrier after the handoff.
 - **Assignments hold** through the whole run.

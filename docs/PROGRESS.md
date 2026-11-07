@@ -2,6 +2,72 @@
 
 _Last updated: 2026-11-06_
 
+## Done: the run game against a better defense: graded blocks and the pile (2026-11-06)
+Bug: with a weak team (Northern Illinois, off 60 against Kent State's def 65) almost every run went for no gain or a loss, with the DL through the line at once. The balance harness only ever tested offense +2 (90 v 88), so it never saw it.
+
+**Diagnosis** (headless probes; the new GAP rows keep measuring it):
+- The rating *level* doesn't matter; the *gap* does. Reference rosters at every level from 55 to 90 gave the same curve: about 4 YPC at even, 2.0 with the defense 5 points better, 0.8 at +10, and −0.2 at +15.
+- Real rosters matched: NIU v Kent 1.9 YPC with 29% stuffs and first contact 1.3 yd behind the line; Georgia v Kent 28 YPC; NIU v Georgia −1.7.
+- About 90% of stuffs were a DL shedding about 0.5 s after the snap. A run block was all or nothing: power linear in the rating gap against an 8-point roll, then a random shed, after which the defender was fully free. A 5-point better DL won half his blocks, and some DL won almost every snap.
+- Real lines differ far less: ESPN's NFL team run-stop win rate runs only about 24–36% from best to worst.
+
+**The new model** (`sim/runBlocking.ts`; the user's design: a defender can be fully blocked, partly blocked or free):
+- **Squeezed talent edge** (`RUN_GAP`, `runTalent`): a defender's rating edge over his blocker counts at 0.5 near even and saturates past about 10 (tanh). It's measured from the edge equal-talent players at those two positions would have (`evenEdge`, from the templates), so a WR stalking a corner plays as before.
+- **Block control** (`RUN_CONTROL`, `Player.blockControl`): 1 at contact, worn down while the defender wins (faster the more he wins), barely worn while he loses, and won back by a winning blocker. He's off at 0, so a block now breaks gradually, never on a coin flip at contact.
+  - **At the point of attack** the fight speeds up, and even a losing defender works to get off (`near`, `nearFloor`), less when walled off.
+  - **Arm tackles:** a defender still on his block can reach the carrier within `armReach`, with odds that grow with the control he's won (`armOdds`). A stood-up defender gets 6%; one nearly off gets about 56%. Pass pro keeps its flat `ARM_TACKLE`.
+  - The old `SHED_WIN` and `SHED_LEVERED` rates are gone.
+- **The pile** (`PILE`, `pileCap`, `Play.pile`): an engaged pair directly in front of the carrier near the line is a wall. He moves forward no faster than the pile, plus his own push by strength. He rides a drive block forward, is held up or driven back by a surge, and can bounce to another lane. `laneScores` reads a lane with a pile in it as shut, so the auto-runner and the daylight streaks show the holes between blocks. This is how short yardage is won and lost: by surge, not by tackle odds.
+- **Scrimmage tackle odds squeezed** (`TACKLE_GAP`, `tackleChance`, `sim/tackling.ts`): 0.8 at even and 1.2% a point near even, saturating through a tanh. An elite back against a weak defense broke 60% of tackles; now it's about a third.
+- **Renderer:** a run block's ring flickers when its control is under 0.3 (`BLOCK_READ.control`), instead of by power.
+- **Tried and dropped along the way:**
+  - A 0.4 s stalemate ramp on the old random shed: fine numbers, but still all or nothing.
+  - A bigger per-block roll (`BLOCK_ROLL_SD` 11–14): more stuffs at every gap without flattening the slope.
+  - A lower OL drive edge (`RUN_BLOCK_EDGE` 1 or −1): steepened the slope again.
+
+**Measured** (`balance.txt` against a baseline regenerated just before; TALENT GAP rows are new):
+
+| GAP row | Before | After |
+| --- | --- | --- |
+| def −20 | 17.7 ypc, 1% stuffs | 14.2, 1% |
+| def −10 | 9.5, 6% | 7.0, 4% |
+| even | 4.3, 19% | 4.6, 9% |
+| def +5 | 2.1, 26% | 3.6, 15% |
+| def +10 | 0.9, 43% | 2.2, 23% |
+| def +20 | −0.9, 77% | 1.4, 31% |
+| NIU 60 v KENT 65 | 1.9, 29%, contact −1.3 | 3.2, 14%, contact −0.4 |
+| UGA 88 v BAMA 88 | 4.0, 10% | 4.9, 6% |
+| UGA 88 v KENT 65 | 27.8, 2% | 19.1, 1% |
+| NIU 60 v UGA 91 | −1.7, 92% | 0.7, 36% |
+
+- **Short yardage against the short-yardage package** (TARGETS.md: sneaks about 83–87%, other runs about 65–68% on 3rd or 4th and 1, NFL):
+
+  | Front | Power | Iso | QB Sneak |
+  | --- | --- | --- | --- |
+  | Goal Line | 52% → 36% | 73% → 78% | 76% → 63% |
+  | Bear Cover 1 | 48% → 74% | 47% → 64% | 74% → 94% |
+
+  Against the base calls, 3rd and 1 converts more than before (Power about 85%, Sneak about 98%), which is fine for a light box.
+- **The core:**
+  - Core runs: 4.1 ypc / 15% stuffs before, 4.9 / 8% after.
+  - RUN ALL: 3.9 / 16% before, 4.9 / 9% after.
+  - DEF light boxes up: 2 Man Under 4.7 → 6.3, Cover 2 4.8 → 6.1. Loaded boxes about level: Cover 0 2.7 → 2.8, Goal Line 3.0 → 3.2.
+  - Pass rows move by RNG noise only: mean PASS ypp 4.5 → 4.8, PA 8.1 → 8.3, PLAY 7.7 → 7.7.
+- **ADAPT, IZ spam:** STATIC 4.2 → 5.5 ypp. SHARP still takes about 40% off late (3.3); NORMAL DC 45 about 11%.
+- **`npm run ratings` (OL, DL, RB):**
+  - OL `rbk` +0.87 → +0.25 (±0.19), about 0.5 YPC per 15 points.
+  - DL `bsh` +0.15 → +0.28 (±0.18).
+  - RB `spd`, `str` and `elu` are unchanged and significant.
+- `npm test`: 317 pass (new tests in `runGame.test.ts`: the squeeze, block control wearing and the arm tackle, the pile, tackle saturation, and the gap ordering; the levered test in `logic.test.ts` now compares control wear).
+- `npm run season` not run: CPU drives are simulated (`DRIVE_SIM`), with no run blocking.
+
+**Flags:**
+- **Even matchups are too clean:** 8–9% stuffs against the 15–22% target, and light boxes at 6+ YPC. Stuffs now come only from dominant reps and unblocked defenders. Next lever: something independent of talent, like slants and stunts or a missed assignment, rather than a bigger talent slope.
+- **OL `rbk` and DL `bsh` matter less.** They're about 0.5 YPC per 15 points, inside the report's 2-SE band. Line talent and the gap slope are the same lever: a 15-point OL deficit is a 12-point talent gap.
+- **The offensive side is still steep:** Georgia v Kent is 19 YPC, mostly speed (`maxSpeed` is shared by every route and pursuit, so it's left alone). Only the user's offense plays on the field, so this matters only for a powerhouse user against a minnow.
+- **Short yardage is uneven by front:** Goal Line stops Power and the sneak more than real life (36% / 63%), and Bear less (74% / 94%). The Goal Line front puts bodies in every gap, so the pile is everywhere.
+- **Not played by hand yet.** Check NIU v Kent State on IZ and Power with patience and the cut. Watch that losing blocks still clog lanes without the defender tackling from inside his block, that the daylight shows the gaps between blocks, and that holding D on the sneak behind a stalemated center creeps forward.
+
 ## Done: fan pulse stories (2026-11-06)
 "What the fans are saying" now reads differently from program to program. Design and thresholds are in [PROGRAM.md](PROGRAM.md#the-fan-pulse).
 - **Stories** (`season/fanStories.ts`, `STORIES`), about 40 new signals:

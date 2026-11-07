@@ -17,11 +17,12 @@ export type RunAssist = 'FULL' | 'LIGHT' | 'OFF';
 
 /**
  * Block reads under each engaged defender: past `even` rating points of edge a block shows as won
- * (green) or lost (red), and past `shed` a losing block flickers (he's about to get off it).
+ * (green) or lost (red), and a losing block flickers when he's about to get off it (run blocks: his blocker's
+ * `blockControl` under `control`; pass pro: power past `shed`).
  * Daylight shows lanes no defender can get to for `laneMin` s, full at `laneFull` s, `laneLen` yd long
  * past the LOS, eased by `laneEase` a frame.
  */
-const BLOCK_READ = { even: 3, shed: 8, laneMin: 0.35, laneFull: 0.8, laneLen: 3, laneEase: 0.25 };
+const BLOCK_READ = { even: 3, shed: 8, control: 0.3, laneMin: 0.35, laneFull: 0.8, laneLen: 3, laneEase: 0.25 };
 
 export function drawLines(g: CanvasRenderingContext2D, cam: Camera, los: number, firstDownX: number): void {
   const top = cam.toScreen(0, 0).y;
@@ -168,7 +169,9 @@ function drawBlocks(g: CanvasRenderingContext2D, cam: Camera, play: Play): void 
     const s = cam.toScreen(d.pos.x, d.pos.y);
     const pw = d.blockPower;
     const col = pw < -BLOCK_READ.even ? '92,255,122' : pw > BLOCK_READ.even ? '255,90,90' : '255,210,63';
-    const fade = pw > BLOCK_READ.shed && Math.floor(play.time * 8) % 2 === 0 ? 0.3 : 0.85;
+    // About to get off it: on a run block, once he's won most of it back (`blockControl`); in pass pro, by power.
+    const aboutOff = play.runBlocking() ? d.blockControl < BLOCK_READ.control : pw > BLOCK_READ.shed;
+    const fade = aboutOff && Math.floor(play.time * 8) % 2 === 0 ? 0.3 : 0.85;
     g.strokeStyle = `rgba(${col},${fade})`;
     for (let i = 0; i < Math.min(n, 2); i++) {
       g.beginPath();

@@ -3,7 +3,9 @@ import { it } from 'vitest';
 import { adaptiveRows } from './adaptive';
 import { CORE_CALLS, DEF_CALLS, type DefCall } from './data/defenses';
 import { PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
+import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
+import { teamById } from './data/teams';
 import { FIELD_W, STEP } from './engine/constants';
 import { add, clamp, dist, mulberry32, scale, type Rng } from './engine/math';
 import type { KickPlay } from './game/kickPlay';
@@ -204,6 +206,50 @@ function runLine(list: number[]): string {
   );
 }
 
+/** The core runs (and the harness's core calls) that the TALENT GAP rows measure. */
+const CORE_RUNS = ['inside-zone', 'outside-zone', 'power', 'toss', 'zone-read'];
+const GAP_REPS = 24;
+
+/**
+ * TALENT GAP: the core runs as the defense gets better or worse than the offense (reference rosters,
+ * offense 70; level alone doesn't move the run game, the gap does), then real generated rosters.
+ * Targets in TARGETS.md (run game vs. talent gap).
+ */
+function gapRows(rng: Rng): string[] {
+  const plays = CORE_RUNS.map((id) => PLAYBOOK.find((p) => p.id === id)!);
+  const cell = (m: H.Matchup) => {
+    const list: number[] = [];
+    let contact = 0;
+    for (const call of CORE_CALLS) {
+      for (const playDef of plays) {
+        for (let i = 0; i < GAP_REPS; i++) {
+          const r = H.runRep(m, playDef, call, rng);
+          if (!r.o || !r.ran) continue;
+          list.push(r.yds);
+          contact += r.contact;
+        }
+      }
+    }
+    return `${runLine(list)} contact ${(contact / Math.max(1, list.length)).toFixed(1)}`;
+  };
+  const rows: string[] = [];
+  for (const gap of [-20, -10, -5, 0, 5, 10, 20]) {
+    const label = `off 70 def ${70 + gap} (${gap > 0 ? '+' : ''}${gap})`;
+    rows.push(`GAP  ${label.padEnd(26)} | ${cell(H.referenceMatchup(70, 70 + gap))}`);
+  }
+  const real = (o: string, d: string) => {
+    const off = teamById(o);
+    const def = teamById(d);
+    return { off, def, offR: rosterFor(off), defR: rosterFor(def) };
+  };
+  for (const [o, d] of [['northernillinois', 'kentstate'], ['kentstate', 'northernillinois'], ['georgia', 'alabama'], ['georgia', 'kentstate'], ['northernillinois', 'georgia']]) {
+    const m = real(o, d);
+    const label = `${m.off.abbr} ${teamRatings(buildSquad(m.off)).off} v ${m.def.abbr} ${teamRatings(buildSquad(m.def)).def}`;
+    rows.push(`GAP  ${label.padEnd(26)} | ${cell(m)}`);
+  }
+  return rows;
+}
+
 /** Third and 1: how often each short-yardage run (`short`) gets the yard. */
 function shortRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
@@ -396,6 +442,7 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   // Per-play rows also get their own RNG, after everything else.
   rows.push('', ...perPlayRows([...pass, ...pa].filter(picked), mulberry32(11)));
   rows.push('', ...shortRows(PLAYBOOK.filter((p) => p.short && picked(p)), mulberry32(13)));
+  if (!only || only.includes('gap')) rows.push('', ...gapRows(mulberry32(23)));
   if (!only || only.includes('route')) rows.push('', ...routeRows(mulberry32(17)));
   if (!only || only.includes('defense')) rows.push('', ...defenseRows(pass, pa, runs, mulberry32(19)));
   if (!only || only.includes('adaptive')) rows.push('', ...adaptiveRows());

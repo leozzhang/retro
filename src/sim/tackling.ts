@@ -2,9 +2,17 @@ import { clamp } from '../engine/math';
 
 export const TACKLE_RANGE = 0.9;
 
+/**
+ * Scrimmage tackles: 80% at even, 1.2 points per rating point near even (`scale / soft`), squeezed
+ * through a tanh so a big skill gap saturates: an elite back against a weak defense still breaks
+ * about a third of tackles, not 60% (the old linear curve), which made 25+ YPC runs against weak teams.
+ */
+export const TACKLE_GAP = { base: 0.8, scale: 0.18, soft: 15 };
+
 /** Chance a tackle attempt brings the carrier down. */
 export function tackleChance(tkl: number, carrierElu: number, carrierStr: number): number {
-  const p = 0.8 + (tkl - (carrierElu * 0.6 + carrierStr * 0.4)) * 0.012;
+  const gap = tkl - (carrierElu * 0.6 + carrierStr * 0.4);
+  const p = TACKLE_GAP.base + TACKLE_GAP.scale * Math.tanh(gap / TACKLE_GAP.soft);
   return clamp(p, 0.15, 0.97);
 }
 

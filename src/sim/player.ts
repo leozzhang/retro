@@ -127,6 +127,8 @@ export interface Player {
   blockDir: Vec | null;
   /** Run blocks: this block's luck, in rating points, rolled at contact. */
   blockRoll: number;
+  /** Run blocks: how much of him his blocker still has, 1 at contact down to 0 when he's off it (`RUN_CONTROL`). */
+  blockControl: number;
   /** Run blocks: the defender's edge over his blockers last step (negative = the blockers are winning), for the renderer. */
   blockPower: number;
   goal: Vec | null;
@@ -202,6 +204,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     noEngage: 0,
     blockDir: null,
     blockRoll: 0,
+    blockControl: 1,
     blockPower: 0,
     goal: null,
     fitAt: Infinity,
