@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import * as H from './harness';
 import { Camera, project, unproject } from './engine/camera';
 import { dist, mulberry32 } from './engine/math';
 import {
   advanceSim, afterPlay, clockText, newClock, nextQuarter, penaltySpot, playClockText, QUARTER_DRIVES, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap,
   tickBetween, tickLive, timeLeftInHalf, type Clock,
 } from './game/clock';
-import { DEF_CALLS, packageFor, type DefCall } from './data/defenses';
+import { DEF_CALLS, packageFor, type DefCall, type Disguise } from './data/defenses';
 import { ACE, EMPTY, FORMATIONS, GUN_TRIPS, I_FORM, PLAYBOOK, type Formation, type PlayDef } from './data/plays';
 import {
   athleteName, buildSquad, freshSquad, onField, PICK_ORDER, positionOrder, reorderPosition, rosterFor, SLOT_CANDIDATES, starters, teamRatings,
@@ -1337,5 +1338,75 @@ describe('playbook page', () => {
     expect(s.has(PLAYBOOK[1].id)).toBe(true);
     toggleStar(s, PLAYBOOK[1].id);
     expect(s.size).toBe(0);
+  });
+});
+
+describe('coverage disguise and presnap motion', () => {
+  const m = H.referenceMatchup();
+  const make = (callId: string, disguise: Disguise | null, seed = 3, play = 'four-verts') =>
+    new Play({
+      offTeam: m.off, defTeam: m.def, offRoster: m.offR, defRoster: m.defR, play: PLAYBOOK.find((x) => x.id === play)!,
+      defCall: DEF_CALLS.find((c) => c.id === callId)!, press: {}, los: 35, ballY: 26.65, rng: mulberry32(seed), disguise,
+    });
+  const run = (p: Play, secs: number) => {
+    for (let t = 0; t < secs; t += STEP) p.update(STEP, H.fakeInput, H.cam);
+  };
+
+  it('a disguise moves only the defenders it shows somewhere else', () => {
+    const plain = make('c3', null);
+    const shown = make('c3', { show: 'two-high', weight: 1 });
+    for (let i = 0; i < plain.def.length; i++) {
+      const s = plain.def[i].slot;
+      if (s === 'FS' || s === 'SS') expect(shown.def[i].pos.x).toBeGreaterThan(35 + 10);
+      else expect(shown.def[i].pos).toEqual(plain.def[i].pos);
+    }
+    expect(plain.isDisguised()).toBe(false);
+    expect(shown.isDisguised()).toBe(true);
+  });
+
+  it('Cover 3 shown two-high spins at the snap: the down safety comes up from 13 yards', () => {
+    const p = make('c3', { show: 'two-high', weight: 1 }, 3, 'slant-flat');
+    const ss = p.def.find((d) => d.slot === 'SS')!;
+    run(p, 0.2); // nothing moves before the snap
+    expect(ss.pos.x).toBeGreaterThan(35 + 12);
+    p.snap();
+    run(p, 1.5);
+    expect(ss.pos.x).toBeLessThan(35 + 10);
+  });
+
+  it('motion: his man travels with him, a zone only slides, and the snap waits until he is set', () => {
+    let man: Play | null = null;
+    for (let seed = 1; seed < 20 && !man; seed++) {
+      const p = make('2-man', null, seed);
+      p.startMotion();
+      if (p.motion?.trail) man = p;
+    }
+    expect(man).not.toBeNull();
+    const who = man!.motion!.who;
+    const d = man!.def.find((x) => x.manTarget === who)!;
+    const [wy, dy0] = [who.pos.y, d.pos.y];
+    expect(man!.canSnap()).toBe(false);
+    run(man!, 1.2);
+    expect(Math.abs(who.pos.y - wy)).toBeGreaterThan(3);
+    expect(Math.abs(d.pos.y - dy0)).toBeGreaterThan(0.6 * Math.abs(who.pos.y - wy));
+    run(man!, 5);
+    expect(man!.canSnap()).toBe(true);
+
+    const zone = make('c3', null);
+    zone.startMotion();
+    const zw = zone.motion!.who;
+    const y0 = zone.def.map((x) => x.pos.y);
+    const zwy = zw.pos.y;
+    run(zone, 1.2);
+    const moved = Math.max(...zone.def.map((x, i) => Math.abs(x.pos.y - y0[i])));
+    expect(moved).toBeLessThan(0.45 * Math.abs(zw.pos.y - zwy));
+  });
+
+  it('the hard count makes no one move on a straight call but a walked-up blitzer', () => {
+    const p = make('c3', null);
+    const before = p.def.map((x) => ({ ...x.pos }));
+    p.hardCount();
+    run(p, 0.3);
+    p.def.forEach((x, i) => expect(dist(x.pos, before[i])).toBeLessThan(0.01));
   });
 });

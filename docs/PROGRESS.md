@@ -2,6 +2,17 @@
 
 _Last updated: 2026-11-06_
 
+## Done: reading the coverage: disguise, motion, the hard count (2026-11-06)
+Before this, the presnap picture never lied: every defender lined up where his call put him, and the HUD named the shell. Details are in [DEFENSE.md](DEFENSE.md), "Reading the coverage".
+- **Disguise:** 8 of the 13 calls can show another shell (and press or off corners) and spin to their real coverage at the snap. The safeties show on the side of their real job. How often comes from the identity (`IDENTITY.disguise`: about 30%, by the DC's ADJUST and the secondary). There's never a disguise in prevent or on a try. Tells: a low-`prc` disguiser creeps late on the play clock.
+- **Motion (M):** yo-yo motion with no route changes. His man defender travels with him (some calls, and 20% of man snaps, bump instead); zones slide. Motion can force a disguiser to give it away. The snap waits until he's set.
+- **Hard count (H):** twice a drive, for 1.5 s of play clock. Disguisers flinch, blitzers jump, and about 3% of the time a DL jumps offside (5 yards, a first down if it gets there).
+- **Feedback:** the read line names the *shown* look. The READ HELP setting (FULL / SHELL / OFF; exhibitions use FULL) and a blue line after each snap: "THEY WERE IN COVER 3 + SPY, SHOWN AS TWO HIGH". The scouting report has a tier-2 OC line, "DISGUISES ITS COVERAGE: n%".
+- **Measured:** every existing `npm run balance` row is byte-identical to a baseline from the last commit (no disguise or motion = old behavior). The new DISGUISE section (table in DEFENSE.md) shows what each look costs the defense. Looks that cost 2+ yards a pass play or 1.5+ a carry were dropped (Cover 0 in both looks, Robber and Cover 3 Sky and Nickel Cat as two-high, Cover 3 as zero).
+- **The DISGUISES setting** (ON / OFF) on the dynasty's SETTINGS page. The settings rows are tighter (18 px apart) so all ten fit above the button.
+- `npm test`: 4 new tests (a disguise moves only its show defenders, the spin, motion man vs zone and the snap lock, a hard count on a straight call). Checked by hand in the browser build: the presnap look, M, H, the reveal line.
+- **Not done yet:** a READ HELP toggle on the exhibition screen (its options line is full); play-authored motion (jet, orbit); the DC learning from the user's reads; a harness that reads the look.
+
 ## Done: the run game against a better defense: graded blocks and the pile (2026-11-06)
 Bug: with a weak team (Northern Illinois, off 60 against Kent State's def 65) almost every run went for no gain or a loss, with the DL through the line at once. The balance harness only ever tested offense +2 (90 v 88), so it never saw it.
 
@@ -1789,5 +1800,5 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
    - a pass-rush package for the `wide` front
 4. Playbook UI, part 2: filter by situation (short yardage, red zone, 2-minute).
 5. Special teams, part 2: playable kick and punt returns, onside kicks, fakes, a real free kick after a safety, and CPU 4th-down decisions shown as actual kicks.
-6. Pre-snap reads and audibles beyond Esc (hot routes, protection slides).
+6. Pre-snap, round 2: play-authored motion, hot routes and protection slides; maybe bring back Cover 0's disguise with a late creep.
 7. Sound, and packaging as an .exe with Electron or Tauri.

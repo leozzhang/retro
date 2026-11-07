@@ -238,8 +238,8 @@ export interface SettingRow {
 const SET_X = 120;
 const SET_W = VIEW_W - 2 * SET_X;
 const SET_Y = 88;
-const SET_H = 20;
-const SET_STEP = 23;
+const SET_H = 16;
+const SET_STEP = 18;
 
 export function settingRect(i: number): Box {
   return { x: SET_X, y: SET_Y + i * SET_STEP, w: SET_W, h: SET_H };
@@ -266,11 +266,11 @@ export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number,
       g.fillStyle = GOLD;
       g.fillRect(r.x, r.y, 3, r.h);
     }
-    text(g, row.label, r.x + 12, r.y + 6, { color: hot ? GOLD : '#ffffff' });
+    text(g, row.label, r.x + 12, r.y + 4, { color: hot ? GOLD : '#ffffff' });
     const a = settingArrows(i);
-    text(g, '<', a.prev.x + 10, r.y + 6, { align: 'center', color: inBox(a.prev, mx, my) ? GOLD : ACCENT });
-    text(g, row.value, (a.prev.x + a.next.x + 20) / 2, r.y + 6, { align: 'center', color: '#ffffff' });
-    text(g, '>', a.next.x + 10, r.y + 6, { align: 'center', color: inBox(a.next, mx, my) ? GOLD : ACCENT });
+    text(g, '<', a.prev.x + 10, r.y + 4, { align: 'center', color: inBox(a.prev, mx, my) ? GOLD : ACCENT });
+    text(g, row.value, (a.prev.x + a.next.x + 20) / 2, r.y + 4, { align: 'center', color: '#ffffff' });
+    text(g, '>', a.next.x + 10, r.y + 4, { align: 'center', color: inBox(a.next, mx, my) ? GOLD : ACCENT });
   });
   const y = SET_Y + rows.length * SET_STEP + 6;
   if (rows[sel]) text(g, rows[sel].help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });

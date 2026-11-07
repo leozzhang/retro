@@ -1,7 +1,7 @@
-import { taggedAssign, type DefCall, type DefPackage, type DefTags, type Front } from '../data/defenses';
+import { taggedAssign, type DefCall, type DefPackage, type DefTags, type Disguise, type Front } from '../data/defenses';
 import { ROUTES, type PlayDef, type RunScheme } from '../data/plays';
 import { passBlockValue } from '../data/ratings';
-import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type RosterPlayer, type Team } from '../data/teams';
+import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type OffSlot, type RosterPlayer, type Team } from '../data/teams';
 import type { Camera } from '../engine/camera';
 import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import type { Input } from '../engine/input';
@@ -19,7 +19,7 @@ import {
 } from '../sim/runBlocking';
 import { fallForward, jukeTackleMul, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { matchDefense } from './matchups';
-import { alignY, resolvePlay, type ResolvedPlay } from './resolvePlay';
+import { alignY, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
 
 export type Phase = 'presnap' | 'snap' | 'live' | 'air' | 'run' | 'over';
@@ -49,6 +49,8 @@ export interface PlaySetup {
   ballY: number;
   /** The user mirrored the play at the call. */
   flip?: boolean;
+  /** The look the defense shows before the snap, if it's disguising its call (data/defenses.ts). */
+  disguise?: Disguise | null;
   rng: Rng;
 }
 
@@ -100,6 +102,34 @@ export const SCREEN_SET = 0.8;
 const FIT_EARLY = 0.15;
 /** A spy reacts to his QB taking off this fast. */
 const SPY_REACT = 0.05;
+/**
+ * Disguises (data/defenses.ts `Disguise`). Show spots: `deep` yd for a deep safety, `down` and
+ * `downWide` for the safety rolled down in a single-high look, `zero` and `zeroWide` for both safeties
+ * walked up. At the snap the AI takes each from there to his real job.
+ * - The tells: a disguiser tips it with odds `tip` × (`tipPrc` − prc/100), creeping `tipShare` of the way
+ *   to his real spot once the play clock is down to somewhere in `tipClock` (seconds). `walk` is the
+ *   presnap walking speed, a share of top speed.
+ */
+export const DISGUISE = {
+  deep: 13, down: 7, downWide: 4.5, zero: 6.5, zeroWide: 5,
+  tip: 0.45, tipPrc: 1.3, tipShare: 0.55, tipClock: [4, 14] as [number, number], walk: 0.35,
+};
+/**
+ * Presnap yo-yo motion: the receiver jogs at `speed` of top speed `depth` yd in toward the ball (no
+ * closer than `gap`) and back. His man defender travels with him at `trail` speed; on a `bump` call
+ * (or `bumpOdds` of trail snaps) the defense bumps over instead. A zone defender within `reach` yd of
+ * him slides `bump` of his move, a deep one `deep`. A disguiser rolls `spin` × (`tipPrc` − prc/100)
+ * to give it away and rotate early.
+ */
+export const MOTION = { speed: 0.5, depth: 7, gap: 2.5, trail: 0.8, bumpOdds: 0.2, reach: 11, bump: 0.35, deep: 0.12, spin: 0.35 };
+/**
+ * The hard count: a fake snap. A disguiser flinches `share` of the way to his real spot for `time` s
+ * with odds `flinch` × (`DISGUISE.tipPrc` − prc/100); a walked-up blitzer jumps at the line with
+ * odds `jump` × the same. A DL jumps offside with odds `offside` × his line's mean (1 − prc/100).
+ * The game caps it at `perDrive` and takes `clock` s off the play clock each time.
+ */
+export const HARD_COUNT = { share: 0.6, time: 0.55, flinch: 0.55, jump: 0.5, offside: 0.1, perDrive: 2, clock: 1.5 };
+
 /** Routes that make a receiver the target of a screen (the others stalk-block for him). */
 const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble'];
 
@@ -180,6 +210,25 @@ export class Play {
   /** Screen: the line has let its rushers go and is releasing. */
   screenReleased = false;
 
+  /** The look the defense shows before the snap, if it's disguised. */
+  readonly disguise: Disguise | null;
+  /** Each disguised defender's real spot (where his call lines him up); he shows `start`. */
+  private readonly realSpot = new Map<Player, Vec>();
+  /** Disguisers who'll tip it, by the play clock they start creeping at. */
+  private readonly tipAt = new Map<Player, number>();
+  /** Disguisers creeping toward their real spot. */
+  private readonly tipped = new Set<Player>();
+  /** A flinch on the hard count: where to, and until when. */
+  private readonly flinches = new Map<Player, { to: Vec; until: number }>();
+  /** Presnap motion under way: the receiver, his spot, the turn, and how the defense answers. */
+  motion: { who: Player; home: Vec; turn: Vec; back: boolean; trail: boolean } | null = null;
+  /** Receivers sent in motion this snap, for cycling through them. */
+  private motions = 0;
+  /** Players who moved before the snap: their `start` is reset at the snap. */
+  private readonly movedPre = new Set<Player>();
+  /** Seconds on the play clock, set by the game each presnap frame (none headless). */
+  clockLeft = Infinity;
+
   constructor(s: PlaySetup) {
     this.los = s.los;
     this.ballY = s.ballY;
@@ -224,6 +273,7 @@ export class Play {
           : { x: this.los + 1.5, y: this.ballY };
 
     this.prevent = !!s.tags?.prevent;
+    this.disguise = s.disguise ?? null;
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
     const assign = taggedAssign(s.defCall, plan.assign, s.tags);
@@ -236,6 +286,20 @@ export class Play {
       d.pos = this.defAlignment(slot, d, bySlot, s.press[slot] ?? false);
       d.start = { ...d.pos };
       this.def.push(d);
+    }
+    if (this.disguise) {
+      for (const d of this.def) {
+        const show = this.disguiseSpot(d.slot as DefSlot, d, bySlot);
+        if (!show) continue;
+        this.realSpot.set(d, d.pos);
+        d.pos = show;
+        d.start = { ...show };
+      }
+    }
+    // The tells: a disguiser who'll give it away by creeping as the play clock runs down.
+    const [lo, hi] = DISGUISE.tipClock;
+    for (const d of this.realSpot.keys()) {
+      if (this.rng() < DISGUISE.tip * (DISGUISE.tipPrc - d.r.prc / 100)) this.tipAt.set(d, lo + this.rng() * (hi - lo));
     }
 
     if (s.play.read === 'zoneRead' || s.play.read === 'option') {
@@ -352,6 +416,162 @@ export class Play {
     return { x: Math.min(pos.x, FIELD_LEN - 0.5), y: clamp(pos.y, 1, FIELD_W - 1) };
   }
 
+  /**
+   * Where a disguised defender shows himself, or null if the disguise doesn't move him. Safeties line up
+   * in the shown shell; corners walk up into press over a zone, or play off with outside leverage over man.
+   */
+  private disguiseSpot(slot: DefSlot, d: Player, off: Map<string, Player>): Vec | null {
+    const g = this.disguise!;
+    const a = d.assign!;
+    if (a.kind === 'spy' || this.prevent) return null;
+    const { los, ballY: by } = this;
+    const D = DISGUISE;
+    if (slot === 'FS' || slot === 'SS') {
+      // Each safety shows on the side of his real job, so the spin is a rotation, not a sprint across.
+      const both = this.def.filter((x) => x.slot === 'FS' || x.slot === 'SS');
+      const other = both.find((x) => x !== d);
+      const side = !other ? (slot === 'FS' ? -1 : 1) : d.pos.y < other.pos.y || (d.pos.y === other.pos.y && slot === 'FS') ? -1 : 1;
+      if (g.show === 'two-high') return { x: los + D.deep, y: side < 0 ? FIELD_W / 4 : (FIELD_W * 3) / 4 };
+      if (g.show === 'zero') return { x: los + D.zero, y: clamp(by + side * D.zeroWide, 2, FIELD_W - 2) };
+      // Single-high: the safety with the deepest job shows the middle.
+      const deep = (x: Player) => (x.assign?.kind === 'deep' ? 2 : x.assign?.kind === 'robber' ? 1 : 0);
+      const mid = !other || deep(d) > deep(other) || (deep(d) === deep(other) && slot === 'FS');
+      return mid ? { x: los + D.deep, y: FIELD_W / 2 } : { x: los + D.down, y: clamp(by + side * D.downWide, 2, FIELD_W - 2) };
+    }
+    if ((slot === 'CB1' || slot === 'CB2') && g.corners) {
+      if (g.corners === 'press' && a.kind !== 'man') {
+        // Press bail: up on the outside receiver with the inside leverage of press man.
+        const w = this.overWidest(slot, off, 1, 0);
+        d.press = true;
+        return { x: w.x, y: w.y + Math.sign(by - w.y) * 0.8 };
+      }
+      if (g.corners === 'off' && a.kind === 'man') {
+        d.press = false;
+        d.turned = false;
+        d.cushion = 7;
+        return this.overWidest(slot, off, 7, 1);
+      }
+    }
+    return null;
+  }
+
+  /** The defense's disguise is still on: someone stands away from his real spot. */
+  isDisguised(): boolean {
+    return this.realSpot.size > 0;
+  }
+
+  /** Whether the ball can be snapped: not with a man in motion. */
+  canSnap(): boolean {
+    return this.phase === 'presnap' && !this.motion;
+  }
+
+  /** Receivers who can go in motion, the slots first, then the wideouts, then the tight ends. */
+  private motionMen(): Player[] {
+    const RANK: Partial<Record<CoverClass, number>> = { slot: 0, wide: 1, inline: 2 };
+    const rank = (o: Player) => RANK[this.resolved.cover[o.slot as OffSlot] ?? 'back'] ?? 3;
+    return this.off
+      .filter((o) => isEligible(o) && o.role !== 'QB' && rank(o) < 3 && o.pos.x > this.los - 2)
+      .sort((a, b) => rank(a) - rank(b) || a.pos.y - b.pos.y);
+  }
+
+  /** Yo-yo motion: the next receiver jogs in toward the ball and back. Returns false if no one can go. */
+  startMotion(): boolean {
+    if (!this.canSnap()) return false;
+    const men = this.motionMen();
+    if (!men.length) return false;
+    const who = men[this.motions++ % men.length];
+    const home = { ...who.start };
+    const off = home.y - this.ballY;
+    let dir = -Math.sign(off) || 1;
+    let travel = Math.min(MOTION.depth, Math.abs(off) - MOTION.gap);
+    if (travel < 2) {
+      dir = -dir; // in tight: motion out and back
+      travel = 4;
+    }
+    const turn = { x: home.x, y: clamp(home.y + dir * travel, 1.5, FIELD_W - 1.5) };
+    const trail = this.defCall.motion !== 'bump' && this.rng() >= MOTION.bumpOdds;
+    this.motion = { who, home, turn, back: false, trail };
+    // Motion can force a disguise's hand: a defender who has to move gives it away.
+    for (const d of this.realSpot.keys()) {
+      if (this.rng() < MOTION.spin * (DISGUISE.tipPrc - d.r.prc / 100)) this.tipped.add(d);
+    }
+    return true;
+  }
+
+  /**
+   * The hard count: a fake snap. Disguisers may flinch toward their real spots and walked-up blitzers
+   * may jump. Returns true if a lineman jumped offside (the game takes it from there).
+   */
+  hardCount(): boolean {
+    if (!this.canSnap()) return false;
+    const H = HARD_COUNT;
+    for (const d of this.def) {
+      const real = this.realSpot.get(d);
+      const raw = DISGUISE.tipPrc - d.r.prc / 100;
+      if (real && this.rng() < H.flinch * raw) {
+        this.flinches.set(d, { to: lerp2(this.restSpot(d), real, H.share), until: this.time + H.time });
+      } else if (d.role !== 'DL' && d.assign?.kind === 'rush' && this.rng() < H.jump * raw) {
+        this.flinches.set(d, { to: { x: this.los + 1.2, y: d.pos.y }, until: this.time + H.time });
+      }
+    }
+    const dl = this.def.filter((d) => d.role === 'DL');
+    const loose = dl.reduce((n, d) => n + (1 - d.r.prc / 100), 0) / Math.max(1, dl.length);
+    const offside = this.rng() < H.offside * loose;
+    if (offside) this.popup('OFFSIDE', { x: this.los + 1, y: this.ballY }, '#ffd23f');
+    return offside;
+  }
+
+  /** Where a defender stands before the snap if nothing moves him: his shown spot, or partway home once he's tipped it. */
+  private restSpot(d: Player): Vec {
+    const real = this.realSpot.get(d);
+    return real && this.tipped.has(d) ? lerp2(d.start, real, DISGUISE.tipShare) : d.start;
+  }
+
+  /** Presnap movement: the motion man and the defense's answer to him, tips and flinches. Each sets `want`. */
+  private presnapMoves(): void {
+    for (const [d, at] of this.tipAt) if (this.clockLeft <= at) this.tipped.add(d);
+    const m = this.motion;
+    let dy = 0;
+    if (m) {
+      const w = m.who;
+      if (!m.back && dist(w.pos, m.turn) < 0.4) m.back = true;
+      if (m.back && dist(w.pos, m.home) < 0.25 && len(w.vel) < 0.6) {
+        this.motion = null;
+        w.want = { x: 0, y: 0 };
+      } else {
+        w.want = seek(w, m.back ? m.home : m.turn, maxSpeed(w) * MOTION.speed, 0.8);
+        this.movedPre.add(w);
+      }
+      dy = w.pos.y - m.home.y;
+    }
+    for (const d of this.def) {
+      let to = this.restSpot(d);
+      let speed = maxSpeed(d) * DISGUISE.walk;
+      const f = this.flinches.get(d);
+      if (f && this.time < f.until) {
+        to = f.to;
+        speed = maxSpeed(d) * 0.7;
+      }
+      if (m && dy) {
+        const k = this.motionShare(d, m);
+        if (k === 1) speed = maxSpeed(d) * MOTION.trail;
+        to = { x: to.x, y: clamp(to.y + k * dy, 1, FIELD_W - 1) };
+      }
+      if (dist(to, d.pos) < 0.08 && len(d.vel) < 0.3) continue;
+      d.want = seek(d, to, speed, 0.7);
+      this.movedPre.add(d);
+    }
+  }
+
+  /** How much of the motion man's move a defender takes: all of it trailing him in man, a slide in zone. */
+  private motionShare(d: Player, m: NonNullable<Play['motion']>): number {
+    const a = d.assign;
+    if (!a || a.kind === 'rush' || d.role === 'DL') return 0;
+    if (a.kind === 'man') return d.manTarget === m.who ? (m.trail ? 1 : MOTION.bump) : 0;
+    const near = Math.max(0, 1 - Math.abs(d.start.y - m.home.y) / MOTION.reach);
+    return (a.kind === 'deep' ? MOTION.deep : MOTION.bump) * near;
+  }
+
   /** A corner's spot over the outermost receiver on his side, `depth` yards deep with outside leverage. */
   private overWidest(slot: DefSlot, off: Map<string, Player>, depth: number, lev: number): Vec {
     const side = slot === 'CB1' ? -1 : 1;
@@ -380,7 +600,8 @@ export class Play {
   }
 
   snap(): void {
-    if (this.phase !== 'presnap') return;
+    if (!this.canSnap()) return;
+    for (const p of this.movedPre) p.start = { ...p.pos };
     this.phase = 'snap';
     this.snapTime = this.time;
     const from = { x: this.center.pos.x + 0.3, y: this.center.pos.y, z: 0.4 };
@@ -478,6 +699,7 @@ export class Play {
       if (d === this.carrier) returnerAI(this, d);
       else thinkDefense(this, d);
     }
+    if (this.phase === 'presnap') this.presnapMoves();
     if (this.controlled) this.userControl(input, dt);
     this.pile();
 
@@ -1203,4 +1425,9 @@ function frontSet(front: Front, los: number, by: number, strong: number): Partia
     default:
       return {};
   }
+}
+
+/** A point `t` of the way from `a` to `b`. */
+function lerp2(a: Vec, b: Vec, t: number): Vec {
+  return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };
 }

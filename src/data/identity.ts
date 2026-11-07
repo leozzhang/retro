@@ -1,6 +1,6 @@
 import { clamp, hashString } from '../engine/math';
 import { desperate, tempo, type Situation } from '../game/situation';
-import { buildStaff } from './coaches';
+import { buildStaff, dcAdjust } from './coaches';
 import { DEF_CALLS, rushers, type DefCall } from './defenses';
 import type { Team } from './teams';
 
@@ -33,6 +33,8 @@ export interface DefIdentity {
   press: Record<string, number>;
   /** Pressure multiplier on third or fourth and `longToGo` or more. */
   longBlitz: number;
+  /** Share of snaps it disguises its call (`IDENTITY.disguise`, `pickDisguise`), when the call has a disguise. */
+  disguise: number;
 }
 
 /**
@@ -55,6 +57,9 @@ export interface DefIdentity {
  *     `preventHalfSecs` of the 1st half, and `preventMax` against a last-snap heave.
  *   - `sellout*`: the defense behind late against an offense running the clock out loads the box and
  *     brings pressure to get the ball back.
+ * - `disguise`: how often a call is shown as another look (data/defenses.ts `Disguise`): `base`, plus
+ *   `perAdjust` a point of the DC's ADJUST over `adjustMid` (the smart DCs move their safeties around),
+ *   plus `perUnit` a point of the secondary (the CB and S units' mean), held to `min`..`max`.
  */
 export const IDENTITY = {
   prior: {
@@ -88,6 +93,7 @@ export const IDENTITY = {
   preventMax: 1.5,
   preventDials: { twoHigh: 0.9, blitz: -0.8, man: -0.6 },
   selloutDials: { box: 0.5, blitz: 0.4 },
+  disguise: { base: 0.3, adjustMid: 60, perAdjust: 0.006, perUnit: 0.03, min: 0.1, max: 0.55 },
 };
 
 /** A call's traits the dials weigh: extra rushers, man or zone, two-high or not, and box count against 7. */
@@ -136,14 +142,18 @@ export function defIdentity(team: Team): DefIdentity {
   const hit = cache.get(team.id);
   if (hit) return hit;
   // The DC owns the style.
-  const style = buildStaff(team).DC.style ?? defStyle(team.id);
+  const dc = buildStaff(team).DC;
+  const style = dc.style ?? defStyle(team.id);
   const S = IDENTITY.styles[style];
   const dl = team.profile.units.DL ?? 0;
   const cb = team.profile.units.CB ?? 0;
   const dials = addDials(S.dials, { blitz: IDENTITY.dlBlitz * dl, man: IDENTITY.cbMan * cb });
   const press: Record<string, number> = {};
   for (const [slot, p] of Object.entries(IDENTITY.basePress)) press[slot] = clamp(p * S.press + IDENTITY.cbPress * cb, 0.05, 0.7);
-  const id: DefIdentity = { style, dials, mix: mixFor(dials), press, longBlitz: S.longBlitz };
+  const D = IDENTITY.disguise;
+  const secondary = ((team.profile.units.CB ?? 0) + (team.profile.units.S ?? 0)) / 2;
+  const disguise = clamp(D.base + D.perAdjust * (dcAdjust(dc) - D.adjustMid) + D.perUnit * secondary, D.min, D.max);
+  const id: DefIdentity = { style, dials, mix: mixFor(dials), press, longBlitz: S.longBlitz, disguise };
   cache.set(team.id, id);
   return id;
 }

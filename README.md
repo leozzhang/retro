@@ -54,6 +54,9 @@ The .exe isn't code-signed, so Windows SmartScreen warns on first launch: click 
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
 | Audible (pre-snap) | Esc |
 | Snap | Space or click |
+| Motion (pre-snap) | M sends a receiver in toward the ball and back (each press, the next one: slots, then wideouts, then tight ends). His man defender travels with him; a zone only slides over. You can't snap until he's set |
+| Hard count (pre-snap) | H fakes the snap, twice a drive, for 1.5 s of play clock. A disguised defender may flinch toward his real spot, a blitzer may jump, and now and then a lineman jumps offside (5 yards) |
+| Reading the coverage | Some snaps the defense shows one shell and spins to its real coverage at the snap (the DISGUISES setting turns this off); the read line over the field names what's shown (the READ HELP setting: the whole look, the shell only, or nothing). After the play, a blue line says what they were really in |
 | Pass | Press anywhere, drag back, and release. The target is projected the opposite way from the QB, with no slow motion unless you turn on SLOW AIM (a dynasty setting; M on the exhibition screen), which also covers aiming a punt. Space cancels the aim without throwing |
 | Hand off / pitch to the RB | Right-click (or F) while he's in the backfield and not blocking. Works on any play, so you can call a draw |
 | Move QB / steer runner | WASD or arrow keys. After a catch the runner keeps going downfield automatically. A runner at the line (within 2 yards of it after a handoff) waits for the hole when you hold nothing, and W or S alone slides him along the line; past it, he runs downfield on his own |

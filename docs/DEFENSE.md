@@ -17,15 +17,12 @@ Each call has a front, a shell (the pre-snap tell), a coverage, a box count, and
 | --- | --- | --- | --- | --- | --- |
 | 2 Man Under | two-high | man | 4 | 6 | |
 | Cover 1 Robber | one-high | man | 4 | 7 | |
-| Cover 0 Blitz | zero | man | 6 | 8 | |
 | Cover 2 | two-high | zone | 4 | 6 | flat, curl, middle hole, curl, flat under two halves |
 | Tampa 2 | two-high | zone | 4 | 6 | the MIKE runs the deep middle |
 | Cover 3 | one-high | zone | 4 | 7 | corners and FS in thirds; hook, hook, curl/flat ×2 |
-| Cover 3 Sky | one-high | zone | 4 | 8 | the strong safety rotates down into the box (`fit`) |
 | Cover 4 | two-high | zone | 4 | 7 | quarters, with two apex curl/flat defenders and a middle hole |
 | Cover 1 Fire | one-high | man | 5 | 7 | MIKE blitz |
 | Fire Zone | one-high | zone | 5 | 7 | 3 under, 3 deep, a dropping end |
-| Nickel Cat | one-high | man | 5 | 7 | the nickel blitzes off the edge |
 | Bear Cover 1 | one-high | man | 4 | 8 | bear front |
 | Goal Line | zero | man | 5 | 9 | goal-line front with the base backer down; short yardage only |
 
@@ -59,15 +56,12 @@ From `npm run balance`'s DEF rows. The reference matchup: the auto-QB throws to 
 | --- | --- | --- | --- | --- | --- |
 | 2 Man Under | 4.1 | 5.5 | 7.6 | 4.6 | 88%, 3.0 |
 | Cover 1 Robber | 6.4 | 6.2 | 8.6 | 3.3 | 94%, 3.1 |
-| Cover 0 Blitz | 7.1 | -2.2 | 3.4 | 2.3 | 89%, 2.3 |
 | Cover 2 | 5.7 | 11.0 | 8.9 | 4.0 | 93%, 3.4 |
 | Tampa 2 | 5.3 | 9.3 | 9.3 | 4.3 | 91%, 3.6 |
 | Cover 3 | 7.2 | 8.7 | 9.2 | 3.6 | 88%, 3.3 |
-| Cover 3 Sky | 8.0 | 9.4 | 9.5 | 3.3 | 91%, 3.4 |
 | Cover 4 | 7.6 | 8.4 | 10.8 | 3.6 | 76%, 2.8 |
 | Cover 1 Fire | 7.4 | 7.0 | 12.2 | 2.9 | 86%, 2.2 |
 | Fire Zone | 8.3 | 7.4 | 11.8 | 3.2 | 84%, 2.2 |
-| Nickel Cat | 7.1 | 6.9 | 9.3 | 3.5 | 92%, 2.9 |
 | Bear Cover 1 | 8.9 | 6.4 | 10.4 | 2.6 | 87%, 2.3 |
 | Goal Line | 7.3 | 4.9 | 13.5 | 2.6 | 77%, 1.7 |
 
@@ -219,7 +213,87 @@ Scripted offenses play 30 games of 40 snaps against the reference defense, start
 - **Flag:** quick-game-only offenses are barely touched (the harness's quick throws are already about 4 yards a play).
 - The auto-runner doesn't "hold D and push" the sneak the way a user does, so a user's sneak starts higher than these 2.6 yards. It should fall by a similar share.
 
+## Reading the coverage: disguise, motion and the hard count
+Before this, the presnap picture was always the truth: every defender lined up where his call put him, so the shell never lied, and Cover 2 and Tampa 2 looked the same. Now the defense can lie, the offense has two tools for testing it, and the snap tells the truth.
+
+### Disguise (`Disguise` in `data/defenses.ts`; `DISGUISE` in `game/playState.ts`)
+- **A call can show another look.** Its `disguises` list the shells it shows (`two-high`, `one-high`, `zero`) and, optionally, the corners:
+  - `press`: zone corners walk up into a press-man look (press bail).
+  - `off`: man corners play off, with a zone corner's outside leverage.
+- **The safeties show on the side of their real job,** so at the snap the spin is a rotation, not a sprint across the field. The post-snap AI takes each defender from his shown spot to his real job; nothing else changes. A disguised safety gets to his landmark about half a second after a straight one, and the spot he left is open for that beat.
+- **The disguises by call:**
+
+  | Call | Shows |
+  | --- | --- |
+  | 2 Man Under | single-high; two-high with off corners |
+  | Cover 1 Robber | single-high with off corners |
+  | Cover 2 | single-high; two-high with press corners |
+  | Tampa 2, Cover 4 | single-high |
+  | Cover 3 | two-high; single-high with press corners (press bail) |
+  | Cover 1 Fire | two-high |
+  | Fire Zone | two-high; zero with press corners |
+  | Cover 0, Cover 3 Sky, Nickel Cat, Bear, Goal Line | never disguised |
+
+  A look that gave up 2+ yards a pass play at either hold, or 1.5+ a carry, against the call played straight (the DISGUISE rows) was dropped: Cover 0 as two-high and as single-high, Cover 1 Robber as two-high, Cover 3 as zero, Cover 3 Sky as two-high, and Nickel Cat as two-high.
+
+- **The DISGUISES setting** (dynasty, ON by default; `SeasonConfig.disguises`) turns them off: every call is played straight. Exhibitions always disguise.
+- **How often** is the identity's `disguise` (`IDENTITY.disguise`): 0.3 of snaps, plus 0.006 a point of the DC's ADJUST over 60, plus 0.03 a point of the secondary (the CB and S units' mean), held to 0.10–0.55. Prevent and tries are never disguised.
+- **The tells:** a disguiser tips it with odds 0.45 × (1.3 − prc/100). Once the play clock is down to somewhere between :14 and :04, he creeps 55% of the way to his real spot. A fast snap keeps the disguise but catches them away from their spots; waiting may let them give it away.
+- **The scouting report** has a tier-2 OC line: "DISGUISES ITS COVERAGE: n% OF SNAPS". It's a warning at 38% and up.
+
+### Motion (`MOTION`)
+- **M** sends a receiver in toward the ball (7 yd, no closer than 2.5) and back, at half speed. Each press takes the next receiver: slots first, then wideouts, then tight ends. Routes don't change, since he comes back to his spot, and the snap waits until he's set.
+- **Man:** his defender travels with him. On a `bump` call (Cover 1 Robber, Nickel Cat), or on 20% of the other man snaps, the defense bumps over instead: his man slides 35% of the way.
+- **Zone:** an underneath defender within 11 yd of him slides 35% of his move; a deep one slides 12%.
+- **Motion can force a disguise's hand:** each disguiser rolls 0.35 × (1.3 − prc/100) to give it away and creep toward his real spot.
+- So motion is strong evidence, not proof.
+
+### The hard count (`HARD_COUNT`)
+- **H** fakes the snap, twice a drive, for 1.5 s of play clock each time (not on tries).
+- A disguiser flinches 60% of the way to his real spot for about half a second, with odds 0.55 × (1.3 − prc/100).
+- A walked-up blitzer jumps at the line, with odds 0.5 × the same.
+- A DL jumps offside with odds 0.1 × his line's mean (1 − prc/100): about 3% against a typical line. That's 5 yards, half the distance inside the 10, and a first down if it reaches the line to gain. Replay the down.
+
+### The feedback
+- **The read line** names what's *shown*: it counts the safeties where they stand, so a disguise reads as the look it shows. The **READ HELP** setting is FULL (the shell, front, box, walked-up backers, press and spy), SHELL (the shell only) or OFF. Exhibitions show FULL.
+- **After every snap,** a blue line under the result: "THEY WERE IN COVER 3, SHOWN AS TWO HIGH".
+
+### Measured: the DISGUISE section of `npm run balance`
+Each disguised call is played straight and then in each of its looks, from the same seeds. The auto-QB never reads the look, so these rows measure only what the spin costs the defense, not what a reader gains.
+
+| Call | Look | Pass 1.2s ypp | Pass 2.2s ypp | Runs ypc |
+| --- | --- | --- | --- | --- |
+| 2 Man Under | straight | 5.5 | 6.0 | 6.8 |
+| 2 Man Under | single high | 5.4 | 5.8 | 6.2 |
+| 2 Man Under | two high, off corners | 5.2 | 5.9 | 5.7 |
+| Cover 1 Robber | straight | 10.2 | 6.8 | 5.2 |
+| Cover 1 Robber | two high | 10.0 | 9.3 | 5.7 |
+| Cover 1 Robber | single high, off corners | 5.4 | 7.1 | 5.5 |
+| Cover 2 | straight | 7.4 | 12.6 | 6.9 |
+| Cover 2 | single high | 8.5 | 13.1 | 5.5 |
+| Cover 2 | two high, press | 7.6 | 12.6 | 5.3 |
+| Tampa 2 | straight | 4.7 | 10.7 | 6.0 |
+| Tampa 2 | single high | 5.6 | 12.6 | 5.7 |
+| Cover 3 | straight | 8.1 | 11.6 | 4.6 |
+| Cover 3 | two high | 8.5 | 11.4 | 4.6 |
+| Cover 3 | single high, press | 9.6 | 12.2 | 3.7 |
+| Cover 4 | straight | 10.4 | 9.6 | 5.3 |
+| Cover 4 | single high | 7.9 | 8.9 | 5.1 |
+| Cover 1 Fire | straight | 9.8 | 9.4 | 3.7 |
+| Cover 1 Fire | two high | 11.1 | 8.3 | 4.9 |
+| Fire Zone | straight | 12.9 | 10.0 | 3.7 |
+| Fire Zone | two high | 13.3 | 9.8 | 4.9 |
+| Fire Zone | no deep safety, press | 9.8 | 10.5 | 4.3 |
+
+The pass rows are noisy (a few hundred reps), so read the runs and the big moves:
+- **A two-high look costs a run call some of its box.** Cover 1 Fire's and Fire Zone's runs go 3.7 → 4.9 ypc when shown two-high: two-high invites the run, so run against a two-high look you don't trust.
+- **Cheap disguises:** Cover 3 as two-high, Cover 4 as single-high and 2 Man Under in either look cost about nothing.
+- The harness never reads the look, so these rows show only what a disguise costs the defense, not what it gains against a user who misreads it.
+
 ## Hooks for later
 - **Film study** (phase 5): `TeamState.film` holds your bucket shares from your last few live games, so next week's DC starts with a prior, weighted by his SCOUT. The prep page would say what they've seen.
 - **The CPU's drives** could learn your defensive play in the same way, if user defense is ever played live.
 - **The `wide` front** has no call yet; a pass-rush package for third and long would use it.
+- **Play-authored motion:** jet, orbit and across-the-formation motion that changes strength, with routes written for the formation after it. The defense would re-align (man defenders follow, zones rebalance by strength).
+- **The DC learning your reads:** disguise more against an offense that keeps beating the straight look, and less when the user keeps burning the rotation.
+- **The harness reading the look:** an auto-QB that throws to the side a rotating safety left, so the DISGUISE rows can show what reading it is worth.

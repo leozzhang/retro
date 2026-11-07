@@ -1,4 +1,4 @@
-import { pickDefCall, type DefCall, type DefTags } from '../data/defenses';
+import { disguiseName, pickDefCall, pickDisguise, type DefCall, type DefTags, type Disguise } from '../data/defenses';
 import type { Situation } from './situation';
 import { defIdentity, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
@@ -82,7 +82,7 @@ import {
   timeLeftInHalf, type Clock, type Tempo,
 } from './clock';
 import { KickPlay } from './kickPlay';
-import { Play } from './playState';
+import { HARD_COUNT, Play } from './playState';
 import { personnelOf } from './resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, simTwoPoint, simulateDrive, startDrive, userStartAfter,
@@ -116,6 +116,7 @@ const playName = (id: string) => (PLAYBOOK.find((p) => p.id === id)?.name ?? id)
 const IQ_OPTIONS: DefenseIq[] = ['STATIC', 'NORMAL', 'SHARP'];
 /** Daylight for the runner (render/renderer.ts): always, until the handoff, or never. */
 const ASSIST_OPTIONS: RunAssist[] = ['FULL', 'LIGHT', 'OFF'];
+const READ_OPTIONS: NonNullable<SeasonConfig['readHelp']>[] = ['FULL', 'SHELL', 'OFF'];
 
 /**
  * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
@@ -166,6 +167,18 @@ const SETTINGS: {
     options: ['OFF', 'ON'], start: 0,
     apply: (c, i) => (c.aimSlow = i === 1),
     read: (c) => (c.aimSlow ? 1 : 0),
+  },
+  {
+    label: 'DISGUISES', help: 'THE CPU DEFENSE SHOWS ONE COVERAGE AND SPINS TO ANOTHER AT THE SNAP',
+    options: ['ON', 'OFF'], start: 0,
+    apply: (c, i) => (c.disguises = i === 0),
+    read: (c) => (c.disguises === false ? 1 : 0),
+  },
+  {
+    label: 'READ HELP', help: 'THE PRESNAP READ OVER THE FIELD: THE WHOLE LOOK, THE SHELL ONLY, OR NOTHING',
+    options: READ_OPTIONS, start: 0,
+    apply: (c, i) => (c.readHelp = READ_OPTIONS[i]),
+    read: (c) => READ_OPTIONS.indexOf(c.readHelp ?? 'FULL'),
   },
   {
     label: 'HISTORY', help: 'REAL PROGRAM HISTORY TO 2025, OR EVERY TEAM STARTS FROM NOTHING',
@@ -298,6 +311,10 @@ export class Game {
   /** The CPU defense's in-game learning (null at STATIC), its tags on this snap, and its newest line for the user. */
   private brain: DefBrain | null = null;
   private defTags: DefTags = {};
+  /** The look the CPU defense shows this snap, if it's disguising its call. */
+  private disguise: Disguise | null = null;
+  /** Hard counts the user has left this drive (`HARD_COUNT.perDrive`). */
+  private hardCountsLeft = HARD_COUNT.perDrive;
   private dcNote: string | null = null;
   private exhibitionIq: DefenseIq = 'NORMAL';
   private exhibitionAssist: RunAssist = 'FULL';
@@ -349,6 +366,11 @@ export class Game {
   /** On the field: a play, a kick, the call screen, a notice or the final. */
   private inGame(): boolean {
     return this.screen === 'call' || this.screen === 'play' || this.screen === 'kick' || this.screen === 'notice' || this.screen === 'final';
+  }
+
+  /** The READ HELP setting: the dynasty's in a season game; exhibitions show the whole read. */
+  private readHelp(): NonNullable<SeasonConfig['readHelp']> {
+    return this.seasonGame && this.season ? this.season.config.readHelp ?? 'FULL' : 'FULL';
   }
 
   /** The SLOW AIM setting: the dynasty's in a season game, the exhibition's otherwise. */
@@ -752,7 +774,7 @@ export class Game {
     this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? 6 : QUARTER_OPTIONS[this.qIdx]);
     this.tempo = 'normal';
     this.autoHurryQ = 0;
-    this.drive = startDrive(25);
+    this.drive = this.freshDrive(25);
     this.wind = newWind(this.rng);
     this.windQuarter = 1;
     this.kickSketch.clear();
@@ -810,7 +832,7 @@ export class Game {
     const summary = (extra: string) => this.notify({ title: `SIMULATED TO ${to}`, sub: this.scoreLine(), extra, color: '#9ad7ff' });
     switch (r.next.kind) {
       case 'user':
-        this.drive = startDrive(r.next.start);
+        this.drive = this.freshDrive(r.next.start);
         summary(`${r.next.mid ? 'Your drive goes on' : 'Your ball'} at the ${fieldLabel(this.drive.los)}  ${clockText(this.clock)}`);
         this.showNotices('call');
         return;
@@ -854,7 +876,7 @@ export class Game {
     // The final's clock: the 4th quarter, or the overtime period it ended in.
     this.clock.quarter = 4 + r.ot;
     this.clock.time = 0;
-    this.drive = startDrive(25);
+    this.drive = this.freshDrive(25);
     this.play = null;
     this.kick = null;
     this.applied = null;
@@ -1867,6 +1889,10 @@ export class Game {
     }
     const pr = ident.press;
     this.press = { CB1: this.rng() < pr.CB1, CB2: this.rng() < pr.CB2, NB: this.rng() < pr.NB };
+    // Some snaps it shows one look and spins to its call at the snap (never in prevent or on a try).
+    const disguises = !(this.seasonGame && this.season?.config.disguises === false);
+    this.disguise =
+      disguises && mode === 'normal' && !this.defTags.prevent && this.rng() < ident.disguise ? pickDisguise(this.rng, this.defCall) : null;
     if (mode === 'pat' || mode === 'try') this.tab = Math.min(this.tab, 2);
     readyForPlay(this.clock);
     // Inside two minutes of a half and not ahead: go no-huddle, once, so the user can still huddle up.
@@ -2027,6 +2053,28 @@ export class Game {
     return leverage(d.down, OPP_GOAL - d.los, late, fg ? fgDistance(d.los, OPP_GOAL) : undefined);
   }
 
+  /** A new drive for the user: the hard counts come back. */
+  private freshDrive(start: number): Drive {
+    this.hardCountsLeft = HARD_COUNT.perDrive;
+    return startDrive(start);
+  }
+
+  /** The defense jumped on the hard count: 5 yards (half the distance inside the 10), a first down if it gets there. */
+  private offsidePenalty(): void {
+    this.play = null;
+    const d = this.drive;
+    const los = d.los + Math.min(5, (OPP_GOAL - d.los) / 2);
+    const first = los >= d.firstDownX;
+    this.drive = { ...d, los, ...(first ? { down: 1, firstDownX: Math.min(OPP_GOAL, los + 10) } : {}) };
+    adminStop(this.clock);
+    const yds = Math.round(los - d.los);
+    this.notify({
+      title: 'OFFSIDE, DEFENSE', sub: `${yds === 5 ? '5-yard' : 'Half the distance'} penalty. ${first ? 'First down' : 'Replay the down'}`,
+      extra: downDistance(this.drive), color: '#ffd23f',
+    });
+    this.showNotices('call');
+  }
+
   private startPlay(def: PlayDef): void {
     // Everyone plays this snap with his confidence at its leverage.
     this.snapLev = this.snapLeverage();
@@ -2043,6 +2091,7 @@ export class Game {
       los: this.drive.los,
       ballY: this.drive.ballY,
       flip: this.flipCall,
+      disguise: this.disguise,
       rng: this.rng,
     });
     this.flipCall = false;
@@ -2130,7 +2179,17 @@ export class Game {
         this.play = null;
         return;
       }
-      if (input.hit('Space') || input.mouse.pressed) {
+      play.clockLeft = this.clock.play;
+      if (input.hit('KeyM')) play.startMotion();
+      if (input.hit('KeyH') && this.hardCountsLeft > 0 && !this.drive.try && play.canSnap()) {
+        this.hardCountsLeft--;
+        this.clock.play = Math.max(0.1, this.clock.play - HARD_COUNT.clock);
+        if (play.hardCount()) {
+          this.offsidePenalty();
+          return;
+        }
+      }
+      if ((input.hit('Space') || input.mouse.pressed) && play.canSnap()) {
         play.snap();
         if (!this.drive.try) {
           runoffAtSnap(this.clock, this.tempo); // tries are untimed
@@ -2234,12 +2293,12 @@ export class Game {
         this.toCall('pat');
         return;
       case 'kickoff':
-        this.drive = startDrive(25);
+        this.drive = this.freshDrive(25);
         this.kickOffNext();
         return;
       case 'pick6':
       case 'returnTd': {
-        this.drive = startDrive(25);
+        this.drive = this.freshDrive(25);
         adminStop(this.clock);
         const sub = c.kind === 'pick6' ? 'Pick six' : c.sub;
         this.notify({ title: `${this.cpu.abbr} SCORES`, sub: `${sub}. Kickoff to you.`, extra: '' });
@@ -2361,7 +2420,7 @@ export class Game {
       this.showNotices('pat');
       return;
     }
-    this.drive = startDrive(OVERTIME.start);
+    this.drive = this.freshDrive(OVERTIME.start);
     adminStop(this.clock);
     this.notify({ title: 'YOUR BALL', sub: this.scoreLine(), extra: `At the ${fieldLabel(this.drive.los)}`, color: '#9ad7ff' });
     this.showNotices('call');
@@ -2565,7 +2624,7 @@ export class Game {
       }
       return;
     }
-    this.drive = startDrive(userStartAfter(sim, this.rng));
+    this.drive = this.freshDrive(userStartAfter(sim, this.rng));
     adminStop(c);
     notice.extra = `Your ball at the ${fieldLabel(this.drive.los)}  ${clockText(c)}`;
     this.showNotices('call');
@@ -2753,15 +2812,18 @@ export class Game {
       const o = play.outcome;
       const extra = this.applied.headline && this.applied.headline !== o.text.replace('!', '') ? this.applied.headline : '';
       drawBanner(g, o.text, o.sub, o.color, extra);
+      if (!this.drive.try) this.drawReveal(g, play, extra ? 192 : 180);
       drawHint(g, 'CLICK OR SPACE TO CONTINUE');
       return;
     }
     switch (play.phase) {
-      case 'presnap':
-        drawHint(g, 'SPACE/CLICK: SNAP   ESC: AUDIBLE   READ THE SAFETIES');
-        this.drawShellRead(g);
+      case 'presnap': {
+        const hc = this.drive.try ? '' : `H: HARD COUNT (${this.hardCountsLeft})   `;
+        drawHint(g, play.motion ? 'IN MOTION: WATCH WHO GOES WITH HIM   ESC: AUDIBLE' : `SPACE/CLICK: SNAP   M: MOTION   ${hc}ESC: AUDIBLE`);
+        if (this.readHelp() !== 'OFF') this.drawShellRead(g);
         if (this.dcNote) this.drawDcNote(g, 34);
         break;
+      }
       case 'snap':
       case 'live': {
         const ho = play.handoffOption();
@@ -2800,6 +2862,16 @@ export class Game {
     text(g, s, VIEW_W / 2, y, { align: 'center', color: '#ffd23f' });
   }
 
+  /** After the snap: the coverage they were really in, and the look it was shown as. */
+  private drawReveal(g: CanvasRenderingContext2D, play: Play, y: number): void {
+    const tags = play.def.some((d) => d.assign?.kind === 'spy') ? ' + SPY' : '';
+    const s = `THEY WERE IN ${play.defCall.name.toUpperCase()}${tags}${play.disguise && play.isDisguised() ? `, SHOWN AS ${disguiseName(play.disguise)}` : ''}`;
+    const w = textWidth(g, s) + 16;
+    g.fillStyle = 'rgba(8,10,14,0.8)';
+    g.fillRect(Math.round(VIEW_W / 2 - w / 2), y - 3, Math.round(w), 14);
+    text(g, s, VIEW_W / 2, y, { align: 'center', color: '#9ad7ff' });
+  }
+
   /** A light pre-snap hint so the user learns to read the shell themselves. */
   private shellRead(): string {
     const play = this.play!;
@@ -2807,6 +2879,7 @@ export class Game {
     const walked = play.def.filter((d) => d.role === 'LB' && d.pos.x < play.los + 3).length;
     const press = play.def.filter((d) => d.press).length;
     const shell = deep >= 2 ? 'TWO HIGH' : deep === 1 ? 'SINGLE HIGH' : 'NO DEEP SAFETY';
+    if (this.readHelp() === 'SHELL') return shell;
     // The front and the box count are there to see; so is a defender sitting in the middle on the QB.
     const front = play.defCall.front === 'goal' ? '  GOAL LINE' : play.defCall.front === 'bear' ? '  BEAR FRONT' : '';
     const box = play.def.filter((d) => d.pos.x < play.los + 6 && Math.abs(d.pos.y - play.ballY) < 7).length;

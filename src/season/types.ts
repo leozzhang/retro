@@ -47,6 +47,10 @@ export interface SeasonConfig {
   runAssist?: 'FULL' | 'LIGHT' | 'OFF';
   /** Slow motion while the QB aims a pass or the punter aims a punt in live games. Missing means off. */
   aimSlow?: boolean;
+  /** The presnap read line in live games: the shell and the rest of the look, the shell only, or nothing. Missing means FULL. */
+  readHelp?: 'FULL' | 'SHELL' | 'OFF';
+  /** The CPU defense disguises its coverage before the snap in live games (data/defenses.ts `Disguise`). Missing means on. */
+  disguises?: boolean;
   /**
    * Program history on the team pages (season/program.ts): the real history through 2025
    * (data/fbs/history.ts), or every team starting from nothing. Set when the dynasty starts. Missing means real.

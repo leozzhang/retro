@@ -64,8 +64,8 @@ export function referenceMatchup(off = REF_OFF, def = REF_DEF): Matchup {
   return { off: teamById('georgia'), def: teamById('alabama'), offR: referenceRoster(off), defR: referenceRoster(def) };
 }
 
-/** The DC's tags and the defenders' leans for a snap (game/defBrain.ts); none plays the call as written. */
-export type DefExtras = Pick<PlaySetup, 'tags' | 'reads'>;
+/** The DC's tags, the defenders' leans (game/defBrain.ts) and a disguise for a snap; none plays the call as written. */
+export type DefExtras = Pick<PlaySetup, 'tags' | 'reads' | 'disguise'>;
 
 export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras): Play {
   return new Play({

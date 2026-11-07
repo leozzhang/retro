@@ -29,13 +29,13 @@ Controls are listed in [README.md](README.md).
   - `ratings.ts` (every rating and what it does), `positions.ts` (positions, overall formulas), `athletes.ts` (player schema, rating templates, archetypes, builds)
   - `fbs/` (the 138 researched team profiles, home states and hometowns), `rosterGen.ts` (85-man rosters from a profile, walk-ons), `depth.ts` (depth chart, starters, injuries, computed team ratings, `generatedAthlete` by id), `teams.ts` (`TEAMS`, uniforms, slots)
   - `season/`: world data for seasons: conference rules, rivalries, the calendar, the playoff format and bowls. See [docs/SEASON.md](docs/SEASON.md)
-  - formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), the defensive playbook: 13 calls with fronts, zones, pressures, run fronts and the SPY/CONTAIN tags (`defenses.ts`), each defense's identity as dials over it (`identity.ts`; see [docs/DEFENSE.md](docs/DEFENSE.md) and [docs/SCOUTING.md](docs/SCOUTING.md)), kick types and special-teams units (`specialTeams.ts`)
+  - formations, route trees and playbook (`plays.ts`), route concepts by receiver number (`concepts.ts`), the defensive playbook: 13 calls with fronts, zones, pressures, run fronts, the SPY/CONTAIN tags and the presnap disguises (`defenses.ts`), each defense's identity as dials over it (`identity.ts`; see [docs/DEFENSE.md](docs/DEFENSE.md) and [docs/SCOUTING.md](docs/SCOUTING.md)), kick types and special-teams units (`specialTeams.ts`)
 - `sim/`: player physics (`player.ts`, with the defenders' leans `LEAN_FX`), ball flight, AI (`ai.ts`: routes, man and zone coverage with the unit pattern match, spy, contain, pass pro, pursuit), run blocking by scheme (`runBlocking.ts`: zone/stretch/gap/trap/draw, combos, pulls, leverage, the auto-runner's lane read), catch, tackle and pass-aim math, kick physics with wind (`kicking.ts`), and side-agnostic blocking for special teams (`blocking.ts`)
 - `game/`:
   - `resolvePlay.ts`: lays a play out for the snap (mirroring, personnel, concepts to slot routes). See [docs/PLAYBOOK.md](docs/PLAYBOOK.md)
   - `matchups.ts`: the defense's package and man matchups for the offense on the field
   - `defBrain.ts`: the CPU defense learning your offense in a live game: the DC's posture, tags and lines, and each defender's lean and nerve, by the DC's ADJUST and the DEFENSE IQ setting. See [docs/DEFENSE.md](docs/DEFENSE.md)
-  - `playState.ts`: the `Play` class, the state machine for one snap, including handoffs
+  - `playState.ts`: the `Play` class, the state machine for one snap, including handoffs, and the presnap: a disguise's show spots and tells, motion and the hard count (DEFENSE.md)
   - `kickPlay.ts`: the `KickPlay` class (FG/XP, punts, kickoffs) and the special-teams AI
   - `rules.ts`: down and distance, scoring, kick spots, CPU drive sim
   - `clock.ts`: game and play clock rules
@@ -77,6 +77,7 @@ Controls are listed in [README.md](README.md).
   - defense vs. the run: `LB_FIT_DEPTH`, `MAN_DEPTH`, `TRASH_SPEED`, `PURSUIT_LEAD` (`sim/ai.ts`)
   - zones and tags: `ZONE`, `ZONE_HELP`, `ZONE_LEASH`, `ZONE_WIDEN`, `ZONE_OUTSIDE`, `ZONE_STICK`, `ZONE_UNDER`, `DEEP_OVER_NARROW`, `SPY_DEPTH`, `CONTAIN_WIDTH`, `SMELL_RANGE` (`sim/ai.ts`); `FIT_EARLY`, `SPY_REACT` (`game/playState.ts`)
   - the learning defense: `DEF_BRAIN`, `ANTICIPATE` (`game/defBrain.ts`), `LEAN_FX` (`sim/player.ts`), ADJUST's `ADJUST_SPREAD` (`data/coaches.ts`)
+  - reading the coverage: `DISGUISE`, `MOTION`, `HARD_COUNT` (`game/playState.ts`); `IDENTITY.disguise` (`data/identity.ts`)
   - zone read and option: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH`, `KEEP_INSIDE`, `OPTION_CUT`; screens `SCREEN_SET` (`game/playState.ts`)
   - `pitchOdds`, `PITCH_REACH`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)

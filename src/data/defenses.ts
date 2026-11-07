@@ -30,11 +30,28 @@ export type Assign =
  */
 export type Front = 'even' | 'bear' | 'goal' | 'wide';
 
+/** How many safeties are deep before the snap. */
+export type Shell = 'two-high' | 'one-high' | 'zero';
+
+/**
+ * A disguise: the look a call shows before the snap, spun out of at the snap. The safeties line up in
+ * the `show` shell, and the post-snap AI takes each defender from there to his real job, so a disguise
+ * costs the defense a step: the spot a rotating safety left is open for a beat. `corners: 'press'`
+ * walks zone corners up into a press-man look (press bail); `'off'` plays man corners off with the
+ * zone corners' outside leverage. Execution and the tells are in `Play` (`DISGUISE`, game/playState.ts).
+ */
+export interface Disguise {
+  show: Shell;
+  corners?: 'press' | 'off';
+  /** Its share of the call's disguised snaps. */
+  weight: number;
+}
+
 export interface DefCall {
   id: string;
   name: string;
-  /** How many safeties are deep pre-snap: the main tell for reading coverage. */
-  shell: 'two-high' | 'one-high' | 'zero';
+  /** How many safeties are deep pre-snap, played straight: the main tell for reading coverage. */
+  shell: Shell;
   /** Default draw weight, used only when no mix is given (the first three calls, as before). */
   weight: number;
   front: Front;
@@ -50,6 +67,10 @@ export interface DefCall {
   spyFrom?: DefSlot;
   /** Man targets are written against 11 personnel; `matchDefense` re-keys them to whoever lines up there. */
   assign: Record<DefSlot, Assign>;
+  /** The looks it can disguise itself as (none: always played straight). How often is the DC's (`DefIdentity.disguise`). */
+  disguises?: Disguise[];
+  /** Man calls against presnap motion: the man defender travels with him (`trail`, the default) or the defense bumps over (`bump`). */
+  motion?: 'trail' | 'bump';
 }
 
 const RUSH4 = {
@@ -73,10 +94,13 @@ export const DEF_CALLS: DefCall[] = [
   {
     id: '2-man', name: '2 Man Under', shell: 'two-high', weight: 0.4, front: 'even', coverage: 'man', box: 6, spyFrom: 'MLB',
     assign: { ...RUSH4, WLB: man('RB'), MLB: man('TE'), ...MAN5, FS: half(0), SS: half(1) },
+    disguises: [{ show: 'one-high', weight: 1 }, { show: 'two-high', corners: 'off', weight: 1 }],
   },
   {
     id: 'c1-robber', name: 'Cover 1 Robber', shell: 'one-high', weight: 0.4, front: 'even', coverage: 'man', box: 7, spyFrom: 'SS',
     assign: { ...RUSH4, WLB: man('RB'), MLB: man('TE'), ...MAN5, FS: { kind: 'deep', yMin: 0, yMax: W }, SS: { kind: 'robber' } },
+    disguises: [{ show: 'one-high', corners: 'off', weight: 1 }],
+    motion: 'bump',
   },
   {
     id: 'c0-blitz', name: 'Cover 0 Blitz', shell: 'zero', weight: 0.2, front: 'even', coverage: 'man', box: 8,
@@ -85,6 +109,7 @@ export const DEF_CALLS: DefCall[] = [
   {
     id: 'c2', name: 'Cover 2', shell: 'two-high', weight: 0, front: 'even', coverage: 'zone', box: 6, spyFrom: 'NB',
     assign: { ...RUSH4, WLB: zone('curl', -1), MLB: zone('curl', 1), CB1: zone('flat', -1), CB2: zone('flat', 1), NB: zone('mid', 'strong'), FS: half(0), SS: half(1) },
+    disguises: [{ show: 'one-high', weight: 2 }, { show: 'two-high', corners: 'press', weight: 1 }],
   },
   {
     id: 'tampa2', name: 'Tampa 2', shell: 'two-high', weight: 0, front: 'even', coverage: 'zone', box: 6, spyFrom: 'WLB',
@@ -92,10 +117,12 @@ export const DEF_CALLS: DefCall[] = [
       ...RUSH4, WLB: zone('curl', -1), NB: zone('curl', 1), MLB: { kind: 'deep', yMin: W / 2 - 7, yMax: W / 2 + 7 },
       CB1: zone('flat', -1), CB2: zone('flat', 1), FS: half(0), SS: half(1),
     },
+    disguises: [{ show: 'one-high', weight: 1 }],
   },
   {
     id: 'c3', name: 'Cover 3', shell: 'one-high', weight: 0, front: 'even', coverage: 'zone', box: 7, spyFrom: 'MLB',
     assign: { ...RUSH4, WLB: zone('hook', -1), MLB: zone('hook', 1), NB: zone('curl', 'strong'), SS: zone('curl', 'weak'), CB1: third(0), FS: third(1), CB2: third(2) },
+    disguises: [{ show: 'two-high', weight: 2 }, { show: 'one-high', corners: 'press', weight: 1 }],
   },
   {
     id: 'c3-sky', name: 'Cover 3 Sky', shell: 'one-high', weight: 0, front: 'even', coverage: 'zone', box: 8, spyFrom: 'MLB',
@@ -104,10 +131,12 @@ export const DEF_CALLS: DefCall[] = [
   {
     id: 'c4', name: 'Cover 4', shell: 'two-high', weight: 0, front: 'even', coverage: 'zone', box: 7, spyFrom: 'NB',
     assign: { ...RUSH4, WLB: zone('curl', 'weak'), MLB: zone('mid', 'strong'), NB: zone('curl', 'strong'), CB1: quarter(0), FS: quarter(1), SS: quarter(2), CB2: quarter(3) },
+    disguises: [{ show: 'one-high', weight: 1 }],
   },
   {
     id: 'c1-fire', name: 'Cover 1 Fire', shell: 'one-high', weight: 0, front: 'even', coverage: 'man', box: 7,
     assign: { ...RUSH4, WLB: man('RB'), MLB: { kind: 'rush' }, ...MAN5, FS: { kind: 'deep', yMin: 0, yMax: W }, SS: man('TE') },
+    disguises: [{ show: 'two-high', weight: 1 }],
   },
   {
     id: 'fire-zone', name: 'Fire Zone', shell: 'one-high', weight: 0, front: 'even', coverage: 'zone', box: 7,
@@ -115,10 +144,12 @@ export const DEF_CALLS: DefCall[] = [
       DE1: zone('flat', -1), DT1: { kind: 'rush' }, DT2: { kind: 'rush' }, DE2: { kind: 'rush' }, WLB: { kind: 'rush' }, MLB: { kind: 'rush' },
       NB: zone('hook', 'strong'), SS: zone('curl', 1), CB1: third(0), FS: third(1), CB2: third(2),
     },
+    disguises: [{ show: 'two-high', weight: 1 }, { show: 'zero', corners: 'press', weight: 1 }],
   },
   {
     id: 'cat', name: 'Nickel Cat', shell: 'one-high', weight: 0, front: 'even', coverage: 'man', box: 7,
     assign: { ...RUSH4, WLB: man('RB'), MLB: man('TE'), CB1: man('X'), CB2: man('Z'), NB: { kind: 'rush' }, SS: man('SL'), FS: { kind: 'deep', yMin: 0, yMax: W } },
+    motion: 'bump',
   },
   {
     id: 'bear', name: 'Bear Cover 1', shell: 'one-high', weight: 0, front: 'bear', coverage: 'man', box: 8,
@@ -158,6 +189,22 @@ export function pickDefCall(rng: () => number, mix?: Record<string, number>): De
     if (r <= 0) return c;
   }
   return DEF_CALLS[0];
+}
+
+/** One of the call's disguises by weight, with one random draw. */
+export function pickDisguise(rng: () => number, call: DefCall): Disguise | null {
+  const ds = call.disguises;
+  if (!ds?.length) return null;
+  let r = rng() * ds.reduce((n, d) => n + d.weight, 0);
+  for (const d of ds) if ((r -= d.weight) <= 0) return d;
+  return ds[ds.length - 1];
+}
+
+export const SHELL_NAME: Record<Shell, string> = { 'two-high': 'TWO HIGH', 'one-high': 'SINGLE HIGH', zero: 'NO DEEP SAFETY' };
+
+/** What a disguise shows, in words: "TWO HIGH", "SINGLE HIGH, PRESSED". */
+export function disguiseName(d: Disguise): string {
+  return `${SHELL_NAME[d.show]}${d.corners === 'press' ? ', PRESS' : d.corners === 'off' ? ', OFF CORNERS' : ''}`;
 }
 
 /** Tags the DC can put on any call that has the defender for it. */

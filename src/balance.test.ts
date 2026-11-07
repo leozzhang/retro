@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
 import { adaptiveRows } from './adaptive';
-import { CORE_CALLS, DEF_CALLS, type DefCall } from './data/defenses';
+import { CORE_CALLS, DEF_CALLS, disguiseName, type DefCall } from './data/defenses';
 import { PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
 import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
@@ -25,15 +25,15 @@ const REPS = 120;
 const RUN_REPS = 180;
 
 const newPlay = (playDef: PlayDef, call: DefCall, rng: Rng, los = LOS): Play => H.newPlay(M, playDef, call, rng, los);
-const runRep = (playDef: PlayDef, call: DefCall, rng: Rng, los = LOS) => H.runRep(M, playDef, call, rng, los);
+const runRep = (playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: H.DefExtras) => H.runRep(M, playDef, call, rng, los, x);
 const runKick = (kd: KickDef, los: number, params: (kp: KickPlay) => KickParams, wind: Wind, rng: Rng) =>
   H.runKick(M, kd, los, params, wind, rng);
 
 /** Auto-QB throws to the receiver with the most separation after a fixed hold time. */
-function passLine(plays: PlayDef[], call: DefCall, holdTime: number, reps: number, rng: Rng): string {
+function passLine(plays: PlayDef[], call: DefCall, holdTime: number, reps: number, rng: Rng, x?: H.DefExtras): string {
   const stats = { n: 0, comp: 0, int: 0, sack: 0, yards: 0, sackT: 0, pbu: 0, yac: 0, td: 0 };
   for (let i = 0; i < reps; i++) {
-    const { play, catchX } = H.passRep(M, plays[i % plays.length], call, holdTime, rng);
+    const { play, catchX } = H.passRep(M, plays[i % plays.length], call, holdTime, rng, x);
     const o = play.outcome;
     if (!o) continue;
     stats.n++;
@@ -303,6 +303,31 @@ function defenseRows(pass: PlayDef[], pa: PlayDef[], runs: PlayDef[], rng: Rng):
   return rows;
 }
 
+/**
+ * What a disguise costs the defense: each call played straight, then in each of its disguises
+ * (data/defenses.ts), from the same seed. The pass book at a quick and a normal hold, and every run.
+ */
+function disguiseRows(pass: PlayDef[], runs: PlayDef[]): string[] {
+  const rows: string[] = [];
+  for (const call of DEF_CALLS) {
+    if (!call.disguises?.length) continue;
+    for (const dz of [null, ...call.disguises]) {
+      const tag = `DISG ${call.name.padEnd(15)} ${(dz ? `as ${disguiseName(dz)}` : 'straight').padEnd(24)}`;
+      const x = { disguise: dz };
+      rows.push(`${tag} pass 1.2s | ${passLine(pass, call, 1.2, REPS, mulberry32(29), x)}`);
+      rows.push(`${tag} pass 2.2s | ${passLine(pass, call, 2.2, REPS, mulberry32(31), x)}`);
+      const rng = mulberry32(37);
+      const all: number[] = [];
+      for (let i = 0; i < RUN_REPS * 2; i++) {
+        const r = runRep(runs[i % runs.length], call, rng, LOS, x);
+        if (r.o && r.ran) all.push(r.yds);
+      }
+      rows.push(`${tag} runs      | ${runLine(all)}`);
+    }
+  }
+  return rows;
+}
+
 // ---------------------------------------------------------------- special teams
 
 const KREPS = 200;
@@ -446,5 +471,6 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   if (!only || only.includes('route')) rows.push('', ...routeRows(mulberry32(17)));
   if (!only || only.includes('defense')) rows.push('', ...defenseRows(pass, pa, runs, mulberry32(19)));
   if (!only || only.includes('adaptive')) rows.push('', ...adaptiveRows());
+  if (!only || only.includes('disguise')) rows.push('', ...disguiseRows(pass, runs));
   writeFileSync(process.env.BAL_OUT ?? 'balance.txt', rows.join('\n'));
 }, 1_200_000);

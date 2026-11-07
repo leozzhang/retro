@@ -203,6 +203,9 @@ function averages(s: SeasonState, team: string): ScoutReport['averages'] {
   return { games: n, ppg: pf / n, papg: pa / n, ypg: yds / n, passYpg: pass / n, rushYpg: rush / n };
 }
 
+/** A disguise rate the OC calls out as a lot (the league is about 0.3). */
+const DISGUISE_LOTS = 0.38;
+
 /** The OC on their defense: what they call, when they bring it, and who to account for. */
 function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach): ScoutSection {
   const N = (norms ??= leagueNorms());
@@ -223,6 +226,10 @@ function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach): 
     },
     adjustItem(theirDc),
     { tier: 2, text: `CORNERS PRESS: ${pctAt(press, scout)} (FBS ~${pct(N.press)}).${press >= 0.42 ? ' EXPECT JAMS: QUICK BREAKS AND RUBS.' : press <= 0.25 ? ' SOFT CUSHIONS: THE QUICK GAME IS THERE.' : ''}` },
+    {
+      tier: 2, warn: id.disguise >= DISGUISE_LOTS,
+      text: `DISGUISES ITS COVERAGE: ${pctAt(id.disguise, scout)} OF SNAPS.${id.disguise >= DISGUISE_LOTS ? ' THE SHELL LIES: MOTION AND READ THE SAFETIES AT THE SNAP.' : id.disguise <= 0.22 ? ' WHAT YOU SEE IS MOSTLY WHAT YOU GET.' : ''}`,
+    },
   ];
   const on = starters(opp);
   const defSlots = DEF_SLOTS.filter((sl) => on[sl]);
