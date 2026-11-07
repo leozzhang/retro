@@ -482,6 +482,11 @@ export interface TeamYear {
   bw?: 1;
   /** The head coach's name ('YOU' for the user's program). */
   hc?: string;
+  /** Rivalry games (regular season), by opponent: 1 won, 0 lost. */
+  rv?: Record<string, 1 | 0>;
+  /** W-L against teams in the AP top 25 at kickoff, and in one-score games (8 or fewer), postseason included. */
+  big?: [number, number];
+  close?: [number, number];
 }
 
 /** A news item kept past its season for a team's page (season/program.ts `archiveChronicle`). */

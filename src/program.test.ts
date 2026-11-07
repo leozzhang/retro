@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { athleteName, starters } from './data/depth';
 import { TEAM_HISTORY } from './data/fbs/history';
+import { RIVALRIES } from './data/season/rivalries';
+import { TEAMS, teamById } from './data/teams';
 import { findSpans, wrapSpans } from './render/links';
-import { fanPulse, pulseLabel } from './season/fanPulse';
+import { fanPulse, PULSE, pulseLabel } from './season/fanPulse';
 import { simOffseason } from './season/offseason';
-import { coachTenure, newsWeight, pastSeasons, trophies } from './season/program';
+import { bowlGame, coachStart, coachTenure, newsWeight, pastSeasons, rivalrySeries, trophies } from './season/program';
 import { records } from './season/standings';
 import { advanceWeek, defaultConfig, newSeason, simSeason } from './season/season';
 import type { SeasonState } from './season/types';
@@ -77,6 +79,46 @@ describe('program history', () => {
     expect(newsWeight({ kind: 'result', text: 'x', teams: ['a'] }, 'b')).toBe(0);
   }, LONG);
 
+  it('keeps each season\'s rivalry results, big games and close games', () => {
+    const s = done();
+    const y = s.history[s.history.length - 1].teams!;
+    for (const g of s.games.filter((x) => x.result && x.kind !== 'bowl' && x.kind !== 'cfp' && x.kind !== 'champ')) {
+      const a = y[g.home].rv?.[g.away];
+      if (a === undefined) continue;
+      expect(y[g.away].rv?.[g.home]).toBe(a ? 0 : 1);
+      expect(a).toBe(g.result!.home > g.result!.away ? 1 : 0);
+    }
+    expect(Object.values(y).some((row) => row.rv)).toBe(true);
+    for (const row of Object.values(y)) {
+      const n = row.w + row.l;
+      expect((row.big?.[0] ?? 0) + (row.big?.[1] ?? 0)).toBeLessThanOrEqual(n);
+      expect((row.close?.[0] ?? 0) + (row.close?.[1] ?? 0)).toBeLessThanOrEqual(n);
+      expect(row.big?.[0] ?? 0).toBeLessThanOrEqual(row.w);
+    }
+    expect(bowlGame('W SEC TITLE, L CFP QF')).toBe('L');
+    expect(bowlGame('W B1G TITLE')).toBeUndefined();
+    expect(bowlGame('W NATIONAL TITLE')).toBe('W');
+    expect(bowlGame('L FCS SEMIFINAL')).toBeUndefined();
+  }, LONG);
+
+  it('counts a rivalry streak across seasons and the fans talk about it', () => {
+    const s = season();
+    simSeason(s);
+    const next = simOffseason(s);
+    const row = (w: number) => ({ conf: 'SEC', w, l: 12 - w, cw: 4, cl: 4 });
+    // Alabama lost the last two to Auburn.
+    next.history[0].teams!.alabama.rv = { auburn: 0 };
+    next.history[0].teams!.auburn.rv = { alabama: 1 };
+    next.history.unshift({ year: next.year - 2, champion: 'x', teams: { alabama: { ...row(9), rv: { auburn: 0 } }, auburn: { ...row(8), rv: { alabama: 1 } } } });
+    expect(rivalrySeries(next, 'alabama', 'auburn')).toMatchObject({ w: 0, l: 2, streak: -2 });
+    expect(rivalrySeries(next, 'auburn', 'alabama').streak).toBe(2);
+    expect(rivalrySeries(next, 'alabama', 'auburn', next.year - 1).l).toBe(1);
+    const a = fanPulse(next, 'alabama').all.find((p) => p.key === 'rivalStreak:auburn');
+    expect(a?.tone).toBe('worry');
+    expect(a?.teams).toEqual(['auburn']);
+    expect(fanPulse(next, 'auburn').all.find((p) => p.key === 'rivalStreak:alabama')?.tone).toBe('hope');
+  }, LONG);
+
   it('counts a head coach\'s years', () => {
     const s = season();
     expect(coachTenure(s, USER)).toMatchObject({ name: 'YOU', year: 1, user: true });
@@ -94,7 +136,7 @@ describe('fan pulse', () => {
     const a = fanPulse(s, 'texas');
     expect(fanPulse(s, 'texas')).toEqual(a);
     expect(a.points.length).toBeGreaterThan(0);
-    expect(a.points.length).toBeLessThanOrEqual(4);
+    expect(a.points.length).toBeLessThanOrEqual(PULSE.points);
     expect(a.label).toBe(pulseLabel(a.mood));
   }, LONG);
 
@@ -103,17 +145,57 @@ describe('fan pulse', () => {
     for (let i = 0; i < 6; i++) advanceWeek(s);
     s.teamState[USER].xw = -2.2;
     const bad = fanPulse(s, USER);
-    expect(bad.points.find((p) => p.key === 'coach')?.tone).toBe('worry');
-    expect(bad.points.find((p) => p.key === 'results')?.tone).toBe('worry');
+    expect(bad.all.find((p) => p.key === 'coach')?.tone).toBe('worry');
+    expect(bad.all.find((p) => p.key === 'results')?.tone).toBe('worry');
     expect(bad.mood).toBeLessThan(0);
     s.teamState[USER].xw = 2.2;
     const qb = starters(squadFor(s, USER)).QB;
     s.confLog = [...(s.confLog ?? []), { week: 6, team: USER, id: qb.id, pos: 'QB', kind: 'breakout' }];
     const good = fanPulse(s, USER);
-    expect(good.points.find((p) => p.key === 'coach')?.tone).toBe('hope');
+    expect(good.all.find((p) => p.key === 'coach')?.tone).toBe('hope');
     expect(good.mood).toBeGreaterThan(bad.mood);
-    const qbPoint = good.points.find((p) => p.key === 'qb') ?? fanPulse(s, USER).points.find((p) => p.key === 'qb');
+    const qbPoint = good.all.find((p) => p.key === 'qb');
     if (qbPoint) expect(qbPoint.tone).toBe('hope');
+  }, LONG);
+  it('shows one point per group while other groups have something to say', () => {
+    const s = done();
+    for (const t of TEAMS) {
+      const p = fanPulse(s, t.id);
+      const shown = new Set(p.points.map((x) => x.group));
+      const twice = p.points.some((x, i) => p.points.findIndex((y) => y.group === x.group) !== i);
+      // (The calm "about as expected" line is filler, left out on purpose.)
+      if (twice) for (const x of p.all) if (!(x.key === 'results' && x.tone === 'calm')) expect(shown.has(x.group)).toBe(true);
+      for (const g of shown) expect(p.points.filter((x) => x.group === g).length).toBeLessThanOrEqual(2);
+    }
+  }, LONG);
+
+  it('tells each program its own story', () => {
+    const s = done();
+    const sets = new Set<string>();
+    const freq = new Map<string, number>();
+    for (const t of TEAMS) {
+      const keys = fanPulse(s, t.id).points.map((x) => x.key.split(':')[0]);
+      sets.add(keys.slice().sort().join(','));
+      for (const k of new Set(keys)) freq.set(k, (freq.get(k) ?? 0) + 1);
+    }
+    expect(sets.size / TEAMS.length).toBeGreaterThan(0.7);
+    // The record and the QB are everyone's talk; no story should be.
+    for (const [k, n] of freq) if (k !== 'results' && k !== 'qb') expect(n / TEAMS.length, k).toBeLessThanOrEqual(0.5);
+  }, LONG);
+
+  it('compares a program only with a peer who hired the same winter', () => {
+    const s = done();
+    let n = 0;
+    for (const t of TEAMS) {
+      const p = fanPulse(s, t.id).all.find((x) => x.key === 'peer');
+      if (!p) continue;
+      n++;
+      const peer = p.teams![0];
+      expect(coachStart(s, peer)).toBe(coachStart(s, t.id));
+      const rival = RIVALRIES.some((r) => (r.a === t.id && r.b === peer) || (r.b === t.id && r.a === peer));
+      expect(rival || teamById(peer).conference === t.conference).toBe(true);
+    }
+    expect(n).toBeGreaterThan(0);
   }, LONG);
 });
 

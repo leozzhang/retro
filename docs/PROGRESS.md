@@ -1,6 +1,27 @@
 # Progress
 
-_Last updated: 2026-11-05_
+_Last updated: 2026-11-06_
+
+## Done: fan pulse stories (2026-11-06)
+"What the fans are saying" now reads differently from program to program. Design and thresholds are in [PROGRAM.md](PROGRAM.md#the-fan-pulse).
+- **Stories** (`season/fanStories.ts`, `STORIES`), about 40 new signals:
+  - **Rivals:** streaks, the coach's record against the rival, rivalry week, and the rival's season (envy or schadenfreude).
+  - **The coach's story:** steady but never more, can't win (or wins) the big ones, bowl runs.
+  - **Peers:** a conference mate or rival that hired the same winter and is clearly doing better ("what could have been") or worse.
+  - **Coaches who left:** the old coach elsewhere (bitter, awkward or vindicated) and coordinators hired away.
+  - **The draft:** the first overall pick, the nation's or conference's most picks, a named first-rounder at a smaller school, first-round streaks, early entrants who went late, a thin T1 draft.
+  - **This season's texture:** close losses, winning and losing runs, scoring extremes, unbeaten at home, the bad loss and the signature win.
+  - **Real history:** title droughts, a first playoff trip or still waiting, years in a new conference, bowl streaks and droughts, the best season in years, Heisman lore, all-time win milestones.
+  - **Recruiting:** five-star commits, the state's top recruit staying home or going to a rival, big portal arrivals.
+- **Kept for it.** `TeamYear` gains `rv` (rivalry results), `big` (W-L against the AP top 25) and `close` (one-score games). Helpers in `program.ts`: `yearExtras`, `rivalrySeries`, `splitRecord`, `coachStart` and `bowlGame`.
+- **Selection.** Up to 5 points, one per group (results, race, coach, players, rivals, peers, history, offseason, texture) while others have something to say, with a ±15% hash jitter. Most signals have more wordings. `Pulse.all` holds every signal, and the mood still uses all of them. Named rivals and peers are links.
+- **Fixed:** a conference title drought named today's conference for a title won in another league (South Carolina's 1969 ACC title read as an SEC title). Now it names the conference only when the record shows it.
+- **Checks:**
+  - `npm test`: 312 pass. `program.test.ts` adds 5 tests: the new season fields, a rivalry streak across seasons, the group cap, variety (70%+ distinct sets, no story on more than half the teams), and peers hired the same winter.
+  - `npm run season` (2 seasons): identical to the last commit apart from timing lines.
+  - A 3-season dump of all 138 pulses was read by hand. 95–128 distinct sets per snapshot, and every page fits its points.
+  - Not yet looked at in the app itself.
+- **Choices:** rivalry history counts dynasty games only (no researched real series), and there are no fictional pro careers: the draft is all the game knows.
 
 ## Done: program pages for every team, clickable names, the PLAYER REGISTRY (2026-11-05)
 Design and numbers are in [PROGRAM.md](PROGRAM.md).

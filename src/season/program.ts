@@ -1,4 +1,5 @@
 import { CALENDAR } from '../data/season/calendar';
+import { RIVALRIES } from '../data/season/rivalries';
 import { TEAM_HISTORY } from '../data/fbs/history';
 import type { PastSeason, ProgramHistory } from '../data/fbs/programHistory';
 import { TEAMS, teamById } from '../data/teams';
@@ -42,7 +43,7 @@ export function seasonRows(state: SeasonState): Record<string, TeamYear> {
   const out: Record<string, TeamYear> = {};
   for (const t of TEAMS) {
     const r = rec.get(t.id)!;
-    const row: TeamYear = { conf: t.conference, w: r.w, l: r.l, cw: r.cw, cl: r.cl, hc: coachLabel(state, t.id) };
+    const row: TeamYear = { conf: t.conference, w: r.w, l: r.l, cw: r.cw, cl: r.cl, hc: coachLabel(state, t.id), ...yearExtras(state, t.id) };
     const rank = rankIn(ap, t.id);
     if (rank) row.ap = rank;
     out[t.id] = row;
@@ -66,6 +67,30 @@ export function seasonRows(state: SeasonState): Record<string, TeamYear> {
       }
     }
   }
+  return out;
+}
+
+/** A season's rivalry results, and its records against ranked teams and in one-score games. */
+export function yearExtras(state: SeasonState, id: string): Pick<TeamYear, 'rv' | 'big' | 'close'> {
+  const rivals = new Set(RIVALRIES.flatMap((r) => (r.a === id ? [r.b] : r.b === id ? [r.a] : [])));
+  const rv: Record<string, 1 | 0> = {};
+  const big: [number, number] = [0, 0];
+  const close: [number, number] = [0, 0];
+  for (const g of state.games) {
+    if (!g.result || (g.home !== id && g.away !== id)) continue;
+    const opp = g.home === id ? g.away : g.home;
+    const us = g.home === id ? g.result.home : g.result.away;
+    const them = g.home === id ? g.result.away : g.result.home;
+    // The column: 0 a win, 1 a loss.
+    const col = us > them ? 0 : 1;
+    if (rivals.has(opp) && g.kind !== 'cfp' && g.kind !== 'bowl' && g.kind !== 'champ' && !(opp in rv)) rv[opp] = col ? 0 : 1;
+    if (rankIn(latestPoll(state, 'ap', g.week), opp)) big[col]++;
+    if (Math.abs(us - them) <= 8) close[col]++;
+  }
+  const out: Pick<TeamYear, 'rv' | 'big' | 'close'> = {};
+  if (Object.keys(rv).length) out.rv = rv;
+  if (big[0] + big[1]) out.big = big;
+  if (close[0] + close[1]) out.close = close;
   return out;
 }
 
@@ -204,6 +229,69 @@ export function coachTenure(state: SeasonState, id: string): Tenure {
     before = b ? Math.max(0, CALENDAR.year - b.coachSince) : coachTraits(c.id).tenure;
   }
   return { name: `${c.first[0]}. ${c.last}`.toUpperCase(), year: before + here + live, user: false, w: w + (live ? rec.w : 0), l: l + (live ? rec.l : 0) };
+}
+
+/** The season the head coach's run began (next season for a coach hired this offseason). */
+export const coachStart = (state: SeasonState, id: string, ten = coachTenure(state, id)): number => state.year - ten.year + 1;
+
+/** A dynasty season's extras: the finished season's row, or this season's while it's played. */
+function extrasOf(state: SeasonState, id: string, year: number): Pick<TeamYear, 'rv' | 'big' | 'close'> | undefined {
+  const h = state.history.find((x) => x.year === year);
+  if (h) return h.teams?.[id];
+  return year === state.year ? yearExtras(state, id) : undefined;
+}
+
+/** Years the dynasty has seen, this one included once a game is played. */
+function dynastyYears(state: SeasonState): number[] {
+  const ys = state.history.map((h) => h.year);
+  if (!ys.includes(state.year) && state.games.some((g) => g.result)) ys.push(state.year);
+  return ys;
+}
+
+export interface Series {
+  w: number;
+  l: number;
+  /** The run at the end: +n won the last n, -n lost them. */
+  streak: number;
+  /** Each game, oldest first: the year and whether they won. */
+  games: { year: number; won: boolean }[];
+}
+
+/** A rivalry in the dynasty's games, from `from` on. */
+export function rivalrySeries(state: SeasonState, id: string, opp: string, from = -Infinity): Series {
+  const games: Series['games'] = [];
+  for (const y of dynastyYears(state)) {
+    if (y < from) continue;
+    const r = extrasOf(state, id, y)?.rv?.[opp];
+    if (r !== undefined) games.push({ year: y, won: r === 1 });
+  }
+  let streak = 0;
+  for (let i = games.length - 1; i >= 0; i--) {
+    const s = games[i].won ? 1 : -1;
+    if (streak && Math.sign(streak) !== s) break;
+    streak += s;
+  }
+  return { w: games.filter((g) => g.won).length, l: games.filter((g) => !g.won).length, streak, games };
+}
+
+/** The record against ranked teams (or in one-score games) in the dynasty's seasons from `from` on. */
+export function splitRecord(state: SeasonState, id: string, key: 'big' | 'close', from = -Infinity): [number, number] {
+  const out: [number, number] = [0, 0];
+  for (const y of dynastyYears(state)) {
+    if (y < from) continue;
+    const r = extrasOf(state, id, y)?.[key];
+    if (r) {
+      out[0] += r[0];
+      out[1] += r[1];
+    }
+  }
+  return out;
+}
+
+/** The postseason game a season ended with, from its `post` text: won or lost, or none (FCS games aside). */
+export function bowlGame(post: string | undefined): 'W' | 'L' | undefined {
+  const part = (post ?? '').split(', ').filter((p) => p && !/FCS/.test(p) && (!/ TITLE$/.test(p) || /NATIONAL TITLE$/.test(p))).pop();
+  return part ? (part[0] as 'W' | 'L') : undefined;
 }
 
 export const ordinal = (n: number): string => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'TH' : ['TH', 'ST', 'ND', 'RD'][n % 10] ?? 'TH'}`;

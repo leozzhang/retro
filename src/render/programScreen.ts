@@ -181,7 +181,7 @@ function drawPulse(g: CanvasRenderingContext2D, s: SeasonState, id: string): voi
   let y = TOP + 100;
   const chars = Math.floor((w - 12) / 8);
   for (const pt of p.points) {
-    const lines = newsRich(s, { text: pt.text, teams: [id] }, chars);
+    const lines = newsRich(s, { text: pt.text, teams: [id, ...(pt.teams ?? [])] }, chars);
     if (y + lines.length * 11 > BOTTOM - 4) break;
     g.fillStyle = TONE[pt.tone];
     g.fillRect(x, y + 2, 4, 4);
