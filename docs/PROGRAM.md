@@ -75,7 +75,7 @@ The real 2021–25 seasons don't have these, so rivalry streaks and big-game rec
   - Years 2–3: still not turning the corner.
   - Year 8 and up: gone stale, or an institution.
   - Hot seat: security under `HOT_SEAT + 10`. For the user, only in coach career mode.
-- **qb:** the starter's line.
+- **qb:** the starter's line, judged by his passer efficiency's rank among every team's leading passer this season (`PULSE.qbHot`, `qbCold`, `qbPicks`), not real-world numbers: the box score's attempts and YPA aren't on the real scale (see PROGRESS.md bugs). The top 15% or a breakout is the real deal; the bottom 10% with 3+ INT starts the QB debate.
   - Hope: a breakout, or 7.8+ yards an attempt with 2.5 TDs per INT.
   - Worry: 60+ attempts, 3+ INTs, and more INTs than TDs or a poor rate.
   - A young starter (FR, SO) weighs more. A five-star freshman or a real returning starter counts in the preseason.

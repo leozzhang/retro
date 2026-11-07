@@ -10,7 +10,7 @@ import { latestPoll, rankIn } from './polls';
 import { coachStart, coachTenure, ordinal, pastSeasons, rivalrySeries, trophies, type SeasonRow, type Tenure, type Trophies } from './program';
 import { classRanks } from './recruiting';
 import { records, recordText, standings, type TeamRecord } from './standings';
-import { seasonStats } from './stats';
+import { seasonStats, type SeasonLine } from './stats';
 import type { SeasonState } from './types';
 import { squadFor } from './world';
 
@@ -66,6 +66,14 @@ export const PULSE = {
   /** Wins over the pregame odds that read as clearly ahead of (or behind) expectations. */
   ahead: 0.7,
   wayAhead: 1.6,
+  /**
+   * The QB talk: his passer efficiency's rank among every team's leading passer this season, so the
+   * bar is the league's and not real-world numbers the box score isn't on. The top `qbHot` are the
+   * real deal; the bottom `qbCold` with `qbPicks`+ interceptions start the QB debate.
+   */
+  qbHot: 0.15,
+  qbCold: 0.1,
+  qbPicks: 3,
 };
 
 /** Which group each signal belongs to, by its key (before any `:`). */
@@ -185,6 +193,30 @@ function pick(pts: TalkingPoint[], salt: string): TalkingPoint[] {
   return out.sort((a, b) => sal(b) - sal(a));
 }
 
+/** NCAA passer efficiency. */
+const efficiency = (l: SeasonLine) => (8.4 * l.passYds + 330 * l.passTd + 100 * l.cmp - 200 * l.int) / l.att;
+
+/** Every team's leading passer's efficiency this season (40+ attempts), sorted, cached per games played. */
+const qbBoard = new WeakMap<SeasonState, { played: number; effs: number[] }>();
+function leagueQbs(state: SeasonState, stats: Map<string, SeasonLine>): number[] {
+  const played = state.games.reduce((n, g) => n + (g.result ? 1 : 0), 0);
+  const hit = qbBoard.get(state);
+  if (hit && hit.played === played) return hit.effs;
+  const lead = new Map<string, SeasonLine>();
+  for (const l of stats.values()) if (l.att >= 40 && l.att > (lead.get(l.team)?.att ?? 0)) lead.set(l.team, l);
+  const effs = [...lead.values()].map(efficiency).sort((a, b) => a - b);
+  qbBoard.set(state, { played, effs });
+  return effs;
+}
+
+/** The share of the league's leading passers `l` is better than, 0..1. */
+function qbRank(state: SeasonState, stats: Map<string, SeasonLine>, l: SeasonLine): number {
+  const effs = leagueQbs(state, stats);
+  if (effs.length < 2) return 0.5;
+  const e = efficiency(l);
+  return effs.filter((x) => x < e).length / (effs.length - 1);
+}
+
 /** The season as it stands: the record, the coach's year, the QB, the stars, the polls, the rivalry, recruiting. */
 function coreSignals(c: Ctx): void {
   const { state, id, t, tier, rec, recTxt, gp, over, pre, was, xw, ten, hc, past, last, tro, rank, say } = c;
@@ -225,14 +257,17 @@ function coreSignals(c: Ctx): void {
     const name = athleteName(qb).toUpperCase();
     const young = qb.year === 'FR' || qb.year === 'SO';
     const who = `${young ? (qb.year === 'FR' ? 'FRESHMAN' : 'SOPHOMORE') : 'QB'} ${name}`;
-    const line = seasonStats(state).get(qb.id);
+    const stats = seasonStats(state);
+    const line = stats.get(qb.id);
     const broke = state.confLog?.some((e) => e.id === qb.id && e.kind === 'breakout');
     if (line && line.att >= 40) {
-      const ypa = line.passYds / line.att;
-      if (broke || (ypa >= 7.8 && line.passTd >= 2.5 * Math.max(1, line.int))) {
+      const pct = qbRank(state, stats, line);
+      if (broke || pct >= 1 - PULSE.qbHot) {
         say('qb', 0.75, young ? 2.6 : 1.6, [`${who} (${line.passYds} YDS, ${line.passTd} TD) HAS THE FAN BASE DREAMING.`, `${who} LOOKS LIKE THE REAL DEAL: ${line.passTd} TD, ${line.int} INT.`, `${line.passYds} YARDS AND ${line.passTd} TD. ${who} IS A PROBLEM FOR DEFENSES.`]);
-      } else if (line.att >= 60 && line.int >= 3 && (line.int > line.passTd || (ypa < 6 && line.passTd < 2 * line.int))) {
-        say('qb', -0.6, 2, [`QB PLAY IS THE QUESTION: ${name} HAS ${line.passTd} TD AND ${line.int} INT.`, `FANS ARE CALLING FOR THE BACKUP. ${name}: ${line.int} INT.`, `${line.int} INTERCEPTIONS. THE QB DEBATE IS ON.`]);
+      } else if (line.att >= 60 && pct <= PULSE.qbCold && line.int >= PULSE.qbPicks) {
+        say('qb', -0.6, 2, line.int >= line.passTd
+          ? [`QB PLAY IS THE QUESTION: ${name} HAS ${line.passTd} TD AND ${line.int} INT.`, `FANS ARE CALLING FOR THE BACKUP. ${name}: ${line.int} INT.`, `${line.int} INTERCEPTIONS. THE QB DEBATE IS ON.`]
+          : [`QB PLAY IS THE QUESTION. THE PASSING GAME IS AMONG THE WORST IN FBS.`, `${name} AND THE PASSING GAME ARE STUCK IN NEUTRAL. FANS WANT A CHANGE.`, `THE QB DEBATE IS ON: ${name} HASN'T MOVED THE BALL THROUGH THE AIR.`]);
       } else if (young) say('qb', 0.3, 1.2, [`${who} IS GROWING UP ON THE JOB.`, `${who} HAS GROWING PAINS, BUT FANS LIKE HIM.`]);
     } else if (pre || over) {
       if (young && qb.stars >= 5) say('qb', 0.55, 2, [`ALL EYES ON THE FIVE-STAR ${who}.`, `THE FIVE-STAR ${who} COULD CHANGE EVERYTHING.`]);

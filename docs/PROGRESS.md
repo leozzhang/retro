@@ -2,6 +2,12 @@
 
 _Last updated: 2026-11-06_
 
+## Done: the fan pulse's QB debate is league-relative (2026-11-06)
+Bug: "QB PLAY IS THE QUESTION" showed for ~43% of teams (nearly the whole Mountain West), and the "real deal" line never showed. The QB signal judged real-world YPA (under 6 bad, 7.8+ good), but the sim's box score puts every starter near 4.5 YPA.
+- The QB is now ranked by NCAA passer efficiency against every team's leading passer this season (`PULSE.qbHot` 0.15, `qbCold` 0.1, `qbPicks` 3; `season/fanPulse.ts`). In a probe season, the debate showed for 9 to 14 of 138 teams from week 6 on, and the real deal for about 19.
+- When the INTs aren't the problem, the debate is about the passing game stalling, not his TD-INT line.
+- **Open, not fixed: the box score's passing scale.** Per team-game: 59 att, 35 cmp (58.7%), 267 yds, 4.5 YPA, 7.7 yds per catch. Real FBS is about 32 att, 20 cmp, 230 yds, 7.2 YPA, 11.5 per catch. Each pass snap is cast as a short catch at the drive sim's per-play gain, and `credit` adds 0.61 hidden incompletions per catch on top (`season/simGame.ts`, `CAST.completion`). Scores and team yards are fine. Season passing totals, the Heisman's production and anything else read against real numbers are off.
+
 ## Done: reading the coverage: disguise, motion, the hard count (2026-11-06)
 Before this, the presnap picture never lied: every defender lined up where his call put him, and the HUD named the shell. Details are in [DEFENSE.md](DEFENSE.md), "Reading the coverage".
 - **Disguise:** 8 of the 13 calls can show another shell (and press or off corners) and spin to their real coverage at the snap. The safeties show on the side of their real job. How often comes from the identity (`IDENTITY.disguise`: about 30%, by the DC's ADJUST and the secondary). There's never a disguise in prevent or on a try. Tells: a low-`prc` disguiser creeps late on the play clock.
