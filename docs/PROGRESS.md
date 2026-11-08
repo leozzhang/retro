@@ -2,6 +2,35 @@
 
 _Last updated: 2026-11-08_
 
+## Done: game pages and the postgame (2026-11-08)
+Every finished game in the league has a page. After a played game, the postgame shows highlights and then that page. See [GAMES.md](GAMES.md).
+- **Saved with every game:**
+  - defensive stats (`sk`, `defInt`, credited from the cast's `by`)
+  - the key plays, `GameResult.plays` (`season/gamePlays.ts`). They're built from a story `simGame` now always tells, which draws no random numbers.
+  - the game id on news items
+  - `npm run season` is byte-identical apart from the new GAME PAGES section and the careers' new stat keys.
+- **The live game's story** (`season/liveBox.ts`): the user's snaps, with who made them (`Play.tackler` for the sacker), the CPU's drives, points as they're scored, and the CPU defense's scores (`against`).
+- **Stars** (`season/gameStars.ts`, `STARS`): PLAYER OF THE GAME, BIG PLAY and OVERPERFORMER, scored against each position's usual game. Player of the game over 2 seasons: QB 28%, HB 33%, WR 24%, DEF 12%.
+- **The page** (`render/gameScreen.ts`): SUMMARY, BOX SCORE, PLAYS. It opens from SCHEDULE and program SEASON results, SCORES, and news scores (`gameLink`, `gameSpan`). Program and game pages share the back stack.
+- **Postgame:** FINAL → the game page → the hub. Up to 2 highlights wait as thumbnails in the SUMMARY's bottom right corner (each its play's opening frame), to click and watch, or H for both. The user's own snaps replay from a tape of the real play (`game/tape.ts`, `drawTape`). The reel favors plays that went the user's way and scores that tie the game or take the lead. A tape of the user being stopped gets no bonus. A SIM GAME with key plays ends on the page.
+- **Checked in the browser** (headless Chrome over CDP), with no page errors:
+  - a game played from Q4 to the final, the tape highlight, all three tabs
+  - links from SCHEDULE, SCORES and NEWS to a game page, then to a player and back
+  - a watched sim ending on the page
+- **Fixed:** the CPU's yards in a played game had decimals. Its drives started on the unrounded spot where a play or kick ended. `cpuDrive` now rounds it, and `unpackSeason` rounds box scores already saved.
+- **Save cost:** about 290 KB gzipped a season, on about 0.95 MB.
+- **Not done:** watching another game's highlights from its page, and tackles (they'd need new casting draws).
+
+## Done: live games keep a box score; 8:00 is the default (2026-11-08)
+- **The problem:** the user team's season passing and rushing stats were far below every CPU team's. The cause wasn't pacing: a live game added nothing to the box score. `finishSeasonGame` wrote blank team lines and no player lines, so only simulated games and simulated quarters counted. That also zeroed the opponent's line for that game and kept the user's players out of the stat award races.
+- **Why we didn't inflate the numbers:** points and yards per game scale together. At 8:00 a game has about 7 drives a team (real FBS: about 12–13), but a user who scores realistically on 7 drives is gaining about 50–60 yd a drive, so the yards should land near the real 390–430 too. Madden and EA's college game don't normalize stats either: short quarters give short stat lines, and the accelerated clock (our `SNAP_AT`) sets the pace.
+- **`season/liveBox.ts`:** the live game's box score, built as it's played.
+  - The user's snaps are credited to who threw, caught or carried it: `Play.ballMan` (the last offensive player to hold the ball) and `Play.caught`. Sacks and scrambles are rushes (NCAA). FG tries go to the kicker. Two-point tries aren't credited.
+  - The CPU's simulated drives are cast and credited the way `simGame` does it. `creditSnaps` and `lineFor` are split out of `credit` (`season/simGame.ts`), and the cast (`castCpu`) is shared with the key plays. `npm run season` is byte-identical apart from timing.
+  - A game taken over partway starts its box from the simulated quarters' box (this replaces `partBox`). Exhibitions keep none.
+- **8:00 quarters are the default** (`DEFAULT_QUARTER`, `game/clock.ts`) for new dynasties, exhibitions, and saves that never stored a length.
+- Tests: `src/liveBox.test.ts`. Not checked by hand in the app yet. Next: play a few 8:00 games and compare the user's yards a game with FBS. If they're still short, look at a pace-adjusted award race, not inflating the sim.
+
 ## Done: pullers and lead backs block their man (2026-11-08)
 Bug: Pin-Pull Sweep almost never worked, and the I-Form fullback often ignored the man he was supposed to block. Headless traces (every blocker's mark and engagement every 0.4 s) found one root cause: pullers and lead backs had no assignment at the snap and grabbed someone late, by proximity, often a man another blocker already had.
 - **Pullers ran to the sideline before looking:** `pullBlock` sent them flat to the hole's y (a kick: 2.5 past it), which on a sweep is 11–13 yd out, and `formEngagements` skipped them until they got there. On Pin-Pull both pullers were outside the back, still behind the line, while the MLB scraped over the top inside them.
@@ -629,7 +658,7 @@ Design and numbers are in [SIMULATION.md](SIMULATION.md).
 
 ## Done: game pacing (2026-10-31)
 - **The problem:** every setting showed 15:00 quarters, and the setting only sped up the time between plays. A user play cost about 6–20 s of game clock, but a CPU drive cost about 32 s per play. Games had about 15 possessions a team and scores like 80-14.
-- **Quarters are as long as the setting** (Madden style): SHORT 4:00, STANDARD 6:00 (default), LONG 8:00. `QUARTER_DRIVES` (4/5/7 possessions a team) is checked by a pacing test that plays alternating `simulateDrive` possessions through `advanceSim` (it measures 3.8/5.3/6.7).
+- **Quarters are as long as the setting** (Madden style): SHORT 4:00, STANDARD 6:00, LONG 8:00 (the default since 2026-11-08; it was STANDARD). `QUARTER_DRIVES` (4/5/7 possessions a team) is checked by a pacing test that plays alternating `simulateDrive` possessions through `advanceSim` (it measures 3.8/5.3/6.7).
 - **Both clocks run 1:1.** Plays and CPU drives cost what they would in real football, so the quarter length alone sets the number of possessions.
 - **Accelerated clock:** `runoffAtSnap` runs the play clock down to `SNAP_AT` (:14, huddle) or `HURRY_AT` (:28, hurry-up) at the snap when the clock is running. A running play costs about 30 s however fast it's called. A stopped clock (incompletion, change of possession) costs nothing. The runoff always leaves 0:01, so it never takes away a last-second kick; waiting still runs the clock out.
 - **Tempo:** H on the call screen toggles HUDDLE and HURRY (a tag under the play clock). It switches to HURRY once per quarter when the user isn't ahead inside 2:00 of a half.
@@ -1893,7 +1922,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **Confidence only moves between games.** Live games have no in-game swings (a pick shaking the QB for a few drives) and no mid-game substitutions, so next man up works week to week. The user's live-game starters spark like everyone else, but a sim-game backup's breakout is luck around the expectation, by design.
 - **Breakouts are common nationally** (about 57 a season, about 0.4 per team-season). The news shows the user's and two elsewhere a week. If they feel too frequent, `BREAKOUT.z` is the lever.
 - **Progression:** in season only players who play grow; everyone grows in the offseason (RECRUITING.md). A full season is about 2.6 MB of JSON, plus about 2.9 MB of careers a season with departures (CAREERS.md); gzipped saves are about a seventh of that, and the desktop app has no practical size limit. Details in [PROGRESSION.md](PROGRESSION.md).
-- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), the user's live games record no player stats, divisions and real bowl selection orders aren't modeled.
+- **Season placeholders** (details in [SEASON.md](SEASON.md)): too few games decided by 3 or fewer (11% vs 17%), yards per game high (about 430 vs 390), stat leaders inflated (only starters get credit), divisions and real bowl selection orders aren't modeled.
 - **Research class years and redshirts are partly guessed,** and several QB situations were in flux on Oct 24 (ROSTERS.md).
 - **The pass harness is "most open at a fixed hold".** It over-throws flats and checkdowns, and it throws quick game and screens too late (see the flags above). Per-route targeting is needed before using the NFL completion targets.
 - **Flagged plays need mechanic work:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (see the flags above). Each has a diagnosis.
@@ -1918,7 +1947,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **Light boxes are very good to run against:** Outside Zone against 2 Man gives about 10 YPC, and RPO give rows against 2 Man give 6–8. The run fronts (Bear, Cover 3 Sky, Goal Line) and the learning DC's box dial now answer a run-heavy offense (DEFENSE.md), but 2 Man itself is unchanged.
 - **WR stalk blocks lose the matchup quickly:** in `runEngagement` the defender's side is `str*0.7 + spd*0.3`, and the WR adds only his `blk` (about 45). A fast corner wins by about 30 points and sheds at about 2.3/s. On stretch plays the WR also takes the lineman's `REACH_PENALTY`. Perimeter blocks now form and last longer than before, but they still don't hold long. Not tuned: consider a stalk-block rule (the WR only has to stay between, not drive) or no reach penalty for non-linemen.
 - **CPU drives don't take timeouts,** and the user has no two-minute tools.
-- **Live games now score less than CPU-vs-CPU season games:** about 5 possessions a team at STANDARD vs about 12 in `simGame`. That lowers the user's points for and against and the margin terms in the polls (`AP_WEIGHTS`, `CFP_WEIGHTS`). Not compensated yet.
+- **Live games have fewer possessions than CPU-vs-CPU season games:** about 7 a team at the default LONG 8:00 (5 at STANDARD) vs about 12 in `simGame`. Played by hand, 8:00 gives realistic scores, since the user scores more per drive. That lowers the user's points for and against and the margin terms in the polls (`AP_WEIGHTS`, `CFP_WEIGHTS`). Not compensated yet.
 - **Check the user's points per drive by playing.** If the live offense scores on more than 60% of drives, that's a gameplay balance issue, separate from pacing.
 - **RPOs are still a run plus a tagged route.** There's no read on a defender yet, and the harness measures only the give.
 - **Zone-read keeps are weak for the auto-runner** (about 0 YPC even on a correct read). Blocks on the backside don't hold up once the QB pulls it: the X never reaches a corner who's fitting downhill, and blocks more than 8 yd from a deep QB on his backside shed at once. Keeps were unchanged by the perimeter-block fix. A human steering the QB should do better; check by playing before tuning.
@@ -1932,7 +1961,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
 1. **Recruiting, round 2** ([RECRUITING.md](RECRUITING.md) flags): bring tier 5's classes and starters back to level; a faster summer at the top; the REDSHIRT toggle and 4-game depth management; former players as GAs; play a full cycle by hand.
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
-1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; the offseason's systems (carousel, departures, recruiting, portal) are built.
+1. **Fill in the season framework** ([SEASON.md](SEASON.md)): spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; the offseason's systems (carousel, departures, recruiting, portal) are built.
 1. **Fix the flagged plays:** pullers and lead backs are done (2026-11-08). Left: Power O against Cover 1 (too big), Counter GT and QB Power (still low), Draw against pressure, and the harness's power-read read. Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.

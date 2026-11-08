@@ -4,14 +4,21 @@ import { defIdentity, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage } from '../data/confidence';
-import { buildSquad, onField, reorderPosition, teamConf, teamRatings, type Squad } from '../data/depth';
+import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, teamRatings, type Squad } from '../data/depth';
+import type { Athlete } from '../data/athletes';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
 import { DEF_SLOTS, teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
-import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_W } from '../engine/constants';
+import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_H, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { mulberry32, type Vec3 } from '../engine/math';
+import {
+  creditCpuDrive, creditUserFg, creditUserSnap, finishLiveBox, liveGamePlays, newLiveBox, storyAgainst, storyCpuDrive, storyUserEnd, storyUserPoints,
+  storyUserSnap, userCredit, type LiveBox, type SnapAt, type UserSnap,
+} from '../season/liveBox';
+import { newRecorder, pickReel, recordFrame, TAPE, tapeScore, type Tape, type TapeRecorder } from './tape';
+import { drawGame, GAME_TABS, gameReelAt, gameScrollMax, gameTabAt, type GameView, type ReelThumb } from '../render/gameScreen';
 import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
@@ -71,14 +78,15 @@ import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog, lineupOf, simPart } from '../season/simGame';
 import { castDrive } from '../season/cast';
 import { newStory, type DriveCredit, type StoryDrive } from '../season/story';
-import type { BoxScore, DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
-import { drawShow, keyShow, prefetchShow, updateShow, type KeyShow, type ShowCtx } from './highlights';
-import { KEY_LEVELS, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
+import type { DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
+import type { SimPlay as LiveSimPlay } from './rules';
+import { cueShow, drawShow, drawShowStill, keyShow, prefetchShow, showFocus, updateShow, type KeyShow, type ShowCtx } from './highlights';
+import { KEY_LEVELS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { text, textWidth } from '../render/text';
 import {
   adminStop, advanceSim, afterPlay, clockText, inOvertime, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
-  QUARTER_DRIVES, QUARTER_LABELS, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap, snapClock, tickBetween, tickLive,
+  DEFAULT_QUARTER, QUARTER_DRIVES, QUARTER_LABELS, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap, snapClock, tickBetween, tickLive,
   timeLeftInHalf, type Clock, type Tempo,
 } from './clock';
 import { KickPlay } from './kickPlay';
@@ -90,7 +98,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -134,9 +142,9 @@ const SETTINGS: {
   },
   {
     label: 'GAME LENGTH', help: 'QUARTER LENGTH IN THE GAMES YOU PLAY',
-    options: QUARTER_OPTIONS.map((q, i) => `${QUARTER_LABELS[i]} ${q}:00`), start: QUARTER_OPTIONS.indexOf(6),
+    options: QUARTER_OPTIONS.map((q, i) => `${QUARTER_LABELS[i]} ${q}:00`), start: QUARTER_OPTIONS.indexOf(DEFAULT_QUARTER),
     apply: (c, i) => (c.quarter = QUARTER_OPTIONS[i]),
-    read: (c) => Math.max(0, QUARTER_OPTIONS.indexOf(c.quarter ?? 6)),
+    read: (c) => Math.max(0, QUARTER_OPTIONS.indexOf(c.quarter ?? DEFAULT_QUARTER)),
   },
   {
     label: 'SIM GAMES', help: 'SIMULATED GAMES AND QUARTERS: THE RESULT, OR WATCH THE KEY PLAYS',
@@ -205,6 +213,8 @@ interface Notice {
 
 /** Slow motion while the QB (or a punter) aims, when the SLOW AIM setting is on. */
 const AIM_TIME_SCALE = 0.65;
+/** The share of the screen a postgame highlight's thumbnail shows, around the ball. */
+const REEL_CROP = 0.42;
 /**
  * A called run is played zoomed in from the huddle to the whistle: the camera spreads the field `x`
  * times along and `y` times across (sprites keep their size, so the line comes apart), and the snap
@@ -259,7 +269,7 @@ export class Game {
   /** Roster screen: whose roster and which page. */
   private rosterIdx = 0;
   private rosterPage = 0;
-  private qIdx = QUARTER_OPTIONS.indexOf(6);
+  private qIdx = QUARTER_OPTIONS.indexOf(DEFAULT_QUARTER);
   /** Main menu: the highlighted item. */
   private menuSel = 0;
   /** The dynasty save slots, and the slot being played (1 to `SLOTS`; 0 outside a dynasty). */
@@ -322,7 +332,7 @@ export class Game {
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
-  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' = 'call';
+  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' | 'game' = 'call';
   private tab = 0;
   /** Formation chip picked on each playbook tab (index into `chipsFor`), and the page within it. */
   private chip: Record<number, number> = {};
@@ -341,15 +351,26 @@ export class Game {
   private showCtx: ShowCtx | null = null;
   /** Key plays for the CPU's drives in an exhibition (K on its setup screen). */
   private exhibitionKeys: KeyLevel = 'normal';
-  /** The simulated quarters' box score, when the user took over a game partway. */
-  private partBox: BoxScore | null = null;
+  /** A season game's box score and story, built as it's played (season/liveBox.ts). */
+  private liveBox: LiveBox | null = null;
+  /** Where the user's snap now in play falls in the game, from its snap. */
+  private snapAt: SnapAt | null = null;
+  /** The user's last snap or kick as the story has it, for a score the defense makes on it. */
+  private lastSnap: LiveSimPlay | null = null;
+  /** The snap now in play on tape, and the best tapes this game (game/tape.ts). */
+  private tapeRec: TapeRecorder | null = null;
+  private tapes = new Map<LiveSimPlay, { tape: Tape; score: number }>();
+  /** The game page (render/gameScreen.ts). */
+  private gameView?: GameView;
+  /** The game a SIM GAME with key plays is showing, for its page after the final. */
+  private watchGame: string | null = null;
   /** Watching a simulated game's key plays: the result is already in the season. */
   private watchOnly = false;
   private seasonView: SeasonView = newSeasonView();
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private programView?: ProgramView;
   /** Where Esc goes from a program page: the screen it was opened from, or the program page before. */
-  private programBack: ({ screen: Screen } | { view: ProgramView })[] = [];
+  private programBack: ({ screen: Screen } | { view: ProgramView } | { game: GameView })[] = [];
   private bookView: BookView = { tab: 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
   private prepView: PrepView = { tab: 0, scroll: 0, page: 0, sel: 0, mx: 0, my: 0, report: null };
   private portalView: PortalView = { tab: 0, chip: 0, sel: 0, top: 0, mx: 0, my: 0, note: '' };
@@ -429,6 +450,9 @@ export class Game {
       case 'program':
         this.updateProgram(input);
         break;
+      case 'game':
+        this.updateGame(dt, input);
+        break;
       case 'playbook':
         this.updateBook(input);
         break;
@@ -466,7 +490,9 @@ export class Game {
             this.finishSeasonGame();
           } else if (this.watchOnly) {
             this.watchOnly = false;
-            this.screen = 'season';
+            if (this.watchGame) this.toGame(this.watchGame, true);
+            else this.screen = 'season';
+            this.watchGame = null;
           } else this.screen = 'exhibition';
         }
         break;
@@ -766,12 +792,11 @@ export class Game {
   private startGame(user: Team = TEAMS[this.userIdx], cpu: Team = TEAMS[this.cpuIdx], squads?: { user: Squad; cpu: Squad }, from = 1): void {
     this.setupField(user, cpu, squads);
     this.notices = [];
-    this.partBox = null;
     this.watchOnly = false;
     this.ot = null;
     this.score = { user: 0, cpu: 0 };
     // A dynasty's games use its own quarter length; exhibitions use the picker's.
-    this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? 6 : QUARTER_OPTIONS[this.qIdx]);
+    this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? DEFAULT_QUARTER : QUARTER_OPTIONS[this.qIdx]);
     this.tempo = 'normal';
     this.autoHurryQ = 0;
     this.drive = this.freshDrive(25);
@@ -780,6 +805,15 @@ export class Game {
     this.kickSketch.clear();
     this.tab = 0;
     this.liveDrives = this.seasonGame ? [{ off: user.id, plays: [] }] : null;
+    // The box score is built as the game goes (exhibitions keep none). Its casting stream is its own.
+    this.liveBox = this.seasonGame
+      ? newLiveBox({ id: user.id, on: starters(this.userSquad) }, { id: cpu.id, on: starters(this.cpuSquad) }, mulberry32((Math.random() * 2 ** 31) >>> 0), {
+        home: this.seasonGame.home, away: this.seasonGame.away,
+      })
+      : null;
+    this.tapes.clear();
+    this.tapeRec = null;
+    this.lastSnap = null;
     const s = this.season;
     this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
     const dc = (this.seasonGame && s ? staffFor(s, cpu.id) : buildStaff(cpu)).DC;
@@ -822,7 +856,14 @@ export class Game {
       drives: this.liveDrives ?? undefined,
       story,
     });
-    this.partBox = r.box;
+    // The simulated quarters' stats carry into the live box score.
+    if (this.liveBox) {
+      const uh = g.home === this.user.id;
+      this.liveBox = newLiveBox(this.liveBox.user, this.liveBox.cpu, this.liveBox.user.cast, {
+        home: g.home, away: g.away, story: r.story,
+        from: { user: uh ? r.box.home : r.box.away, cpu: uh ? r.box.away : r.box.home, players: r.box.players },
+      });
+    }
     this.score = { user: r.user, cpu: r.cpu };
     this.clock.quarter = r.quarter;
     this.clock.time = r.time;
@@ -868,6 +909,7 @@ export class Game {
     const r = game.result!;
     this.seasonGame = null;
     this.watchOnly = true;
+    this.watchGame = game.id;
     this.setupField(teamById(u), teamById(opp), squads);
     this.notices = [];
     this.score = { user: game.home === u ? r.home : r.away, cpu: game.home === u ? r.away : r.home };
@@ -1207,10 +1249,114 @@ export class Game {
         this.programView.tab = tab;
         return;
       }
-      this.programBack.push({ view: this.programView });
-    } else this.programBack = [{ screen: this.screen }];
+    }
+    this.pushBack();
     this.programView = { team, tab, scroll: 0, career: newCareerView(squadFor(s, team), player), mx: 0, my: 0 };
     this.screen = 'program';
+  }
+
+  /** Remember where the user is for Esc: a program or game page goes on the stack, any other screen starts it. */
+  private pushBack(): void {
+    if (this.screen === 'program' && this.programView) this.programBack.push({ view: this.programView });
+    else if (this.screen === 'game' && this.gameView) this.programBack.push({ game: this.gameView });
+    else this.programBack = [{ screen: this.screen }];
+  }
+
+  /** A game's page (render/gameScreen.ts). `postgame`: right after the user's game, Space goes on to the hub. */
+  private toGame(id: string, postgame = false): void {
+    if (postgame) this.programBack = [{ screen: 'season' }];
+    else this.pushBack();
+    this.gameView = { game: id, tab: 0, scroll: 0, postgame, mx: 0, my: 0 };
+    this.screen = 'game';
+  }
+
+  /** A game page: 1-3 or the tabs pick the page, the wheel or W/S scroll PLAYS, names are links, Esc goes back (Space too after the user's game). */
+  private updateGame(dt: number, input: Input): void {
+    const s = this.season!;
+    const v = this.gameView!;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    const reel = this.reelOn(v);
+    if (reel) this.cueReel(dt);
+    if (reel && input.hit('KeyH')) {
+      this.playReel(0, true);
+      return;
+    }
+    if (input.hit('Escape', 'Backspace') || (v.postgame && input.hit('Space', 'Enter'))) {
+      if (v.postgame && this.programBack.length <= 1) {
+        this.programBack = [];
+        this.gameView = undefined;
+        this.toSeason();
+      } else this.programBackOut();
+      return;
+    }
+    const n = GAME_TABS.length;
+    const setTab = (i: number) => Object.assign(v, { tab: i, scroll: 0 });
+    ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => input.hit(k) && setTab(i));
+    if (input.hit('Tab')) setTab((v.tab + 1) % n);
+    if (input.mouse.pressed) {
+      const tab = gameTabAt(x, y);
+      if (tab >= 0) {
+        setTab(tab);
+        return;
+      }
+      const hl = reel ? gameReelAt(x, y, reel.items.length) : -1;
+      if (hl >= 0) {
+        this.playReel(hl, false);
+        return;
+      }
+      const link = linkAt(x, y);
+      if (link) {
+        this.followLink(link);
+        return;
+      }
+    }
+    const step = input.mouse.wheel * 3 + (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0);
+    if (step) v.scroll = Math.max(0, Math.min(gameScrollMax(s, v), v.scroll + step));
+  }
+
+  /** The last played game's highlights, when this page is that game's SUMMARY. */
+  private reelOn(v: GameView): Game['reel'] {
+    return this.reel && this.reel.game === v.game && v.tab === 0 ? this.reel : null;
+  }
+
+  /** Set up the next highlight's opening frame and draw its thumbnail, one at a time. */
+  private cueReel(dt: number): void {
+    const r = this.reel!;
+    const it = r.items.find((i) => !i.still);
+    if (!it || !cueShow(it.cue, dt)) return;
+    const full = document.createElement('canvas');
+    full.width = VIEW_W;
+    full.height = VIEW_H;
+    const fg = full.getContext('2d')!;
+    fg.imageSmoothingEnabled = false;
+    drawShowStill(fg, it.cue, r.ctx, r.crowd);
+    // Cropped around the ball, so the players read at thumbnail size.
+    const f = showFocus(it.cue);
+    const at = it.cue.cam.toScreen(f.x, f.y, 0);
+    const w = VIEW_W * REEL_CROP;
+    const h = VIEW_H * REEL_CROP;
+    const sx = Math.max(0, Math.min(VIEW_W - w, at.x - w / 2));
+    const sy = Math.max(0, Math.min(VIEW_H - h, at.y - h / 2));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    c.getContext('2d')!.drawImage(full, sx, sy, w, h, 0, 0, w, h);
+    it.still = c;
+  }
+
+  /** Watch highlight `from` (and the rest, with `all`), then back to the game page. */
+  private playReel(from: number, all: boolean): void {
+    const r = this.reel!;
+    // The teams on the field are the reel's game's, whatever was watched since.
+    this.showCtx = r.ctx;
+    this.crowd = r.crowd;
+    this.notices = r.items.slice(from, all ? undefined : from + 1).map((it) => ({
+      title: '', sub: '', extra: '',
+      show: keyShow(it.k, r.ctx, it.seed, { tape: it.tape, label: 'HIGHLIGHT' }),
+    }));
+    this.showNotices('game');
   }
 
   /** The user's PLAYER REGISTRY on one of his players. */
@@ -1222,7 +1368,9 @@ export class Game {
   private followLink(l: Link): void {
     const s = this.season!;
     if (l.kind === 'team') this.toProgram(l.id);
-    else if (l.team === s.config.userTeamId) this.toTeam(l.id);
+    else if (l.kind === 'game') this.toGame(l.id);
+    // From a game page every player opens in the registry, so Esc comes back to the game.
+    else if (l.team === s.config.userTeamId && this.screen !== 'game') this.toTeam(l.id);
     else this.toProgram(l.team, PROGRAM_TABS.indexOf('REGISTRY'), l.id);
   }
 
@@ -1230,10 +1378,17 @@ export class Game {
     const b = this.programBack.pop();
     if (b && 'view' in b) {
       this.programView = b.view;
+      this.screen = 'program';
+      return;
+    }
+    if (b && 'game' in b) {
+      this.gameView = b.game;
+      this.screen = 'game';
       return;
     }
     this.screen = b?.screen ?? 'season';
     this.programView = undefined;
+    this.gameView = undefined;
   }
 
   /**
@@ -1836,20 +1991,48 @@ export class Game {
     const userHome = g.home === s.config.userTeamId;
     const home = userHome ? this.score.user : this.score.cpu;
     const away = userHome ? this.score.cpu : this.score.user;
-    const blank = (points: number) => ({ points, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 });
-    // TODO: record the live game's team and player stats from the plays. Simulated quarters keep theirs.
-    const pb = this.partBox;
-    const box = pb
-      ? { home: { ...pb.home, points: home }, away: { ...pb.away, points: away }, players: pb.players }
-      : { home: blank(home), away: blank(away), players: [] };
-    this.partBox = null;
+    const box = this.liveBox
+      ? finishLiveBox(this.liveBox, userHome, home, away)
+      : { home: { points: home, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 }, away: { points: away, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 }, players: [] };
     const result: GameResult = { home, away, ot: this.otPeriods(), box };
+    // The highlights: the game's biggest plays, the user's own on tape (game/tape.ts).
+    const reel = this.liveBox ? pickReel(this.liveBox.story, (p: LiveSimPlay) => this.tapes.has(p), this.user.id) : [];
+    if (this.liveBox) result.plays = liveGamePlays(this.liveBox);
+    this.liveBox = null;
     this.seasonGame = null;
     advanceWeek(s, result, this.liveDrives ?? undefined);
     this.liveDrives = null;
     this.save();
-    this.toSeason();
+    // The highlights wait on the game page's SUMMARY, to click and watch.
+    const ctx = this.showCtx;
+    const crowd = this.crowd;
+    this.reel = reel.length && ctx && crowd
+      ? {
+        game: g.id, ctx, crowd,
+        items: reel.map((k) => {
+          const tape = this.tapes.get(k.play)?.tape;
+          const seed = (Math.random() * 2 ** 31) >>> 0;
+          return { k, tape, seed, cue: keyShow(k, ctx, seed, { tape, label: 'HIGHLIGHT' }), still: null };
+        }),
+      }
+      : null;
+    this.tapes.clear();
+    this.tapeRec = null;
+    this.notices = [];
+    this.toGame(g.id, true);
   }
+
+  /**
+   * The last played game's highlights (up to `POSTGAME.reel`), shown on its page: each with its tape
+   * when the user played it, the seed its replay is found with, and a show cued to its opening frame
+   * for the thumbnail. Kept in memory until the next game ends.
+   */
+  private reel: {
+    game: string;
+    ctx: ShowCtx;
+    crowd: HTMLCanvasElement;
+    items: { k: KeyPlay; tape?: Tape; seed: number; cue: KeyShow; still: HTMLCanvasElement | null }[];
+  } | null = null;
 
   // ------------------------------------------------------------ play call
 
@@ -2078,6 +2261,7 @@ export class Game {
   private startPlay(def: PlayDef): void {
     // Everyone plays this snap with his confidence at its leverage.
     this.snapLev = this.snapLeverage();
+    this.snapAt = null;
     this.play = new Play({
       offTeam: this.user,
       defTeam: this.cpu,
@@ -2195,10 +2379,17 @@ export class Game {
           runoffAtSnap(this.clock, this.tempo); // tries are untimed
           snapClock(this.clock);
         }
+        this.snapAt = this.atNow();
         input.mouse.pressed = false; // the snap click must not start an aim
       }
     }
     play.update(dt, input, this.cam);
+    // Where the snap falls in the game, if it went off some other way than the snap key.
+    if (!this.snapAt && play.phase !== 'presnap') this.snapAt = this.atNow();
+    if (this.liveBox) {
+      if (this.tapeRec?.play !== play) this.tapeRec = newRecorder(play);
+      if (play.phase !== 'over' || play.overTime < 0.8) recordFrame(this.tapeRec, dt);
+    }
     if (play.phase !== 'presnap' && play.phase !== 'over' && !this.drive.try) tickLive(this.clock, dt);
 
     const lead = play.aim ? 0.22 : play.phase === 'run' ? 0.4 : play.phase === 'air' ? 0.45 : 0.35;
@@ -2209,8 +2400,10 @@ export class Game {
       if (!this.applied) {
         if (this.drive.try) {
           this.applied = applyTry(this.drive, play.outcome);
+          this.storyTry(play, this.applied.userPoints);
         } else {
           this.logSnap(play.playDef.kind !== 'run', play.outcome);
+          this.creditSnap(play, play.outcome);
           this.observeSnap(play, play.outcome);
           this.applied = applyOutcome(this.drive, play.outcome);
           afterPlay(this.clock, play.outcome.type, this.applied.headline === 'FIRST DOWN');
@@ -2218,6 +2411,7 @@ export class Game {
         }
         this.score.user += this.applied.userPoints;
         this.score.cpu += this.applied.cpuPoints;
+        if (!this.drive.try) this.storySnapResult(this.applied);
       } else if (!this.drive.try) {
         tickBetween(this.clock, dt);
       }
@@ -2260,6 +2454,7 @@ export class Game {
         this.applied = applyKick(this.drive, kp.outcome);
         this.score.user += this.applied.userPoints;
         this.score.cpu += this.applied.cpuPoints;
+        this.storyKick(kp.outcome, this.applied);
         // Every kick ends in a score or a change of possession: the clock stops until the next snap.
         adminStop(this.clock);
       } else if (kp.unit !== 'xp') {
@@ -2452,10 +2647,13 @@ export class Game {
     const walkOff = td && second && six > this.score.user;
     const kick = td && !walkOff && period < OVERTIME.mustGoForTwo && !(second && this.score.user - six === 2);
     const points = td ? (kick ? 7 : 6) : sim.points;
-    this.showCpuDrive({
+    const credit = this.castCpu(plays, otClock, OVERTIME.start);
+    const told: StoryDrive = {
       off: this.cpu.id, half: period + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-      start: OVERTIME.start, result: sim.result, points, plays, credit: this.castCpu(plays, otClock, OVERTIME.start),
-    });
+      start: OVERTIME.start, result: sim.result, points, plays, credit,
+    };
+    if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
+    this.showCpuDrive(told);
     this.score.cpu += points;
     this.notify({
       title: `${this.cpu.abbr} DRIVE: ${sim.result}`, sub: `${sim.plays} plays, ${sim.yards} yards`,
@@ -2469,11 +2667,13 @@ export class Game {
   private cpuTwoPoint(): void {
     const good = simTwoPoint(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, this.rng);
     const plays: SimPlay[] = [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }];
-    this.showCpuDrive({
+    const told: StoryDrive = {
       off: this.cpu.id, half: this.otPeriods() + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
       start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, plays,
       credit: this.castCpu(plays, { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: 'second' }, 97),
-    });
+    };
+    if (this.liveBox) storyCpuDrive(this.liveBox, told);
+    this.showCpuDrive(told);
     if (good) this.score.cpu += 2;
     this.notify({ title: `${this.cpu.abbr} TWO-POINT TRY: ${good ? 'GOOD' : 'NO GOOD'}`, sub: this.scoreLine(), extra: '', color: good ? '#ff5a5a' : '#ffd23f' });
   }
@@ -2582,15 +2782,131 @@ export class Game {
     });
   }
 
+  /** A season game's box score: who threw, caught or carried the user's snap (NCAA: sacks are rushes). */
+  private creditSnap(play: Play, o: PlayOutcome): void {
+    if (!this.liveBox) return;
+    const on = this.liveBox.user.on;
+    const qb = on[play.qb.slot];
+    const gain = Math.round((o.type === 'td' ? OPP_GOAL : o.spot) - this.drive.los);
+    const td = o.type === 'td';
+    let snap: UserSnap;
+    if (o.type === 'incomplete') snap = { kind: 'inc', qb, yds: 0, td: false };
+    else if (o.type === 'int' || o.type === 'pick6') snap = { kind: 'int', qb, yds: 0, td: false, turnover: true };
+    else if (play.caught) snap = { kind: 'catch', qb, who: play.ballMan ? on[play.ballMan.slot] : undefined, yds: gain, td };
+    else snap = { kind: o.type === 'sack' ? 'sack' : 'run', who: on[(play.ballMan ?? play.qb).slot], yds: gain, td };
+    // The CPU defender who made it: the interceptor has the ball, the sacker made the tackle.
+    const dOn = this.liveBox.cpu.on;
+    const picker = play.carrier?.side === 'def' ? play.carrier : null;
+    const stopper = snap.kind === 'int' ? picker : snap.kind === 'sack' ? play.tackler : null;
+    if (stopper) snap.by = dOn[stopper.slot];
+    creditUserSnap(this.liveBox, snap);
+
+    // The story: the snap as the drive sim would log it, for the game page and the highlights.
+    const d = this.drive;
+    const turnover = snap.kind === 'int';
+    const p: LiveSimPlay = {
+      gain: turnover ? 0 : gain, explosive: gain >= 20, turnover, down: d.down, toGo: Math.round(d.firstDownX - d.los), yard: Math.round(d.los - OWN_GOAL), t: 0,
+      lev: this.snapLev,
+    };
+    const slotOf = (a: Athlete) => [...Object.entries(on), ...Object.entries(dOn)].find(([, x]) => x === a)?.[0];
+    storyUserSnap(this.liveBox, this.snapAt ?? this.atNow(), p, userCredit(snap, slotOf, play.playDef.kind !== 'run'));
+    this.lastSnap = p;
+    this.keepTape(p, play);
+  }
+
+  /** Where the game is now, for the story: the half (2+ in overtime), its seconds left, the score. */
+  private atNow(): SnapAt {
+    const c = this.clock;
+    const ot = inOvertime(c);
+    return {
+      half: ot ? this.otPeriods() + 1 : c.quarter <= 2 ? 0 : 1, left: ot ? 0 : timeLeftInHalf(c), qSecs: c.qSecs,
+      score: { [this.user.id]: this.score.user, [this.cpu.id]: this.score.cpu },
+    };
+  }
+
+  /** Keep this snap's tape if it's one of the game's best so far (`TAPE.keep`, by `tapeScore`). */
+  private keepTape(p: LiveSimPlay, play: Play): void {
+    const rec = this.tapeRec;
+    if (!rec || rec.play !== play || rec.tape.frames.length < 2) return;
+    const score = tapeScore(p);
+    if (score <= 0) return;
+    this.tapes.set(p, { tape: rec.tape, score });
+    if (this.tapes.size > TAPE.keep) {
+      const worst = [...this.tapes].sort((a, b) => a[1].score - b[1].score)[0][0];
+      this.tapes.delete(worst);
+    }
+  }
+
+  /** A snap's result in the story: the user's points, the CPU's (a pick six, a safety), or the drive over. */
+  private storySnapResult(a: Applied): void {
+    const box = this.liveBox;
+    if (!box || !this.lastSnap) return;
+    if (a.userPoints) storyUserPoints(box, a.userPoints, 'TOUCHDOWN');
+    if (a.cpuPoints) storyAgainst(box, this.lastSnap, a.cpuPoints, a.change.kind === 'pick6' ? 'pick6' : 'safety');
+    else if (a.change.kind === 'int') storyUserEnd(box, 'TURNOVER');
+    else if (a.change.kind === 'downs') storyUserEnd(box, 'DOWNS');
+  }
+
+  /**
+   * A try in the story: in regulation and the first overtimes its points go on the touchdown's drive;
+   * in the shootout it's its own one-snap drive, as in `simGame`.
+   */
+  private storyTry(play: Play, pts: number): void {
+    const box = this.liveBox;
+    if (!box) return;
+    if (this.otPeriods() < OVERTIME.shootout) {
+      storyUserPoints(box, pts);
+      return;
+    }
+    const o = play.outcome!;
+    const gain = o.type === 'td' ? 3 : 0;
+    const p: LiveSimPlay = { gain, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 };
+    const who = play.ballMan ? box.user.on[play.ballMan.slot] : undefined;
+    const slot = play.ballMan?.slot;
+    const credit = { kind: (play.caught ? 'catch' : 'run') as 'catch' | 'run', pass: play.playDef.kind !== 'run', ...(who && slot ? { who: { slot, name: athleteName(who), yds: gain } } : {}) };
+    storyUserSnap(box, this.atNow(), p, credit, { try: true });
+    storyUserPoints(box, pts, pts ? 'TOUCHDOWN' : 'DOWNS');
+    this.keepTape(p, play);
+  }
+
+  /** A kick in the story: a field goal try as a snap, the user's points, a punt ending the drive, a return the CPU scores on. */
+  private storyKick(o: KickOutcome, a: Applied): void {
+    const box = this.liveBox;
+    if (!box) return;
+    const at = this.atNow();
+    const d = this.drive;
+    const kick = (extra: Partial<LiveSimPlay>): LiveSimPlay => {
+      const p: LiveSimPlay = { gain: 0, explosive: false, turnover: false, down: d.down, toGo: Math.round(d.firstDownX - d.los), yard: Math.round(d.los - OWN_GOAL), t: 0, lev: this.snapLev, ...extra };
+      storyUserSnap(box, at, p, null);
+      return p;
+    };
+    if (o.unit === 'fg') {
+      const made = o.result === 'fgGood';
+      kick({ fg: { dist: fgDistance(d.los, OPP_GOAL), made } });
+      storyUserPoints(box, a.userPoints, made ? 'FIELD GOAL' : 'MISSED FG');
+    } else if (o.unit === 'xp') {
+      storyUserPoints(box, a.userPoints);
+    }
+    if (a.cpuPoints) {
+      const p = o.unit === 'fg' ? box.open?.plays[box.open.plays.length - 1] ?? kick({ punt: true }) : kick({ punt: true });
+      storyAgainst(box, p, a.cpuPoints, a.change.kind === 'safety' ? 'safety' : 'returnTd');
+    } else if (o.unit === 'punt') storyUserEnd(box, 'PUNT');
+  }
+
   private logKick(o: KickOutcome): void {
     if (!this.liveDrives) return;
     const good = o.unit === 'fg' ? o.result === 'fgGood' : o.unit === 'xp' ? o.result === 'xpGood' : true;
+    if (o.unit === 'fg' && this.liveBox) creditUserFg(this.liveBox, this.liveBox.user.on.K, good);
     const kick = { unit: o.unit, good, ...(o.unit === 'fg' ? { dist: fgDistance(this.drive.los, OPP_GOAL) } : {}) };
     this.liveDrives[0].plays.push({ gain: 0, down: 0, toGo: 0, kick, ...(this.snapLev ? { lev: this.snapLev } : {}) });
   }
 
-  /** Simulate a CPU possession from `start` (yards from its own goal), burning game clock. */
-  private cpuDrive(start: number): void {
+  /**
+   * Simulate a CPU possession from `from` (yards from its own goal), burning game clock. The spot is
+   * rounded: it's where a live play or kick ended, and the drive sim and its box score count whole yards.
+   */
+  private cpuDrive(from: number): void {
+    const start = Math.round(from);
     const c = this.clock;
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
@@ -2601,14 +2917,14 @@ export class Game {
     const dc: DriveClock = { timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs };
     const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, dc, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
+    const credit = this.castCpu(plays, dc, start + left);
+    const told: StoryDrive = {
+      off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
+      start, result: sim.result, points: sim.points, plays, credit,
+    };
+    if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
     const level = this.keyLevel('defense');
-    if (level !== 'off') {
-      const d: StoryDrive = {
-        off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-        start, result: sim.result, points: sim.points, plays, credit: this.castCpu(plays, dc, start + left),
-      };
-      this.queueShows(pickDrive(d, level, 'defense'));
-    }
+    if (level !== 'off') this.queueShows(pickDrive(told, level, 'defense'));
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += sim.points;
     const notice = this.notify({
@@ -2652,6 +2968,7 @@ export class Game {
   /** The notice queue is empty: go where it was leading. */
   private finishNotices(): void {
     if (this.afterNotices === 'final') this.screen = 'final';
+    else if (this.afterNotices === 'game') this.screen = 'game';
     else if (this.afterNotices === 'kickoff') this.toCall('kickoff');
     else if (this.afterNotices === 'pat') this.toCall('pat');
     else this.toCall();
@@ -2684,6 +3001,13 @@ export class Game {
     }
     if (this.screen === 'program') {
       drawProgram(g, this.season!, this.programView!);
+      return;
+    }
+    if (this.screen === 'game') {
+      const v = this.gameView!;
+      const reel = this.reelOn(v);
+      const thumbs: ReelThumb[] = reel?.items.map((it) => ({ still: it.still, clock: it.cue.clock, title: KEY_TITLE[it.k.kind] })) ?? [];
+      drawGame(g, this.season!, v, thumbs);
       return;
     }
     if (this.screen === 'playbook') {

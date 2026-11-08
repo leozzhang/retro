@@ -223,6 +223,11 @@ export class Play {
   intended: Player | null = null;
   scramble = false;
   thrown = false;
+  /** The last offensive player to hold the ball, and whether a pass was caught: for the box score. */
+  ballMan: Player | null = null;
+  caught = false;
+  /** Who made the tackle that ended the play (the sacker on a sack). */
+  tackler: Player | null = null;
   /** How set (facing the QB, 0..1) the receiver was on the last catch attempt. */
   catchSet = 0;
   /** How much of a look at the ball the receiver got on the last catch attempt (0..1, `readyAt`). */
@@ -792,6 +797,7 @@ export class Play {
   }
 
   private giveBall(p: Player): void {
+    if (p.side === 'off') this.ballMan = p;
     this.carrier = p;
     this.ball.state = 'held';
     this.ball.carrier = p;
@@ -1191,6 +1197,7 @@ export class Play {
         );
 
     if (res === 'catch' && bestO) {
+      this.caught = true;
       this.giveBall(bestO);
       this.controlled = bestO;
       this.phase = 'run';
@@ -1439,6 +1446,7 @@ export class Play {
     if (c.side === 'off') c.pos = { x: Math.min(c.pos.x + fallForward(c.vel.x, c.r.str, t.r.str), OPP_GOAL - 0.01), y: c.pos.y };
     knockDown(c);
     knockDown(t);
+    this.tackler = t;
     const spot = c.pos.x;
     const spotY = c.pos.y;
     if (c.side === 'def') {

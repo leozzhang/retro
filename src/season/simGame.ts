@@ -7,7 +7,8 @@ import { OVERTIME, simTwoPoint, simulateDrive, userStartAfter, type DriveClock, 
 import { CAST, castDrive, QB_RUN_SHARE, type Lineup } from './cast';
 import { driveMods, type TeamMods } from './emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
-import type { DriveCredit, GameStory } from './story';
+import { gamePlays } from './gamePlays';
+import { newStory, type DriveCredit, type GameStory } from './story';
 import type { BoxScore, DriveLog, GameResult, LoggedPlay, PlayerLine, TeamLine } from './types';
 
 /**
@@ -28,22 +29,30 @@ const HALF_SECS = 1800;
 const OT_MAX_ROUNDS = 8;
 export { INT_SHARE, QB_RUN_SHARE, TARGETS } from './cast';
 
-interface Side {
+/** One team's box score as it's built: its line, its players' lines, and who's on the field. */
+export interface BoxSide {
   id: string;
+  on: Record<string, Athlete>;
+  /** The casting stream (season/cast.ts), apart from the results' stream. */
+  cast: Rng;
+  tl: TeamLine;
+  lines: Map<string, PlayerLine>;
+}
+
+interface Side extends BoxSide {
   squad: Squad;
   off: number;
   def: number;
   plan: GamePlan;
   qbRun: number;
-  on: Record<string, Athlete>;
   lineup: Lineup;
-  /** The game's casting stream (season/cast.ts), apart from the results' stream. */
-  cast: Rng;
   conf: UnitConf;
   /** This week's emphases (season/emphasis.ts), if any group isn't on standard. */
   mods?: TeamMods;
-  tl: TeamLine;
-  lines: Map<string, PlayerLine>;
+}
+
+export function blankTeamLine(): TeamLine {
+  return { points: 0, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 };
 }
 
 /** A side's players and tendencies, for casting. */
@@ -61,17 +70,17 @@ function side(squad: Squad, plan: GamePlan, edge: number, cast: Rng, mods?: Team
     lineup,
     cast,
     conf: teamConf(squad),
-    tl: { points: 0, yards: 0, passYds: 0, rushYds: 0, turnovers: 0, plays: 0 },
+    tl: blankTeamLine(),
     lines: new Map(),
   };
 }
 
-function lineFor(s: Side, a: Athlete): PlayerLine {
+export function lineFor(s: BoxSide, a: Athlete): PlayerLine {
   let l = s.lines.get(a.id);
   if (!l) {
     l = {
       id: a.id, team: s.id, name: athleteName(a), pos: a.pos,
-      cmp: 0, att: 0, passYds: 0, passTd: 0, int: 0, rush: 0, rushYds: 0, rushTd: 0, rec: 0, recYds: 0, recTd: 0, fgm: 0, fga: 0,
+      cmp: 0, att: 0, passYds: 0, passTd: 0, int: 0, rush: 0, rushYds: 0, rushTd: 0, rec: 0, recYds: 0, recTd: 0, fgm: 0, fga: 0, sk: 0, defInt: 0,
     };
     s.lines.set(a.id, l);
   }
@@ -85,6 +94,14 @@ function lineFor(s: Side, a: Athlete): PlayerLine {
 function credit(s: Side, dfn: Side, d: DriveSim, plays: SimPlay[], clock: DriveClock, out?: DriveCredit): void {
   const snaps = castDrive(plays, s.lineup, dfn.lineup, clock, s.cast);
   if (out) out.snaps = snaps;
+  creditSnaps(s, d, plays, snaps, dfn);
+}
+
+/**
+ * Credit a drive's cast snaps to the offense's box score (also the CPU's drives in a live game), and
+ * the defense's sacks and interceptions to `dfn`'s.
+ */
+export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: DriveCredit['snaps'], dfn?: BoxSide): void {
   const tl = s.tl;
   tl.plays += d.plays;
   tl.yards += d.yards;
@@ -98,6 +115,9 @@ function credit(s: Side, dfn: Side, d: DriveSim, plays: SimPlay[], clock: DriveC
     const yds = Math.min(p.gain, 100 - p.yard);
     const td = !p.turnover && p.yard + p.gain >= 100;
     const who = c.who && s.on[c.who.slot] ? lineFor(s, s.on[c.who.slot]) : null;
+    const by = dfn && c.by && dfn.on[c.by.slot] ? lineFor(dfn, dfn.on[c.by.slot]) : null;
+    if (by && c.kind === 'sack') by.sk++;
+    if (by && c.kind === 'int') by.defInt++;
     switch (c.kind) {
       case 'catch':
         passYds += yds;
@@ -268,6 +288,8 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
   const cast = castStream(rng);
   const h = side(home, opts.plans?.home ?? autoGamePlan(home, away), edge, cast, opts.emph?.home);
   const a = side(away, opts.plans?.away ?? autoGamePlan(away, home), 0, cast, opts.emph?.away);
+  // Always told, for the game page's plays: telling draws no random numbers.
+  const story = opts.story ?? newStory(h.id, a.id);
   const firstHalf = rng() < 0.5 ? h : a;
   for (let half = 0; half < 2; half++) {
     let off = half === 0 ? firstHalf : firstHalf === h ? a : h;
@@ -281,17 +303,19 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
       // The fourth quarter is the last 900 seconds of the second half.
       const close = half === 1 && left <= 900 && lateAndClose(4, lead);
       const [d, plays] = drive(off, dfn, off.off - script, start, rng, clock, opts.drives, driveConf(off, dfn, close));
-      credit(off, dfn, d, plays, clock, tell(opts.story, off, dfn, d, plays, start, half, left, HALF_SECS / 2));
+      credit(off, dfn, d, plays, clock, tell(story, off, dfn, d, plays, start, half, left, HALF_SECS / 2));
       left -= d.secs;
       if (d.result === 'END OF HALF') break;
       start = userStartAfter(d, rng);
       off = dfn;
     }
   }
-  const ot = h.tl.points === a.tl.points ? overtime(a, h, rng, opts.drives, opts.story) : 0;
+  const ot = h.tl.points === a.tl.points ? overtime(a, h, rng, opts.drives, story) : 0;
   return {
     home: h.tl.points, away: a.tl.points, ot,
     box: { home: h.tl, away: a.tl, players: [...h.lines.values(), ...a.lines.values()] },
+    // By the game's own ids (a caller's story may not name them).
+    plays: gamePlays({ ...story, home: h.id, away: a.id }, { [h.id]: h.on, [a.id]: a.on }),
   };
 }
 
@@ -315,6 +339,8 @@ export interface PartResult {
   next: LiveNext;
   /** The simulated stretch's box score. */
   box: BoxScore;
+  /** The simulated stretch drive by drive (`opts.story` when given), for the live game's to go on from. */
+  story: GameStory;
 }
 
 export interface PartOptions {
@@ -340,6 +366,7 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
   const cast = castStream(rng);
   const u = side(user, opts.plans.user, userHome ? edge : 0, cast, opts.emph?.user);
   const c = side(cpu, opts.plans.cpu, userHome ? 0 : edge, cast, opts.emph?.cpu);
+  const story = opts.story ?? (userHome ? newStory(u.id, c.id) : newStory(c.id, u.id));
   const clock = newClock(qMin);
   const qSecs = clock.qSecs;
   let off = u;
@@ -363,7 +390,7 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
     };
     const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
     const [d, plays] = drive(off, dfn, off.off - script, start, rng, dc, opts.drives, driveConf(off, dfn, lateAndClose(q, lead)));
-    credit(off, dfn, d, plays, dc, tell(opts.story, off, dfn, d, plays, start, q <= 2 ? 0 : 1, left, qSecs));
+    credit(off, dfn, d, plays, dc, tell(story, off, dfn, d, plays, start, q <= 2 ? 0 : 1, left, qSecs));
     if (cut && d.result === 'END OF HALF') {
       advanceSim(clock, d.secs);
       next = { kind: off === u ? 'user' : 'cpu', start: d.endYard, mid: true };
@@ -389,6 +416,7 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
   return {
     quarter: clock.quarter, time: clock.time, user: u.tl.points, cpu: c.tl.points, next,
     box: { home: userHome ? u.tl : c.tl, away: userHome ? c.tl : u.tl, players: lines },
+    story,
   };
 }
 

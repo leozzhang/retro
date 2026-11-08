@@ -34,7 +34,7 @@ export interface SeasonConfig {
   delegate: Delegation;
   /** How often players get hurt (season/injuries.ts). Missing means normal. */
   injuries?: InjuryLevel;
-  /** Quarter length in minutes for the user's live games (game/clock.ts `QUARTER_OPTIONS`). Missing means 6. */
+  /** Quarter length in minutes for the user's live games (game/clock.ts `QUARTER_OPTIONS`). Missing means `DEFAULT_QUARTER` (8). */
   quarter?: number;
   /**
    * Key-play highlights (game/keyPlays.ts): `sim` for simulated games and stretches (missing: off,
@@ -83,6 +83,9 @@ export interface PlayerLine {
   recTd: number;
   fgm: number;
   fga: number;
+  /** Defense: sacks and interceptions (as cast, season/cast.ts). Zero in box scores from before they were kept. */
+  sk: number;
+  defInt: number;
 }
 
 export interface TeamLine {
@@ -97,7 +100,7 @@ export interface TeamLine {
 export interface BoxScore {
   home: TeamLine;
   away: TeamLine;
-  /** Empty for the user's live games until the on-field game records stats. */
+  /** A live game's come from the field as it's played (season/liveBox.ts). */
   players: PlayerLine[];
 }
 
@@ -108,6 +111,42 @@ export interface GameResult {
   box: BoxScore;
   /** Played on the field by the user, not simulated. */
   live?: boolean;
+  /** Its scoring plays and biggest other plays, in order (season/gamePlays.ts). Missing in games from before they were kept. */
+  plays?: GamePlay[];
+}
+
+/**
+ * One of a game's key plays, for its game page (render/gameScreen.ts). `kind` is the key-play kind
+ * (game/keyPlays.ts): 'td', 'fg', 'missedFg', 'int', 'fumble', 'fourthStop', 'fourthConv', 'explosive',
+ * 'sack', 'twoPt', 'twoPtStop', 'redZoneStop', ..., or a defensive score in a played game: 'pick6',
+ * 'returnTd', 'safety'.
+ */
+export interface GamePlay {
+  /** Quarter (5 is the 1st overtime) and the seconds left in it. */
+  q: number;
+  time: number;
+  /** The offense's team id. */
+  off: string;
+  kind: string;
+  /** Yards gained (a touchdown's stop at the goal line), the spot before the snap from the offense's own goal, the down and distance. */
+  yds: number;
+  yard: number;
+  down: number;
+  toGo: number;
+  pass?: boolean;
+  /**
+   * Athlete ids: the carrier, receiver or kicker, and the defender on an interception or sack.
+   * Their names (and the passer, the offense's line with the most attempts) are on the game's box score.
+   */
+  who?: string;
+  by?: string;
+  /** Points the play scored (a touchdown with its kick), and the score after it, home first. */
+  pts: number;
+  /** The defense's id when it scored them (a pick six, a return, a safety). */
+  for?: string;
+  score: [number, number];
+  /** How much the snap mattered, 0..1. Missing is 0. */
+  lev?: number;
 }
 
 export interface SeasonGame {
@@ -143,6 +182,8 @@ export interface NewsItem {
   kind: 'upset' | 'performance' | 'poll' | 'heisman' | 'postseason' | 'result' | 'coach' | 'progress' | 'injury' | 'portal' | 'carousel' | 'draft' | 'recruiting';
   text: string;
   teams: string[];
+  /** The game it's about (`SeasonGame.id`), for a link to its page. */
+  game?: string;
 }
 
 /**

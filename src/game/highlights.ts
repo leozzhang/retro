@@ -4,7 +4,7 @@ import { FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import { drawField } from '../render/field';
 import { drawBanner, drawHint, drawScorebug } from '../render/hud';
 import { drawKickPlay } from '../render/kickRenderer';
-import { drawLines, drawPlay } from '../render/renderer';
+import { drawLines, drawPlay, drawTape } from '../render/renderer';
 import { getBallSprite } from '../render/sprites';
 import { text } from '../render/text';
 import { storyClock } from '../season/story';
@@ -12,6 +12,7 @@ import { mmss, quarterName } from './clock';
 import { creditFor, downText, KEY_TITLE, shownGain, spotLabel, type KeyKind, type KeyPlay } from './keyPlays';
 import type { KickPlay } from './kickPlay';
 import type { Play } from './playState';
+import { frameAt, tapeLength, type Tape } from './tape';
 import {
   FgSearch, fgTargetFor, makeFg, makeReplay, ReplaySearch, stepFg, stepReplay, targetFor, type FgSetup, type ReplaySetup, type ReplaySide,
 } from './replay';
@@ -20,7 +21,8 @@ import {
  * One key play on screen: it finds its replay (a few milliseconds a frame), shows the lineup,
  * plays it with the CPU on both sides (a field goal with the CPU kicker), then holds the caption. With
  * no replay (no seed that matched) it's a card: the ball slides the sim's yards with the same caption.
- * Captions and yards come from the sim, so they agree with the score and the box score.
+ * Captions and yards come from the sim, so they agree with the score and the box score. A snap the
+ * user played can come with its tape (game/tape.ts): then the real play is shown, nothing searched.
  */
 
 /** Seconds: a scorer running into the end zone before the caption, at most this long for a loose ball to be recovered, at least this long finding the replay, the lineup before the snap, the caption after. */
@@ -57,17 +59,22 @@ export interface KeyShow {
   clock: string;
   /** The show's own camera, mirrored when the CPU has the ball so it attacks left, as in a played game. */
   cam: Camera;
+  /** The real play, when the user played it. */
+  tape: Tape | null;
+  /** The corner label: KEY PLAY, or the postgame's HIGHLIGHT. */
+  label: string;
 }
 
 /** Kinds that are good news for the defense. */
 const DEFENSIVE = new Set<KeyKind>(['int', 'fumble', 'fourthStop', 'thirdStop', 'redZoneStop', 'sack', 'missedFg', 'twoPtStop']);
 
-export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number): KeyShow {
+export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: Tape; label?: string } = {}): KeyShow {
   const d = k.drive;
   const userBall = d.off === ctx.user.id;
   const [off, def] = userBall ? [ctx.userSide, ctx.cpuSide] : [ctx.cpuSide, ctx.userSide];
-  const fg = fgTargetFor(k, off, def);
-  const target = fg ? null : targetFor(k, off, def, userBall ? ctx.userPass : ctx.cpuPass);
+  const tape = opts.tape && opts.tape.frames.length ? opts.tape : null;
+  const fg = tape ? null : fgTargetFor(k, off, def);
+  const target = fg || tape ? null : targetFor(k, off, def, userBall ? ctx.userPass : ctx.cpuPass);
   const search = fg ? new FgSearch(fg, seed) : target ? new ReplaySearch(target, seed) : null;
   const before = { user: d.score[ctx.user.id] ?? 0, cpu: d.score[ctx.cpu.id] ?? 0 };
   const pts = k.kind === 'td' || k.kind === 'twoPt' ? d.points : k.kind === 'fg' ? 3 : 0;
@@ -80,7 +87,8 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number): KeyShow {
   cam.snap();
   return {
     k, userBall, search, setup: null, play: null, fgSetup: null, kick: null,
-    phase: 'find', t: 0, over: 0, before, after, clock: c.quarter > 4 ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
+    phase: tape ? 'set' : 'find', t: 0, over: 0, before, after, clock: c.quarter > 4 ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
+    tape, label: opts.label ?? 'KEY PLAY',
   };
 }
 
@@ -113,15 +121,22 @@ export function updateShow(sh: KeyShow, dt: number): boolean {
       }
       return false;
     case 'set':
-      cam.follow(los, 0.35);
+      cam.follow(sh.tape ? sh.tape.frames[0].focus : los, 0.35);
       if (sh.t >= SHOW.set) {
+        // A tape just runs (from 0, as `t` restarts).
         if (sh.kick) sh.kick.release(sh.fgSetup!.kick);
-        else sh.play!.snap();
+        else sh.play?.snap();
         sh.phase = 'run';
         sh.t = 0;
       }
       return false;
     case 'run': {
+      if (sh.tape) {
+        const f = frameAt(sh.tape, sh.t);
+        cam.follow(f.focus, f.lead);
+        if (sh.t >= tapeLength(sh.tape)) sh.over += dt;
+        return sh.over >= SHOW.hold;
+      }
       if (sh.kick) {
         stepFg(sh.kick, sh.fgSetup!);
         const f = sh.kick.focus();
@@ -201,28 +216,55 @@ function playLine(sh: KeyShow): string {
   }
 }
 
-export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx, crowd: HTMLCanvasElement, debug: boolean): void {
+/**
+ * Get a show to its opening frame without playing it: the search runs and the snap is set up. True
+ * once it's there (or the search found nothing and it's down to the card). For the postgame's
+ * thumbnails (`drawShowStill`).
+ */
+export function cueShow(sh: KeyShow, dt: number): boolean {
+  if (sh.phase === 'find') updateShow(sh, dt);
+  return sh.phase !== 'find';
+}
+
+/** Where the ball is now on a show (the snap's spot before it's set up), in world yards: the thumbnail's center. */
+export function showFocus(sh: KeyShow): { x: number; y: number } {
+  const b = sh.tape?.frames[0].ball ?? sh.play?.ball.pos ?? sh.kick?.ball.pos;
+  return b ? { x: b.x, y: b.y } : { x: OWN_GOAL + sh.k.play.yard, y: FIELD_W / 2 };
+}
+
+/** The show's field and players as they are now, with no scorebug, label or caption. */
+export function drawShowStill(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx, crowd: HTMLCanvasElement): void {
+  drawShowField(g, sh, ctx, crowd, false);
+}
+
+function drawShowField(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx, crowd: HTMLCanvasElement, debug: boolean): void {
   const p = sh.k.play;
   const cam = sh.cam;
-  const [off, def] = sh.userBall ? [ctx.user, ctx.cpu] : [ctx.cpu, ctx.user];
   // The field as in a played game, the user's end zone on the left: the replay attacks +x, and the
   // mirrored camera turns the CPU's snaps around so they go left.
   drawField(g, cam, ctx.user, ctx.cpu, crowd);
   const los = OWN_GOAL + p.yard;
   drawLines(g, cam, los, Math.min(OPP_GOAL, los + p.toGo));
-  if (sh.kick) drawKickPlay(g, cam, sh.kick, debug, true);
+  if (sh.tape) drawTape(g, cam, sh.tape, sh.phase === 'run' ? frameAt(sh.tape, sh.t) : sh.tape.frames[0]);
+  else if (sh.kick) drawKickPlay(g, cam, sh.kick, debug, true);
   else if (sh.play) drawPlay(g, cam, sh.play, debug, true);
   else {
     const s = cam.toScreen(cardX(sh), FIELD_W / 2, 0.2);
     g.drawImage(getBallSprite(), Math.round(s.x - 4), Math.round(s.y - 4));
   }
+}
+
+export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx, crowd: HTMLCanvasElement, debug: boolean): void {
+  const p = sh.k.play;
+  const [off, def] = sh.userBall ? [ctx.user, ctx.cpu] : [ctx.cpu, ctx.user];
+  drawShowField(g, sh, ctx, crowd, debug);
   const captioned = sh.over > 0;
   const situation = `${sh.k.drive.try ? 'TWO-POINT TRY' : downText(p)}  ${spotLabel(p.yard, off.abbr, def.abbr)}`;
   drawScorebug(g, ctx.user, ctx.cpu, captioned ? sh.after : sh.before, sh.clock, situation, `${off.abbr} OFFENSE`);
-  text(g, 'KEY PLAY', 8, 40, { size: 8, color: '#ffd23f' });
+  text(g, sh.label, 8, 40, { size: 8, color: '#ffd23f' });
   if (captioned) {
     const good = DEFENSIVE.has(sh.k.kind) !== sh.userBall;
     drawBanner(g, KEY_TITLE[sh.k.kind], playLine(sh), good ? '#ffd23f' : '#ff5a5a', situation);
   }
-  drawHint(g, 'SPACE: NEXT   ESC: SKIP THE KEY PLAYS');
+  drawHint(g, sh.label === 'HIGHLIGHT' ? 'SPACE: NEXT   ESC: BACK TO THE GAME' : 'SPACE: NEXT   ESC: SKIP THE KEY PLAYS');
 }

@@ -70,8 +70,8 @@ function withFourthDowns(d: StoryDrive): [SimPlay, SnapCredit | undefined][] {
   for (let i = 0; i < snaps.length; i++) {
     const a = snaps[i];
     out.push([a, d.credit.snaps[i] ?? undefined]);
-    // A logged 4th-down snap (a coach going for it) needs no rebuilding.
-    if (isKick(a) || a.turnover || a.down === 4 || a.kneel) continue;
+    // A logged 4th-down snap (a coach going for it) needs no rebuilding, nor does a played drive.
+    if (d.live || isKick(a) || a.turnover || a.down === 4 || a.kneel) continue;
     const at = a.yard + a.gain;
     const toGo = a.toGo - a.gain;
     const b = snaps[i + 1];
@@ -124,7 +124,7 @@ export function driveEvents(d: StoryDrive, view: KeyView): KeyPlay[] {
   return out;
 }
 
-const byImportance = (a: KeyPlay, b: KeyPlay) => b.priority - a.priority || Math.abs(b.play.gain) - Math.abs(a.play.gain);
+export const byImportance = (a: KeyPlay, b: KeyPlay) => b.priority - a.priority || Math.abs(b.play.gain) - Math.abs(a.play.gain);
 const inOrder = (a: KeyPlay, b: KeyPlay) => a.play.t - b.play.t;
 
 /** A drive's key plays at `level`, in order. */

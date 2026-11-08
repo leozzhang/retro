@@ -11,7 +11,7 @@ import type { SeasonState } from '../season/types';
 import { squadFor, staffFor } from '../season/world';
 import { CAREER_HINT, drawCareer, type CareerView } from './careerScreen';
 import { drawHint } from './hud';
-import { drawRich, linkText, newsRich, playerLink, teamLink, wrapSpans, type RichLine } from './links';
+import { drawRich, gameLink, linkText, newsRich, playerLink, teamLink, wrapSpans, type RichLine } from './links';
 import { ovrColor } from './rosterScreen';
 import { text } from './text';
 
@@ -284,7 +284,7 @@ function drawSeasonTab(g: CanvasRenderingContext2D, s: SeasonState, v: ProgramVi
       const us = x.home === id ? x.result.home : x.result.away;
       const them = x.home === id ? x.result.away : x.result.home;
       const res = `${us > them ? 'W' : 'L'} ${us}-${them}${x.result.ot ? ' OT' : ''}`;
-      text(g, res, L_X + L_W - 8, y, { align: 'right', color: us > them ? GREEN : RED, shadow: false });
+      linkText(g, res, L_X + L_W - 8, y, { align: 'right', color: us > them ? GREEN : RED, shadow: false }, gameLink(x.id));
     } else if (x.name) text(g, x.name.toUpperCase().slice(0, 12), L_X + L_W - 8, y, { align: 'right', color: ACCENT, shadow: false });
   });
   if (!games.length) text(g, 'NO GAMES ON THE SCHEDULE', L_X + 8, TOP + 32, { color: DIM, shadow: false });

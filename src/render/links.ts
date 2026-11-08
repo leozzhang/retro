@@ -5,13 +5,14 @@ import { squadFor } from '../season/world';
 import { text, type TextOpts } from './text';
 
 /**
- * Clickable names: team names open the team's program page, player names his card. Screens draw a
+ * Clickable names: team names open the team's program page, player names his card, scores the
+ * game's page (render/gameScreen.ts). Screens draw a
  * link with `linkText` (or `drawRich` for a line of news), which registers its box for the frame;
  * `Game.render` clears them first, and a click in the next update reads them with `linkAt`.
  * The pixel font is monospaced: every character is `size` px wide.
  */
 
-export type Link = { kind: 'team'; id: string } | { kind: 'player'; team: string; id: string };
+export type Link = { kind: 'team'; id: string } | { kind: 'player'; team: string; id: string } | { kind: 'game'; id: string };
 
 interface LinkBox {
   x: number;
@@ -70,6 +71,22 @@ export function linkText(g: CanvasRenderingContext2D, s: string, x: number, y: n
 
 export const teamLink = (id: string): Link => ({ kind: 'team', id });
 export const playerLink = (team: string, id: string): Link => ({ kind: 'player', team, id });
+export const gameLink = (id: string): Link => ({ kind: 'game', id });
+
+/** A score in a line of news ("31-28", "31-28 (2OT)"). */
+const SCORE = /\b\d+-\d+(?: \((?:\d*OT)\))?/;
+
+/**
+ * The span a news item's game links from: its score, or for a line with no score (a big game by a
+ * player) what comes after the colon.
+ */
+export function gameSpan(s: string, game: string | undefined): Span | null {
+  if (!game) return null;
+  const m = SCORE.exec(s);
+  if (m) return { start: m.index, len: m[0].length, link: gameLink(game) };
+  const at = s.lastIndexOf(': ');
+  return at >= 0 && at + 2 < s.length ? { start: at + 2, len: s.length - at - 2, link: gameLink(game) } : null;
+}
 
 // ------------------------------------------------------------ rich text: news with names in it
 
@@ -163,14 +180,21 @@ export function wrapSpans(s: string, spans: Span[], n: number): RichLine[] {
 const cache = new WeakMap<SeasonState, Map<string, RichLine[]>>();
 
 /** A news item as wrapped lines with its names linked (memoized per season state and text). */
-export function newsRich(state: SeasonState, n: Pick<NewsItem, 'text' | 'teams'>, width: number): RichLine[] {
+export function newsRich(state: SeasonState, n: Pick<NewsItem, 'text' | 'teams' | 'game'>, width: number): RichLine[] {
   let m = cache.get(state);
   if (!m) cache.set(state, (m = new Map()));
-  const key = `${width}|${n.teams.join(',')}|${n.text}`;
+  const key = `${width}|${n.teams.join(',')}|${n.game ?? ''}|${n.text}`;
   let lines = m.get(key);
   if (!lines) {
     const up = n.text.toUpperCase();
-    lines = wrapSpans(up, findSpans(state, up, n.teams), width);
+    const spans = findSpans(state, up, n.teams);
+    const g = gameSpan(up, n.game);
+    // The score's span, unless a name already covers it.
+    if (g && !spans.some((sp) => sp.start < g.start + g.len && g.start < sp.start + sp.len)) {
+      spans.push(g);
+      spans.sort((a, b) => a.start - b.start);
+    }
+    lines = wrapSpans(up, spans, width);
     m.set(key, lines);
   }
   return lines;

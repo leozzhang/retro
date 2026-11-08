@@ -37,6 +37,8 @@ export interface StoryDrive {
   credit: DriveCredit;
   /** A two-point try (overtime): one snap from the 3, good for `points` 2 or none. */
   try?: boolean;
+  /** Played on the field: every snap is logged (fourth downs too), so none are rebuilt. */
+  live?: boolean;
 }
 
 export interface GameStory {

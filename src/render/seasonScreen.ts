@@ -13,7 +13,7 @@ import { LEADER_CATEGORIES, leaders, seasonStats } from '../season/stats';
 import type { SeasonGame, SeasonState } from '../season/types';
 import { squadFor } from '../season/world';
 import { drawHint } from './hud';
-import { drawRich, linkText, newsRich, playerLink, teamLink, type RichLine } from './links';
+import { drawRich, gameLink, linkText, newsRich, playerLink, teamLink, type RichLine } from './links';
 import { getSprite, teamUniform } from './sprites';
 import { text } from './text';
 
@@ -548,7 +548,7 @@ function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {
     const school = teamById(opp).school.toUpperCase();
     drawRich(g, lineWith(`${vsText(x, u).padEnd(3)}${label}`, 3 + label.length - school.length, school.length, teamLink(opp)), PX + 32, y, { color: cur ? GOLD : '#ffffff' });
     const res = resultText(x, u);
-    text(g, res, PX + 262, y, { color: res.startsWith('W') ? GREEN : RED });
+    linkText(g, res, PX + 262, y, { color: res.startsWith('W') ? GREEN : RED }, x.result ? gameLink(x.id) : undefined);
     if (x.name) text(g, x.name.toUpperCase().slice(0, 16), PX + 352, y, { color: ACCENT });
   });
 }
@@ -572,8 +572,10 @@ function drawScores(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView):
       const at = l.startsWith('#') ? l.indexOf(' ') + 1 : 0;
       return lineWith('', off + at, l.length - at, teamLink(id)).spans;
     };
-    drawRich(g, { t: `${label(x.away).padEnd(15)} ${String(r.away).padStart(2)}`, spans: span(x.away, 0) }, PX + 40, y, { color: hw ? SOFT : '#ffffff' });
-    drawRich(g, { t: `@ ${label(x.home).padEnd(15)} ${String(r.home).padStart(2)}${r.ot ? ' OT' : ''}`, spans: span(x.home, 2) }, PX + 192, y, { color: hw ? '#ffffff' : SOFT });
+    // The scores open the game's page.
+    const score = (start: number, len: number) => ({ start, len, link: gameLink(x.id) });
+    drawRich(g, { t: `${label(x.away).padEnd(15)} ${String(r.away).padStart(2)}`, spans: [...span(x.away, 0), score(16, 2)] }, PX + 40, y, { color: hw ? SOFT : '#ffffff' });
+    drawRich(g, { t: `@ ${label(x.home).padEnd(15)} ${String(r.home).padStart(2)}${r.ot ? ' OT' : ''}`, spans: [...span(x.home, 2), score(18, r.ot ? 5 : 2)] }, PX + 192, y, { color: hw ? '#ffffff' : SOFT });
   });
 }
 

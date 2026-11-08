@@ -44,27 +44,27 @@ export function weekNews(state: SeasonState, week: number): NewsItem[] {
     const upset = !!lr && (!wr || wr - lr >= UPSET_GAP);
     if (w === user || l === user) {
       out.push({
-        week, kind: upset ? 'upset' : 'result', teams: [w, l],
+        week, kind: upset ? 'upset' : 'result', teams: [w, l], game: g.id,
         text: `${upset ? 'UPSET: ' : ''}${label}${name(w)} ${w === user ? 'beats' : 'tops'} ${name(l)} ${score(g)} (${teamById(user).abbr} ${recordText(recs.get(user)!)})`,
       });
     } else if (upset) {
-      out.push({ week, kind: 'upset', teams: [w, l], text: `UPSET: ${label}${name(w)} stuns ${name(l)} ${score(g)}` });
+      out.push({ week, kind: 'upset', teams: [w, l], game: g.id, text: `UPSET: ${label}${name(w)} stuns ${name(l)} ${score(g)}` });
     } else if (g.kind === 'champ' || g.kind === 'cfp' || (wr && lr)) {
-      out.push({ week, kind: 'result', teams: [w, l], text: `${label}${name(w)} beats ${name(l)} ${score(g)}` });
+      out.push({ week, kind: 'result', teams: [w, l], game: g.id, text: `${label}${name(w)} beats ${name(l)} ${score(g)}` });
     }
   }
 
-  const perf = games.flatMap((g) => g.result!.box.players).map((p) => {
+  const perf = games.flatMap((g) => g.result!.box.players.map((p) => ({ p, g }))).map(({ p, g }) => {
     const td = p.passTd + p.rushTd + p.recTd;
     const text =
       p.passYds >= 400 ? `${p.passYds} passing yards and ${p.passTd} TD` :
       p.rushYds >= 200 ? `${p.rushYds} rushing yards and ${p.rushTd} TD` :
       p.recYds >= 180 ? `${p.rec} catches for ${p.recYds} yards` :
       td >= 5 ? `${td} touchdowns` : '';
-    return { p, text, size: p.passYds / 2 + p.rushYds + p.recYds + td * 40 };
+    return { p, g, text, size: p.passYds / 2 + p.rushYds + p.recYds + td * 40 };
   }).filter((x) => x.text).sort((a, b) => b.size - a.size).slice(0, MAX_PERFORMANCES);
-  for (const { p, text } of perf) {
-    out.push({ week, kind: 'performance', teams: [p.team], text: `${p.name} (${teamById(p.team).abbr}): ${text}` });
+  for (const { p, g, text } of perf) {
+    out.push({ week, kind: 'performance', teams: [p.team], game: g.id, text: `${p.name} (${teamById(p.team).abbr}): ${text}` });
   }
 
   if (after && before && after.week === week && after.ranks[0] && after.ranks[0].team !== before.ranks[0]?.team) {

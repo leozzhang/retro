@@ -6,6 +6,7 @@ import { facingQB } from '../sim/ai';
 import { flightPos, passParams, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
 import { endurance, isEligible, poseOf, type Player } from '../sim/player';
+import type { Tape, TapeFrame } from '../game/tape';
 import { laneScores, levered } from '../sim/runBlocking';
 import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite, type Look } from './sprites';
 import { text } from './text';
@@ -290,6 +291,45 @@ export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, 
     g.globalAlpha = 1;
   }
   g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
+}
+
+/** One frame of a tape of a played snap (game/tape.ts): the men as they were, then the ball. */
+export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f: TapeFrame): void {
+  for (const m of f.men) {
+    const s = cam.toScreen(m.x, m.y);
+    drawShadow(g, s.x, s.y, 6);
+  }
+  const b = f.ball;
+  const airborne = b.state === 'air' || b.state === 'snap' || b.state === 'bounce';
+  if (airborne) {
+    const s = cam.toScreen(b.x, b.y);
+    drawShadow(g, s.x, s.y, 2.5);
+  }
+  const bs = getBallSprite();
+  const order = f.men.map((_, i) => i).sort((i, j) => f.men[i].y - f.men[j].y);
+  for (const i of order) {
+    const m = f.men[i];
+    const c = tape.cast[i];
+    const spr = getSprite(c.uniform, c.skin, m.pose, (cam.mirror ? -m.facing : m.facing) as 1 | -1, m.look);
+    const s = cam.toScreen(m.x, m.y);
+    if (m.juke > 0) {
+      for (let k = 3; k >= 1; k--) {
+        const gs = cam.toScreen(m.x - m.vx * k * 0.05, m.y - m.vy * k * 0.05);
+        g.globalAlpha = 0.6 - k * 0.15;
+        g.drawImage(spr, Math.round(gs.x - ANCHOR_X), Math.round(gs.y - ANCHOR_Y));
+      }
+      g.globalAlpha = 1;
+    }
+    g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
+    if (b.state === 'held' && b.carrier === i) {
+      const bp = cam.toScreen(b.x, b.y, b.z);
+      g.drawImage(bs, Math.round(bp.x - 4), Math.round(bp.y - 4));
+    }
+  }
+  if ((b.state === 'dead' && b.carrier < 0) || airborne) {
+    const s = cam.toScreen(b.x, b.y, b.z);
+    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
+  }
 }
 
 /**

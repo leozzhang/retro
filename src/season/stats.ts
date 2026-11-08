@@ -4,7 +4,7 @@ import type { PlayerLine, SeasonState } from './types';
 
 export type StatKey = Exclude<keyof PlayerLine, 'id' | 'team' | 'name' | 'pos'>;
 
-export const STAT_KEYS: StatKey[] = ['cmp', 'att', 'passYds', 'passTd', 'int', 'rush', 'rushYds', 'rushTd', 'rec', 'recYds', 'recTd', 'fgm', 'fga'];
+export const STAT_KEYS: StatKey[] = ['cmp', 'att', 'passYds', 'passTd', 'int', 'rush', 'rushYds', 'rushTd', 'rec', 'recYds', 'recTd', 'fgm', 'fga', 'sk', 'defInt'];
 
 export interface SeasonLine extends PlayerLine {
   games: number;

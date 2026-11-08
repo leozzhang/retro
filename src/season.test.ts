@@ -20,7 +20,7 @@ import { deleteSlot, freeSlot, latestSlot, loadSlot, migrateLegacySave, packSeas
 import { getItem, setItem } from './engine/storage';
 import { setUserDepth, useStaffDepth } from './season/staff';
 import { squadFor } from './season/world';
-import type { GameResult, SeasonGame, SeasonState } from './season/types';
+import type { GameResult, PlayerLine, SeasonGame, SeasonState } from './season/types';
 
 const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 const score = (home: number, away: number): GameResult => ({
@@ -126,6 +126,18 @@ describe('season', () => {
     expect(r.ot).toBeGreaterThan(0);
   });
 
+  it('saves load with whole yards, even ones written with fractions', () => {
+    const s = newSeason(defaultConfig('georgia'), 1);
+    const r = score(24, 20);
+    r.box.away.yards = 312.4600000001;
+    r.box.players = [{ id: 'x', name: 'X', team: 'alabama', pos: 'WR', recYds: 41.53, rec: 3 } as unknown as PlayerLine];
+    s.games = [{ id: 'g', week: 1, home: 'georgia', away: 'alabama', kind: 'conf', neutral: false, result: r }];
+    const back = unpackSeason(packSeason(s)).games[0].result!.box;
+    expect(back.away.yards).toBe(312);
+    expect(back.players[0].recYds).toBe(42);
+    expect(back.players[0].sk).toBe(0);
+  });
+
   it('standings: conference record first, then head-to-head', () => {
     const s = newSeason(defaultConfig('georgia'), 1);
     const g = (home: string, away: string, h: number, a: number): SeasonGame => ({
@@ -229,7 +241,8 @@ describe('season', () => {
     const packed = packSeason(s);
     // Box scores shrink by about half; progression (about 0.9 MB) and careers (about 2.4 MB a season)
     // don't pack. Saves are stored gzipped (engine/storage.ts): about 0.9 MB for a season.
-    const boxes = (x: unknown) => JSON.stringify((x as typeof s).games).length;
+    // (The box scores alone: a game's key plays, about 0.3 MB gzipped a season, are kept as they are.)
+    const boxes = (x: unknown) => JSON.stringify((x as typeof s).games.map((g) => g.result?.box)).length;
     expect(boxes(JSON.parse(packed))).toBeLessThan(boxes(s) * 0.6);
     expect(gzipSync(packed).length).toBeLessThan(1.5e6);
     expect(JSON.parse(JSON.stringify(unpackSeason(packed)))).toEqual(JSON.parse(JSON.stringify(s)));

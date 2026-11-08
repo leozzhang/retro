@@ -1,4 +1,7 @@
 import { writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
+import { seasonGameStars } from './season/gameStars';
+import { packSeason } from './season/save';
 import { it } from 'vitest';
 import { buildSquad, healthOf, healthy, HEALTH, positionOrder, reorderPosition, starters, teamRatings } from './data/depth';
 import { overallRaw, POS_ROLE, POSITIONS } from './data/positions';
@@ -1126,6 +1129,44 @@ function partialSim(): string[] {
   return rows;
 }
 
+/**
+ * GAME PAGES (docs/GAMES.md): who the star cards go to by position, how often there's an
+ * overperformer, the plays kept per game, games whose scoring plays don't add up to the final, and
+ * what the plays cost a save.
+ */
+function gamePages(seasons: SeasonState[]): string[] {
+  const group = (pos: string) => (['QB', 'HB', 'WR', 'TE', 'K'].includes(pos) ? pos : pos === 'FB' ? 'HB' : 'DEF');
+  const by = { pog: new Map<string, number>(), over: new Map<string, number>(), play: new Map<string, number>() };
+  let games = 0;
+  let plays = 0;
+  let off = 0;
+  let gz = 0;
+  let gzNone = 0;
+  for (const s of seasons) {
+    for (const g of s.games) {
+      const r = g.result;
+      if (!r) continue;
+      games++;
+      plays += r.plays?.length ?? 0;
+      const pts = (r.plays ?? []).reduce((t, p) => t + p.pts, 0);
+      if (pts !== r.home + r.away) off++;
+      for (const c of seasonGameStars(s, g)) by[c.kind].set(group(c.pos), (by[c.kind].get(group(c.pos)) ?? 0) + 1);
+    }
+    gz += gzipSync(packSeason(s)).length;
+    gzNone += gzipSync(packSeason({ ...s, games: s.games.map((g) => (g.result ? { ...g, result: { ...g.result, plays: undefined } } : g)) })).length;
+  }
+  const share = (m: Map<string, number>) =>
+    ['QB', 'HB', 'WR', 'TE', 'K', 'DEF'].map((k) => `${k} ${pctText((m.get(k) ?? 0) / games)}`).join('  ');
+  return [
+    '', '== GAME PAGES ==', '',
+    `player of the game  ${share(by.pog)}   (target: QB <= 40%, HB and WR clearly there, DEF ~10%)`,
+    `overperformer       ${share(by.over)}   (shown in ${pctText([...by.over.values()].reduce((a, b) => a + b, 0) / games)} of games)`,
+    `big play            ${share(by.play)}`,
+    `plays kept per game ${(plays / games).toFixed(1)}; scoring plays off the final in ${off} of ${games} games`,
+    `save size per season ${(gz / seasons.length / 1024).toFixed(0)} KB gzipped, ${((gz - gzNone) / seasons.length / 1024).toFixed(0)} KB of it the plays`,
+  ];
+}
+
 it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const n = Number(process.env.SEASONS ?? 5);
   const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
@@ -1155,7 +1196,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
     ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
-    ...portalReport(n), ...coaches(), ...partialSim(), ...detail(seasons[0]),
+    ...portalReport(n), ...coaches(), ...partialSim(), ...gamePages(seasons), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

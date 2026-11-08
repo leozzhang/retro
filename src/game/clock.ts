@@ -14,6 +14,8 @@ export const TWO_MIN = 120;
 export const QUARTER_OPTIONS = [4, 6, 8];
 export const QUARTER_DRIVES = [4, 5, 7];
 export const QUARTER_LABELS = ['SHORT', 'STANDARD', 'LONG'];
+/** The default game length (minutes a quarter), for new dynasties, exhibitions and old saves without one. */
+export const DEFAULT_QUARTER = 8;
 /** Play clock left at the snap when the clock was running: normal tempo huddles, hurry-up only lines up. */
 export const SNAP_AT = 14;
 export const HURRY_AT = 28;

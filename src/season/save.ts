@@ -49,11 +49,18 @@ export function packSeason(state: SeasonState): string {
 }
 
 export function unpackSeason(raw: string): SeasonState {
-  return mapLines(JSON.parse(raw) as SeasonState, (l) => {
+  const s = mapLines(JSON.parse(raw) as SeasonState, (l) => {
     const out = { ...l };
-    for (const k of STAT_KEYS) out[k] ??= 0;
+    // Rounded: saves from before the live game's CPU drives started on a whole yard have fractions.
+    for (const k of STAT_KEYS) out[k] = Math.round(out[k] ?? 0);
     return out;
   });
+  for (const g of s.games) {
+    for (const tl of g.result ? [g.result.box.home, g.result.box.away] : []) {
+      for (const k of Object.keys(tl) as (keyof typeof tl)[]) tl[k] = Math.round(tl[k]);
+    }
+  }
+  return s;
 }
 
 function parse(raw: string | null): SeasonState | null {

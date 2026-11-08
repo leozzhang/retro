@@ -45,7 +45,7 @@ Phases: `regular` (weeks 1–14) → `confChamp` (week 15) → `postseason` (wee
 - **Standings** (`standings.ts`): conference win %, then `TIEBREAKERS` in order (head-to-head among the tied teams, overall record, conference margin, a seeded coin flip). Conference records count only conference games, not the title game.
 - **Polls** (`polls.ts`): `AP_WEIGHTS` (62 voters) and `CFP_WEIGHTS` (13 members). Each voter scores every team on wins and losses, strength of schedule, capped margin, a preseason prior from the roster overall and prestige that fades by week 9 (AP only), and inertia toward last week's rank, plus personal noise. Ballots are counted Borda style.
 - **Postseason** (`postseason.ts`): title games between the top two in the standings (neutral site). Selection uses the final committee order: the top `autoBids` conference champions plus the best remaining teams, seeded straight. The bracket is the next power of two, so 12 teams give 4 byes; the first round is on campus. Bowls take the best remaining team from each tie-in conference, with 6+ wins, in `BOWLS` order.
-- **Stats and awards** (`stats.ts`, `awards.ts`): season totals and leaders from the box scores. `AWARDS` (Heisman, O'Brien, Walker, Biletnikoff, Groza) score production, scaled by team success for the Heisman and O'Brien. Awards are given at selection, before the bowls.
+- **Stats and awards** (`stats.ts`, `awards.ts`): season totals and leaders from the box scores. `AWARDS` (Heisman, O'Brien, Walker, Biletnikoff, Groza) score production, scaled by team success for the Heisman and O'Brien. Awards are given at selection, before the bowls. The user's live games count too: their box score is built as they're played (`season/liveBox.ts`: the user's snaps credited to who threw, caught or carried it, the CPU's drives cast like a simulated game's). At the default 8:00 quarters a live game has about 7 possessions a team against `simGame`'s 12, so the user's totals run on fewer, more productive drives.
 - **Coach career** (`coach.ts`): when on, job security moves with wins against `expectedWins` from prestige. Firing and offers aren't built yet.
 
 ## Hub controls
@@ -113,3 +113,6 @@ The comparison scripts (the ESPN fetch and a Python comparison) were scratch too
 - **Live games record only the score.** The user's players have no stats, so they never lead or win awards.
 - Average wins by tier: T1 10.2, T2 8.8, T3 5.8, T4 6.1, T5 2.8. Tier 4 above tier 3 is mostly the Group of Five teams beating each other.
 - The playoff format is the 2024–25 12-team format with straight seeding. The New Year's Six hosting playoff games and real bowl selection orders aren't modeled.
+
+## Game pages
+Every game keeps its key plays (`GameResult.plays`), and defenders get sacks and interceptions in the box score. Both come from what the sim already casts, so they draw no new random numbers. The season report's GAME PAGES section shows who the star cards go to and what the plays cost a save. See [GAMES.md](GAMES.md).
