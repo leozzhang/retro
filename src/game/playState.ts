@@ -12,6 +12,7 @@ import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS
 import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
   accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
+  startGather,
 } from '../sim/player';
 import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
 import {
@@ -1174,6 +1175,7 @@ export class Play {
           bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet, ready: this.catchReady, hot } : null,
           bestD ? { pos: sd, cth: bestD.r.cth, prc: bestD.r.prc, ready: readyAt(bestD, this.time) } : null,
           this.rng,
+          this.passTipped ? 0 : THROWS[this.thrownKind].jump,
         );
 
     if (res === 'catch' && bestO) {
@@ -1181,6 +1183,7 @@ export class Play {
       this.controlled = bestO;
       this.phase = 'run';
       setPose(bestO, 'catch', 0.25);
+      if (!this.passTipped) startGather(bestO, THROWS[this.thrownKind].gather);
       for (const d of this.def) d.reactAt = this.time + 0.12 + (1 - d.r.prc / 100) * 0.35;
       this.popup('CATCH!', bestO.pos, '#ffffff');
       return;

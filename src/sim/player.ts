@@ -93,6 +93,8 @@ export interface Player {
   eyes: number;
   /** When he locates a thrown ball (Infinity until there's one, or if it isn't near him). */
   findAt: number;
+  /** Seconds left gathering a bullet he just caught: his acceleration is cut (`GATHER`). */
+  gather: number;
   isBlocker: boolean;
   /** Turns into a pass blocker once the route (a play-action fake) is done. */
   thenBlock: boolean;
@@ -191,6 +193,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     lookAt: Infinity,
     eyes: 0,
     findAt: Infinity,
+    gather: 0,
     isBlocker: false,
     thenBlock: false,
     lateBlock: false,
@@ -273,6 +276,22 @@ export function startJuke(p: Player, dir: number): boolean {
   return true;
 }
 
+/**
+ * Gathering a bullet (docs/PASSING.md): a ball on a rope comes into his body, not his hands in stride.
+ * He keeps `keep` of his speed through the catch and has `accel` of his acceleration for `time` s.
+ * Sure hands ease both: a 100 `cth` takes `ease` off the hit, a 50 takes none. His `acc` still sets
+ * how fast he gets going again.
+ */
+export const GATHER = { time: 0.35, keep: 0.75, accel: 0.6, ease: 0.5 };
+
+/** Start gathering a bullet he just caught (sim/ball.ts `THROWS.gather` = 1 at full). */
+export function startGather(p: Player, amount: number): void {
+  if (amount <= 0) return;
+  const hit = amount * (1 - GATHER.ease * clamp((p.r.cth - 50) / 50, 0, 1));
+  p.vel = scale(p.vel, 1 - (1 - GATHER.keep) * hit);
+  p.gather = GATHER.time * hit;
+}
+
 export function accelOf(p: Player): number {
   return 10 + (p.r.acc / 100) * 10;
 }
@@ -333,7 +352,8 @@ export function tickTimers(p: Player, dt: number): void {
 
 export function stepPlayer(p: Player, dt: number): void {
   const want = p.down ? { x: 0, y: 0 } : p.want;
-  const decel = p.down ? 18 : accelOf(p) * (p.juke > 0 ? JUKE.accel : 1);
+  const decel = p.down ? 18 : accelOf(p) * (p.juke > 0 ? JUKE.accel : 1) * (p.gather > 0 ? GATHER.accel : 1);
+  if (p.gather > 0) p.gather = Math.max(0, p.gather - dt);
   const dv = limit(sub(want, p.vel), decel * dt);
   p.vel = add(p.vel, dv);
   p.pos = add(p.pos, scale(p.vel, dt));

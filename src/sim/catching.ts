@@ -31,18 +31,31 @@ export const READY = { hands: 0.5, contest: 0.5, dContest: 0.6, hot: 0.3 };
 export const SET_HANDS = 0.04;
 export const SET_CONTEST = 0.05;
 
+/**
+ * A jump ball: a LOB hangs long enough for both sides to get under it (docs/PASSING.md). `jump` (0..1,
+ * the throw type's, sim/ball.ts `THROWS`) flattens how much being a step closer matters to who wins
+ * it (the contest's `pos` exponent goes from 0.6 to `pos`), so a covered receiver still has a real shot. His surest
+ * hands of any throw (`hands`), a boost to his contest share from `cit` (`contest`, he high-points it),
+ * and more of the balls the defense gets to are picks (`int`, × the share of non-catches picked).
+ */
+export const JUMP = { pos: 0.45, hands: 0.05, contest: 0.2, int: 0.8 };
+
 export type CatchResult = 'catch' | 'int' | 'drop' | 'pbu' | 'miss';
 
 export const CATCH_REACH = 1.7;
 
 /** Probability of a catch by the offense and of an interception, given the best contender on each side. */
-export function catchOdds(o: Contender | null, d: Contender | null): { catch: number; int: number } {
+export function catchOdds(o: Contender | null, d: Contender | null, jump = 0): { catch: number; int: number } {
   const oPos = o ? Math.pow(clamp(o.pos, 0, 1), 0.6) : 0;
   const dPos = d ? Math.pow(clamp(d.pos, 0, 1), 0.6) : 0;
+  // In a jump ball, a step closer matters less to who wins it (not to whether an open man gets there).
+  const exp = lerp(0.6, JUMP.pos, jump);
+  const oJump = o ? Math.pow(clamp(o.pos, 0, 1), exp) : 0;
+  const dJump = d ? Math.pow(clamp(d.pos, 0, 1), exp) : 0;
   const set = o?.set ?? 0;
   const oReady = o?.ready ?? 1;
   const heat = o?.hot ? 1 - READY.hot * o.hot * (1.5 - o.cth / 100) : 1;
-  const hands = o ? 0.75 + (0.25 * o.cth) / 100 + SET_HANDS * set : 0;
+  const hands = o ? 0.75 + (0.25 * o.cth) / 100 + SET_HANDS * set + JUMP.hands * jump : 0;
   const open = o ? clamp(0.2 + 0.8 * oPos * hands, 0, 0.98) * lerp(READY.hands, 1, oReady) * heat : 0;
   if (!d) return { catch: open, int: 0 };
 
@@ -51,17 +64,17 @@ export function catchOdds(o: Contender | null, d: Contender | null): { catch: nu
   const intBase = clamp(0.08 + 0.5 * dPos * (dHands / 100), 0, 0.7) * dReady;
   if (!o) return { catch: 0, int: intBase };
 
-  const traffic = o.cit === undefined ? hands : 0.75 + (0.25 * o.cit) / 100 + SET_HANDS * set;
-  const oSkill = oPos * traffic * (1 + SET_CONTEST * set) * lerp(READY.contest, 1, oReady);
-  const dSkill = dPos * (0.6 + (0.4 * dHands) / 100) * lerp(READY.dContest, 1, dReady);
+  const traffic = o.cit === undefined ? hands : 0.75 + (0.25 * o.cit) / 100 + SET_HANDS * set + JUMP.hands * jump;
+  const oSkill = oJump * traffic * (1 + SET_CONTEST * set + (JUMP.contest * jump * (o.cit ?? o.cth)) / 100) * lerp(READY.contest, 1, oReady);
+  const dSkill = dJump * (0.6 + (0.4 * dHands) / 100) * lerp(READY.dContest, 1, dReady);
   const share = oSkill / (oSkill + dSkill * 0.9 + 1e-6);
   const pc = open * share;
-  return { catch: pc, int: (1 - pc) * intBase * 0.4 };
+  return { catch: pc, int: (1 - pc) * intBase * 0.4 * (1 + JUMP.int * jump) };
 }
 
-export function resolveCatch(o: Contender | null, d: Contender | null, rng: Rng): CatchResult {
+export function resolveCatch(o: Contender | null, d: Contender | null, rng: Rng, jump = 0): CatchResult {
   if (!o && !d) return 'miss';
-  const odds = catchOdds(o, d);
+  const odds = catchOdds(o, d, jump);
   const r = rng();
   if (r < odds.catch) return 'catch';
   if (r < odds.catch + odds.int) return 'int';

@@ -46,10 +46,31 @@ Each type sets the ball's speed, arc, range, error, pressure sensitivity and cat
 |---|---|---|---|
 | Speed (× the arm's) | 1.4 (`kindSpeed`: all of it from a 90 arm, 40% of the extra at 60) | 1 | 0.78 |
 | Arc height | 0.3× | 1× (the old single arc, exactly) | 1.6× |
-| Range | 55% of max | full | full |
+| Range | 42% of max (about 26–29 yd) | full | full |
 | Error, short → deep | 1.25 → 1.6× | 1× | 1.3 → 1.05× |
 | Pressure error | 1.5× | 1× | 1.2× |
 | Catch radius (both sides) | 0.8× | 1× | 1.15× |
+| After the catch | gathered (`GATHER`) | | |
+| At the catch | | | a jump ball (`JUMP`) |
+
+**What each is for:**
+- **BULLET threads the needle short and intermediate**, and gets the ball out fast on screens and quick game. It can't reach the deep third (the range), it's the throw most likely to get tipped, and it costs a step after the catch.
+- **TOUCH is the baseline**: the old arc, no extra costs.
+- **LOB is the throw to a man who isn't open.** It hangs the longest, so both the receiver and the defender get the most time to find it and get under it. It gives the receiver his best chance in a contest and the fewest drops, and gives the defense the most picks.
+
+**Gathering a bullet** (`startGather`, `GATHER` in sim/player.ts). A ball on a rope comes into his body, not his hands in stride:
+- He keeps `GATHER.keep` (75%) of his speed through the catch.
+- He has `GATHER.accel` (60%) of his acceleration for `GATHER.time` (0.35 s).
+- Sure hands ease both: a 100 `cth` takes off `GATHER.ease` (half), a 50 none. His `acc` still sets how fast he gets going again.
+- A tipped ball isn't gathered.
+- Measured over 1,500 reps of every pass play (hold 1.4 s): a bullet's yards after the catch are 11.6 without it and 9.6 with it, against 7.9 for touch. The bullet's yards per play go from 12.1 to 10.9, against touch's 10.4. A bullet still gets there first, so it keeps a little more run-after than touch.
+
+**The jump ball** (`catchOdds(o, d, jump)`, `JUMP` in sim/catching.ts; `THROWS.lob.jump` = 1, others 0, a tipped ball 0):
+- In the contest, being a step closer matters less (the contest's `pos` exponent goes from 0.6 to `JUMP.pos`, 0.45). Whether an open man gets there doesn't change.
+- The receiver gets `JUMP.hands` (+0.05) on his hands, the surest of any throw, and a contest boost of `JUMP.contest` × `cit` (he high-points it).
+- `JUMP.int` (+80%) more of the non-catches are picks.
+- At the same spot (receiver 0.6, defender 1.0 into his reach) a touch pass is 35% caught and 12% picked; a lob is 45% caught and 18% picked. An open receiver at the edge of his reach drops a lob least.
+- Its real cost is the long flight, which brings the defenders in.
 
 **Hot balls** (`hotness`, `HOT`). A bullet is hard to hang on to, which comes off the receiver's hands (`READY.hot`, eased by `cth`):
 - short: hot out to 18 yards, more with a big arm
@@ -87,7 +108,7 @@ Nothing new on the HUD. It's all in the players:
 ## Measured (`npm run balance`, THROW section)
 The THROW rows throw each type to one route against the man and the zone calls. ON TIME is 0.3 s out of his break. EARLY is the moment he plants, before his head is around.
 - **Throwing before the head comes around costs a lot.** Drag EARLY: 17–21% of bullets and touch passes find him ready (a lob, 71%), against 99–100% ON TIME. Early bullets to the in, quick out and curl complete 40–51%, against 66–84% on time.
-- **BULLET:** best on quick throws through clean lanes (flat 84–92%, quick out vs man 78%, curl vs man 84%). It gets tipped 2–12% of the time on slants, ins and curls, and it's worse deep against zone (go 36%, against 66% for a LOB).
-- **LOB:** best over the top against zone (go: 66% complete, 31 yards per throw). Poor on anything short.
+- **BULLET:** best on quick throws through clean lanes (flat 83–84%, curl vs man about 90%). It gets tipped 3–15% of the time on slants, ins and curls. A 150-rep row swings about 8 points between runs, so compare shapes, not single rows.
+- **LOB:** the most intercepted throw (THROW ALL: 7.5–11.5%, against 0–3.3% for touch). Best over the top against zone (go: 72% complete, 33.5 yards per throw). On short routes it's picked 10–16% of the time, so it's the wrong throw there.
 - **TOUCH:** the middle. About equal to BULLET on curls and drags against zone, better than BULLET deep against zone.
 - **Flag:** BULLET still edges TOUCH on most short and intermediate routes when the lane is clean. The harness picks receivers by separation, not by lane, so it under-counts tips.

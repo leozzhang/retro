@@ -8,6 +8,7 @@ import { cam, fakeInput } from './harness';
 import { eyesOf, FIND, readyAt, receiverFind } from './sim/ai';
 import { hotness, kindSpeed, passParams, THROWS } from './sim/ball';
 import { catchOdds, reachScore } from './sim/catching';
+import { GATHER, startGather } from './sim/player';
 import { maxThrowDist, throwErrorSd } from './sim/passing';
 
 const QB = { sac: 85, mac: 82, dac: 78, tup: 80, pac: 80 };
@@ -46,6 +47,38 @@ describe('throw types', () => {
     expect(catchOdds({ pos: 1, cth: 80, hot: 1 }, null).catch).toBeLessThan(catchOdds({ pos: 1, cth: 80 }, null).catch);
     expect(reachScore(1, THROWS.bullet.reach)).toBeLessThan(reachScore(1));
     expect(reachScore(1, THROWS.lob.reach)).toBeGreaterThan(reachScore(1));
+  });
+  it('a bullet is a short-to-intermediate throw, even from a cannon', () => {
+    expect(maxThrowDist(99, 'bullet')).toBeLessThan(30);
+    expect(maxThrowDist(70, 'bullet')).toBeGreaterThan(24);
+  });
+  it('a bullet has to be gathered: he slows through the catch, less with sure hands', () => {
+    const p = H.newPlay(H.referenceMatchup(), PLAYBOOK.find((q) => q.kind === 'pass')!, DEF_CALLS[0], mulberry32(1)).off.find((q) => q.role === 'WR')!;
+    p.vel = { x: 8, y: 0 };
+    startGather(p, THROWS.touch.gather);
+    expect(p.vel.x).toBe(8);
+    expect(p.gather).toBe(0);
+    p.r = { ...p.r, cth: 60 };
+    startGather(p, THROWS.bullet.gather);
+    const shaky = { v: p.vel.x, t: p.gather };
+    expect(shaky.v).toBeLessThan(8);
+    expect(shaky.t).toBeGreaterThan(0);
+    expect(shaky.t).toBeLessThanOrEqual(GATHER.time);
+    p.vel = { x: 8, y: 0 };
+    p.r = { ...p.r, cth: 95 };
+    startGather(p, THROWS.bullet.gather);
+    expect(p.vel.x).toBeGreaterThan(shaky.v);
+    expect(p.gather).toBeLessThan(shaky.t);
+  });
+  it('a lob is a jump ball: surest hands, more of the contested ones caught, and more picks', () => {
+    const o = { pos: 0.6, cth: 80, cit: 80 };
+    const d = { pos: 1, cth: 70, prc: 80 };
+    const lob = THROWS.lob.jump;
+    expect(THROWS.touch.jump).toBe(0);
+    expect(catchOdds({ ...o }, null, lob).catch).toBeGreaterThan(catchOdds({ ...o }, null).catch);
+    expect(catchOdds(o, d, lob).catch).toBeGreaterThan(catchOdds(o, d).catch);
+    expect(catchOdds(o, d, lob).int).toBeGreaterThan(catchOdds(o, d).int);
+    expect(catchOdds(o, d, 0)).toEqual(catchOdds(o, d));
   });
 });
 

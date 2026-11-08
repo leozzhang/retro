@@ -69,8 +69,8 @@ Controls are listed in [README.md](README.md).
 - **Art is original pixel art drawn in code** (`render/sprites.ts`). Don't copy Retro Bowl assets.
 - **Tuning constants sit next to their logic:**
   - `throwErrorSd`, `ACC_BANDS`, `composure` (`sim/passing.ts`)
-  - `catchOdds`, and the set-receiver bonus `SET_HANDS`, `SET_CONTEST`, readiness and hot balls `READY` (`sim/catching.ts`)
-  - eyes and finding the ball `FIND` (`sim/ai.ts`); throw types `THROWS`, `HOT`, `ROPE` (`sim/ball.ts`); in-flight tips `TIP`, the CPU QB's `CPU_THROW` (`game/playState.ts`). See [docs/PASSING.md](docs/PASSING.md)
+  - `catchOdds`, and the set-receiver bonus `SET_HANDS`, `SET_CONTEST`, readiness and hot balls `READY`, the lob's jump ball `JUMP` (`sim/catching.ts`)
+  - eyes and finding the ball `FIND` (`sim/ai.ts`); throw types `THROWS`, `HOT`, `ROPE` (`sim/ball.ts`), gathering a bullet `GATHER` (`sim/player.ts`); in-flight tips `TIP`, the CPU QB's `CPU_THROW` (`game/playState.ts`). See [docs/PASSING.md](docs/PASSING.md)
   - route running: `BURST`, `BURST_TAPER`, `PLANT_DECEL`, `cutKeep`, `TURN_TIME`, `SET_MAX_SPEED` (`sim/ai.ts`)
   - `tackleChance` and its squeeze `TACKLE_GAP`, `FALL_FORWARD`; kick returns: `returnTackleChance`, `BROKEN_TOLL` (`sim/tackling.ts`)
   - pass-pro shed and push rates (`Play.updateEngagements`), `ARM_TACKLE` (`game/playState.ts`)

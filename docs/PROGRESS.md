@@ -2,6 +2,22 @@
 
 _Last updated: 2026-11-07_
 
+## Done: each throw type has its own job (2026-11-07)
+Each throw type now has its own use and its own costs. Details are in [PASSING.md](PASSING.md).
+- **BULLET:**
+  - Range is cut from 55% to 42% of max (about 26–29 yd), so it's short and intermediate only.
+  - The receiver has to gather it (`GATHER`, `startGather`, sim/player.ts): 75% of his speed through the catch and 60% of his acceleration for 0.35 s. Good hands ease both. That takes a bullet's yards after catch from 11.6 to 9.6 per catch (touch: 7.9), and its yards per play from 12.1 to 10.9 (touch: 10.4).
+- **TOUCH:** unchanged; it's the baseline.
+- **LOB:** a jump ball (`JUMP`, sim/catching.ts, `catchOdds`'s third argument).
+  - In the contest, being a step closer matters less.
+  - The receiver gets surer hands (the fewest drops) and a contest boost from `cit`.
+  - 80% more of the non-catches are picks.
+  - THROW ALL: lob int 7.5–11.5%, touch 0–3.3%.
+  - The deep lob against zone went to 80% complete while the flattening also applied to uncontested catches. Limiting it to the contest brought it back to 72% (it was 66% before).
+- **Core rows (PLAY, PA, DEF, ROUTE, GAP, ADAPT) are byte-identical.** They throw TOUCH, and touch's `jump` and `gather` are 0.
+- **Still flagged:** BULLET edges TOUCH in completion rate on clean short throws (flat 83–84% vs 65–71%). The gather now takes back the yards after the catch, so the edge in yards is small.
+- `npm test`: 335 pass, 3 new: bullet range, gather, jump ball.
+
 ## Done: eyes on the ball, and three throw types (2026-11-07)
 Before this, only settle routes knew whether a receiver was ready for the ball (`set`). A slant's stem caught as well as its break. A defender either saw the throw or didn't, and every pass was the same arc. Details are in [PASSING.md](PASSING.md).
 - **Eyes and finding the ball:**

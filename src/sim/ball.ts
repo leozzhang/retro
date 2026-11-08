@@ -36,15 +36,16 @@ export function flightPos(from: Vec3, to: Vec3, peak: number, s: number): Vec3 {
  * part × `pressure` (a bullet needs his feet set and a step into it). `reach` scales
  * the catch radius (sim/catching.ts `CATCH_REACH`) for everyone: there's no adjusting to a rope, and all
  * the time in the world under a floater. On short
- * throws it's `hot`, and deep it's a rope over his shoulder (`hotness`, sim/catching.ts `READY.hot`). LOB floats
- * it high and slow over the underneath defenders.
+ * throws it's `hot`, and deep it's a rope over his shoulder (`hotness`, sim/catching.ts `READY.hot`); and
+ * he has to `gather` it before he runs (sim/player.ts `GATHER`). LOB floats it high and slow over the
+ * underneath defenders and comes down as a `jump` ball (sim/catching.ts `JUMP`).
  */
 export type ThrowKind = 'bullet' | 'touch' | 'lob';
 export const THROW_KINDS: ThrowKind[] = ['bullet', 'touch', 'lob'];
-export const THROWS: Record<ThrowKind, { speed: number; release: number; peak: number; range: number; errShort: number; errDeep: number; pressure: number; reach: number }> = {
-  bullet: { speed: 1.4, release: 0.12, peak: 0.3, range: 0.55, errShort: 1.25, errDeep: 1.6, pressure: 1.5, reach: 0.8 },
-  touch: { speed: 1, release: 0.18, peak: 1, range: 1, errShort: 1, errDeep: 1, pressure: 1, reach: 1 },
-  lob: { speed: 0.78, release: 0.22, peak: 1.6, range: 1, errShort: 1.3, errDeep: 1.05, pressure: 1.2, reach: 1.15 },
+export const THROWS: Record<ThrowKind, { speed: number; release: number; peak: number; range: number; errShort: number; errDeep: number; pressure: number; reach: number; jump: number; gather: number }> = {
+  bullet: { speed: 1.4, release: 0.12, peak: 0.3, range: 0.42, errShort: 1.25, errDeep: 1.6, pressure: 1.5, reach: 0.8, jump: 0, gather: 1 },
+  touch: { speed: 1, release: 0.18, peak: 1, range: 1, errShort: 1, errDeep: 1, pressure: 1, reach: 1, jump: 0, gather: 0 },
+  lob: { speed: 0.78, release: 0.22, peak: 1.6, range: 1, errShort: 1.3, errDeep: 1.05, pressure: 1.2, reach: 1.15, jump: 1, gather: 0 },
 };
 export const HOT = { to: 18, armFrom: 60, armBase: 0.4, deepFrom: 20, deepSpan: 15, deep: 0.8 };
 
