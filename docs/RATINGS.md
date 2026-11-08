@@ -11,11 +11,11 @@ Every rating is a 0-99 number that some sim formula reads. The rule: **no rating
 | | `str` Strength | 40% of the carrier's side of a tackle; falling forward (carrier minus tackler); 20% of a blocker's anchor (`ANCHOR_STR`) | `tackleChance`, `fallForward`, `passBlockValue`, `runBlockValue` |
 | | `sta` Stamina | How long a full sprint lasts and how fast it recovers. **Only for the player you control** | `endurance` |
 | Carrier | `elu` Elusiveness | 60% of the carrier's side of a tackle | `tackleChance` |
-| Receiving | `cth` Catching | Hands on open catches, pitches (`pitchOdds`) and kicks (muffs); a defender's ball skills on interceptions (60%) | `catchOdds` |
+| Receiving | `cth` Catching | Hands on open catches, pitches (`pitchOdds`) and kicks (muffs); how soon he finds a thrown ball he wasn't looking for, and holding on to a hot bullet ([PASSING.md](PASSING.md)); a defender's ball skills on interceptions (60%) and tips (50%) | `catchOdds`, `receiverFind`, `Play.inFlight` |
 | | `cit` Catch in Traffic | The receiver's share of a contested ball | `catchOdds` |
-| | `rte` Route Running | Burst off the line and out of breaks, speed carried through cuts (`cutKeep`), turning to the QB on settle routes | `runRoute`, `turnTime` |
+| | `rte` Route Running | Burst off the line and out of breaks, speed carried through cuts (`cutKeep`), turning to the QB on settle routes, and turning his head to the QB out of a break ([PASSING.md](PASSING.md)) | `runRoute`, `turnTime`, `eyesOf` |
 | | `rls` Release | Beating the press jam at the snap (against the corner's `prs`) | `Play.snap` |
-| QB | `arm` Throw Power | Max throw distance (42 + 0.28·arm yd) and ball speed | `maxThrowDist`, `passParams` |
+| QB | `arm` Throw Power | Max throw distance (42 + 0.28·arm yd) and ball speed; how much a bullet adds to it (all from 90, 40% at 60) | `maxThrowDist`, `passParams`, `kindSpeed` |
 | | `sac` / `mac` / `dac` Short / Medium / Deep Accuracy | Throw error. Short to 8 yd, medium 14-20, deep 28+, blended in between (`ACC_BANDS`) | `accuracyAt`, `throwErrorSd` |
 | | `tup` Throw on the Run | Scales the extra error from moving: `composure(tup)` = 1 at 80, 1.5 at 55, 0.7 at 95 | `throwErrorSd` |
 | | `pac` Poise | Scales the extra error under pressure the same way | `throwErrorSd` |
@@ -27,7 +27,7 @@ Every rating is a 0-99 number that some sim formula reads. The rule: **no rating
 | | `mcv` Man Coverage | Reaction lag trailing a receiver in man; reaction to the throw when in man | `cover`, `Play.throwBall` |
 | | `zcv` Zone Coverage | Reaction to the throw from a zone (Cover 2, 3, 4, Tampa 2, Fire Zone: [DEFENSE.md](DEFENSE.md)) | `Play.throwBall` |
 | | `prs` Press | Winning the jam at the line (against the receiver's `rls`) | `Play.snap` |
-| | `prc` Play Recognition | Reading run, play action and pitches; run-fit timing; 40% of interception ball skills; how much of the offense's in-game tendencies he leans on ([DEFENSE.md](DEFENSE.md)) | `reactToRun`, `sellFake`, `catchOdds`, `leansFor` |
+| | `prc` Play Recognition | Reading run, play action and pitches; run-fit timing; 40% of interception ball skills; 50% of tipping a pass in flight; how much of the offense's in-game tendencies he leans on ([DEFENSE.md](DEFENSE.md)) | `reactToRun`, `sellFake`, `catchOdds`, `leansFor` |
 | Kicking | `kpw` Kick Power | Leg speed: distance on kicks and punts | `legSpeed` |
 | | `kac` Kick Accuracy | Kick error and the width of the timing meter's green | `kickErrorSd`, `timingGreen` |
 

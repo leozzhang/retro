@@ -109,7 +109,8 @@ export function thinkOffense(play: Play, p: Player): void {
     p.want = play.phase === 'snap' ? seek(p, play.qbDrop, maxSpeed(p) * 0.8, 0.8) : ZERO;
     return;
   }
-  if (play.phase === 'air' && p === play.intended && play.ballTarget) {
+  // He keeps running his route until he finds the ball.
+  if (play.phase === 'air' && p === play.intended && play.ballTarget && (play.pitch || play.time >= p.findAt)) {
     // A pitch is led to where the back gets at full tilt, so he runs through the spot rather than timing it.
     const d = sub(play.ballTarget, p.pos);
     if (play.pitch) p.want = len(d) > 0.3 ? scale(norm(d), maxSpeed(p)) : p.vel;
@@ -169,6 +170,44 @@ export function facingQB(p: Player, qb: Player, time: number): number {
   return clamp((time - p.turnAt) / turnTime(p), 0, 1);
 }
 
+/**
+ * Finding the ball (docs/PASSING.md). At the throw, each player's `eyes` turn into `findAt`, when he
+ * locates the ball:
+ * - a receiver: at the throw with his head around, up to `blind` later (less with `cth`) with it still
+ *   downfield; if his head comes around in flight, `base` after that
+ * - a defender: his break on the throw (`react`) facing the QB; trailing his man, `trail` of the flight,
+ *   and no sooner than `trailLeft` before it comes down (he plays the receiver's hands on a long ball)
+ * `settle` is the look he needs before it arrives to play it cleanly (`Contender.ready`).
+ * Defenders' `eyes`: `backpedal` for a man defender still facing the QB, `lbMan` for a backer in man,
+ * 0 trailing his man with his back turned, 1 for everyone else (zones, spies, rushers).
+ */
+export const FIND = { base: 0.08, blind: 0.6, settle: 0.25, trail: 0.6, trailLeft: 0.8, backpedal: 0.8, lbMan: 0.7 };
+
+/** 0..1: how much `p` has the QB in view right now (see `Player.eyes`). */
+export function eyesOf(play: Play, p: Player): number {
+  if (p.side === 'off') {
+    if (!p.passRoute || p.isBlocker) return 0;
+    if (p.settle) return facingQB(p, play.qb, play.time);
+    return clamp((play.time - p.lookAt) / turnTime(p), 0, 1);
+  }
+  if (p.assign?.kind !== 'man' || p.manTarget?.isBlocker) return 1;
+  if (!p.turned) return FIND.backpedal;
+  return p.role === 'LB' ? FIND.lbMan : 0;
+}
+
+/**
+ * When a receiver with `eyes` locates a ball thrown at `time`: looking at the QB, he sees it leave his
+ * hand; with his head still downfield, up to `blind` later, less with good hands.
+ */
+export function receiverFind(p: Player, time: number): number {
+  return time + (1 - p.eyes) * FIND.blind * (1.25 - (0.5 * p.r.cth) / 100);
+}
+
+/** 0..1: how much of a look he got before the ball arrived at `time` (see `Contender.ready`). */
+export function readyAt(p: Player, time: number): number {
+  return clamp((time - p.findAt) / FIND.settle, 0, 1);
+}
+
 function runRoute(play: Play, p: Player): void {
   let sp = maxSpeed(p) * 0.95;
   if (p.jam > 0) sp *= 0.45;
@@ -184,6 +223,8 @@ function runRoute(play: Play, p: Player): void {
       const vb = maxSpeed(p) * 0.95 * p.cutKeep[p.routeIdx];
       sp = Math.min(sp, Math.sqrt(vb * vb + 2 * PLANT_DECEL * dist(p.pos, p.route[p.routeIdx])));
     }
+    // His head comes around once he's out of his break (or deep enough on a straight route).
+    if (!p.settle && p.lookAt === Infinity && (p.routeIdx >= p.look || p.pos.x - p.start.x >= p.lookDepth)) p.lookAt = play.time;
     // A settle route turns to the QB as he comes back down the final leg, or once he stops.
     if (p.settle && p.turnAt === Infinity) {
       const n = p.route.length;
@@ -221,11 +262,6 @@ function runRoute(play: Play, p: Player): void {
 export function isRusher(d: Player): boolean {
   const t = d.manTarget;
   return d.assign?.kind === 'rush' || (d.assign?.kind === 'man' && !!t?.isBlocker && !t.lateBlock && !t.stalk);
-}
-
-/** Defenders who are facing the QB when he throws and can break on the ball right away. */
-export function seesThrow(d: Player): boolean {
-  return d.assign?.kind !== 'man' || !d.turned || d.role === 'LB' || !!d.manTarget?.isBlocker;
 }
 
 function pickRusher(play: Play, p: Player): Player | null {

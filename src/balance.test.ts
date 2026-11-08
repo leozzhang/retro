@@ -7,7 +7,7 @@ import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
 import { teamById } from './data/teams';
 import { FIELD_W, STEP } from './engine/constants';
-import { add, clamp, dist, mulberry32, scale, type Rng } from './engine/math';
+import { add, clamp, dist, len, mulberry32, norm, scale, sub, type Rng } from './engine/math';
 import type { KickPlay } from './game/kickPlay';
 import type { Play } from './game/playState';
 import { resolvePlay } from './game/resolvePlay';
@@ -15,6 +15,7 @@ import { applyKick, startDrive } from './game/rules';
 import { newWind } from './game/wind';
 import { CALM, type KickParams, type Wind } from './sim/kicking';
 import type { Player } from './sim/player';
+import { THROW_KINDS, type ThrowKind } from './sim/ball';
 import * as H from './harness';
 import { cam, fakeInput, LOS, median } from './harness';
 
@@ -30,10 +31,10 @@ const runKick = (kd: KickDef, los: number, params: (kp: KickPlay) => KickParams,
   H.runKick(M, kd, los, params, wind, rng);
 
 /** Auto-QB throws to the receiver with the most separation after a fixed hold time. */
-function passLine(plays: PlayDef[], call: DefCall, holdTime: number, reps: number, rng: Rng, x?: H.DefExtras): string {
+function passLine(plays: PlayDef[], call: DefCall, holdTime: number, reps: number, rng: Rng, x?: H.DefExtras, kind: ThrowKind | 'auto' = 'touch'): string {
   const stats = { n: 0, comp: 0, int: 0, sack: 0, yards: 0, sackT: 0, pbu: 0, yac: 0, td: 0 };
   for (let i = 0; i < reps; i++) {
-    const { play, catchX } = H.passRep(M, plays[i % plays.length], call, holdTime, rng, x);
+    const { play, catchX } = H.passRep(M, plays[i % plays.length], call, holdTime, rng, x, LOS, kind);
     const o = play.outcome;
     if (!o) continue;
     stats.n++;
@@ -160,6 +161,92 @@ function routeRows(rng: Rng): string[] {
   }
   return rows;
 }
+
+/**
+ * Throw types (docs/PASSING.md): each kind to one route, against the man and the zone calls, thrown
+ * `ROUTE_THROW_AFTER` out of his break (ON TIME) or the moment he plants (EARLY, head not around yet),
+ * led along the leg he's on.
+ * `ready` is the share of catch attempts where he'd found the ball in time; `tip` is tipped in flight.
+ * Then the auto-QB's whole pass game per kind, and with the CPU's pick (AUTO).
+ */
+const THROW_ROUTES: [RouteName, number][] = [
+  ['slant', 1.6], ['in', 3.1], ['quickOut', 1.9], ['curl', 2.7], ['corner', 2.8], ['go', 2.1], ['drag', 1.5], ['flat', 1.2],
+];
+
+function throwRows(pass: PlayDef[], rng: Rng): string[] {
+  const rows: string[] = [];
+  const calls = DEF_CALLS.filter((c) => !c.situational);
+  const byCov = { man: calls.filter((c) => c.coverage === 'man'), zone: calls.filter((c) => c.coverage === 'zone') };
+  for (const [route, brk] of THROW_ROUTES) {
+    const plays = PLAYBOOK.filter((pd) => {
+      if (pd.kind === 'run') return false;
+      const r = resolvePlay(pd, 26.6, false).routes;
+      return Object.entries(r).some(([slot, rn]) => rn === route && slot !== 'RB' && slot !== 'FB');
+    });
+    if (!plays.length) continue;
+    for (const early of [false, true]) {
+      for (const kind of THROW_KINDS) {
+        for (const cov of ['man', 'zone'] as const) {
+          const s = { att: 0, comp: 0, int: 0, tip: 0, ready: 0, tries: 0, yds: 0 };
+          for (let i = 0; i < THROW_REPS; i++) {
+            const play = newPlay(plays[i % plays.length], byCov[cov][i % byCov[cov].length], rng);
+            play.snap();
+            const tgt = play.off.find((o) => o.routeName === route && o.role !== 'RB' && !o.isBlocker);
+            if (!tgt) continue;
+            const keep = tgt.cutKeep.slice(0, tgt.settle ? -1 : undefined);
+            const sharpest = Math.min(...keep);
+            const bi = keep.length && sharpest < 0.97 ? keep.indexOf(sharpest) : -1;
+            let brokeAt = Infinity;
+            let thrown = false;
+            for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
+              if (bi >= 0 && brokeAt === Infinity && tgt.routeIdx > bi) brokeAt = play.time;
+              const after = early ? 0 : ROUTE_THROW_AFTER;
+              const due = bi >= 0 ? play.time >= brokeAt + after : play.time - play.snapTime >= brk * (early ? 0.6 : 1) + after;
+              if (!thrown && play.phase === 'live' && due) {
+                // Led along the leg he's on now (not his velocity, which lags a break), or to the spot he settles at.
+                const n = tgt.route.length;
+                const next = tgt.routeIdx < n ? tgt.route[tgt.routeIdx] : null;
+                const dir = next ? norm(sub(next, tgt.pos)) : tgt.routeDir ?? { x: 0, y: 0 };
+                // A settle route is thrown to his spot; the rest are led by the ball's flight time.
+                const aim = tgt.settle ? tgt.route[n - 1] : play.cpuAim(tgt, kind, dir, Math.max(len(tgt.vel), 6)).aim;
+                play.throwBall({ x: Math.min(aim.x, 119), y: clamp(aim.y, 1.5, FIELD_W - 1.5) }, kind);
+                thrown = true;
+              }
+              const before = play.phase;
+              play.update(STEP, fakeInput, cam);
+              if (before === 'air' && play.phase !== 'air' && !play.passTipped) {
+                s.tries++;
+                if (play.catchReady >= 0.95) s.ready++;
+              }
+            }
+            const o = play.outcome;
+            if (!o || !thrown) continue;
+            s.att++;
+            if (play.passTipped) s.tip++;
+            if (o.type === 'int' || o.type === 'pick6') s.int++;
+            else s.yds += o.spot - LOS;
+            if (['tackle', 'oob', 'td'].includes(o.type)) s.comp++;
+          }
+          const n = Math.max(1, s.att);
+          rows.push(
+            `THROW ${route.padEnd(9)} ${(early ? 'EARLY' : 'ON TIME').padEnd(7)} ${kind.toUpperCase().padEnd(6)} ${cov.padEnd(4)} | att ${String(s.att).padStart(3)} ` +
+              `comp ${((s.comp / n) * 100).toFixed(0).padStart(3)}% int ${((s.int / n) * 100).toFixed(1).padStart(4)}% tip ${((s.tip / n) * 100).toFixed(1).padStart(4)}% ` +
+              `ready ${((s.ready / Math.max(1, s.tries)) * 100).toFixed(0).padStart(3)}% ypt ${(s.yds / n).toFixed(1)}`,
+          );
+        }
+      }
+    }
+  }
+  rows.push('');
+  for (const kind of [...THROW_KINDS, 'auto'] as const) {
+    for (const hold of [1.2, 2.2]) {
+      rows.push(`THROW ALL ${kind.toUpperCase().padEnd(6)} hold ${hold}s | ${passLine(pass, calls[0], hold, REPS, rng, undefined, kind)} (vs ${calls[0].name})`);
+      rows.push(`THROW ALL ${kind.toUpperCase().padEnd(6)} hold ${hold}s | ${passLine(pass, byCov.zone[1] ?? byCov.zone[0], hold, REPS, rng, undefined, kind)} (vs ${(byCov.zone[1] ?? byCov.zone[0]).name})`);
+    }
+  }
+  return rows;
+}
+const THROW_REPS = 150;
 
 function runRows(plays: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
@@ -472,5 +559,6 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   if (!only || only.includes('defense')) rows.push('', ...defenseRows(pass, pa, runs, mulberry32(19)));
   if (!only || only.includes('adaptive')) rows.push('', ...adaptiveRows());
   if (!only || only.includes('disguise')) rows.push('', ...disguiseRows(pass, runs));
+  if (!only || only.includes('throw')) rows.push('', ...throwRows(pass, mulberry32(37)));
   writeFileSync(process.env.BAL_OUT ?? 'balance.txt', rows.join('\n'));
 }, 1_200_000);

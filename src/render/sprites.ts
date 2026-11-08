@@ -47,9 +47,15 @@ export function teamUniform(team: Team, home: boolean): Uniform {
 
 type Px = (x: number, y: number, w: number, h: number, col: string) => void;
 
+/**
+ * Where an upright player is looking (docs/PASSING.md): `back` = head turned back over his shoulder to
+ * the QB while he runs away from him; `hands` = hands up for a ball he's found; `backHands`, both.
+ */
+export type Look = 'fwd' | 'back' | 'hands' | 'backHands';
+
 // All poses are authored facing right in a 16x20 local box, then offset into
 // the 20x22 canvas so the outline pass has room.
-function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose): void {
+function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = 'fwd'): void {
   const running = pose.startsWith('run');
   const bob = pose === 'run1' || pose === 'run3' ? -1 : 0;
   const ux = running || pose === 'fight' ? 1 : pose === 'stumble' ? -1 : 0;
@@ -101,6 +107,32 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose): void {
   P(6 + ux, 9 + uy, 3, 2, u.trim);
   P(7 + ux, 6 + uy, 2, 1, skin);
 
+  if (look === 'back' || look === 'backHands') {
+    // Helmet turned back over his shoulder: the side view mirrored, facemask on the left.
+    P(6 + ux, 1 + uy, 4, 1, u.stripe);
+    P(5 + ux, 2 + uy, 6, 1, u.helmet);
+    P(7 + ux, 3 + uy, 4, 2, u.helmet);
+    P(5 + ux, 3 + uy, 2, 2, skin);
+    P(4 + ux, 3 + uy, 1, 3, u.mask);
+    P(5 + ux, 5 + uy, 2, 1, u.mask);
+    P(7 + ux, 5 + uy, 4, 1, u.helmet);
+    P(8 + ux, 3 + uy, 2, 2, u.logo);
+    P(7 + ux, 2 + uy, 2, 1, 'rgba(255,255,255,0.55)');
+  } else {
+    drawHelmet(P, u, skin, ux, uy);
+  }
+  if (look === 'hands' || look === 'backHands') {
+    // Both hands up for the ball, clear of the helmet: out in front, or back over his head for one
+    // coming over his shoulder (the same arms mirrored about the body).
+    const X = (x: number, w: number) => (look === 'hands' ? x : 16 - x - w) + ux;
+    P(X(11, 2), 5 + uy, 2, 3, u.jersey); P(X(12, 2), 3 + uy, 2, 2, skin);
+    P(X(10, 2), 4 + uy, 2, 2, u.jersey); P(X(11, 2), 0 + uy, 2, 3, u.jersey); P(X(12, 2), -1 + uy, 2, 2, skin);
+    return;
+  }
+  drawArm(P, u, skin, pose, ux, uy);
+}
+
+function drawHelmet(P: Px, u: Uniform, skin: string, ux: number, uy: number): void {
   // Helmet (side view, facemask on the right)
   P(6 + ux, 1 + uy, 4, 1, u.stripe);
   P(5 + ux, 2 + uy, 6, 1, u.helmet);
@@ -111,7 +143,9 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose): void {
   P(5 + ux, 5 + uy, 4, 1, u.helmet);
   P(6 + ux, 3 + uy, 2, 2, u.logo);
   P(7 + ux, 2 + uy, 2, 1, 'rgba(255,255,255,0.55)');
+}
 
+function drawArm(P: Px, u: Uniform, skin: string, pose: Pose, ux: number, uy: number): void {
   // Near arm
   switch (pose) {
     case 'run0':
@@ -238,7 +272,7 @@ function outline(g: CanvasRenderingContext2D, w: number, h: number): void {
   for (const [x, y] of edge) g.fillRect(x, y, 1, 1);
 }
 
-function paint(u: Uniform, skin: string, pose: Pose): HTMLCanvasElement {
+function paint(u: Uniform, skin: string, pose: Pose, look: Look): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = SPR_W;
   c.height = SPR_H;
@@ -253,21 +287,21 @@ function paint(u: Uniform, skin: string, pose: Pose): HTMLCanvasElement {
   else if (pose === 'stance') drawStance(P, u, skin);
   else if (pose === 'hold') drawHold(P, u, skin);
   else if (pose === 'drive') drawDrive(P, u, skin);
-  else drawUpright(P, u, skin, pose);
+  else drawUpright(P, u, skin, pose, look);
   outline(g, SPR_W, SPR_H);
   return c;
 }
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-export function getSprite(u: Uniform, skin: string, pose: Pose, facing: 1 | -1): HTMLCanvasElement {
-  const key = `${u.key}|${skin}|${pose}|${facing}`;
+export function getSprite(u: Uniform, skin: string, pose: Pose, facing: 1 | -1, look: Look = 'fwd'): HTMLCanvasElement {
+  const key = `${u.key}|${skin}|${pose}|${facing}|${look}`;
   let s = cache.get(key);
   if (s) return s;
   if (facing === 1) {
-    s = paint(u, skin, pose);
+    s = paint(u, skin, pose, look);
   } else {
-    const base = getSprite(u, skin, pose, 1);
+    const base = getSprite(u, skin, pose, 1, look);
     s = document.createElement('canvas');
     s.width = SPR_W;
     s.height = SPR_H;

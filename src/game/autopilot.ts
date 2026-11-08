@@ -1,6 +1,5 @@
-import { FIELD_W } from '../engine/constants';
 import type { Input } from '../engine/input';
-import { add, clamp, dist, scale } from '../engine/math';
+import { dist } from '../engine/math';
 import { isEligible, type Player } from '../sim/player';
 import { DRAW_SET } from '../sim/runBlocking';
 import type { Play } from './playState';
@@ -63,8 +62,8 @@ export function autoStep(play: Play, plan: AutoPlan): void {
     if (!play.thrown && play.phase === 'live' && play.carrier === play.qb && !play.scramble && since >= plan.hold) {
       const r = receiver(play, plan);
       if (r) {
-        const tgt = add(r.pos, scale(r.vel, dist(play.qb.pos, r.pos) / 22));
-        play.throwBall({ x: Math.min(tgt.x, 119), y: clamp(tgt.y, 1.5, FIELD_W - 1.5) });
+        const { aim, kind } = play.cpuAim(r);
+        play.throwBall(aim, kind);
       }
     }
   } else {

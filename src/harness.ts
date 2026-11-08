@@ -10,11 +10,12 @@ import { SLOT_POS } from './data/positions';
 import { RATING_KEYS, type Ratings } from './data/ratings';
 import { SLOT_ROLE, teamById, type RosterPlayer, type Team } from './data/teams';
 import { Camera } from './engine/camera';
-import { FIELD_W, STEP } from './engine/constants';
+import { STEP } from './engine/constants';
 import type { Input } from './engine/input';
-import { add, clamp, dist, scale, type Rng } from './engine/math';
+import { dist, type Rng } from './engine/math';
 import { KickPlay } from './game/kickPlay';
 import { Play, type PlaySetup } from './game/playState';
+import type { ThrowKind } from './sim/ball';
 import type { KickParams, Wind } from './sim/kicking';
 import { isEligible } from './sim/player';
 import { DRAW_SET } from './sim/runBlocking';
@@ -74,8 +75,12 @@ export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, l
   });
 }
 
-/** One auto-QB pass rep: throws to the receiver with the most separation after `holdTime`. `catchX` is where he caught it. */
-export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng, x?: DefExtras, los = LOS) {
+/**
+ * One auto-QB pass rep: throws to the receiver with the most separation after `holdTime`. `catchX` is where
+ * he caught it. `kind` is the throw type, or 'auto' for the CPU QB's pick (`cpuThrowKind`); the core rows
+ * throw TOUCH, the old single arc.
+ */
+export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng, x?: DefExtras, los = LOS, kind: ThrowKind | 'auto' = 'touch') {
   const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let thrown = false;
@@ -91,10 +96,9 @@ export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: n
         if (!best || sep > best.sep) best = { p: o, sep };
       }
       if (best) {
-        const lead = dist(play.qb.pos, best.p.pos) / 22;
-        const tgt = add(best.p.pos, scale(best.p.vel, lead));
-        // Keep the lead point in bounds, or a flat runner near the sideline gets a ball out of bounds.
-        (play as any).throwBall({ x: Math.min(tgt.x, 119), y: clamp(tgt.y, 1.5, FIELD_W - 1.5) });
+        // Led by the ball's flight time, and kept in bounds, or a flat runner near the sideline gets a ball out of bounds.
+        const { aim, kind: k } = play.cpuAim(best.p, kind === 'auto' ? undefined : kind);
+        play.throwBall(aim, k);
         thrown = true;
       }
     }

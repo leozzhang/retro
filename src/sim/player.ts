@@ -81,6 +81,18 @@ export interface Player {
   settle: boolean;
   /** When his turn toward the QB started (Infinity until then). */
   turnAt: number;
+  /** Receivers: the waypoint index past which he turns his head to the QB (`RouteDef.look`), or the depth for routes without a break. */
+  look: number;
+  lookDepth: number;
+  /** When his head came around to the QB (Infinity until then). */
+  lookAt: number;
+  /**
+   * 0..1: how much he has the QB in view right now (sim/ai.ts `eyesOf`). Receivers: head turned to the QB.
+   * Defenders: facing the backfield rather than trailing his man with his back turned.
+   */
+  eyes: number;
+  /** When he locates a thrown ball (Infinity until there's one, or if it isn't near him). */
+  findAt: number;
   isBlocker: boolean;
   /** Turns into a pass blocker once the route (a play-action fake) is done. */
   thenBlock: boolean;
@@ -174,6 +186,11 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     cutKeep: [],
     settle: false,
     turnAt: Infinity,
+    look: 1,
+    lookDepth: Infinity,
+    lookAt: Infinity,
+    eyes: 0,
+    findAt: Infinity,
     isBlocker: false,
     thenBlock: false,
     lateBlock: false,

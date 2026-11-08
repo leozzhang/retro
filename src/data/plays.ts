@@ -50,6 +50,13 @@ export interface RouteDef {
   delayBlock?: boolean;
   /** Lead blocker on a run: he's a blocker from the snap, runs the path, then run-blocks the first man he finds. */
   lead?: boolean;
+  /**
+   * Pass routes: the waypoint index past which he turns his head to the QB and expects the ball (default 1,
+   * out of the first break); 0 = from the start (screens, swings). Settle routes turn at the top instead.
+   */
+  look?: number;
+  /** Straight-line routes: he looks over his shoulder only this many yards downfield (go, seam). */
+  lookDepth?: number;
 }
 
 /**
@@ -62,8 +69,8 @@ export interface RouteDef {
 export const ROUTES: Record<RouteName, RouteDef> = {
   // Shapes follow NFL tracking medians (analysis/out/route_compare.md).
   // Go: drift ~15° toward the numbers, then straighten so it keeps some room on the sideline.
-  go: { pts: [[18, -4.8], [45, -5.5]], cont: true },
-  seam: { pts: [[4, 0.5], [45, 1.5]], cont: true },
+  go: { pts: [[18, -4.8], [45, -5.5]], cont: true, lookDepth: 12 },
+  seam: { pts: [[4, 0.5], [45, 1.5]], cont: true, lookDepth: 12 },
   slant: { pts: [[2, 0], [8, 6]], cont: true },
   // Quick out: the common NFL out. Leaves the 5.5-yd break at about -65°, then flattens.
   quickOut: { pts: [[5.5, 0], [7.5, -4.3], [8, -12]], cont: true },
@@ -79,8 +86,8 @@ export const ROUTES: Record<RouteName, RouteDef> = {
   // Drag: climbs at about 73° to 5-6 yd, then flattens.
   drag: { pts: [[2, 1], [5.5, 12.5], [6, 24]], cont: true },
   wheel: { pts: [[1.5, -5], [6, -10], [30, -11]], cont: true },
-  swing: { pts: [[-1, -4], [2, -10]], cont: true },
-  bubble: { pts: [[-1.5, -2], [-1, -6]], cont: true },
+  swing: { pts: [[-1, -4], [2, -10]], cont: true, look: 0 },
+  bubble: { pts: [[-1.5, -2], [-1, -6]], cont: true, look: 0 },
   block: { pts: [], cont: false },
   // Gun: cross in front of the QB (mesh), then the playside B gap.
   iz: { pts: [[0.7, 1.6], [3.8, 3.85], [7, 4.35]], cont: true, run: true },
@@ -99,11 +106,11 @@ export const ROUTES: Record<RouteName, RouteDef> = {
   // Smoke: one step up, then back toward the QB for a quick screen.
   smoke: { pts: [[1, 0], [0, 0.4]], cont: false },
   // Tunnel: come inside behind the line, then turn up behind the linemen.
-  tunnel: { pts: [[0.3, 2], [-0.8, 6], [1, 8.5]], cont: true },
+  tunnel: { pts: [[0.3, 2], [-0.8, 6], [1, 8.5]], cont: true, look: 0 },
   // Backs
   // Check-release: block, then leak to the flat and get just past the line.
-  checkFlat: { pts: [[1.5, -3], [5.5, -9]], cont: true, delay: 0.7, delayBlock: true },
-  screen: { pts: [[1.5, -3.5], [1.8, -6]], cont: false, delay: 0.9, delayBlock: true },
+  checkFlat: { pts: [[1.5, -3], [5.5, -9]], cont: true, delay: 0.7, delayBlock: true, look: 0 },
+  screen: { pts: [[1.5, -3.5], [1.8, -6]], cont: false, delay: 0.9, delayBlock: true, look: 0 },
   angle: { pts: [[1, -3], [4, -2], [6.5, 5]], cont: true },
   // Run paths. Under center / pistol inside zone: downhill at the playside B gap, free to cut back.
   izDeep: { pts: [[2.5, 0.8], [5.6, 2.6], [9, 3]], cont: true, run: true },

@@ -1,6 +1,40 @@
 # Progress
 
-_Last updated: 2026-11-06_
+_Last updated: 2026-11-07_
+
+## Done: eyes on the ball, and three throw types (2026-11-07)
+Before this, only settle routes knew whether a receiver was ready for the ball (`set`). A slant's stem caught as well as its break. A defender either saw the throw or didn't, and every pass was the same arc. Details are in [PASSING.md](PASSING.md).
+- **Eyes and finding the ball:**
+  - Every player has `eyes` (0..1, looking at the QB). Receivers turn their head out of the break (`RouteDef.look`, or `lookDepth` 12 yards on go and seam routes; screens and swings look from the start).
+  - Defenders: zones, spies and rushers 1; man defenders still backpedaling 0.8; backers in man 0.7; trailing 0.
+  - At the throw, `eyes` becomes `findAt` (`FIND`). A receiver who hasn't found the ball when it arrives catches about half as often (`READY`). The receiver it's meant for keeps running his route until he finds it.
+  - A defender who never found it can't pick it. A trailing defender finds it no sooner than 0.8 s before it lands.
+- **Throw types:**
+  - BULLET, TOUCH and LOB (`THROWS`): speed, arc, range, error, pressure error, catch radius. A bullet's speed scales with `arm` (`kindSpeed`), and it's hot short and a rope deep (`hotness`).
+  - TOUCH is the old arc exactly.
+  - Passes can be tipped in flight by a defender reading the QB with the ball under his reach (`TIP`). A tip is a pick or a free ball.
+  - The wheel or `1` picks the type (TOUCH each snap); the arc preview and a label by the reticle show it, and the aiming hint names the keys.
+  - The CPU QB picks its type (`cpuThrowKind`) on replays.
+- **Animation:**
+  - A receiver's helmet turns back to the QB once he's looking. Hands go up once he's found a ball coming down near him (sprite `Look`).
+  - Defenders reading the QB face the backfield; trailing man defenders show their backs.
+  - Checked in the browser build over the DevTools protocol: the head turn, the frames picked in flight (`back`, then `hands` within 5 yd), the LOB label and arc, wheel and `1` cycling, no console errors.
+- **Fixed along the way:** the intended receiver was whoever stood nearest the landing spot at release. On a long lead that was often somebody else. Now it's who's headed there (his position along his velocity at arrival).
+- **Measured** against a baseline from the last commit (all rows move, since tip rolls change the RNG stream):
+
+  | Rows | Before (comp / YPP) | After (comp / YPP) |
+  |---|---|---|
+  | PLAY | 68.7% / 7.74 | 69.4% / 7.53 |
+  | PA | 69.9% / 8.32 | 65.9% / 7.58 |
+  | DEF | 71.1% / 9.35 | 72.1% / 9.17 |
+  | ROUTE | 58.0% / 12.7 | 59.6% / 13.2 |
+
+  - GAP rows are byte-identical. ADAPT moves within noise, but the learning defense takes less off a quick-only offense than before (16+ snaps 4.9 → 5.7).
+  - The new THROW section's shape is in PASSING.md.
+- **The harness under-leads its throws.** The auto-QB leads by distance/22 s, short of the ball's real flight time. Leading by the real flight time took PASS from 4.7 to 8.0 YPP and PA from 7.8 to 12.7. It's kept, scaled per throw type (`CPU_THROW.lead`), so the rows stay comparable. A user who leads well may find passing easier than the balance rows say.
+- **Flag, not tuned: BULLET still edges TOUCH** on most short and intermediate routes through a clean lane (flat 84–92% vs 71–73%; quick out and in vs man +12–17 points). It loses deep against zone, and its costs are tips (2–12% on slants, ins and curls), a narrower catch radius, hot drops, and more error under pressure. The harness picks receivers by separation, not by lane, so it under-counts tips. Decide in play whether TOUCH needs a buff or BULLET more cost.
+- `npm test`: 332 pass, including 11 new in `passing.test.ts`: throw types, readiness, eyes on a slant and a go, defender eyes by coverage, tips on bullets vs lobs.
+- **Next:** non-intended receivers near a popped-up or overthrown ball should go for it; the CPU defense's DC could learn the user's throw types; key-play replays of tips.
 
 ## Done: the fan pulse's QB debate is league-relative (2026-11-06)
 Bug: "QB PLAY IS THE QUESTION" showed for ~43% of teams (nearly the whole Mountain West), and the "real deal" line never showed. The QB signal judged real-world YPA (under 6 bad, 7.8+ good), but the sim's box score puts every starter near 4.5 YPA.

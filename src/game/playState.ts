@@ -7,8 +7,8 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { cutKeep, facingQB, isRusher, matchZones, PREVENT, returnerAI, seesThrow, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
-import { launch, makeBall, passParams, startBounce, updateBounce, updateFlight, type Ball } from '../sim/ball';
+import { cutKeep, eyesOf, facingQB, FIND, isRusher, matchZones, PREVENT, readyAt, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
+import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
 import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
 import {
   accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
@@ -133,6 +133,32 @@ export const HARD_COUNT = { share: 0.6, time: 0.55, flinch: 0.55, jump: 0.5, off
 /** Routes that make a receiver the target of a screen (the others stalk-block for him). */
 const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble'];
 
+/**
+ * In-flight tips (`Play.inFlight`): a defender reading the QB within `width` yd of the ball, with it
+ * below his `reach` (yd, a jumping or arms-up hand), has up to `odds` of a hand on it: full odds with
+ * it `under` yd below his reach and right at him. `engaged` scales a lineman on his block. `pick` (×
+ * his cth) of tips by an unblocked man are caught; the rest pop `pop.dist` yd on, found `find` s later.
+ * Nothing within `clear` yd of the target (that's the catch, `resolveArrival`).
+ */
+export const TIP = {
+  width: 0.75,
+  reach: { DL: 2.8, LB: 2.9, DB: 3.0 },
+  under: 0.6,
+  odds: 0.35,
+  engaged: 0.35,
+  pick: 0.35,
+  clear: 1.8,
+  find: 0.2,
+  pop: { dist: 3, dur: 0.7, peak: 1.5 },
+};
+
+/**
+ * The CPU QB's throw types (`cpuThrowKind`): LOB past `lobFrom` yd, BULLET into a defender within `tight`
+ * yd of the spot inside `bulletMax`. He leads a receiver by distance / `lead` seconds on a touch throw
+ * (`cpuAim`; short of the ball's real flight time, which the balance rows were tuned with).
+ */
+export const CPU_THROW = { lobFrom: 30, tight: 2.5, bulletMax: 24, lead: 22 };
+
 export type HandoffKind = 'handoff' | 'pitch';
 
 /**
@@ -189,6 +215,16 @@ export class Play {
   thrown = false;
   /** How set (facing the QB, 0..1) the receiver was on the last catch attempt. */
   catchSet = 0;
+  /** How much of a look at the ball the receiver got on the last catch attempt (0..1, `readyAt`). */
+  catchReady = 1;
+  /** The throw type picked while aiming (the wheel or 1), TOUCH each snap; and the one in the air. */
+  throwKind: ThrowKind = 'touch';
+  thrownKind: ThrowKind = 'touch';
+  /** The pass was tipped in flight (by `tipper`); it's a free ball now. */
+  passTipped = false;
+  tipper: Player | null = null;
+  /** Defenders already checked for a tip on this throw. */
+  private tipChecked = new Set<Player>();
   outcome: PlayOutcome | null = null;
   popups: Popup[] = [];
   history = new Map<number, Vec[]>();
@@ -331,6 +367,8 @@ export class Play {
     // Speed carried through each waypoint, from how sharply the route turns there.
     p.passRoute = !r.run && !r.thenBlock && !r.lead;
     p.settle = p.passRoute && !r.cont && p.route.length > 0;
+    p.look = r.lookDepth !== undefined ? Infinity : r.look ?? 1;
+    p.lookDepth = r.lookDepth ?? Infinity;
     p.cutKeep = p.route.map((pt, i) => {
       const next = p.route[i + 1];
       if (!next) return r.cont ? 1 : 0;
@@ -683,6 +721,7 @@ export class Play {
         break;
       case 'air':
         if (updateFlight(this.ball, dt)) this.resolveArrival();
+        else if (!this.pitch) this.inFlight();
         break;
       case 'over':
         this.overTime += dt;
@@ -713,6 +752,7 @@ export class Play {
     this.updateEngagements(dt);
     this.blockCut();
     for (const p of this.players) stepPlayer(p, dt);
+    this.updateEyes();
     this.anchorBlockers();
     this.formEngagements();
 
@@ -774,6 +814,12 @@ export class Play {
     }
     const canThrow = !this.scramble && !qb.down;
     const m = input.mouse;
+    // Throw type: the wheel steps it (up = more loft), 1 cycles it (trackpads).
+    if (canThrow && (this.aim || m.wheel) && m.wheel) {
+      const i = THROW_KINDS.indexOf(this.throwKind) - Math.sign(m.wheel);
+      this.throwKind = THROW_KINDS[clamp(i, 0, THROW_KINDS.length - 1)];
+    }
+    if (canThrow && input.hit('Digit1')) this.throwKind = THROW_KINDS[(THROW_KINDS.indexOf(this.throwKind) + 1) % THROW_KINDS.length];
     if (canThrow && m.pressed) this.aim = { start: { x: m.downX, y: m.downY }, cur: { x: m.x, y: m.y } };
     if (!this.aim) return;
     this.aim.cur = { x: m.x, y: m.y };
@@ -784,7 +830,7 @@ export class Play {
       this.aim = null;
     } else if (m.released || !m.down) {
       const drag = len(sub(this.aim.start, this.aim.cur));
-      const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm);
+      const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm, this.throwKind);
       this.aim = null;
       if (drag >= MIN_DRAG_PX) this.throwBall(tgt);
     } else {
@@ -829,6 +875,7 @@ export class Play {
       launch(this.ball, from, to, dist(from, to) / PITCH_SPEED + 0.05, 0.35);
       this.ballTarget = { x: to.x, y: to.y };
       this.intended = rb;
+      rb.findAt = this.time;
       this.pitch = true;
       this.carrier = null;
       this.controlled = null;
@@ -983,11 +1030,49 @@ export class Play {
 
   /** Current aim point while dragging, for the trajectory preview. */
   aimPoint(cam: Camera): Vec | null {
-    return this.aim ? aimTarget(this.aim, this.qb.pos, cam, this.qb.r.arm) : null;
+    return this.aim ? aimTarget(this.aim, this.qb.pos, cam, this.qb.r.arm, this.throwKind) : null;
   }
 
-  /** Throw to `target` (the user's aim, or the CPU's on a replay). */
-  throwBall(target: Vec): void {
+  /**
+   * The CPU QB's throw type to `target` (replays, the harness; docs/PASSING.md): a deep shot is a LOB; a
+   * window with a reading defender under the line is thrown over him (TOUCH, or LOB if he'd get TOUCH
+   * too); a tight window short of `CPU_THROW.bulletMax` with a clean lane is a BULLET; the rest TOUCH.
+   */
+  cpuThrowKind(target: Vec): ThrowKind {
+    const qb = this.qb.pos;
+    const d = dist(qb, target);
+    if (d > CPU_THROW.lobFrom) return 'lob';
+    const under = (kind: ThrowKind) => {
+      const { peak } = passParams(d, this.qb.r.arm, kind);
+      return this.def.some((x) => {
+        if (x.down || x.eyes <= 0 || dist(x.pos, target) < TIP.clear) return false;
+        const s = clamp(((x.pos.x - qb.x) * (target.x - qb.x) + (x.pos.y - qb.y) * (target.y - qb.y)) / (d * d), 0, 1);
+        const at = { x: lerp(qb.x, target.x, s), y: lerp(qb.y, target.y, s) };
+        const z = lerp(2.0, 1.2, s) + 4 * peak * s * (1 - s);
+        return s > 0 && s < 1 && dist(x.pos, at) < TIP.width + 0.3 && z < TIP.reach[x.role === 'DL' ? 'DL' : x.role === 'LB' ? 'LB' : 'DB'];
+      });
+    };
+    if (under('bullet')) return under('touch') ? 'lob' : 'touch';
+    const tight = this.def.some((x) => !x.down && dist(x.pos, target) < CPU_THROW.tight);
+    return tight && d < CPU_THROW.bulletMax ? 'bullet' : 'touch';
+  }
+
+  /**
+   * Where the CPU QB throws to `p`, and with what: he picks the type for where `p` is (`cpuThrowKind`),
+   * then leads him by that ball's flight time along `dir` (his velocity unless given) at `speed`.
+   */
+  cpuAim(p: Player, kind?: ThrowKind, dir?: Vec, speed?: number): { aim: Vec; kind: ThrowKind } {
+    const k = kind ?? this.cpuThrowKind(p.pos);
+    const v = dir ? scale(dir, speed ?? len(p.vel)) : p.vel;
+    // The CPU's old touch lead (distance / CPU_THROW.lead), scaled by how much longer or shorter this type's ball is in the air.
+    const d = dist(this.qb.pos, p.pos);
+    const t = (d / CPU_THROW.lead) * (passParams(d, this.qb.r.arm, k).dur / passParams(d, this.qb.r.arm).dur);
+    const aim = add(p.pos, scale(v, t));
+    return { aim: { x: Math.min(aim.x, 119), y: clamp(aim.y, 1.5, FIELD_W - 1.5) }, kind: k };
+  }
+
+  /** Throw to `target` (the user's aim, or the CPU's on a replay) with the given throw type. */
+  throwBall(target: Vec, kind: ThrowKind = this.throwKind): void {
     const qb = this.qb;
     const rng = this.rng;
     let nearest = Infinity;
@@ -996,11 +1081,12 @@ export class Play {
     }
     const pressure = clamp((4 - nearest) / 4, 0, 1);
     const moving = clamp(len(qb.vel) / 6, 0, 1);
-    const sd = throwErrorSd(dist(qb.pos, target), qb.r, pressure, moving);
+    const sd = throwErrorSd(dist(qb.pos, target), qb.r, pressure, moving, kind);
     const to = { x: target.x + gauss(rng) * sd, y: target.y + gauss(rng) * sd * 0.8, z: 1.2 };
     const from = { x: qb.pos.x + qb.facing * 0.3, y: qb.pos.y, z: 2.0 };
-    const { dur, peak } = passParams(dist(from, to), qb.r.arm);
+    const { dur, peak } = passParams(dist(from, to), qb.r.arm, kind);
     launch(this.ball, from, to, dur, peak);
+    this.thrownKind = kind;
 
     this.ballTarget = { x: to.x, y: to.y };
     this.carrier = null;
@@ -1011,20 +1097,24 @@ export class Play {
 
     let best: Player | null = null;
     let bd = 15;
+    // The ball's for whoever's headed there: nearest to it where he'll be when it comes down, on his way.
     for (const o of this.off) {
       if (!isEligible(o) || o.down) continue;
-      const dd = dist(o.pos, this.ballTarget);
+      const dd = Math.min(dist(o.pos, this.ballTarget), dist(add(o.pos, scale(o.vel, dur)), this.ballTarget));
       if (dd < bd) {
         bd = dd;
         best = o;
       }
     }
     this.intended = best;
+    // Receivers find the ball soon with their heads around, late with them still downfield.
+    for (const o of this.off) o.findAt = isEligible(o) && !o.down ? receiverFind(o, this.time) : Infinity;
 
-    // Defenders facing the QB break on the throw; trailing man defenders only
-    // find the ball late in its flight.
+    // Defenders facing the QB break on the throw; trailing man defenders only find the ball late
+    // in its flight (FIND.trail of it), and the ones in between, in between.
     for (const d of this.def) {
       d.reactAt = Infinity;
+      d.findAt = Infinity;
       if (d.down) continue;
       const isMan = !!best && d.manTarget === best;
       if (dist(d.pos, this.ballTarget) < 14 || isMan) {
@@ -1037,7 +1127,8 @@ export class Play {
           : air > LEAN_FX.deepAir ? leanMul(d.lean.deep) * (1 + LEAN_FX.late * Math.max(0, d.lean.screen, d.lean.run))
           : leanMul(-d.lean.deep);
         const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean;
-        d.reactAt = this.time + (seesThrow(d) ? react + 0.1 : Math.max(react, dur * 0.6));
+        d.reactAt = this.time + lerp(Math.max(react, dur * FIND.trail, dur - FIND.trailLeft), react + 0.1, d.eyes);
+        d.findAt = d.reactAt;
       }
     }
   }
@@ -1063,7 +1154,7 @@ export class Play {
     let sd = 0;
     for (const p of this.players) {
       if (p.down || p.engaged || p.engagedBy.length) continue;
-      const s = reachScore(dist(p.pos, land));
+      const s = reachScore(dist(p.pos, land), this.passTipped ? 1 : THROWS[this.thrownKind].reach);
       if (s <= 0) continue;
       if (isEligible(p) && s > so) {
         so = s;
@@ -1074,11 +1165,14 @@ export class Play {
       }
     }
     this.catchSet = bestO ? facingQB(bestO, this.qb, this.time) : 0;
+    this.catchReady = bestO ? readyAt(bestO, this.time) : 1;
+    // A bullet on a short throw comes in hot (a tipped ball has none of that left).
+    const hot = this.passTipped ? 0 : hotness(this.thrownKind, dist(this.ball.from, this.ball.to), this.qb.r.arm);
     const res = oob
       ? 'miss'
       : resolveCatch(
-          bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet } : null,
-          bestD ? { pos: sd, cth: bestD.r.cth, prc: bestD.r.prc } : null,
+          bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet, ready: this.catchReady, hot } : null,
+          bestD ? { pos: sd, cth: bestD.r.cth, prc: bestD.r.prc, ready: readyAt(bestD, this.time) } : null,
           this.rng,
         );
 
@@ -1101,7 +1195,7 @@ export class Play {
       return;
     }
 
-    let sub = 'Nobody home';
+    let sub = this.passTipped && this.tipper ? `Tipped by #${this.tipper.num} ${this.tipper.name}` : 'Nobody home';
     if (oob) sub = 'Out of bounds';
     else if (res === 'pbu' && bestD) {
       setPose(bestD, 'catch', 0.4);
@@ -1382,6 +1476,75 @@ export class Play {
 
   private popup(text: string, at: Vec, color: string): void {
     this.popups.push({ text, x: at.x, y: at.y, t: 0, color });
+  }
+
+  /**
+   * Each player's eyes this step (`eyesOf`). Defenders reading the QB face him (a backpedal or a shuffle,
+   * not the way they're moving) until they break on a throw; in flight, a receiver whose head comes
+   * around finds the ball then.
+   */
+  private updateEyes(): void {
+    const reading = this.phase === 'snap' || this.phase === 'live' || this.phase === 'air';
+    for (const p of this.players) {
+      p.eyes = eyesOf(this, p);
+      if (!reading || p.down) continue;
+      if (p.side === 'def') {
+        const broke = this.phase === 'air' && this.time >= p.reactAt;
+        if (!broke && p.eyes > 0.5 && !p.engagedBy.length && !this.scramble) p.facing = this.qb.pos.x < p.pos.x ? -1 : 1;
+      } else if (this.phase === 'air' && p.eyes >= 1) {
+        p.findAt = Math.min(p.findAt, this.time + FIND.base);
+      }
+    }
+  }
+
+  /**
+   * A pass in flight (docs/PASSING.md): a defender with his eyes on the QB can get a hand on a ball that
+   * passes within `TIP.width` of him below his reach, on the way to somebody else. A tip is a pick
+   * (`TIP.pick`, with his hands) or a free ball popped up `TIP.pop` yards on. Linemen on their blocks
+   * still bat balls at the line, `TIP.engaged` as often. Lobs sail over everyone.
+   */
+  private inFlight(): void {
+    if (this.passTipped) return;
+    const b = this.ball;
+    const land = this.ballTarget!;
+    if (dist(b.pos, land) < TIP.clear) return;
+    for (const d of this.def) {
+      if (d.down || d.stun > 0 || this.tipChecked.has(d) || d.eyes <= 0) continue;
+      const reach = TIP.reach[d.role === 'DL' ? 'DL' : d.role === 'LB' ? 'LB' : 'DB'];
+      if (b.pos.z > reach || dist(d.pos, b.pos) > TIP.width || dist(d.pos, land) < TIP.clear) continue;
+      this.tipChecked.add(d);
+      const skill = (d.r.cth * 0.5 + d.r.prc * 0.5) / 100;
+      const close = 1 - dist(d.pos, b.pos) / TIP.width;
+      const low = Math.min(1, (reach - b.pos.z) / TIP.under);
+      const odds = TIP.odds * d.eyes * (0.5 + close * 0.5) * low * (0.5 + skill * 0.5) * (d.engagedBy.length ? TIP.engaged : 1);
+      if (this.rng() >= odds) continue;
+      this.passTipped = true;
+      this.tipper = d;
+      if (!d.engagedBy.length && this.rng() < TIP.pick * d.r.cth / 100) {
+        this.giveBall(d);
+        this.phase = 'run';
+        setPose(d, 'catch', 0.25);
+        for (const x of this.def) this.release(x);
+        for (const o of this.off) o.reactAt = this.time + 0.3 + this.rng() * 0.2;
+        this.popup('PICKED OFF!', d.pos, '#ff5a5a');
+        return;
+      }
+      // Popped up: everyone near it goes for the free ball.
+      setPose(d, 'catch', 0.3);
+      const dir = norm(sub(land, { x: b.pos.x, y: b.pos.y }));
+      const spot = { x: b.pos.x + dir.x * TIP.pop.dist * (0.4 + this.rng()), y: b.pos.y + dir.y * TIP.pop.dist * (0.4 + this.rng()) + gauss(this.rng) };
+      launch(this.ball, { ...b.pos }, { x: spot.x, y: spot.y, z: 1.0 }, TIP.pop.dur, TIP.pop.peak);
+      this.ballTarget = spot;
+      let near: Player | null = null;
+      for (const o of this.off) if (isEligible(o) && !o.down && (!near || dist(o.pos, spot) < dist(near.pos, spot))) near = o;
+      this.intended = near && dist(near.pos, spot) < 8 ? near : null;
+      for (const p of this.players) {
+        p.findAt = this.time + TIP.find;
+        if (p.side === 'def') p.reactAt = dist(p.pos, spot) < 8 && p !== d ? this.time + TIP.find : Infinity;
+      }
+      this.popup('TIPPED!', d.pos, '#ffd34d');
+      return;
+    }
   }
 
   ballTimeLeft(): number {

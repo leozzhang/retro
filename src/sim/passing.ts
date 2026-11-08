@@ -2,6 +2,7 @@ import { clamp, len, scale, sub, type Vec } from '../engine/math';
 import type { Camera } from '../engine/camera';
 import { FIELD_W } from '../engine/constants';
 import type { Ratings } from '../data/ratings';
+import { THROWS, type ThrowKind } from './ball';
 
 /** Screen-space multiplier: the target lands this many times the pull-back distance in front of the QB. */
 export const AIM_GAIN = 2.6;
@@ -12,21 +13,21 @@ export interface Aim {
   cur: Vec;
 }
 
-export function maxThrowDist(arm: number): number {
-  return 42 + arm * 0.28;
+export function maxThrowDist(arm: number, kind: ThrowKind = 'touch'): number {
+  return (42 + arm * 0.28) * THROWS[kind].range;
 }
 
 /**
  * Slingshot aiming: drag back from where you pressed; the target is projected the
  * opposite way from the QB, in screen space, so you aim at what you see.
  */
-export function aimTarget(aim: Aim, qbPos: Vec, cam: Camera, arm: number): Vec {
+export function aimTarget(aim: Aim, qbPos: Vec, cam: Camera, arm: number, kind: ThrowKind = 'touch'): Vec {
   const qbScreen = cam.toScreen(qbPos.x, qbPos.y);
   const pull = sub(aim.start, aim.cur);
   const tgtScreen = { x: qbScreen.x + pull.x * AIM_GAIN, y: qbScreen.y + pull.y * AIM_GAIN };
   const w = cam.toWorld(tgtScreen.x, tgtScreen.y);
   let off = sub(w, qbPos);
-  const max = maxThrowDist(arm);
+  const max = maxThrowDist(arm, kind);
   const l = len(off);
   if (l > max) off = scale(off, max / l);
   return { x: qbPos.x + off.x, y: clamp(qbPos.y + off.y, -4, FIELD_W + 4) };
@@ -52,11 +53,19 @@ export function composure(rating: number): number {
   return Math.max(0.4, 1 + (80 - rating) / 50);
 }
 
+/** The throw type's error multiplier at `dist` yards: `errShort` to 8 yd, blending to `errDeep` at 28. */
+export function kindError(kind: ThrowKind, dist: number): number {
+  const k = THROWS[kind];
+  const t = Math.min(1, Math.max(0, (dist - 8) / 20));
+  return k.errShort + (k.errDeep - k.errShort) * t;
+}
+
 /** Standard deviation (yards) of throw error. */
-export function throwErrorSd(dist: number, r: PasserRatings, pressure: number, moving: number): number {
+export function throwErrorSd(dist: number, r: PasserRatings, pressure: number, moving: number, kind: ThrowKind = 'touch'): number {
   return (
+    kindError(kind, dist) *
     (0.25 + dist * 0.022) *
     (1.6 - accuracyAt(dist, r) / 100) *
-    (1 + pressure * 1.2 * composure(r.pac) + moving * 0.6 * composure(r.tup))
+    (1 + pressure * 1.2 * composure(r.pac) * THROWS[kind].pressure + moving * 0.6 * composure(r.tup))
   );
 }

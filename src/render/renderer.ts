@@ -1,13 +1,13 @@
 import type { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL } from '../engine/constants';
-import { add, len, scale, type Vec } from '../engine/math';
+import { add, dist, len, scale, type Vec } from '../engine/math';
 import type { Play } from '../game/playState';
 import { facingQB } from '../sim/ai';
-import { flightPos, passParams } from '../sim/ball';
+import { flightPos, passParams, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
 import { endurance, isEligible, poseOf, type Player } from '../sim/player';
 import { laneScores, levered } from '../sim/runBlocking';
-import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite } from './sprites';
+import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite, type Look } from './sprites';
 import { text } from './text';
 
 const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
@@ -207,7 +207,7 @@ function drawAim(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
   const qb = play.qb;
   const from = { x: qb.pos.x, y: qb.pos.y, z: 2 };
   const to = { x: tgt.x, y: tgt.y, z: 1.2 };
-  const { peak } = passParams(Math.hypot(to.x - from.x, to.y - from.y), qb.r.arm);
+  const { peak } = passParams(Math.hypot(to.x - from.x, to.y - from.y), qb.r.arm, play.throwKind);
 
   // Pull-back band
   g.strokeStyle = 'rgba(255,255,255,0.35)';
@@ -234,11 +234,34 @@ function drawAim(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
   g.stroke();
   g.fillStyle = '#ffd23f';
   g.fillRect(Math.round(c.x) - 1, Math.round(c.y) - 1, 2, 2);
+  // The throw type, by the reticle only while aiming (the wheel or 1 changes it).
+  text(g, THROW_LABEL[play.throwKind], Math.round(c.x) + 12, Math.round(c.y) - 3, { size: 6, color: '#ffd23f' });
 }
 
-export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean): void {
+const THROW_LABEL: Record<ThrowKind, string> = { bullet: 'BULLET', touch: 'TOUCH', lob: 'LOB' };
+
+/** Hands go up for a found ball this close (yd) to where it's coming down. */
+const HANDS_RANGE = 5;
+
+/**
+ * Where an upright player is looking (docs/PASSING.md): a route runner's head comes back to the QB once
+ * he's looking for the ball (`eyes`), and anyone's hands come up once he's found a ball coming down near
+ * him. A receiver the ball's thrown to before he looks keeps running head down: he never saw it.
+ */
+export function lookOf(play: Play, p: Player): Look {
+  if (p.down || p.pose || p === play.carrier || p.engaged || p.engagedBy.length) return 'fwd';
+  const behind = (play.qb.pos.x - p.pos.x) * p.facing < 0;
+  const head = p.side === 'off' && p.passRoute && !p.isBlocker && p.eyes > 0.5 && behind;
+  const air = play.phase === 'air' && play.ballTarget && !play.pitch;
+  const found = p.side === 'off' ? play.time >= p.findAt : play.time >= p.reactAt;
+  const hands = !!air && found && dist(p.pos, play.ballTarget!) < HANDS_RANGE;
+  if (hands) return (play.ballTarget!.x - p.pos.x) * p.facing < -0.5 ? 'backHands' : 'hands';
+  return head && play.phase !== 'presnap' && play.phase !== 'run' && play.phase !== 'over' ? 'back' : 'fwd';
+}
+
+export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean, look: Look = 'fwd'): void {
   const s = cam.toScreen(p.pos.x, p.pos.y);
-  const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), (cam.mirror ? -p.facing : p.facing) as 1 | -1);
+  const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), (cam.mirror ? -p.facing : p.facing) as 1 | -1, look);
   if (p.juke > 0) {
     // A cut leaves fading afterimages behind him.
     for (let i = 3; i >= 1; i--) {
@@ -297,7 +320,7 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
   const sorted = [...play.players].sort((a, b) => a.pos.y - b.pos.y);
   const bs = getBallSprite();
   for (const p of sorted) {
-    drawPlayer(g, cam, p, presnap);
+    drawPlayer(g, cam, p, presnap, lookOf(play, p));
     if (ball.state === 'held' && ball.carrier === p) {
       const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
       g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
