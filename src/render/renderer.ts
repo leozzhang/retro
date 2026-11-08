@@ -127,6 +127,24 @@ function laneRunner(play: Play, assist: RunAssist): Player | null {
   return null;
 }
 
+/**
+ * Who the pullers and lead backs are going for (RUN ASSIST): a faint dotted line from each one still on his
+ * way to his man (`poa`). FULL shows them through the run; LIGHT only until the handoff.
+ */
+function drawAssignments(g: CanvasRenderingContext2D, cam: Camera, play: Play, assist: RunAssist): void {
+  if (assist === 'OFF' || !play.runBlocking() || play.phase === 'presnap' || play.phase === 'over') return;
+  if (assist === 'LIGHT' && play.handedOff) return;
+  g.fillStyle = 'rgba(255,255,255,0.55)';
+  for (const o of play.off) {
+    const t = o.poa;
+    if (!o.poaJob || !t || o.engaged || o.down || t.down) continue;
+    const a = cam.toScreen(o.pos.x, o.pos.y);
+    const b = cam.toScreen(t.pos.x, t.pos.y);
+    const steps = Math.max(1, Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 4));
+    for (let k = 1; k < steps; k++) g.fillRect(Math.round(a.x + ((b.x - a.x) * k) / steps), Math.round(a.y + ((b.y - a.y) * k) / steps), 1, 1);
+  }
+}
+
 /** Smoothed daylight per lane (keyed by half yards across), so lanes fade in and out instead of flickering. */
 const laneGlow = new WeakMap<Play, Map<number, number>>();
 
@@ -282,6 +300,7 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
   const presnap = play.phase === 'presnap';
   if (presnap && !replay) drawRoutePreview(g, cam, play);
   if (!replay) drawLanes(g, cam, play, assist);
+  if (!replay) drawAssignments(g, cam, play, assist);
   if (debug) drawDebug(g, cam, play);
 
   // Controlled player ring

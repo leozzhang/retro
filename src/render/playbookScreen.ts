@@ -7,7 +7,7 @@ import { FIELD_W, VIEW_W } from '../engine/constants';
 import { clamp } from '../engine/math';
 import { alignY, personnelOf, resolvePlay, type ResolvedPlay } from '../game/resolvePlay';
 import { drawHint } from './hud';
-import { drawMiniPlay, drawStar, ROUTE_COLORS, type Box } from './playDiagram';
+import { drawMiniPlay, drawStar, pullTurnLat, ROUTE_COLORS, type Box } from './playDiagram';
 import { ovrColor } from './rosterScreen';
 import { inBox, wrap } from './teamScreen';
 import { text } from './text';
@@ -110,16 +110,16 @@ const ROUTE_LABEL: Record<RouteName, string> = {
   smoke: 'SMOKE', tunnel: 'TUNNEL', checkFlat: 'CHK FLAT', screen: 'SCREEN', angle: 'ANGLE',
   iz: 'CARRY', oz: 'CARRY', power: 'CARRY', toss: 'CARRY', paFake: 'PA FAKE', izDeep: 'CARRY',
   stretch: 'CARRY', counter: 'CARRY', trap: 'CARRY', draw: 'CARRY', iso: 'CARRY', sweep: 'CARRY',
-  pitchPath: 'PITCH', lead: 'LEAD', kickOut: 'KICK OUT', leadWide: 'LEAD', slice: 'SLICE', qbLead: 'LEAD',
+  pitchPath: 'PITCH', lead: 'LEAD', kickOut: 'KICK OUT', leadWide: 'LEAD', slice: 'SLICE', qbLead: 'LEAD', arc: 'ARC',
 };
 
 const QB_JOB: Record<ReadType, string> = {
   none: 'PASS', handoff: 'HANDOFF', pitch: 'TOSS', zoneRead: 'READ', option: 'OPTION', rpo: 'RPO',
 };
 
-const LINE_JOB: Record<RunScheme, string> = { zone: 'ZONE', stretch: 'REACH', gap: 'DOWN', trap: 'DOWN', draw: 'DRAW' };
+const LINE_JOB: Record<RunScheme, string> = { zone: 'ZONE', stretch: 'REACH', gap: 'DOWN', trap: 'DOWN', draw: 'DRAW', pin: 'PIN' };
 
-const SCHEME_LABEL: Record<RunScheme, string> = { zone: 'ZONE', stretch: 'OUTSIDE ZONE', gap: 'GAP', trap: 'TRAP', draw: 'DRAW' };
+const SCHEME_LABEL: Record<RunScheme, string> = { zone: 'ZONE', stretch: 'OUTSIDE ZONE', gap: 'GAP', trap: 'TRAP', draw: 'DRAW', pin: 'PIN AND PULL' };
 
 const READ_LABEL: Record<ReadType, string> = {
   none: '', handoff: 'HANDOFF', pitch: 'TOSS', zoneRead: 'ZONE READ', option: 'SPEED OPTION', rpo: 'RPO',
@@ -376,9 +376,9 @@ function drawDetail(g: CanvasRenderingContext2D, squad: Squad, p: PlayDef, v: Bo
     const q = at(slot);
     const rn = rp.routes[slot];
     if (pulled.has(slot)) {
-      // Pull: flat behind the line to the hole (a kick-out aims just outside it), then up into it.
+      // Pull: flat behind the line to where he turns up (`pullTurnLat`), then up onto his man.
       const pl = rp.pulls.find((x) => x.who === slot)!;
-      const ty = L.holeLat + (pl.job === 'kick' ? L.playSign * 2.5 : 0);
+      const ty = pullTurnLat(p, rp, by, L.holeLat, pl);
       const up = pl.job === 'kick' ? 0.8 : 2.5;
       path(g, [P(q.dx, q.lat), P(q.dx - 1, q.lat), P(q.dx - 1, ty), P(q.dx + up, ty)], '#ffffff', 1, 'tee', [3, 2]);
       continue;

@@ -72,7 +72,8 @@ A play is **formation + a concept on each side + backfield jobs + read + blockin
 | Scheme | Line rules | Used by |
 | --- | --- | --- |
 | `zone` | Take the man over you or in your playside gap. An uncovered lineman doubles a neighbour's man (playside first; each covered blocker takes one helper) and climbs to a backer at `COMBO_CLIMB` or as soon as the backer declares. The last uncovered lineman cuts off the backside end. | IZ, Split Zone, Zone Read, RPOs |
-| `stretch` | Zone, but the reach blocks give up `REACH_PENALTY`, and combos climb early. | OZ, Toss, I-Form Stretch, Speed Option, Pin-Pull |
+| `stretch` | Zone, but the reach blocks give up `REACH_PENALTY`, and combos climb early. | OZ, Toss, I-Form Stretch, Lead Toss, Speed Option |
+| `pin` | The linemen who stay pin the man over or playside of them (zone rules, no reach penalty, early climbs); the pullers get around them to the edge. | Pin-Pull |
 | `gap` | Block down (the man over you or in your inside gap), doubles at the point of attack. With a puller, the backside tackle **hinges** to the puller's gap, takes whoever comes through, and works up after `HINGE_HOLD`. Down linemen far backside are left to chase. | Power, Power O, Counter, Duo, Iso, QB Power, Power Read |
 | `trap` | Gap, but the first lineman playside of the center is left for the pulling guard (`pullTarget`). | Trap |
 | `draw` | Pass pro for `DRAW_SET`, then run blocking. The second level reads it late. | Draw, Empty QB Draw |
@@ -87,14 +88,20 @@ A play is **formation + a concept on each side + backfield jobs + read + blockin
 - **Getting on the block:** assigned blockers engage their man from `RUN_ENGAGE`, lead their man's movement, and wall him off from the carrier after the handoff.
 - **Assignments hold** through the whole run.
 
-**Pulls** (`scheme.pulls`):
+**Point-of-attack blocks** (pullers and lead backs; `assignRunBlocks`, `POA`):
+- **A job and a man at the snap** (`Player.poa`, `poaJob`). Pullers get their job from `scheme.pulls`, lead backs from their route's `job`:
+  - **kick** (`kick` pulls, `kickOut`, `slice`): the first man outside the last blocker who stays in on his side (the slice's is the backside one), at least `POA.kickOutside` outside him. That's the end man on the line if he's out there; a man head-up or inside is the line's (gap, down, backer), and the kick goes to the next man out, off the ball. He's reserved before the line assigns. With nobody out there, he turns up through the hole as a lead and takes whoever shows (no backer is held for him). Trap's kick is the trapped lineman.
+  - **lead** (`lead` pulls, `lead`, `qbLead`): the playside backer nearest where he turns up, reserved before the line's combos pick who they climb to. A second lead takes the next backer.
+  - **force** (`leadWide`, `arc`, and a `kick` pull on a `stretch` or `pin` scheme, where the line pins the end): the force or alley defender nobody has, outside the edge.
+- **The edge:** `POA.edge` outside the outermost lineman who stays in. On a perimeter play (an outside scheme, or a back on `sweep`, `toss`, `pitchPath`, `stretch` or `oz`) leads and force blocks turn up there; otherwise a lead turns up at the hole.
+- **Pulling:** flat and tight behind the line to his turn-up point (a kick-out: just inside his man, to hit his inside shoulder), gathering early by how far his sideways speed carries him. He turns up early if his man comes to him (`POA.meet`). He doesn't stop to block anyone on the way but his man, and a lead takes a free defender who crosses his path closer to the ball than his man (`LEAD_PICKUP`).
+- **Lead backs** run their path as the approach and leave it for their man once he's within `POA.attack` or closer than the next waypoint; a lead on a backer goes straight at him after his first step.
+- **Getting there:** a point-of-attack blocker aims at the first spot on his man's line to the ball that he can reach first (`cutOff`), not at where his man will be.
+- **Retargeting:** if his man goes down, is on someone else's block, or leaves the play (`POA.lost`), he takes the most dangerous free defender near the ball. With nobody at all he goes up through the hole (the edge) for whoever shows.
+- **RUN ASSIST** draws a dotted line from each one still on his way to his man (FULL through the run, LIGHT until the handoff). The play cards draw each pull to where he turns up (`pullTurnLat`).
 - **Mirroring:** pulls mirror with the play (LG ↔ RG).
-- **The path:** a puller runs tight behind the line, `PULL_TURN` short of the hole, and doesn't stop to block on the way.
-- **The pickup:** he takes the man nearest the hole. For a `kick` that's the first man outside it; for a `lead` it's a backer.
-
-**Lead blockers** (`RouteDef.lead`: `lead`, `kickOut`, `leadWide`, `slice`, `qbLead`):
-- **On a run:** a back or TE on one of these routes is a blocker from the snap. He runs the path and takes the first unclaimed defender within `LEAD_PICKUP`.
-- **Split Zone:** the Pistol TE slices back across (the `slice` concept) to kick out the backside end.
+- **Split Zone:** the Pistol TE slices back across (the `slice` concept) to kick out the backside end. **Power Read:** the TE arcs around the read end for the force (`arc`).
+- **Lanes:** gap runs read `GAP_READ_W` around the hole, except a back on a perimeter path (Power Read's sweep), who reads wide.
 
 **Defense:**
 - Backers fit at `LB_FIT_DEPTH`.

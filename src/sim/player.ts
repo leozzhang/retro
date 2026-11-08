@@ -1,5 +1,5 @@
 import type { Assign } from '../data/defenses';
-import type { RouteName } from '../data/plays';
+import type { PoaJob, RouteName } from '../data/plays';
 import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
 import { add, clamp, len, lerp, limit, scale, sub, type Vec } from '../engine/math';
@@ -115,8 +115,14 @@ export interface Player {
   comboUntil: number;
   /** Gap-scheme backside tackle: the spot he hinges to, taking whoever comes through it. */
   hinge: Vec | null;
-  /** Trap: the lineman this puller is coming to kick out. */
-  pullTarget: Player | null;
+  /**
+   * Point of attack: the man a puller or lead back is assigned at the snap (`assignRunBlocks`), his job on
+   * him (kick him out, lead up on a backer, or take the force player on the perimeter), and on the
+   * perimeter the spot along the line where he turns up (the edge). The trap's trapped lineman is one too.
+   */
+  poa: Player | null;
+  poaJob: PoaJob | null;
+  turnY: number | null;
   stun: number;
   jam: number;
   manual: boolean;
@@ -206,7 +212,9 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     climb: null,
     comboUntil: 0,
     hinge: null,
-    pullTarget: null,
+    poa: null,
+    poaJob: null,
+    turnY: null,
     stun: 0,
     jam: 0,
     manual: false,

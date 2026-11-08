@@ -35,7 +35,15 @@ export type RouteName =
   | 'iz' | 'oz' | 'power' | 'toss' | 'paFake'
   | 'izDeep' | 'stretch' | 'counter' | 'trap' | 'draw' | 'iso' | 'sweep' | 'pitchPath'
   // Lead blockers (FB, H, TE): run the path, then run-block
-  | 'lead' | 'kickOut' | 'leadWide' | 'slice' | 'qbLead';
+  | 'lead' | 'kickOut' | 'leadWide' | 'slice' | 'qbLead' | 'arc';
+
+/**
+ * A puller's or lead back's job on his man (`sim/runBlocking.ts`, `assignRunBlocks`):
+ * - kick: the end man on the line, blocked from the inside out (on the perimeter, a kick is a force block)
+ * - lead: up through the hole on the playside backer
+ * - force: around the edge on the force (alley) defender
+ */
+export type PoaJob = 'kick' | 'lead' | 'force';
 
 export interface RouteDef {
   pts: [number, number][];
@@ -48,8 +56,13 @@ export interface RouteDef {
   delay?: number;
   /** Pass-block during the delay (screens, check-releases, the draw's fake set). */
   delayBlock?: boolean;
-  /** Lead blocker on a run: he's a blocker from the snap, runs the path, then run-blocks the first man he finds. */
+  /**
+   * Lead blocker on a run: he's a blocker from the snap, gets his man by `job` at the snap, and uses the
+   * path to get there (through the hole, or out to the edge). `away` = his man is on the backside (slice).
+   */
   lead?: boolean;
+  job?: PoaJob;
+  away?: boolean;
   /**
    * Pass routes: the waypoint index past which he turns his head to the QB and expects the ball (default 1,
    * out of the first break); 0 = from the start (screens, swings). Settle routes turn at the top instead.
@@ -117,7 +130,7 @@ export const ROUTES: Record<RouteName, RouteDef> = {
   // Under-center stretch: aim at the tight end's outside hip, then bend it up.
   stretch: { pts: [[3, 1.8], [5.5, 6], [8.5, 8.5]], cont: true, run: true },
   // Gun counter: jab away, then come back across behind the pullers to the off-tackle hole.
-  counter: { pts: [[0.3, -1], [0.8, 2], [4, 5], [8, 5.8]], cont: true, run: true },
+  counter: { pts: [[0.2, -0.4], [0.8, 2], [4, 5], [8, 5.8]], cont: true, run: true },
   // Trap: a quick hitter just inside the trapped lineman.
   trap: { pts: [[3, 0.8], [6.5, 1], [9, 1.2]], cont: true, run: true },
   // Draw: sell pass, then step up beside the QB and hit the A gap.
@@ -129,13 +142,17 @@ export const ROUTES: Record<RouteName, RouteDef> = {
   // Speed option: stay in a pitch relationship, about 4 yd outside and 1.5 behind the QB.
   pitchPath: { pts: [[1, 4.5], [3, 10], [7, 13.5]], cont: true, run: true },
   // Lead blockers
-  lead: { pts: [[3.6, 2.4]], cont: false, lead: true },
-  kickOut: { pts: [[3.2, 4.5], [4, 6]], cont: false, lead: true },
-  leadWide: { pts: [[2, 6], [4, 11]], cont: false, lead: true },
+  // Iso: the fullback through the hole on the playside backer.
+  lead: { pts: [[3.6, 2.4], [5.5, 2.6]], cont: false, lead: true, job: 'lead' },
+  kickOut: { pts: [[3.2, 4.5], [4, 6]], cont: false, lead: true, job: 'kick' },
+  // Out to the edge for the force player (I-Form stretch, lead toss).
+  leadWide: { pts: [[2, 6], [4, 11]], cont: false, lead: true, job: 'force' },
   // Slice: the tight end comes back across behind the line to kick out the backside end.
-  slice: { pts: [[-0.7, 3], [-0.4, 9.8]], cont: false, lead: true },
+  slice: { pts: [[-0.7, 3], [-0.4, 9.8]], cont: false, lead: true, job: 'kick', away: true },
   // QB power: the back leads through the hole for the QB.
-  qbLead: { pts: [[1.5, 2.5], [5, 4.8]], cont: false, lead: true },
+  qbLead: { pts: [[1.5, 2.5], [5, 4.8]], cont: false, lead: true, job: 'lead' },
+  // Arc: the inline tight end releases outside the end (left alone to read) for the force player (power read).
+  arc: { pts: [[0.6, -2.2], [3, -4.5]], cont: false, lead: true, job: 'force' },
 };
 
 // Line splits near the NFL medians (G 1.55, T 3.1, inline TE 4.9; analysis/out/splits.md).
@@ -285,7 +302,10 @@ export type FlipRule = 'fixed' | 'field' | 'boundary';
 
 export interface Pull {
   who: OffSlot;
-  /** 'kick' = block the first defender outside the hole out; 'lead' = turn up through the hole for a backer. */
+  /**
+   * 'kick' = kick out the end man on the line (on a perimeter scheme, the force player); 'lead' = turn up
+   * through the hole (on the perimeter, at the edge) for the playside backer.
+   */
   job: 'kick' | 'lead';
 }
 
@@ -295,9 +315,11 @@ export interface Pull {
  * - stretch: zone, reaching for the playside shoulder (outside zone, toss).
  * - gap: block down; pullers lead or kick out; the backside tackle hinges (power, counter).
  * - trap: gap, but the first lineman playside of the center is left for the pulling guard.
+ * - pin: the linemen who stay pin the man over or playside of them (zone rules, no reach penalty) while
+ *   the pullers get around them to the edge (pin-pull sweep).
  * - draw: show pass for `DRAW_SET`, then run block.
  */
-export type RunScheme = 'zone' | 'stretch' | 'gap' | 'trap' | 'draw';
+export type RunScheme = 'zone' | 'stretch' | 'gap' | 'trap' | 'draw' | 'pin';
 
 export interface BlockScheme {
   /** Runs: the line's rules (default zone). */
@@ -582,9 +604,9 @@ export const PLAYBOOK: PlayDef[] = [
   {
     id: 'pin-pull', name: 'Pin-Pull Sweep', kind: 'run', formation: GUN_TRIPS,
     backs: { RB: 'sweep' }, block: 'run',
-    scheme: { run: 'stretch', pulls: [{ who: 'RG', job: 'lead' }, { who: 'RT', job: 'kick' }] },
+    scheme: { run: 'pin', pulls: [{ who: 'RG', job: 'lead' }, { who: 'RT', job: 'kick' }] },
     read: 'handoff', flip: 'field', drop: 0.5,
-    tip: 'Guard and tackle pull out front of the sweep. Outrun the pursuit.',
+    tip: 'Tackle logs the force, guard leads up on the backer. Stay on their hips.',
   },
   {
     id: 'draw', name: 'Draw', kind: 'run', formation: GUN_DOUBLES,
@@ -599,7 +621,7 @@ export const PLAYBOOK: PlayDef[] = [
   },
   {
     id: 'power-read', name: 'Power Read', kind: 'run', formation: GUN_DOUBLES,
-    backs: { RB: 'sweep' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    strong: 'arc', backs: { RB: 'sweep' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
     read: 'zoneRead', key: 'play', keep: 'inside', flip: 'field', drop: 0.5,
     tip: 'Read the playside end. He widens with the sweep? Keep it inside.',
   },

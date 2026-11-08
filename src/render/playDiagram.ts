@@ -1,7 +1,31 @@
-import { ROUTES, type PlayDef } from '../data/plays';
+import { ROUTES, type PlayDef, type Pull } from '../data/plays';
 import { FIELD_W } from '../engine/constants';
 import { clamp } from '../engine/math';
-import { alignY, resolvePlay } from '../game/resolvePlay';
+import { alignY, resolvePlay, type ResolvedPlay } from '../game/resolvePlay';
+import { POA } from '../sim/runBlocking';
+
+/**
+ * Where a puller turns up on a diagram (field y), as the sim does it: a lead at the hole, or at the edge
+ * (outside the outermost lineman who stays in) on a perimeter play; a kick-out just inside the end, past
+ * that lineman; a kick on a perimeter scheme is a force block a couple of yards outside the edge.
+ */
+export function pullTurnLat(p: PlayDef, rp: ResolvedPlay, by: number, holeY: number, pl: Pull): number {
+  const s = Math.sign(holeY - by) || rp.strongSign;
+  const pulled = new Set(rp.pulls.map((x) => x.who));
+  let edge = 0;
+  for (const [slot, a] of Object.entries(rp.align)) {
+    if (pulled.has(slot as Pull['who']) || slot === 'QB' || a.mode !== 'rel' || a.dx < -1.5) continue;
+    const rn = rp.routes[slot as Pull['who']];
+    if (rn && rn !== 'block') continue;
+    edge = Math.max(edge, (alignY(a, by) - by) * s);
+  }
+  const scheme = p.scheme?.run;
+  const rb = rp.routes.RB;
+  const wide = scheme === 'stretch' || scheme === 'pin' || rb === 'sweep' || rb === 'toss' || rb === 'pitchPath' || rb === 'stretch' || rb === 'oz';
+  const edgeY = by + s * (edge + POA.edge);
+  if (pl.job === 'kick') return wide ? edgeY + s * 2 : by + s * (edge + 1.2) - s * POA.kickInside;
+  return wide ? edgeY : holeY;
+}
 
 /** Route colors, handed out to receivers in slot order (run paths are white). */
 export const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
@@ -104,18 +128,17 @@ export function drawMiniPlay(g: CanvasRenderingContext2D, p: PlayDef, b: Box, fl
     }
   }
 
-  // Pullers: a dotted path flat behind the line to the hole (a kick-out aims just outside it).
+  // Pullers: a dotted path flat behind the line to where he turns up (`pullTurnLat`).
   const rbRoute = rp.routes.RB;
   if (rp.pulls.length && rbRoute && ROUTES[rbRoute].run) {
     const ry = clamp(alignY(rp.align.RB, by), 1, FIELD_W - 1);
     const last = ROUTES[rbRoute].pts[ROUTES[rbRoute].pts.length - 1];
     const holeY = ry + last[1] * (Math.sign(by - ry) || rp.strongSign);
-    const playSign = Math.sign(holeY - by) || rp.strongSign;
     g.fillStyle = '#ffffff';
     for (const pl of rp.pulls) {
       const a = rp.align[pl.who];
       const oy = alignY(a, by);
-      const ty = holeY + (pl.job === 'kick' ? playSign * 2.5 : 0);
+      const ty = pullTurnLat(p, rp, by, holeY, pl);
       const steps = Math.ceil(Math.abs(ty - oy) / 0.9);
       for (let k = 1; k <= steps; k++) {
         g.fillRect(Math.round(sx(a.dx - 0.8)), Math.round(sy(oy + ((ty - oy) * k) / steps)), 1, 1);

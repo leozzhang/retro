@@ -967,9 +967,63 @@ describe('run blocking', () => {
     const dt = at(p, 'DT2'); // lined up over the right guard
     const lg = at(p, 'LG');
     expect(p.off.some((o) => o.mark === dt)).toBe(false);
-    expect(lg.pullTarget).toBe(dt);
+    expect(lg.poa).toBe(dt);
     run(p, 1.0);
     expect(lg.mark).toBe(dt);
+  });
+
+  it('Power O: the FB kicks out the first man outside the TE, and the pulling guard leads on a backer', () => {
+    for (const call of DEF_CALLS.slice(0, 3)) {
+      const p = snapAt(book('power-o'), call);
+      const fb = at(p, 'FB');
+      const lg = at(p, 'LG');
+      const te = at(p, 'TE');
+      const side = Math.sign(p.hole.y - p.ballY);
+      const end = fb.poa;
+      // Outside the last blocker who stays in; with nobody there, he turns up as a lead and finds work.
+      if (fb.poaJob === 'kick') {
+        expect((end!.pos.y - te.pos.y) * side).toBeGreaterThan(0.3);
+        expect(p.off.some((o) => o !== fb && o.mark === end)).toBe(false);
+      } else expect(fb.poaJob).toBe('lead');
+      expect(lg.poaJob).toBe('lead');
+      expect(['LB', 'S']).toContain(lg.poa?.role);
+    }
+  });
+
+  it('Iso: the fullback takes a backer and never doubles a lineman', () => {
+    let onHim = 0;
+    for (let seed = 1; seed <= 24; seed++) {
+      const p = snapAt(book('iso'), DEF_CALLS[0], seed);
+      const fb = at(p, 'FB');
+      expect(fb.poa?.role).toBe('LB');
+      for (let t = 0; t < 1.2 && p.phase !== 'over'; t += 0.1) {
+        run(p, 0.1);
+        expect(fb.engaged?.role ?? 'none').not.toBe('DL');
+      }
+      if (fb.engaged && fb.engaged.role !== 'DL') onHim++;
+    }
+    expect(onHim).toBeGreaterThan(12);
+  });
+
+  it('Pin-Pull: the guard leads on a backer, the tackle takes the force, and both turn up and block', () => {
+    let blocked = 0;
+    for (let seed = 1; seed <= 24; seed++) {
+      const p = snapAt(book('pin-pull'), DEF_CALLS[0], seed);
+      const pullers = p.off.filter((o) => o.pull);
+      expect(pullers.map((o) => o.poaJob).sort()).toEqual(['force', 'lead']);
+      expect(pullers.find((o) => o.poaJob === 'lead')!.poa?.role).toBe('LB');
+      run(p, 1.4);
+      blocked += pullers.filter((o) => o.engaged && o.pos.x > p.los - 1.5).length;
+    }
+    expect(blocked).toBeGreaterThan(24); // more than one a snap on average
+  });
+
+  it('Counter: the pulling guard kicks out the first man outside the TE, or leads with nobody there', () => {
+    const p = snapAt(book('counter'), DEF_CALLS[0]);
+    const kick = p.off.find((o) => o.pull === 'kick')!;
+    const side = Math.sign(p.hole.y - p.ballY);
+    if (kick.poaJob === 'kick') expect((kick.poa!.pos.y - at(p, 'TE').pos.y) * side).toBeGreaterThan(0.3);
+    else expect(kick.poaJob).toBe('lead');
   });
 
   it('draw: the line shows pass, then run blocks', () => {

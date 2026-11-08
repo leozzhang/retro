@@ -74,7 +74,7 @@ Controls are listed in [README.md](README.md).
   - route running: `BURST`, `BURST_TAPER`, `PLANT_DECEL`, `cutKeep`, `TURN_TIME`, `SET_MAX_SPEED` (`sim/ai.ts`)
   - `tackleChance` and its squeeze `TACKLE_GAP`, `FALL_FORWARD`; kick returns: `returnTackleChance`, `BROKEN_TOLL` (`sim/tackling.ts`)
   - pass-pro shed and push rates (`Play.updateEngagements`), `ARM_TACKLE` (`game/playState.ts`)
-  - run blocks: `RUN_BLOCK_EDGE`, the squeezed talent edge `RUN_GAP`, the block-control gradient `RUN_CONTROL` (wear, the point-of-attack fight, arm tackles), the pile `PILE`, `REACH_PENALTY`, `BLOCK_ROLL_SD`, `WASH_RATE`, `COMBO_CLIMB`, `ARM_LEVERED`, `RUN_ENGAGE`, `DRAW_SET` (`sim/runBlocking.ts`)
+  - run blocks: `RUN_BLOCK_EDGE`, the squeezed talent edge `RUN_GAP`, the block-control gradient `RUN_CONTROL` (wear, the point-of-attack fight, arm tackles), the pile `PILE`, `REACH_PENALTY`, `BLOCK_ROLL_SD`, `WASH_RATE`, `COMBO_CLIMB`, `ARM_LEVERED`, `RUN_ENGAGE`, `DRAW_SET`, pullers' and lead backs' point-of-attack blocks `POA` (`sim/runBlocking.ts`)
   - defense vs. the run: `LB_FIT_DEPTH`, `MAN_DEPTH`, `TRASH_SPEED`, `PURSUIT_LEAD` (`sim/ai.ts`)
   - zones and tags: `ZONE`, `ZONE_HELP`, `ZONE_LEASH`, `ZONE_WIDEN`, `ZONE_OUTSIDE`, `ZONE_STICK`, `ZONE_UNDER`, `DEEP_OVER_NARROW`, `SPY_DEPTH`, `CONTAIN_WIDTH`, `SMELL_RANGE` (`sim/ai.ts`); `FIT_EARLY`, `SPY_REACT` (`game/playState.ts`)
   - the learning defense: `DEF_BRAIN`, `ANTICIPATE` (`game/defBrain.ts`), `LEAN_FX` (`sim/player.ts`), ADJUST's `ADJUST_SPREAD` (`data/coaches.ts`)

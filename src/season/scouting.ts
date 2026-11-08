@@ -119,7 +119,7 @@ export function playTraits(p: PlayDef): Set<Trait> {
   const pass = routes.filter((r) => r !== 'block' && !ROUTES[r].run && !ROUTES[r].lead && r !== 'paFake');
   const depth = (r: RouteName) => Math.max(0, ...ROUTES[r].pts.map(([dn]) => dn));
   if (p.kind === 'run') {
-    const outside = p.scheme?.run === 'stretch' || p.read === 'pitch' || p.read === 'option' || routes.some((r) => OUTSIDE_PATHS.has(r));
+    const outside = p.scheme?.run === 'stretch' || p.scheme?.run === 'pin' || p.read === 'pitch' || p.read === 'option' || routes.some((r) => OUTSIDE_PATHS.has(r));
     out.add(outside ? 'runOutside' : 'runInside');
     return out;
   }

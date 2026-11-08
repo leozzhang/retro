@@ -56,6 +56,8 @@ export const CONCEPTS = {
   pop: { name: 'Pop', routes: { 2: 'seam' } },
   // Runs: the inline TE (#2) slices back across to kick out the backside end (split zone)
   slice: { name: 'Slice', routes: { 2: 'slice' } },
+  // Runs: the inline TE (#2) arcs around the read end for the force player (power read)
+  arc: { name: 'Arc', routes: { 2: 'arc' } },
   // Backside solo tags
   go: { name: 'Go', routes: { 1: 'go' } },
   post: { name: 'Post', routes: { 1: 'post' } },

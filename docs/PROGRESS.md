@@ -1,6 +1,58 @@
 # Progress
 
-_Last updated: 2026-11-07_
+_Last updated: 2026-11-08_
+
+## Done: pullers and lead backs block their man (2026-11-08)
+Bug: Pin-Pull Sweep almost never worked, and the I-Form fullback often ignored the man he was supposed to block. Headless traces (every blocker's mark and engagement every 0.4 s) found one root cause: pullers and lead backs had no assignment at the snap and grabbed someone late, by proximity, often a man another blocker already had.
+- **Pullers ran to the sideline before looking:** `pullBlock` sent them flat to the hole's y (a kick: 2.5 past it), which on a sweep is 11–13 yd out, and `formEngagements` skipped them until they got there. On Pin-Pull both pullers were outside the back, still behind the line, while the MLB scraped over the top inside them.
+- **The TE took the kick-out man:** the gap window gave the head-up end to the TE, so Power O's FB and Counter's kicking guard had nobody and wandered to the SAM or the nickel.
+- **Iso's FB doubled the end:** his `lead` path ended behind the line, and `pickRunTarget` then picked the end the TE had, so the MLB came free. QB Power's back did the same.
+- **Wide lead blockers looked only 1.8 yd ahead:** on I-Form Stretch and Lead Toss the FB ran his path out to 9–11 yd while the force player came inside him.
+
+**The fix: point-of-attack assignments** (`assignRunBlocks`, `POA`, `Player.poa` / `poaJob` / `turnY`; details in PLAYBOOK.md):
+- **Jobs at the snap:**
+  - **kick:** the first man outside the last blocker who stays in, reserved before the line assigns. If nobody's there, he turns up as a lead and takes whoever shows.
+  - **lead:** the playside backer nearest where he turns up, held out of the line's climbs.
+  - **force** (`leadWide`, the new `arc`, a kick on an outside scheme): the alley defender nobody has.
+- **Turn-up:** at the hole, or at the edge on perimeter plays, gathering early by his sideways speed. He blocks his man on the way and aims at the first spot on his man's line to the ball (the carrier led like a pursuer) that he can reach first (`cutOff`). He retargets when his man is gone, and a defender counts as taken only if his blocker isn't tied up with someone else.
+- **New scheme `pin`** (Pin-Pull): the stayers pin by zone rules without the reach penalty, and the RT's kick becomes the force block.
+- **Power Read:** the TE arcs around the read end for the force (`arc` concept), and a back on a perimeter path reads lanes wide on gap runs.
+- **Counter GT:** a shorter jab, `[0.3, −1]` → `[0.2, −0.4]`.
+- **RUN ASSIST** draws a dotted line from each puller or lead back to his man (FULL through the run, LIGHT until the handoff). Play cards and the playbook page draw pulls to where they turn up (`pullTurnLat`). The playbook labels `PIN` / `PIN AND PULL` and `ARC`.
+- **Tried and dropped:**
+  - The auto-runner riding the lead blocker's hip until he turned up: much worse (Counter −0.1, Power O 2.5). Waiting behind the line let the backside chase and pursuit arrive.
+  - A deeper counter path: also worse.
+  - Kicking the outermost lineman even head-up on the TE: an unblocked 6i crashed into the backfield before the FB got there (Power O 2.6, contact −2.6).
+
+**Measured** (`npm run balance` against the last commit's `balance.txt`; YPC against 2 Man / Cover 1 / Cover 0, stuffs in parentheses):
+
+| Play | Before | After |
+| --- | --- | --- |
+| Pin-Pull Sweep | 2.3 / 0.3 / −0.4 (61–85%) | 3.2 / 2.3 / 3.3 (21–26%) |
+| Counter GT | 2.0 / 1.8 / 2.2 | 3.6 / 2.9 / 2.5 |
+| Power Read | 2.4 / 1.4 / 0.5 (33–40%) | 9.7 / 7.0 / 1.6 (18–21%) |
+| QB Power | 2.1 / 1.7 / 0.9 | 3.9 / 2.4 / 1.2 |
+| Lead Toss | 8.0 / 2.7 / 5.6 (14–37%) | 7.9 / 4.2 / 8.9 (15–19%) |
+| Power O | 4.4 / 6.8 / 2.4 | 7.3 / 12.3 / 2.6 |
+| Power | 4.3 / 4.1 / 2.4 | 9.4 / 6.3 / 2.5 |
+| Iso | 8.7 / 4.4 / 4.5 | 8.3 / 5.4 / 3.6 |
+| Split Zone | 7.6 / 4.8 / 2.0 | 11.3 / 8.5 / 2.8 |
+
+- **Unchanged:** pass, PA, PLAY, ROUTE and THROW rows are byte-identical. Plays with no puller or lead back move by random-stream noise (they share one stream).
+- **RUN ALL:** 4.8 / 10% stuffs → 5.5 / 6%.
+- **GAP rows** (Power is a core run): even 4.6 → 5.0, +5 3.6 → 3.8, +10 2.2 → 2.8 (now inside TARGETS.md's 2.5–3.5), NIU v Kent 3.2 → 3.9.
+- **Short yardage:** Power against Goal Line 37% → 69% (target 65–70%); Bear: Power 64% → 76%, Iso 79% → 67%.
+- **ADAPT:** QB runs up a little (STATIC 2.9 → 3.2 early); the learning defense still takes about 40% off late. Balanced is within noise.
+- `npm test`: 4 new tests (Power O kick and lead, Iso's FB on a backer, Pin-Pull's pullers turn up and block, Counter's kick), and the trap test reads `poa`. In a full parallel run, three slow season tests (scouting, portal, coaching) timed out; they pass on their own and before this change.
+- Not checked by hand in the browser yet: the RUN ASSIST lines, and the feel of Pin-Pull with the user carrying.
+
+**Flags:**
+- **Power O against Cover 1: 12.3 YPC** (median 4.1, 37% 10+). Seven blockers on seven box defenders leaves the robber and the free safety one-on-one with the back. It's a real strength of the play, but too big; not tuned.
+- **Power (9.4) and Split Zone (11.3) against 2 Man** are high, alongside Inside Zone's 10.0 there: 2 Man's light box.
+- **Power Read against 2 Man: 9.7** with 18% stuffs, boom or bust. Most stuffs are the read end tackling a give the harness (`READ_AT`) should have kept.
+- **Counter GT** is better but still below the other gap runs: the backside end and the chasing WILL get the back. Per the user's call, only the jab was shortened.
+- **Pin-Pull** stuffs (about 23%) now come from the slot's stalk on the nickel and the TE's pin on the end losing, not from the pullers.
+- **QB Power against Goal Line:** 13% on 3rd and 1.
 
 ## Done: a bullet into bodies doesn't get through (2026-11-07)
 Slant bullets were still too reliable from the pocket.
@@ -875,14 +927,14 @@ Rows are from the final report.
 - **Close to the bar against Cover 1 only:** PA Post (21–24 YPP), Ace Max Shot (17–23), PA Seams.
 
 **Useless or broken (a mechanic gap rather than a tuning problem):**
-- **Power Read** (about 1.0 YPC): with the line blocking down, the gun sweep has to cover about 12 yd sideways before it turns up. A squeezing key or the WILL gets him in the backfield. It needs a perimeter blocker or a faster sweep path.
+- **Power Read** (about 1.0 YPC): with the line blocking down, the gun sweep has to cover about 12 yd sideways before it turns up. A squeezing key or the WILL gets him in the backfield. It needs a perimeter blocker or a faster sweep path. _(2026-11-08: TE arc and the wide lane read; see the top entry.)_
 - **Draw** (0.3 YPC; −1.3 against Cover 0): a four-man rush reaches the mesh while the line is still selling pass. Draws need the DL to rush past the back, or a deeper mesh.
-- **QB Power** (0.4 YPC; 3rd and 1 converts 58% / 59% / 1%): after the guard pulls, the center blocks back on the 1-technique alone and loses often enough to stuff the waiting QB.
-- **Pin-Pull Sweep** (0.8 YPC): the playside guard and tackle pull from a gun sweep and get there behind the back.
-- **Counter GT** (1.7 YPC; contact −2.2): with both backside linemen pulling, the center can't hold the backside 1-technique.
+- **QB Power** (0.4 YPC; 3rd and 1 converts 58% / 59% / 1%): after the guard pulls, the center blocks back on the 1-technique alone and loses often enough to stuff the waiting QB. _(2026-11-08: reworked by the point-of-attack assignments; see the top entry.)_
+- **Pin-Pull Sweep** (0.8 YPC): the playside guard and tackle pull from a gun sweep and get there behind the back. _(2026-11-08: reworked by the point-of-attack assignments; see the top entry.)_
+- **Counter GT** (1.7 YPC; contact −2.2): with both backside linemen pulling, the center can't hold the backside 1-technique. _(2026-11-08: reworked by the point-of-attack assignments; see the top entry.)_
 
 **Weak:**
-- **Lead Toss** (2.5 YPC, 44% stuffs; 0.2 against Cover 0).
+- **Lead Toss** (2.5 YPC, 44% stuffs; 0.2 against Cover 0). _(2026-11-08: reworked by the point-of-attack assignments; see the top entry.)_
 - **Empty QB Draw:** fine against 2 Man (3.5), but −1.1 against Cover 0, where six rush against five.
 
 **Strong run rows** (no run-defense calls exist yet, so every light box stays light):
@@ -1881,7 +1933,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 1. **Recruiting, round 2** ([RECRUITING.md](RECRUITING.md) flags): bring tier 5's classes and starters back to level; a faster summer at the top; the REDSHIRT toggle and 4-game depth management; former players as GAs; play a full cycle by hand.
 1. **Compress talent gaps in the live sim** so a 90 vs 60 game is lopsided but playable (speed, tackling and block-power curves), then check every tier pairing with the real rosters.
 1. **Fill in the season framework** ([SEASON.md](SEASON.md)): record the live game's box score; spread box-score credit to backups; non-conference scheduling that pairs strong programs with weak ones, as real schedules do; mid-game injuries and substitutions in live games, and seeding the researched real-world injuries at season start; morale's next hooks (talking to players and promises, captains, position-change offers; then the transfer portal and recruiting read it: see MORALE.md's "not built yet"); more on the team page (season stats on the card); a game plan screen (the `delegate.gamePlan` flag is ready); coaches, round 2 (COACHES.md's "Later"): opponent-aware offensive emphases (the opponent's `defIdentity` in the drive mods), CPU `autoEmphasis`, specializations (recruiter, motivator, developer), OC scheme identities; the offseason's systems (carousel, departures, recruiting, portal) are built.
-1. **Fix the flagged plays:** Power Read, Draw, QB Power, Pin-Pull Sweep and Counter GT (diagnoses are in the flags above). Then review Go Post and PA Boot Flood against single-high.
+1. **Fix the flagged plays:** pullers and lead backs are done (2026-11-08). Left: Power O against Cover 1 (too big), Counter GT and QB Power (still low), Draw against pressure, and the harness's power-read read. Then review Go Post and PA Boot Flood against single-high.
 1. **Run game, round 2:** raise the 4+ rate toward about 45%. Look at second-level fits against climbers, and at yards after contact. Play IZ, Power and Counter by hand before tuning.
 1. **Harness:** target by route or read instead of "most open". Then use the NFL per-route completion table as balance targets, together with the defense work.
 1. **An RPO read on a defender,** and give the harness a pull decision.

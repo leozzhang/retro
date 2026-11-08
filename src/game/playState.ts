@@ -1271,18 +1271,24 @@ export class Play {
     if (this.phase === 'presnap' || this.phase === 'over') return;
     const downfield = this.phase === 'run' && this.carrier?.side === 'off';
     for (const b of this.off) {
-      if (b.down || b.engaged || b.stun > 0 || b === this.carrier || b.role === 'QB' || b.pull) continue; // pullers don't stop to block on the way
+      // Pullers don't stop to block on the way, except on the man they're pulling for.
+      if (b.down || b.engaged || b.stun > 0 || b === this.carrier || b.role === 'QB' || (b.pull && !b.poa)) continue;
       if (!b.isBlocker && !downfield) continue;
       for (const d of this.def) {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
         // Away from the ball only a blocker's own run-block assignment is worth locking onto (a WR on his DB).
         if (downfield && dist(d.pos, this.carrier!.pos) > 10 && !(b.mark === d && this.runBlocking())) continue;
         if (!downfield && d === this.readKey) continue; // left unblocked on purpose
-        if (d.engagedBy.length === 1 && b.mark !== d) continue;
-        // Blockers with an assignment work to their man rather than grabbing whoever they bump into.
-        // On runs too, as long as their man is still close enough to matter.
-        if (b.isBlocker && b.mark && !b.mark.down && b.mark !== d && (!downfield || dist(b.pos, b.mark.pos) < 4)) continue;
-        if (dist(b.pos, d.pos) < (b.mark === d && this.runBlocking() ? RUN_ENGAGE : 1.0)) {
+        if (b.pull && d !== b.poa) continue;
+        // Blockers with an assignment (a puller or lead back on his way: his point-of-attack man) work to
+        // their man rather than grabbing whoever they bump into. On runs too, as long as their man is
+        // still close enough to matter.
+        const man = b.mark ?? (b.poaJob ? b.poa : null);
+        if (d.engagedBy.length === 1 && man !== d) continue;
+        if (b.isBlocker && man && !man.down && man !== d && (!downfield || dist(b.pos, man.pos) < 4)) continue;
+        if (dist(b.pos, d.pos) < (man === d && this.runBlocking() ? RUN_ENGAGE : 1.0)) {
+          if (b.pull) b.pull = null;
+          if (!b.mark && b.poaJob) b.mark = d;
           if (!d.engagedBy.length && this.runBlocking()) {
             // A new run block: note which side the blocker has him from, and roll how it goes.
             d.blockDir = norm(sub(b.pos, d.pos));
