@@ -155,12 +155,18 @@ describe('throw types on the field', () => {
   const M = H.referenceMatchup();
   const pass = PLAYBOOK.filter((p) => p.kind === 'pass');
   const zone = DEF_CALLS.filter((c) => c.coverage === 'zone' && !c.situational);
-  const reps = (kind: 'bullet' | 'lob', n: number) => {
+  const reps = (kind: 'bullet' | 'touch' | 'lob', n: number, dl = false) => {
     const rng = mulberry32(21);
     let tips = 0;
-    for (let i = 0; i < n; i++) if (H.passRep(M, pass[i % pass.length], zone[i % zone.length], 1.6, rng, undefined, H.LOS, kind).play.passTipped) tips++;
+    for (let i = 0; i < n; i++) {
+      const p = H.passRep(M, pass[i % pass.length], zone[i % zone.length], 1.6, rng, undefined, H.LOS, kind).play;
+      if (p.passTipped && (!dl || p.tipper?.role === 'DL')) tips++;
+    }
     return tips;
   };
+  it('a bullet from the pocket gets batted at the line; a touch pass mostly clears it', () => {
+    expect(reps('bullet', 200, true)).toBeGreaterThan(reps('touch', 200, true) * 2);
+  });
   it('bullets get tipped by the underneath defenders sometimes; lobs sail over them', () => {
     const bullet = reps('bullet', 200);
     const lob = reps('lob', 200);

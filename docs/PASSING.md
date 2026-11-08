@@ -76,16 +76,35 @@ Each type sets the ball's speed, arc, range, error, pressure sensitivity and cat
 - short: hot out to 18 yards, more with a big arm
 - deep (from 20 yards): a rope coming over his shoulder instead of dropping in
 
-**Tips in flight** (`Play.inFlight`, `TIP` in game/playState.ts). On its way to the target, a pass can be tipped by a defender who meets all of these:
-- he's reading the QB (`eyes`)
-- he's within `TIP.width` (0.75 yd) of the ball
-- the ball is under his reach (DL 2.8, LB 2.9, DB 3.0 yd)
+**Tips in flight** (`Play.inFlight`, `tipOdds`, `TIP` in game/playState.ts). Each defender rolls once, at the ball's closest pass by him (`tipNear`):
+- **Into his body.** Within `TIP.core` (0.55 yd) of him, the ball is into his chest, helmet or raised hands, and he gets it at `TIP.hit` (0.85) odds:
+  - below `TIP.body` (1.9 yd), whatever he's looking at
+  - above that, up to his reach, if he's reading the QB (`eyes`), less just under his fingertips (`TIP.under`)
+  - a low ball fired through a lineman or a backer doesn't get there; it has to be threaded between them
+- **Past him.** Out to `TIP.width` (DL 1.5 yd, arms up; LB 1.0; DB 0.75), a defender reading the QB has up to `TIP.odds` (DL 0.65, LB 0.45, DB 0.35). It falls off toward the edge of the lane, with his `cth` and `prc`.
+- Reach: DL 2.8, LB 2.9, DB 3.0 yd. A lineman still on his block keeps `TIP.engaged` (0.85): he reads the QB's eyes and gets his hands up anyway.
 
-Odds go up to `TIP.odds` (0.35), scaled by how close he is, how far below his reach the ball is, his `cth` and `prc`, and his eyes. A lineman still on his block bats balls at `TIP.engaged` of that. What happens to a tipped ball:
+What happens to a tipped ball:
 - an unblocked tipper catches `TIP.pick` × `cth` of them (a pick)
-- the rest pop up `TIP.pop` yards on as a free ball for anyone near it
+- off his fingertips, the rest pop `TIP.pop.dist` (3) yd on as a free ball
+- square into him, it dies where he is (`TIP.pop.dead`, 0.8 yd)
 
-Nothing within `TIP.clear` of the target counts; that's the catch itself. A bullet is low the whole way, so a hook or robber defender in the lane can tip it. A touch pass clears linebackers past about 8 yards. A lob clears everyone.
+Nothing within `TIP.clear` of the target counts; that's the catch itself.
+
+Before this, the roll came as the ball entered a defender's lane, at its edge, so a ball straight through a lineman was rolled as if it barely grazed him.
+
+**The pocket against the lanes.** A bullet is low the whole way, so it has to get through the line. From the pocket, the defensive line stands between the QB and anything over the middle. Rolled out or scrambling, nobody is in the lane. A touch pass clears the line and the backers past about 8 yards, and a lob clears everyone. Measured, 400 throws each, the auto-QB leading the receiver at 1.1 s with no regard for the lane:
+
+| | Bullet, pocket | Touch, pocket | Bullet, rolled out |
+|---|---|---|---|
+| Slant | 47.5% comp, 14.2% int, 45% tipped | 66.8%, 3.0%, 0.5% | about 80%, under 1%, 2% |
+| Drag | 46.8%, 8.5%, 59.5% | 78.7%, 2.0%, 0.5% | about 70%, 1.5% |
+| Curl | 31.7%, 12.8%, 24.9% | 60.7%, 4.0%, 0.3% | |
+| Flat (outside the line) | 84.1%, 0%, 2.8% | 80.2%, 1.8%, 0% | |
+
+Bullets that miss every body are caught about 86% of the time: threading it works, and throwing it into bodies doesn't.
+
+A touch dump-off under 10 yards thrown with a rusher in the QB's face still gets batted sometimes (about 30% of the few such throws in a 2-second-hold sample).
 
 **Input:** before or while aiming, the mouse wheel steps the type (up = more loft) and `1` cycles it (for trackpads). It resets to TOUCH every snap. The arc preview draws the chosen type's arc, and its name sits by the reticle while aiming.
 
@@ -108,7 +127,7 @@ Nothing new on the HUD. It's all in the players:
 ## Measured (`npm run balance`, THROW section)
 The THROW rows throw each type to one route against the man and the zone calls. ON TIME is 0.3 s out of his break. EARLY is the moment he plants, before his head is around.
 - **Throwing before the head comes around costs a lot.** Drag EARLY: 17–21% of bullets and touch passes find him ready (a lob, 71%), against 99–100% ON TIME. Early bullets to the in, quick out and curl complete 40–51%, against 66–84% on time.
-- **BULLET:** best on quick throws through clean lanes (flat 83–84%, curl vs man about 90%). It gets tipped 3–15% of the time on slants, ins and curls. A 150-rep row swings about 8 points between runs, so compare shapes, not single rows.
+- **BULLET:** best on quick throws outside the line or through clean lanes (flat 81–90%). Thrown blind from the pocket over the middle it's batted and picked: slant 39–47% complete, 15–18% int, 30–51% tipped; curl, in and drag 18–40% tipped. A 150-rep row swings about 8 points between runs, so compare shapes, not single rows.
 - **LOB:** the most intercepted throw (THROW ALL: 7.5–11.5%, against 0–3.3% for touch). Best over the top against zone (go: 72% complete, 33.5 yards per throw). On short routes it's picked 10–16% of the time, so it's the wrong throw there.
 - **TOUCH:** the middle. About equal to BULLET on curls and drags against zone, better than BULLET deep against zone.
 - **Flag:** BULLET still edges TOUCH on most short and intermediate routes when the lane is clean. The harness picks receivers by separation, not by lane, so it under-counts tips.

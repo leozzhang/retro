@@ -135,22 +135,31 @@ export const HARD_COUNT = { share: 0.6, time: 0.55, flinch: 0.55, jump: 0.5, off
 const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble'];
 
 /**
- * In-flight tips (`Play.inFlight`): a defender reading the QB within `width` yd of the ball, with it
- * below his `reach` (yd, a jumping or arms-up hand), has up to `odds` of a hand on it: full odds with
- * it `under` yd below his reach and right at him. `engaged` scales a lineman on his block. `pick` (×
- * his cth) of tips by an unblocked man are caught; the rest pop `pop.dist` yd on, found `find` s later.
- * Nothing within `clear` yd of the target (that's the catch, `resolveArrival`).
+ * In-flight tips (`Play.inFlight`), rolled once per defender at the ball's closest pass by him:
+ * - **Into his body:** within `core` yd of him, it's into his chest, helmet or raised hands: `hit` odds
+ *   below his `body` height whatever he's looking at, and above it (up to his `reach`) if he's reading
+ *   the QB, full `under` yd below his reach. A low ball fired through a lineman or a backer doesn't get
+ *   there; it has to be threaded between them.
+ * - **Past him:** out to `width` yd (a lineman's arms-up lane is the widest), a defender reading the QB
+ *   has up to `odds`, falling off toward the edge, with his `cth` and `prc`.
+ * `engaged` scales a lineman on his block: he still reads the QB's eyes and gets his hands up, so a
+ * low ball through the line from the pocket gets batted, and one from a QB outside it doesn't. `pick` (×
+ * his cth) of tips by an unblocked man are caught; the rest pop `pop.dist` yd on (`pop.dead` off his
+ * body or square into his hands: it dies at the line), found `find` s later. Nothing within `clear` yd of the target (that's the catch, `resolveArrival`).
  */
 export const TIP = {
-  width: 0.75,
+  core: 0.55,
+  hit: 0.85,
+  body: 1.9,
+  width: { DL: 1.5, LB: 1.0, DB: 0.75 },
   reach: { DL: 2.8, LB: 2.9, DB: 3.0 },
   under: 0.6,
-  odds: 0.35,
-  engaged: 0.35,
+  odds: { DL: 0.65, LB: 0.45, DB: 0.35 },
+  engaged: 0.85,
   pick: 0.35,
   clear: 1.8,
   find: 0.2,
-  pop: { dist: 3, dur: 0.7, peak: 1.5 },
+  pop: { dist: 3, dead: 0.8, dur: 0.7, peak: 1.5 },
 };
 
 /**
@@ -226,6 +235,8 @@ export class Play {
   tipper: Player | null = null;
   /** Defenders already checked for a tip on this throw. */
   private tipChecked = new Set<Player>();
+  /** Each defender's closest pass of the ball so far while it's in his lane: distance and the ball's height then. */
+  private tipNear = new Map<Player, { d: number; z: number }>();
   outcome: PlayOutcome | null = null;
   popups: Popup[] = [];
   history = new Map<number, Vec[]>();
@@ -1050,7 +1061,8 @@ export class Play {
         const s = clamp(((x.pos.x - qb.x) * (target.x - qb.x) + (x.pos.y - qb.y) * (target.y - qb.y)) / (d * d), 0, 1);
         const at = { x: lerp(qb.x, target.x, s), y: lerp(qb.y, target.y, s) };
         const z = lerp(2.0, 1.2, s) + 4 * peak * s * (1 - s);
-        return s > 0 && s < 1 && dist(x.pos, at) < TIP.width + 0.3 && z < TIP.reach[x.role === 'DL' ? 'DL' : x.role === 'LB' ? 'LB' : 'DB'];
+        const unit = x.role === 'DL' ? 'DL' : x.role === 'LB' ? 'LB' : 'DB';
+        return s > 0 && s < 1 && dist(x.pos, at) < TIP.width[unit] + 0.3 && z < TIP.reach[unit];
       });
     };
     if (under('bullet')) return under('touch') ? 'lob' : 'touch';
@@ -1506,21 +1518,38 @@ export class Play {
    * (`TIP.pick`, with his hands) or a free ball popped up `TIP.pop` yards on. Linemen on their blocks
    * still bat balls at the line, `TIP.engaged` as often. Lobs sail over everyone.
    */
+  /** Odds `d` gets a piece of a ball passing `at` yd from him at height `z` (`TIP`). */
+  private tipOdds(d: Player, unit: 'DL' | 'LB' | 'DB', at: number, z: number): number {
+    const reach = TIP.reach[unit];
+    if (z > reach) return 0;
+    const low = Math.min(1, (reach - z) / TIP.under);
+    const block = d.engagedBy.length ? TIP.engaged : 1;
+    if (at <= TIP.core) return TIP.hit * (z < TIP.body ? 1 : d.eyes * low) * block;
+    if (d.eyes <= 0) return 0;
+    const skill = (d.r.cth * 0.5 + d.r.prc * 0.5) / 100;
+    const close = 1 - (at - TIP.core) / (TIP.width[unit] - TIP.core);
+    return TIP.odds[unit] * d.eyes * (0.5 + close * 0.5) * low * (0.5 + skill * 0.5) * block;
+  }
+
   private inFlight(): void {
     if (this.passTipped) return;
     const b = this.ball;
     const land = this.ballTarget!;
     if (dist(b.pos, land) < TIP.clear) return;
     for (const d of this.def) {
-      if (d.down || d.stun > 0 || this.tipChecked.has(d) || d.eyes <= 0) continue;
-      const reach = TIP.reach[d.role === 'DL' ? 'DL' : d.role === 'LB' ? 'LB' : 'DB'];
-      if (b.pos.z > reach || dist(d.pos, b.pos) > TIP.width || dist(d.pos, land) < TIP.clear) continue;
+      if (d.down || d.stun > 0 || this.tipChecked.has(d) || dist(d.pos, land) < TIP.clear) continue;
+      const unit = d.role === 'DL' ? 'DL' : d.role === 'LB' ? 'LB' : 'DB';
+      const now = dist(d.pos, b.pos);
+      const closest = this.tipNear.get(d);
+      // Wait for the closest pass: roll once the ball starts away from him (or out of his lane).
+      if (now <= TIP.width[unit] && (!closest || now < closest.d)) {
+        this.tipNear.set(d, { d: now, z: b.pos.z });
+        continue;
+      }
+      if (!closest) continue;
       this.tipChecked.add(d);
-      const skill = (d.r.cth * 0.5 + d.r.prc * 0.5) / 100;
-      const close = 1 - dist(d.pos, b.pos) / TIP.width;
-      const low = Math.min(1, (reach - b.pos.z) / TIP.under);
-      const odds = TIP.odds * d.eyes * (0.5 + close * 0.5) * low * (0.5 + skill * 0.5) * (d.engagedBy.length ? TIP.engaged : 1);
-      if (this.rng() >= odds) continue;
+      if (this.rng() >= this.tipOdds(d, unit, closest.d, closest.z)) continue;
+      const square = closest.d <= TIP.core;
       this.passTipped = true;
       this.tipper = d;
       if (!d.engagedBy.length && this.rng() < TIP.pick * d.r.cth / 100) {
@@ -1534,8 +1563,10 @@ export class Play {
       }
       // Popped up: everyone near it goes for the free ball.
       setPose(d, 'catch', 0.3);
+      // Off his fingertips it carries on toward the target; square into him it dies where he is.
       const dir = norm(sub(land, { x: b.pos.x, y: b.pos.y }));
-      const spot = { x: b.pos.x + dir.x * TIP.pop.dist * (0.4 + this.rng()), y: b.pos.y + dir.y * TIP.pop.dist * (0.4 + this.rng()) + gauss(this.rng) };
+      const carry = (square ? TIP.pop.dead : TIP.pop.dist) * (0.4 + this.rng());
+      const spot = { x: b.pos.x + dir.x * carry, y: b.pos.y + dir.y * carry + gauss(this.rng) * (square ? 0.6 : 1) };
       launch(this.ball, { ...b.pos }, { x: spot.x, y: spot.y, z: 1.0 }, TIP.pop.dur, TIP.pop.peak);
       this.ballTarget = spot;
       let near: Player | null = null;

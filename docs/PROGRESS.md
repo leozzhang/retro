@@ -2,6 +2,44 @@
 
 _Last updated: 2026-11-07_
 
+## Done: a bullet into bodies doesn't get through (2026-11-07)
+Slant bullets were still too reliable from the pocket.
+- **Fixed a bug:** each defender's tip roll came as the ball entered his lane, at its edge, so a ball straight through a lineman rolled as if it barely grazed him. It now rolls at the closest pass (`Play.tipNear`, `tipOdds`).
+- **New body zone:** within 0.55 yd of a defender (`TIP.core`), a low ball hits him at 0.85 odds (`TIP.hit`). Below 1.9 yd it hits him whatever he's looking at; above that it needs him reading the QB.
+- **Dead balls:** a ball that hits a defender square dies where he is (`TIP.pop.dead`). It no longer carries on to the receiver.
+- **Measured** (400 throws each, the auto-QB leading at 1.1 s, blind to the lane):
+
+  | Throw | Complete | Int | Tipped |
+  |---|---|---|---|
+  | Slant bullet, pocket | 47.5% | 14.2% | 45% |
+  | Slant touch, pocket | 66.8% | 3.0% | 0.5% |
+  | Drag bullet, pocket | 46.8% | 8.5% | 59.5% |
+  | Flat bullet | 84% | – | 3% |
+  | Slant bullet, rolled out | about 80% | – | – |
+
+  - Bullets that miss every body are caught about 86% of the time.
+  - THROW section: slant bullet 39–47% complete, 15–18% int.
+- **Core rows:** PLAY 69.1% / 9.24 YPP (69.9% / 9.30 before), DEF unchanged, ROUTE 55.6% (57.3% before). GAP rows are identical. RUN ALL's stuff rate moved one point from the shifted random-number stream.
+- **Flag:** the harness throws blind to the lane, so its bullet rows are the worst case. A user who threads it does much better, which is the point.
+- `npm test`: 336 pass.
+
+## Done: bullets get batted at the line (2026-11-07)
+A slant bullet on every snap was too reliable. Bullets now have to get through the traffic between the QB and the receiver (`TIP`, game/playState.ts; details in PASSING.md).
+- **Lanes:** each unit has its own lane width and odds. Linemen have the widest lane (1.5 yd, odds 0.65), then backers (1.0, 0.45). DBs are unchanged (0.75, 0.35).
+- **Linemen on a block** keep 85% of their odds, up from 35%: they read the QB's eyes and get their hands up anyway.
+- **The CPU QB** checks each unit's lane before choosing a bullet (`cpuThrowKind`).
+- **Measured** (400 throws, the auto-QB leading at 1.1 s):
+  - Slant bullet from the pocket: 61.5% complete, 7.8% int, 19% tipped. Touch: 70.4%, 3.3%, 0.8%.
+  - The same bullet rolled out of the pocket: 84%, 1.5%, 2.5%.
+  - Drag bullet from the pocket: 24.5% tipped. Flats outside the line: about 2%.
+  - THROW section: slant bullet 14–26% tipped, drag 27–31%.
+- **Tried and reverted:** widening the DBs' lane and raising the pick share dropped deep touch throws against 2 Man Under, so both stayed at their old values. Tips on 20+ yd touch passes are 0.2% (0.1% before).
+- **Core rows:**
+  - PLAY 69.9% / 9.30 YPP, against 69.6% / 9.40. Touch passes pick up a few tips (dump-offs into a rusher).
+  - GAP rows and RUN ALL are identical. The per-play RUN rows move only because the extra tip rolls shift the shared random-number stream.
+- **Flag:** a touch dump-off under 10 yd with a rusher in the QB's face is now batted about 30% of the time (12% before), in a small sample.
+- `npm test`: 336 pass.
+
 ## Done: each throw type has its own job (2026-11-07)
 Each throw type now has its own use and its own costs. Details are in [PASSING.md](PASSING.md).
 - **BULLET:**
