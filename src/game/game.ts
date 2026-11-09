@@ -44,6 +44,9 @@ import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, t
 import { careerList, careerRowAt, careerTabAt, modeAt, newCareerView } from '../render/careerScreen';
 import { beginLinks, linkAt, type Link } from '../render/links';
 import { drawProgram, programScrollMax, programTabAt, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
+import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt, type OfficeView } from '../render/officeScreen';
+import { achievement, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
+import { ROOMS } from '../data/office';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
 import { buildStaff, dcAdjust, GROUPS, type Group } from '../data/coaches';
@@ -78,7 +81,7 @@ import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog, lineupOf, simPart } from '../season/simGame';
 import { castDrive } from '../season/cast';
 import { newStory, type DriveCredit, type StoryDrive } from '../season/story';
-import type { DriveLog, GameResult, KeyLevel, SeasonGame, SeasonState } from '../season/types';
+import type { DriveLog, GameResult, KeyLevel, OfficeState, SeasonGame, SeasonState } from '../season/types';
 import type { SimPlay as LiveSimPlay } from './rules';
 import { cueShow, drawShow, drawShowStill, keyShow, prefetchShow, showFocus, updateShow, type KeyShow, type ShowCtx } from './highlights';
 import { KEY_LEVELS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
@@ -98,7 +101,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -383,6 +386,11 @@ export class Game {
   private callMouse = { x: 0, y: 0 };
   private debug = false;
   private t = 0;
+  private officeView: OfficeView = { tab: 0, scroll: 0, mx: 0, my: 0 };
+  /** The office's unlocks already announced, per dynasty (an office carried into the next season keeps its count). */
+  private officeWatch?: { season: SeasonState; office?: OfficeState; rev: number; tier: number };
+  /** "NEW IN YOUR OFFICE" toasts, shown one at a time off the field. */
+  private toasts: { title: string; sub: string; until?: number }[] = [];
 
   /** On the field: a play, a kick, the call screen, a notice or the final. */
   private inGame(): boolean {
@@ -422,6 +430,7 @@ export class Game {
     this.mouseMoved = input.mouse.x !== this.menuMouse.x || input.mouse.y !== this.menuMouse.y;
     this.menuMouse = { x: input.mouse.x, y: input.mouse.y };
     if (input.hit('F1', 'Backquote')) this.debug = !this.debug;
+    this.watchOffice();
     switch (this.screen) {
       case 'title':
         this.updateTitle(input);
@@ -449,6 +458,9 @@ export class Game {
         break;
       case 'program':
         this.updateProgram(input);
+        break;
+      case 'office':
+        this.updateOffice(input);
         break;
       case 'game':
         this.updateGame(dt, input);
@@ -970,6 +982,7 @@ export class Game {
     else if (item.page === 'prep') this.toPrep();
     else if (item.page === 'recruit') this.toRecruit();
     else if (item.page === 'program') this.toProgram(this.season!.config.userTeamId);
+    else if (item.page === 'office') this.toOffice();
     else if (item.page === 'settings') this.toSettings();
   }
 
@@ -1018,7 +1031,7 @@ export class Game {
       const step = m.wheel * 3 + (input.hit('KeyE') ? 3 : 0) - (input.hit('KeyQ') ? 3 : 0);
       if (step) v.scroll = Math.max(0, Math.min(newsMaxScroll(s, v.sub), v.scroll + step));
     }
-    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'program', KeyR: 'recruit' };
+    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'program', KeyR: 'recruit', KeyC: 'office' };
     for (const [key, id] of Object.entries(hot)) {
       const it = items.find((x) => x.id === id);
       if (it && !it.off && input.hit(key)) {
@@ -1237,6 +1250,112 @@ export class Game {
     const [from, at] = fullMove(view, d.from, to);
     setUserDepth(s, reorderPosition(squad, pos, from, at));
     this.save();
+  }
+
+  // ------------------------------------------------------------ the coach's office
+
+  private toOffice(): void {
+    const s = this.season!;
+    this.officeView = { tab: 0, scroll: 0, mx: 0, my: 0, moved: newRoom(s) };
+    this.screen = 'office';
+  }
+
+  /** Leaving the office: what was new has been seen. */
+  private leaveOffice(): void {
+    const s = this.season!;
+    if (!this.officeView.show) {
+      seeOffice(s);
+      this.save();
+    }
+    this.screen = 'season';
+  }
+
+  /** The office: Tab or the tabs switch OFFICE and LIST, a clicked item from this season opens its game, Esc goes back. In dev, Y toggles the showroom and [ ] step its room. */
+  private updateOffice(input: Input): void {
+    const s = this.season!;
+    const v = this.officeView;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace', 'KeyC')) {
+      this.leaveOffice();
+      return;
+    }
+    if (input.hit('Tab')) Object.assign(v, { tab: (v.tab + 1) % OFFICE_TABS.length, scroll: 0 });
+    if (import.meta.env.DEV) {
+      if (input.hit('KeyY')) v.show = v.show ? undefined : { items: sampleOffice(s), tier: ROOMS.length - 1 };
+      if (v.show && input.hit('BracketLeft')) v.show.tier = Math.max(0, v.show.tier - 1);
+      if (v.show && input.hit('BracketRight')) v.show.tier = Math.min(ROOMS.length - 1, v.show.tier + 1);
+    }
+    if (input.mouse.pressed) {
+      const tab = officeTabAt(x, y);
+      if (tab >= 0) {
+        Object.assign(v, { tab, scroll: 0 });
+        return;
+      }
+      const link = linkAt(x, y);
+      if (link) {
+        this.followLink(link);
+        return;
+      }
+    }
+    if (v.tab === 1) {
+      const step = input.mouse.wheel + (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0);
+      if (step) v.scroll = Math.max(0, Math.min(officeScrollMax(), v.scroll + step));
+    }
+  }
+
+  /** Dev: the office showroom in room `tier`, every item on show, from the console (`game.devOffice(3)`). */
+  devOffice(tier = ROOMS.length - 1): void {
+    if (!this.season) this.season = newSeason(defaultConfig(TEAMS[this.userIdx].id), 1);
+    this.toOffice();
+    this.officeView.show = { items: sampleOffice(this.season), tier };
+  }
+
+  /** Queue a toast for each new office item (and a new room) since last look. Not on the field. */
+  private watchOffice(): void {
+    const s = this.season;
+    if (!s) return;
+    let w = this.officeWatch;
+    if (!w || w.season !== s) {
+      // A loaded save starts quiet; a season rolled over keeps counting from the same office.
+      const carried = !!w && !!s.office && w.office === s.office;
+      w = this.officeWatch = { season: s, office: s.office, rev: carried ? w!.rev : s.office?.rev ?? 0, tier: carried ? w!.tier : s.office?.tier ?? 0 };
+      if (!carried && s.office) w.tier = Math.max(w.tier, newRoom(s) ?? 0);
+    }
+    w.office = s.office;
+    if (this.inGame()) return;
+    const o = s.office;
+    if (o && o.rev > w.rev) {
+      for (const it of o.items.filter((i) => i.rev > w!.rev)) this.toasts.push({ title: 'NEW IN YOUR OFFICE', sub: achievement(it.id)?.name ?? it.id });
+      w.rev = o.rev;
+    }
+    const room = newRoom(s);
+    if (room !== undefined && room > w.tier) {
+      this.toasts.push({ title: 'OFFICE UPGRADE', sub: roomName(room) });
+      w.tier = room;
+    }
+  }
+
+  private drawToast(g: CanvasRenderingContext2D): void {
+    if (this.inGame() || !this.toasts.length) return;
+    const toast = this.toasts[0];
+    toast.until ??= this.t + 3.2;
+    if (this.t > toast.until) {
+      this.toasts.shift();
+      return;
+    }
+    const w = Math.max(toast.title.length, toast.sub.length) * 8 + 32;
+    const x = Math.round((VIEW_W - w) / 2);
+    const y = 300;
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    g.fillRect(x + 2, y + 2, w, 34);
+    g.fillStyle = '#141b26';
+    g.fillRect(x, y, w, 34);
+    g.fillStyle = '#ffd23f';
+    g.fillRect(x, y, w, 2);
+    text(g, toast.title, VIEW_W / 2, y + 7, { align: 'center', color: '#9ad7ff', shadow: false });
+    text(g, toast.sub, VIEW_W / 2, y + 20, { align: 'center', color: '#ffd23f', shadow: false });
   }
 
   // ------------------------------------------------------------ program pages
@@ -2977,6 +3096,11 @@ export class Game {
   // ------------------------------------------------------------ render
 
   render(g: CanvasRenderingContext2D): void {
+    this.renderScreen(g);
+    this.drawToast(g);
+  }
+
+  private renderScreen(g: CanvasRenderingContext2D): void {
     g.imageSmoothingEnabled = false;
     beginLinks(this.menuMouse.x, this.menuMouse.y);
     if (
@@ -3001,6 +3125,10 @@ export class Game {
     }
     if (this.screen === 'program') {
       drawProgram(g, this.season!, this.programView!);
+      return;
+    }
+    if (this.screen === 'office') {
+      drawOffice(g, this.season!, this.officeView, this.t);
       return;
     }
     if (this.screen === 'game') {

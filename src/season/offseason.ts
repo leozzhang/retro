@@ -1,4 +1,5 @@
 import { TEAMS } from '../data/teams';
+import { checkOffice } from './achievements';
 import { nextSeason } from './season';
 import { carouselRound, openCarousel } from './carousel';
 import { openDepartures, runDepartures } from './departures';
@@ -57,6 +58,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
   if (os.stage === 'departures') {
     if (os.round === 0) {
       runDepartures(state);
+      checkOffice(state, 'draft');
       os.round = 1;
     } else {
       os.stage = 'signing';

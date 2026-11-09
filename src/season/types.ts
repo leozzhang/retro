@@ -731,4 +731,34 @@ export interface SeasonState {
   recruiting?: RecruitingState;
   /** Each team's big news from past seasons, newest year last (season/program.ts). History only. */
   chronicle?: Record<string, ChronItem[]>;
+  /** The coach's office: what the user has earned (season/achievements.ts). Kept across seasons; nothing in the sim reads it. */
+  office?: OfficeState;
+}
+
+/** One thing in the coach's office (docs/OFFICE.md). */
+export interface OfficeItem {
+  /** The achievement it's for (season/achievements.ts `ACHIEVEMENTS`). */
+  id: string;
+  /** Unique per item, so finding it again adds nothing: `paper:2027:w6`. */
+  key: string;
+  year: number;
+  week?: number;
+  /** The game it came from, for a link while that season's games are kept. */
+  game?: string;
+  /** The school it was earned at: its colors are drawn into it. */
+  team: string;
+  /** What its art and card need, kept at unlock: games and rosters don't last. */
+  data?: Record<string, string | number>;
+  /** Unlock order (`OfficeState.rev` at the time). */
+  rev: number;
+  /** Not seen on the office page yet. */
+  fresh?: 1;
+}
+
+export interface OfficeState {
+  items: OfficeItem[];
+  /** Bumped by every unlock. */
+  rev: number;
+  /** The room tier last shown, to announce a move. */
+  tier: number;
 }

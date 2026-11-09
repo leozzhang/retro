@@ -2,6 +2,7 @@ import { CONFERENCES } from '../data/fbs/profile';
 import { teamRatings } from '../data/depth';
 import { teamById } from '../data/teams';
 import { VIEW_W } from '../engine/constants';
+import { officeNews } from '../season/achievements';
 import { heismanRace } from '../season/awards';
 import { teamLabel } from '../season/news';
 import { OFFSEASON_STAGES } from '../season/offseason';
@@ -25,7 +26,7 @@ import { text } from './text';
  * The week's main action (play, sim, advance, the offseason stage) is the button under the sidebar.
  */
 
-export type Page = 'team' | 'playbook' | 'prep' | 'recruit' | 'program' | 'settings';
+export type Page = 'team' | 'playbook' | 'prep' | 'recruit' | 'program' | 'office' | 'settings';
 
 export interface NavItem {
   /** A panel's name, or the page it opens. */
@@ -36,6 +37,8 @@ export interface NavItem {
   key?: string;
   /** Shown but not selectable (GAME PREP in the offseason). */
   off?: boolean;
+  /** Something new on the page: a gold dot (the office's new items). */
+  dot?: boolean;
 }
 
 export interface SeasonView {
@@ -94,6 +97,7 @@ function navGroups(s: SeasonState): { head: string; items: NavItem[] }[] {
         { id: 'playbook', label: 'PLAYBOOK', page: 'playbook', key: 'P' },
         { id: 'prep', label: 'GAME PREP', page: 'prep', key: 'O', off: s.phase === 'offseason' },
         ...(s.recruiting ? [{ id: 'recruit', label: 'RECRUITING', page: 'recruit', key: 'R' } as NavItem] : []),
+        { id: 'office', label: 'OFFICE', page: 'office', key: 'C', dot: officeNews(s) },
         { id: 'settings', label: 'SETTINGS', page: 'settings' },
       ],
     },
@@ -164,6 +168,10 @@ function drawSidebar(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView)
       }
       const color = it.off ? DIM : on ? '#ffffff' : hover ? GOLD : '#cfd6df';
       text(g, it.label, 12, y + 3, { color, shadow: on ? undefined : false });
+      if (it.dot) {
+        g.fillStyle = GOLD;
+        g.fillRect(14 + it.label.length * 8, y + 4, 4, 4);
+      }
       if (it.key) text(g, it.key, SB_W - 8, y + 3, { align: 'right', color: on ? '#e6e6e6' : DIM, shadow: false });
       y += NAV_H;
     }

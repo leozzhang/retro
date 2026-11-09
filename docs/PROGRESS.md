@@ -1910,6 +1910,23 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
   - Driven in headless Chrome against the dev build (hub → board → top target → visit → search → offer → class → signing day → portal). No console errors.
 - **Flags** (in RECRUITING.md): T5 signs above its level and its starters still drift up about 4 over 5 seasons; the summer is slow at the top (22% of the top 300); a passive user signs only the summer's commits (placeholders fill); careers grow to about 3.2 MB a season.
 
+## Done: the coach's office, batch 1 (2026-11-08)
+Achievements as a room that fills up. See [OFFICE.md](OFFICE.md).
+- **Framework:**
+  - `SeasonState.office`: items with saved data, unlock order and fresh flags
+  - detectors per hook: the week's new `office` step and the draft
+  - a computed room tier
+  - deterministic placement into slot anchors, with fallbacks and storage boxes
+- **Rooms:** five, from the broom closet to the suite over the stadium, drawn in code. The window views are a parking lot, the practice fields, the stadium, and the stadium at night.
+- **Items:** the game ball, conference trophies, STOP THE PRESSES and the RING OF HONOR. A 3x5 micro font writes their scores, names and headlines.
+- **Page:** OFFICE (C) on the hub: hover cards, click-through to this season's games, and a LIST tab with hints for unfound items and the next room. A gold sidebar dot and "NEW IN YOUR OFFICE" toasts announce unlocks. The dev showroom is Y on the page, or `game.devOffice(tier)`.
+- **Checks:**
+  - `npm run typecheck` passes.
+  - Tests: 358 pass, 8 new in `src/office.test.ts`.
+  - `npm run season` (2 seasons) is identical to main apart from its timing lines.
+  - In headless Chrome on the dev build: screenshots of every room in the showroom, a hover card and LIST; a real dynasty simmed to the first win showed the toast and dot, and leaving the office cleared them.
+- **Not done yet:** the rest of the catalog (OFFICE.md), an OFFICE rarity section in the season report, and playing it by hand.
+
 ## In progress
 - **Coaching carousel:** all 7 steps are built (CAROUSEL_PLAN.md). Left for later: former players as GAs (waits on graduation), retention tools, specializations, chemistry, bowl-week interims, DCs bringing their own style (`defIdentity`), the user changing jobs. The CAROUSEL screen was checked in headless Chrome against the dev build, not by hand with keyboard and mouse; the portal card's coach-left line hasn't been seen on screen. Not checked by hand yet: playing a full game with the new rosters, or a whole season through the hub with real keyboard play (the hub was driven by scripted key presses in headless Chrome).
 
@@ -1957,6 +1974,7 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
 - **Key plays:** kicks never get replays (cards only). A drive continued at a quarter break starts a new set of downs. Replays between very uneven teams match less often (more cards). There's no mid-game "sim the rest" yet.
 
 ## Next up (rough priority)
+1. **The coach's office, batch 2+** ([OFFICE.md](OFFICE.md)): the rest of the catalog in batches (bowls, the national title, rivalry trophies, Giant Killer, the comeback, Homegrown's pin map, the hat rack and the coaching tree with new `signing` and `carousel` hooks), then an OFFICE rarity section in `npm run season`.
 1. **UI, pass 2:** give the sub-pages (team, playbook, prep, recruiting, stats, portal, carousel, departures) the hub's look: a shared header with a clickable BACK, and the same sidebar-and-panel style where it fits. A settings page in the hub for the dynasty's options (game length, injuries) and the delegation toggles. More new-dynasty options (coach career, staff delegation). Rename a slot; export and import a save.
 1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
 1. **Recruiting, round 2** ([RECRUITING.md](RECRUITING.md) flags): bring tier 5's classes and starters back to level; a faster summer at the top; the REDSHIRT toggle and 4-game depth management; former players as GAs; play a full cycle by hand.

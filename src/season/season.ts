@@ -10,6 +10,7 @@ import { generateSchedule } from './schedule';
 import { DEV_LABEL } from '../data/athletes';
 import type { Group } from '../data/coaches';
 import { athleteName, generatedAthlete, type Squad } from '../data/depth';
+import { checkOffice } from './achievements';
 import { archiveSeason, storyWeek } from './career';
 import { archiveChronicle, seasonRows } from './program';
 import { archiveCoaches, programXp, progressCoaches } from './coaching';
@@ -44,6 +45,7 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     coach: prev?.coach ?? (config.coachCareer ? newCoach(config.userTeamId) : undefined),
     history: prev?.history ?? [],
     careers: prev?.careers ?? {},
+    ...(prev?.office ? { office: prev.office } : {}),
     // The staffs grow through the offseason (season/coaching.ts).
     ...(prev ? { coaches: progressCoaches(prev) } : {}),
     ...(prev?.coachCareers ? { coachCareers: prev.coachCareers } : {}),
@@ -333,6 +335,12 @@ const transition: WeekStep = (state, ctx) => {
   }
 };
 
+/** The coach's office (season/achievements.ts): what this week's games earned, and the season's end. Display only. */
+const office: WeekStep = (state, ctx) => {
+  checkOffice(state, 'game', ctx.week);
+  if (state.phase === 'complete') checkOffice(state, 'season', ctx.week);
+};
+
 /** The year's final AP top 25, win shares and development records, for next years' reputations. */
 function yearRecord(state: SeasonState): Pick<SeasonSummary, 'ap' | 'wp' | 'dev'> {
   const ap = latestPoll(state, 'ap')?.ranks.map((r) => r.team) ?? [];
@@ -366,6 +374,7 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
   { name: 'recruit', run: recruit },
   { name: 'news', run: news },
   { name: 'transition', run: transition },
+  { name: 'office', run: office },
 ];
 
 /**

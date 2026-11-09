@@ -258,7 +258,7 @@ function drawDown(P: Px, u: Uniform, skin: string): void {
   P(17, 16, 1, 2, u.mask);
 }
 
-function outline(g: CanvasRenderingContext2D, w: number, h: number): void {
+export function outline(g: CanvasRenderingContext2D, w: number, h: number): void {
   const img = g.getImageData(0, 0, w, h);
   const d = img.data;
   const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0;
