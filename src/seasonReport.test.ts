@@ -38,6 +38,8 @@ import { overall } from './data/positions';
 import { prospect } from './data/recruits';
 import { freshmanLevel } from './data/rosterGen';
 import { TEAM_STATE } from './data/fbs/geo';
+import { ACHIEVEMENTS, checkOffice, levelOf, newOffice, type OfficeHook } from './season/achievements';
+import type { OfficeState } from './season/types';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -596,8 +598,22 @@ function portalReport(n: number): string[] {
   let gapDrift = 0;
   const market: Market = { heads: 0, chairs: 0, fbs: 0, outside: 0, free: 0, ga: 0, promoted: 0, flows: [0, 0, 0], why: new Map(), teach: [] };
   const rec = newRecruitSample();
+  const offices = new Map<string, OfficeState>(TEAMS.map((t) => [t.id, newOffice()]));
+  const officeRun = (st: SeasonState, hooks: OfficeHook[]) => {
+    const o0 = Date.now();
+    for (const t of TEAMS) {
+      const o = offices.get(t.id)!;
+      for (const h of hooks) {
+        if (h === 'game') for (let w = 1; w <= st.week; w++) checkOffice(st, 'game', w, t.id, o);
+        else checkOffice(st, h, st.week, t.id, o);
+      }
+    }
+    officeMs += Date.now() - o0;
+  };
+  let officeMs = 0;
   for (let y = 1; y <= n; y++) {
     recruitSeason(s, rec);
+    officeRun(s, ['game', 'season']);
     simSeason(c);
     // Step 6: each group's level-ups this season against its position coach's teach (as a share of the multiplier).
     for (const t of TEAMS) {
@@ -636,6 +652,7 @@ function portalReport(n: number): string[] {
     }
     const old = s;
     while (s.phase === 'offseason') s = advanceOffseason(s);
+    officeRun(old, ['carousel', 'draft', 'signing']);
     const portal = old.portal!;
     {
       const gone = old.departures!.gone!;
@@ -739,6 +756,44 @@ function portalReport(n: number): string[] {
       `rostered players with a past season ${pctText(withRows / rostered.length)}`,
     'story lines per team-season: ' + [...story.keys()].sort().map((k) => `${k} ${perTeam(k)}`).join('  '),
     ...staffReport(s, n, market),
+    ...officeReport(offices, n, officeMs),
+  ];
+}
+
+/**
+ * The coach's office (docs/OFFICE.md): every team's office over the career, as if its coach were the
+ * user. How often each achievement turns up (finds per team-season), the share of teams with it, and
+ * how far its leveled items got. Display only: nothing here changes the rest of the report.
+ */
+function officeReport(offices: Map<string, OfficeState>, n: number, ms: number): string[] {
+  const teamSeasons = TEAMS.length * n;
+  const rows: string[] = [];
+  for (const a of ACHIEVEMENTS) {
+    let finds = 0, teams = 0;
+    const lv = new Map<number, number>();
+    for (const o of offices.values()) {
+      const mine = o.items.filter((i) => i.id === a.id);
+      if (!mine.length) continue;
+      teams++;
+      for (const it of mine) {
+        finds += it.log?.length ?? 1;
+        if (a.levels) lv.set(levelOf(it), (lv.get(levelOf(it)) ?? 0) + 1);
+      }
+    }
+    const rate = finds / teamSeasons;
+    const every = rate ? ` (1 in ${(1 / rate).toFixed(rate > 0.5 ? 1 : 0)})` : '';
+    const levels = a.levels ? '  levels ' + a.levels.map((_, i) => `${i + 1}:${lv.get(i + 1) ?? 0}`).join(' ') : '';
+    const story = a.levels && !['ballrack', 'league', 'haul', 'bowl', 'hats', 'bonsai', 'plaques', 'bracket', 'doormat'].includes(a.id);
+    const flag = !finds ? '  <-- never' : story && rate > 0.35 ? '  <-- too common' : '';
+    rows.push(`  ${a.id.padEnd(10)} ${rate.toFixed(3)} a team-season${every}, ${pctText(teams / TEAMS.length)} of teams${levels}${flag}`);
+  }
+  const perTeam = [...offices.values()].map((o) => o.items.length);
+  return [
+    '', `OFFICE (docs/OFFICE.md), every team's office over the same ${n} seasons as if its coach were the user. Story items`,
+    'should come a few times a decade for a team, not every year; nothing here feeds the sim.',
+    `items per office: mean ${(perTeam.reduce((x, y) => x + y, 0) / perTeam.length).toFixed(1)}, max ${Math.max(...perTeam)}; ` +
+      `time ${(ms / n / 1000).toFixed(2)} s a season for all ${TEAMS.length} offices`,
+    ...rows,
   ];
 }
 

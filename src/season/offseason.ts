@@ -50,6 +50,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
   if (os.stage === 'carousel') {
     carouselRound(state);
     if (state.offseason!.stage === 'departures') {
+      checkOffice(state, 'carousel');
       recruitsReact(state);
       openDepartures(state);
     }
@@ -70,6 +71,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
   if (os.stage === 'signing') {
     if (os.round === 0) {
       runSigningDay(state);
+      checkOffice(state, 'signing');
       os.round = 1;
     } else {
       os.stage = 'portal';

@@ -1914,6 +1914,20 @@ Plan: [RECRUITING_PLAN.md](RECRUITING_PLAN.md). As built: [RECRUITING.md](RECRUI
   - Driven in headless Chrome against the dev build (hub → board → top target → visit → search → offer → class → signing day → portal). No console errors.
 - **Flags** (in RECRUITING.md): T5 signs above its level and its starters still drift up about 4 over 5 seasons; the summer is slow at the top (22% of the top 300); a passive user signs only the summer's commits (placeholders fill); careers grow to about 3.2 MB a season.
 
+## Done: the coach's office, batch 2: leveled items (2026-11-09)
+24 more achievements, most of them leveled. See [OFFICE.md](OFFICE.md).
+- **Leveling:** each find folds into one item (`OfficeItem.log`), and its art grows at the def's `levels`: more stuff in it, then a wood, silver and gold frame. Old saves' one-per-find front pages fold into one item.
+- **Page:** cards show `LV n/N`, what the next level needs and the latest log lines; LIST shows level pips. A "LEVEL UP IN YOUR OFFICE" toast fires on each new level. Showroom: L steps the level.
+- **Classics:** the national title and the Heisman.
+- **Leveled:** Giant Killer, the Comeback, Ice Water, Air Show, Ground and Pound, Marathon, the ball rack, bowls, the bracket, Perfect Season, Homegrown (the state poster with pins), Prove 'Em Wrong, Turnaround, the doormat, the Long Haul portrait, the awards wall, the coaching tree bonsai, To the League, Draft Night, From Nowhere and the hat rack.
+- **Bad moments:** Hate Mail and For Sale.
+- **Hooks and rooms:** new `carousel` and `signing` hooks. More slots in the bigger rooms, so a full showroom fits the suite except jerseys past its wall.
+- **Season report:** an OFFICE rarity section (every team's office as if it were the user's). The rest of the report is unchanged.
+- **Checks:**
+  - Typecheck passes. 366 tests pass; `src/office.test.ts` has 16, covering folding, old saves, the game and season detectors, and every drawer at every level staying inside its slot.
+  - Headless Chrome screenshots of the showroom at the top, mixed and low levels, the corner and head coach's offices, LIST and a leveled card.
+- **Not done:** rivalry trophies held, Fire Extinguisher, and playing it by hand. From Nowhere's new rule hasn't been through the report yet.
+
 ## Done: the coach's office, batch 1 (2026-11-08)
 Achievements as a room that fills up. See [OFFICE.md](OFFICE.md).
 - **Framework:**
@@ -1978,7 +1992,7 @@ Achievements as a room that fills up. See [OFFICE.md](OFFICE.md).
 - **Key plays:** kicks never get replays (cards only). A drive continued at a quarter break starts a new set of downs. Replays between very uneven teams match less often (more cards). There's no mid-game "sim the rest" yet.
 
 ## Next up (rough priority)
-1. **The coach's office, batch 2+** ([OFFICE.md](OFFICE.md)): the rest of the catalog in batches (bowls, the national title, rivalry trophies, Giant Killer, the comeback, Homegrown's pin map, the hat rack and the coaching tree with new `signing` and `carousel` hooks), then an OFFICE rarity section in `npm run season`.
+1. **The coach's office** ([OFFICE.md](OFFICE.md)): play a dynasty by hand and watch items level. Still to build: rivalry trophies held (dropped when lost) and Fire Extinguisher (needs the season's lowest job security kept). Rerun the OFFICE section for From Nowhere.
 1. **UI, pass 2:** give the sub-pages (team, playbook, prep, recruiting, stats, portal, carousel, departures) the hub's look: a shared header with a clickable BACK, and the same sidebar-and-panel style where it fits. A settings page in the hub for the dynasty's options (game length, injuries) and the delegation toggles. More new-dynasty options (coach career, staff delegation). Rename a slot; export and import a save.
 1. **Careers, round 2** ([CAREERS.md](CAREERS.md)): program records and career leaders, opening a career from the news, leaders and portal screens, and a story line for losing the job. Graduation will make class years move in the rows.
 1. **Recruiting, round 2** ([RECRUITING.md](RECRUITING.md) flags): bring tier 5's classes and starters back to level; a faster summer at the top; the REDSHIRT toggle and 4-game depth management; former players as GAs; play a full cycle by hand.

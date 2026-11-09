@@ -45,7 +45,7 @@ import { careerList, careerRowAt, careerTabAt, modeAt, newCareerView } from '../
 import { beginLinks, linkAt, type Link } from '../render/links';
 import { drawProgram, programScrollMax, programTabAt, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
 import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt, type OfficeView } from '../render/officeScreen';
-import { achievement, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
+import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
 import { ROOMS } from '../data/office';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
@@ -1270,7 +1270,7 @@ export class Game {
     this.screen = 'season';
   }
 
-  /** The office: Tab or the tabs switch OFFICE and LIST, a clicked item from this season opens its game, Esc goes back. In dev, Y toggles the showroom and [ ] step its room. */
+  /** The office: Tab or the tabs switch OFFICE and LIST, a clicked item from this season opens its game, Esc goes back. In dev, Y toggles the showroom, [ ] step its room and L its items' level (top, mixed, then 1 up). */
   private updateOffice(input: Input): void {
     const s = this.season!;
     const v = this.officeView;
@@ -1283,7 +1283,11 @@ export class Game {
     }
     if (input.hit('Tab')) Object.assign(v, { tab: (v.tab + 1) % OFFICE_TABS.length, scroll: 0 });
     if (import.meta.env.DEV) {
-      if (input.hit('KeyY')) v.show = v.show ? undefined : { items: sampleOffice(s), tier: ROOMS.length - 1 };
+      if (input.hit('KeyY')) v.show = v.show ? undefined : { items: sampleOffice(s), tier: ROOMS.length - 1, level: Infinity };
+      if (v.show && input.hit('KeyL')) {
+        const lv = v.show.level === Infinity ? -1 : v.show.level === -1 ? 1 : v.show.level >= 7 ? Infinity : v.show.level + 1;
+        Object.assign(v.show, { level: lv, items: sampleOffice(s, lv) });
+      }
       if (v.show && input.hit('BracketLeft')) v.show.tier = Math.max(0, v.show.tier - 1);
       if (v.show && input.hit('BracketRight')) v.show.tier = Math.min(ROOMS.length - 1, v.show.tier + 1);
     }
@@ -1306,10 +1310,10 @@ export class Game {
   }
 
   /** Dev: the office showroom in room `tier`, every item on show, from the console (`game.devOffice(3)`). */
-  devOffice(tier = ROOMS.length - 1): void {
+  devOffice(tier = ROOMS.length - 1, level = Infinity): void {
     if (!this.season) this.season = newSeason(defaultConfig(TEAMS[this.userIdx].id), 1);
     this.toOffice();
-    this.officeView.show = { items: sampleOffice(this.season), tier };
+    this.officeView.show = { items: sampleOffice(this.season, level), tier, level };
   }
 
   /** Queue a toast for each new office item (and a new room) since last look. Not on the field. */
@@ -1327,7 +1331,11 @@ export class Game {
     if (this.inGame()) return;
     const o = s.office;
     if (o && o.rev > w.rev) {
-      for (const it of o.items.filter((i) => i.rev > w!.rev)) this.toasts.push({ title: 'NEW IN YOUR OFFICE', sub: achievement(it.id)?.name ?? it.id });
+      for (const it of o.items) {
+        const name = achievement(it.id)?.name ?? it.id;
+        if (it.rev > w.rev) this.toasts.push({ title: 'NEW IN YOUR OFFICE', sub: name });
+        else if ((it.up ?? 0) > w.rev) this.toasts.push({ title: 'LEVEL UP IN YOUR OFFICE', sub: `${name}: LV ${levelOf(it)}` });
+      }
       w.rev = o.rev;
     }
     const room = newRoom(s);

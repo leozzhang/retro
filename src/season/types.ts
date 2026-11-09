@@ -753,6 +753,18 @@ export interface OfficeItem {
   rev: number;
   /** Not seen on the office page yet. */
   fresh?: 1;
+  /** A leveled item's finds, oldest first: its level is how many (`AchievementDef.levels`). `data` is the latest's. */
+  log?: OfficeMark[];
+  /** `OfficeState.rev` when it last leveled up, for the toast. */
+  up?: number;
+}
+
+/** One find folded into a leveled item: its key, year, card line and an optional value its art reads (a team, a role). */
+export interface OfficeMark {
+  k: string;
+  y: number;
+  t: string;
+  v?: string;
 }
 
 export interface OfficeState {

@@ -93,7 +93,7 @@ export const ROOMS: RoomTier[] = [
     desk: { x: 120, w: 120, kind: 'wood' },
     shelves: [{ x: 22, y: 120, w: 84 }],
     spots: [
-      at('wall-lg', 130, 40), ...row('wall-sm', 24, 44, 2), ...row('wall-sm', 246, 110, 3),
+      at('wall-lg', 130, 40), ...row('wall-sm', 24, 44, 2), ...row('wall-sm', 246, 110, 3), at('wall-lg', 40, 150),
       at('floor', 6, 206), at('floor', 322, 206),
     ],
   },
@@ -106,8 +106,8 @@ export const ROOMS: RoomTier[] = [
     shelves: [{ x: 298, y: 140, w: 126 }],
     trophyCase: { x: 18, w: 112, rows: 3 },
     spots: [
-      ...row('wall-lg', 150, 34, 2, 12), ...row('wall-sm', 300, 160, 4, 7),
-      at('floor', 136, 236), at('floor', 412, 236),
+      ...row('wall-lg', 150, 34, 2, 12), at('wall-lg', 49, 50), ...row('wall-sm', 300, 160, 4, 7),
+      at('floor', 136, 236), at('floor', 412, 236), at('floor', 376, 236),
     ],
   },
   {
@@ -119,8 +119,8 @@ export const ROOMS: RoomTier[] = [
     shelves: [{ x: 318, y: 168, w: 200 }],
     trophyCase: { x: 16, w: 146, rows: 4 },
     spots: [
-      ...row('jersey', 176, 26, 3, 8), ...row('wall-lg', 172, 90, 2, 32), ...row('wall-sm', 320, 192, 6, 9),
-      at('floor', 168, 256), at('floor', 502, 256),
+      ...row('jersey', 176, 26, 3, 8), ...row('wall-lg', 172, 90, 2, 32), ...row('wall-lg', 22, 44, 2, 34), ...row('wall-sm', 320, 192, 6, 9),
+      at('floor', 168, 256), at('floor', 502, 256), at('floor', 466, 256),
     ],
   },
   {
@@ -133,8 +133,8 @@ export const ROOMS: RoomTier[] = [
     trophyCase: { x: 12, w: 172, rows: 5 },
     spots: [
       ...row('jersey', 476, 22, 3, 8), ...row('jersey', 476, 74, 3, 8), ...row('wall-lg', 478, 128, 2, 14),
-      ...row('wall-sm', 204, 208, 8, 8), at('wall-lg', 478, 176), at('wall-lg', 542, 176),
-      at('floor', 192, 268), at('floor', 500, 268), at('floor', 588, 268),
+      ...row('wall-sm', 204, 208, 8, 8), at('wall-lg', 478, 176), at('wall-lg', 542, 176), ...row('wall-lg', 14, 40, 3, 10),
+      at('floor', 192, 268), at('floor', 500, 268), at('floor', 588, 268), at('floor', 420, 268),
     ],
   },
 ];

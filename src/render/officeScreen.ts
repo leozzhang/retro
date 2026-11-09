@@ -2,7 +2,7 @@ import { caseHeight, caseTop, deskTop, ROOMS, type RoomTier, type WindowView } f
 import { teamById, type Team } from '../data/teams';
 import { VIEW_W } from '../engine/constants';
 import { hashString, mulberry32 } from '../engine/math';
-import { achievement, ACHIEVEMENTS, layoutOffice, officeTier } from '../season/achievements';
+import { achievement, ACHIEVEMENTS, layoutOffice, levelOf, maxLevel, officeTier, toNextLevel } from '../season/achievements';
 import type { OfficeItem, SeasonState } from '../season/types';
 import { makeCrowd } from './field';
 import { drawHint } from './hud';
@@ -25,7 +25,7 @@ export interface OfficeView {
   mx: number;
   my: number;
   /** The dev showroom: these items in this room instead of the save's. */
-  show?: { items: OfficeItem[]; tier: number };
+  show?: { items: OfficeItem[]; tier: number; level: number };
   /** A room just moved into, announced on the page. */
   moved?: number;
 }
@@ -87,7 +87,7 @@ export function drawOffice(g: CanvasRenderingContext2D, s: SeasonState, v: Offic
     g.fillRect(0, 36, VIEW_W, 16);
     text(g, msg, VIEW_W / 2, 40, { align: 'center', color: GOLD });
   }
-  drawHint(g, hover ?? (v.show ? '[ ]: ROOM   Y: LEAVE SHOWROOM   ESC: BACK' : 'HOVER AN ITEM   TAB: LIST   ESC: BACK'));
+  drawHint(g, hover ?? (v.show ? `[ ]: ROOM   L: LEVEL (${showLevel(v.show.level)})   Y: LEAVE   ESC: BACK` : 'HOVER AN ITEM   TAB: LIST   ESC: BACK'));
 }
 
 // ------------------------------------------------------------ the room
@@ -432,19 +432,30 @@ function view(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 
 // ------------------------------------------------------------ cards
 
+const showLevel = (lv: number) => (lv === Infinity ? 'TOP' : lv === -1 ? 'MIXED' : String(lv));
+
 function itemCard(g: CanvasRenderingContext2D, it: OfficeItem, b: Box, s: SeasonState): void {
   const def = achievement(it.id);
   const lines = def ? def.desc(it) : [];
   const school = it.team !== s.config.userTeamId ? [`At ${teamById(it.team).school}.`] : [];
-  tooltip(g, b.x + b.w / 2, b.y, def?.name ?? it.id, [...lines, ...school], String(it.year));
+  if (!def?.levels) {
+    tooltip(g, b.x + b.w / 2, b.y, def?.name ?? it.id, [...lines, ...school], String(it.year));
+    return;
+  }
+  // A leveled item: its level, what's next, and the latest of its log.
+  const next = toNextLevel(it);
+  const more = next === undefined ? 'Fully upgraded.' : `${next} more to level ${levelOf(it) + 1}.`;
+  const log = (it.log ?? []).slice(-3).reverse().filter((m) => m.t).map((m) => `${m.y}: ${m.t}`);
+  tooltip(g, b.x + b.w / 2, b.y, def.name, [...lines, ...school, more], `LV ${levelOf(it)}/${maxLevel(it.id)}`, log);
 }
 
 /** A card next to (cx, cy), kept on screen. */
-function tooltip(g: CanvasRenderingContext2D, cx: number, cy: number, title: string, body: string[], right?: string): void {
-  const w = 224;
+function tooltip(g: CanvasRenderingContext2D, cx: number, cy: number, title: string, body: string[], right?: string, foot: string[] = []): void {
+  const w = 240;
   const n = (w - 16) / 8;
   const lines = body.flatMap((l) => wrapSpans(l, [], n).map((x) => x.t));
-  const h = 24 + lines.length * 11;
+  const feet = foot.flatMap((l) => wrapSpans(l, [], n).map((x) => x.t));
+  const h = 24 + lines.length * 11 + (feet.length ? 6 + feet.length * 11 : 0);
   let x = Math.round(cx - w / 2);
   x = Math.max(4, Math.min(VIEW_W - w - 4, x));
   let y = cy - h - 6;
@@ -461,6 +472,11 @@ function tooltip(g: CanvasRenderingContext2D, cx: number, cy: number, title: str
   g.fillStyle = RULE;
   g.fillRect(x, y + 17, w, 1);
   lines.forEach((l, i) => text(g, l, x + 8, y + 22 + i * 11, { color: '#d8dde4', shadow: false }));
+  if (!feet.length) return;
+  const fy = y + 22 + lines.length * 11 + 2;
+  g.fillStyle = RULE;
+  g.fillRect(x, fy, w, 1);
+  feet.forEach((l, i) => text(g, l, x + 8, fy + 4 + i * 11, { color: SOFT, shadow: false }));
 }
 
 // ------------------------------------------------------------ LIST
@@ -499,9 +515,18 @@ function drawList(g: CanvasRenderingContext2D, s: SeasonState, v: OfficeView): v
       g.fillRect(14, y + 3, 18, 18);
       text(g, '?', 23, y + 8, { align: 'center', color: DIM, shadow: false });
     }
-    text(g, a.name, 42, y + 3, { color: last ? GOLD : '#cfd6df', shadow: false });
-    if (mine.length > 1) text(g, `x${mine.length}`, VIEW_W - 16, y + 3, { align: 'right', color: GOLD, shadow: false });
-    const line = last ? `${last.year}: ${a.desc(last)[0]}` : a.hint;
+    text(g, a.name, 42, y + 3, { color: last ? GOLD : a.bad ? '#c98a8a' : '#cfd6df', shadow: false });
+    if (last && a.levels) {
+      const lv = levelOf(last), top = a.levels.length;
+      text(g, `LV ${lv}/${top}`, VIEW_W - 16, y + 3, { align: 'right', color: lv >= top ? GOLD : ACCENT, shadow: false });
+      // Pips for the levels.
+      for (let k = 0; k < top; k++) {
+        g.fillStyle = k < lv ? GOLD : '#2a3444';
+        g.fillRect(VIEW_W - 16 - 64 - (top - k) * 6, y + 5, 4, 4);
+      }
+    } else if (mine.length > 1) text(g, `x${mine.length}`, VIEW_W - 16, y + 3, { align: 'right', color: GOLD, shadow: false });
+    else if (!last && a.levels) text(g, `${a.levels.length} LEVELS`, VIEW_W - 16, y + 3, { align: 'right', color: DIM, shadow: false });
+    const line = last ? (a.levels ? a.desc(last)[0] : `${last.year}: ${a.desc(last)[0]}`) : a.hint;
     text(g, line.length > 70 ? line.slice(0, 69) + '.' : line, 42, y + 14, { color: last ? SOFT : DIM, shadow: false });
   });
 }
