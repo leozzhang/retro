@@ -178,12 +178,22 @@ function rollProspect(cls: number, salt: string, n: number): { id: string; a: At
 const CITY0: Record<string, string> = Object.fromEntries(Object.entries(CITIES).map(([s, c]) => [s, c[0]]));
 
 const pools = new Map<string, Pool>();
+/**
+ * Pools kept at once, least recently used out first. Rosters hold up to five classes (redshirts stay a
+ * fifth year), plus the class just signed and the one being recruited. Fewer than the live classes and a
+ * roster walk rebuilds a pool on nearly every player (a 26 s freeze at a dynasty's fifth signing day).
+ */
+const POOL_CACHE = 8;
 
-/** The class of `cls` for a career, ranked by the services. Cached (a few classes at a time). */
+/** The class of `cls` for a career, ranked by the services. Cached (`POOL_CACHE` classes at a time). */
 export function recruitPool(cls: number, salt: string): Pool {
   const key = `${cls}.${salt}`;
   const hit = pools.get(key);
-  if (hit) return hit;
+  if (hit) {
+    pools.delete(key);
+    pools.set(key, hit);
+    return hit;
+  }
   const rolled = Array.from({ length: FBS + RECRUITS.extra }, (_, n) => rollProspect(cls, salt, n));
   rolled.sort((x, y) => y.comp - x.comp);
   const posN = new Map<Position, number>();
@@ -197,7 +207,7 @@ export function recruitPool(cls: number, salt: string): Pool {
     return { id: r.id, a: r.a, pos: r.a.pos, level: r.level, pub: r.pub, comp: r.comp, rank, posRank, stars, m: makeup(r.id, r.a.hometown.state, stars) };
   });
   const pool = { cls, salt, list, byId: new Map(list.map((p) => [p.id, p])) };
-  if (pools.size >= 4) {
+  if (pools.size >= POOL_CACHE) {
     const old = pools.values().next().value!;
     for (const id of old.byId.keys()) known.delete(id);
     pools.delete(pools.keys().next().value!);

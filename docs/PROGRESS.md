@@ -2,6 +2,10 @@
 
 _Last updated: 2026-11-08_
 
+## Fixed: the fifth signing day froze the game (2026-11-08)
+- Leaving signing day for the portal took ~26 s of blocking work, so the game looked frozen, and the save sat at that stage, so restarting didn't help. The recruit pool cache (`data/recruits.ts`) kept only 4 classes, but from a dynasty's fifth signing day on, rosters hold 5 (four on campus plus redshirts, and the class just signed). `overCap` walks every roster through `baseRoster`, and each walk evicted a pool and rolled ~3,800 prospects again on nearly every class switch: ~190 ms a team.
+- Now `POOL_CACHE = 8` with least-recently-used eviction. On the slot-2 save (Northern Illinois, 2030) the step takes 0.45 s. Pools are deterministic from their ids, so results don't change.
+
 ## Done: game pages and the postgame (2026-11-08)
 Every finished game in the league has a page. After a played game, the postgame shows highlights and then that page. See [GAMES.md](GAMES.md).
 - **Saved with every game:**
