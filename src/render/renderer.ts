@@ -8,7 +8,7 @@ import { CATCH_REACH } from '../sim/catching';
 import { endurance, isEligible, poseOf, type Player } from '../sim/player';
 import type { Tape, TapeFrame } from '../game/tape';
 import { laneScores, levered } from '../sim/runBlocking';
-import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite, type Look } from './sprites';
+import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite, POSE_LIFT, spinFrame, type Look } from './sprites';
 import { text } from './text';
 
 const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
@@ -280,7 +280,9 @@ export function lookOf(play: Play, p: Player): Look {
 
 export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean, look: Look = 'fwd'): void {
   const s = cam.toScreen(p.pos.x, p.pos.y);
-  const spr = getSprite(p.uniform, p.skin, poseOf(p, presnap), (cam.mirror ? -p.facing : p.facing) as 1 | -1, look);
+  const pose = poseOf(p, presnap);
+  const spr = getSprite(p.uniform, p.skin, pose, (cam.mirror ? -p.facing : p.facing) as 1 | -1, look);
+  const lift = POSE_LIFT[pose] ?? 0;
   if (p.juke > 0) {
     // A cut leaves fading afterimages behind him.
     for (let i = 3; i >= 1; i--) {
@@ -290,7 +292,7 @@ export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, 
     }
     g.globalAlpha = 1;
   }
-  g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
+  g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y - lift));
 }
 
 /** One frame of a tape of a played snap (game/tape.ts): the men as they were, then the ball. */
@@ -320,7 +322,7 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
       }
       g.globalAlpha = 1;
     }
-    g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y));
+    g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y - (POSE_LIFT[m.pose] ?? 0)));
     if (b.state === 'held' && b.carrier === i) {
       const bp = cam.toScreen(b.x, b.y, b.z);
       g.drawImage(bs, Math.round(bp.x - 4), Math.round(bp.y - 4));
@@ -328,7 +330,7 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
   }
   if ((b.state === 'dead' && b.carrier < 0) || airborne) {
     const s = cam.toScreen(b.x, b.y, b.z);
-    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
+    g.drawImage(getBallSprite(spinFrame(b.spin)), Math.round(s.x - 4), Math.round(s.y - 4));
   }
 }
 
@@ -388,7 +390,7 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
   drawBlocks(g, cam, play);
   if (ball.state === 'dead' && !ball.carrier) {
     const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
-    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
+    g.drawImage(getBallSprite(spinFrame(ball.spin)), Math.round(s.x - 4), Math.round(s.y - 4));
   }
   if (airborne) {
     const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);

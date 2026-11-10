@@ -13,6 +13,8 @@ export interface Ball {
   dur: number;
   peak: number;
   vel: Vec3;
+  /** A ball spun on the turf after a score (`sim/celebrate.ts`): quarter turns so far; drawn flat, twirling. */
+  spin?: number;
 }
 
 export function makeBall(x: number, y: number): Ball {

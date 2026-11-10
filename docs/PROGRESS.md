@@ -1,6 +1,21 @@
 # Progress
 
-_Last updated: 2026-11-08_
+_Last updated: 2026-11-09_
+
+## Done: touchdown celebrations (2026-11-09)
+- **The problem:** a scorer froze in the arm-up `catch` pose for 5 s and glided through the end zone. Pick sixes and kick-return TDs glided the same way.
+- **Now** (`sim/celebrate.ts`, `CELEBRATE`): the scorer keeps his running frames as he eases to a stop about 4 yd deep, then does one of three celebrations:
+  - **spike:** ball raised overhead, then slammed into the turf; the ball bounces free
+  - **leap:** tosses the ball aside and jumps twice with both arms up (`POSE_LIFT` raises the sprite off its shadow)
+  - **spin:** with a quick dip, he stands the ball on its tip and spins it like a top. It keeps twirling (`Ball.spin`; upright frames 4–7 in `getBallSprite`, with the laces sweeping around) while he pops back up with both arms raised.
+- **How it's picked:** a hash of the scorer's number and where he crossed, so it never draws from the play's rng. Kick-return TDs only leap, since the kick play's ball stays in his hands.
+- **Where it runs:** the touchdown, pick six, two-point try and kick-return TD paths all go through `startCelebration`. `Player.celebrate` drives the pose in `poseOf` and the timer in `tickTimers`.
+- **Replays:** a live snap's tape now keeps 2.4 s after a score (`TAPE.scoreTail`, was 0.8), so postgame highlights show the celebration. Key-play replays get it from the `Play` itself.
+- **Checks:**
+  - `npm run balance` is byte-identical.
+  - `src/celebrate.test.ts` covers the run-out, the stop depth and the pose order.
+  - A headless sprite sheet confirmed the six new poses, both facings.
+- **Not checked yet:** by hand in a live game.
 
 ## Fixed: the fifth signing day froze the game (2026-11-08)
 - Leaving signing day for the portal took ~26 s of blocking work, so the game looked frozen, and the save sat at that stage, so restarting didn't help. The recruit pool cache (`data/recruits.ts`) kept only 4 classes, but from a dynasty's fifth signing day on, rosters hold 5 (four on campus plus redshirts, and the class just signed). `overCap` walks every roster through `baseRoster`, and each walk evicted a pool and rolled ~3,800 prospects again on nearly every class switch: ~190 ms a team.

@@ -1,13 +1,13 @@
-import { FIELD_W, OPP_GOAL, STEP } from '../engine/constants';
+import { FIELD_W, STEP } from '../engine/constants';
 import { add, clamp, dist, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Assign } from '../data/defenses';
 import type { Play } from '../game/playState';
 import { isEligible, LEAN_FX, maxSpeed, seek, seekTimed, startJuke, type Player } from './player';
 import { pickLane, runBlock } from './runBlocking';
+import { celebrateWant } from './celebrate';
 
 const ZERO: Vec = { x: 0, y: 0 };
 /** Yards a scorer carries on into the end zone after crossing the goal line, before pulling up. Only for show. */
-const TD_RUN_THROUGH = 4;
 /** A back selling pass before a delayed route steps up to block no more than this far from his spot. */
 const DELAY_SET_RANGE = 1.2;
 /** Backers fit a run this far past the LOS (they read, then fill; they don't meet the back at the line). */
@@ -77,9 +77,9 @@ export function pursue(p: Player, c: Player, speedMul = 1, lead = 1.2): void {
 // ---------------------------------------------------------------- offense
 
 export function thinkOffense(play: Play, p: Player): void {
-  if (play.phase === 'over' && p === play.carrier && play.outcome?.type === 'td' && !p.down) {
-    // The scorer runs it through instead of stopping dead on the goal line.
-    p.want = p.pos.x < OPP_GOAL + TD_RUN_THROUGH ? { x: Math.max(p.vel.x, 3), y: p.vel.y * 0.5 } : ZERO;
+  if (p.celebrate && !p.down) {
+    // The scorer runs it through instead of stopping dead on the goal line, then celebrates.
+    p.want = celebrateWant(p);
     return;
   }
   if (p.down || p.stun > 0 || play.phase === 'presnap' || play.phase === 'over') {
@@ -693,6 +693,10 @@ export function autoRun(play: Play, c: Player): void {
 
 /** Returner (interceptions and kick returns): run for the user's end zone, slipping away from nearby tacklers. */
 export function returnerAI(play: { off: Player[]; phase: string }, c: Player): void {
+  if (c.celebrate && !c.down) {
+    c.want = celebrateWant(c); // a pick six or return TD: run it out, then celebrate
+    return;
+  }
   if (c.down || play.phase === 'over') {
     c.want = ZERO;
     return;

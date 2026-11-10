@@ -4,6 +4,7 @@ import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
 import { add, clamp, len, lerp, limit, scale, sub, type Vec } from '../engine/math';
 import type { Pose, Uniform } from '../render/sprites';
+import { celebrationPose, tickCelebration, type Celebrating } from './celebrate';
 
 export type Side = 'off' | 'def';
 
@@ -60,6 +61,8 @@ export interface Player {
   anim: number;
   pose: Pose | null;
   poseTimer: number;
+  /** A scorer celebrating in the end zone (display only, `sim/celebrate.ts`). */
+  celebrate: Celebrating | null;
   down: boolean;
   downTimer: number;
   tackleCd: number;
@@ -180,6 +183,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     anim: Math.random() * 4,
     pose: null,
     poseTimer: 0,
+    celebrate: null,
     down: false,
     downTimer: 0,
     tackleCd: 0,
@@ -341,6 +345,7 @@ export function knockDown(p: Player, time = Infinity): void {
 }
 
 export function tickTimers(p: Player, dt: number): void {
+  if (p.celebrate) tickCelebration(p, dt);
   if (p.poseTimer > 0) {
     p.poseTimer -= dt;
     if (p.poseTimer <= 0) p.pose = null;
@@ -377,6 +382,10 @@ const BLOCK_POSE_WIN = 4;
 
 export function poseOf(p: Player, presnap: boolean): Pose {
   if (p.down) return 'down';
+  if (p.celebrate) {
+    const c = celebrationPose(p);
+    if (c) return c;
+  }
   if (p.pose) return p.pose;
   if (presnap && (p.role === 'OL' || p.role === 'DL')) return 'stance';
   // Blocks: whoever's winning drives, an even block is locked up, a blocker who just got shed stumbles.

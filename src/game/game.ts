@@ -2515,7 +2515,8 @@ export class Game {
     if (!this.snapAt && play.phase !== 'presnap') this.snapAt = this.atNow();
     if (this.liveBox) {
       if (this.tapeRec?.play !== play) this.tapeRec = newRecorder(play);
-      if (play.phase !== 'over' || play.overTime < 0.8) recordFrame(this.tapeRec, dt);
+      const scored = play.outcome?.type === 'td' || play.outcome?.type === 'pick6';
+      if (play.phase !== 'over' || play.overTime < (scored ? TAPE.scoreTail : TAPE.tail)) recordFrame(this.tapeRec, dt);
     }
     if (play.phase !== 'presnap' && play.phase !== 'over' && !this.drive.try) tickLive(this.clock, dt);
 

@@ -15,7 +15,8 @@ import type { Play } from './playState';
  */
 
 /** `fps`: frames a second of play time; `maxSecs`: the longest snap kept; `keep`: tapes kept a game, the best by `tapeScore`. */
-export const TAPE = { fps: 30, maxSecs: 20, keep: 6 };
+/** `tail`: seconds kept after the whistle; `scoreTail` after a touchdown, for the celebration. */
+export const TAPE = { fps: 30, maxSecs: 20, keep: 6, tail: 0.8, scoreTail: 2.4 };
 
 /**
  * The postgame highlights: `reel` plays, the biggest by `reelScore` among those the key plays rate
@@ -77,7 +78,7 @@ export interface TapeFrame {
   /** Seconds since the snap (the first frame is the presnap, at 0). */
   t: number;
   men: TapeMan[];
-  ball: { state: BallState; x: number; y: number; z: number; carrier: number };
+  ball: { state: BallState; x: number; y: number; z: number; carrier: number; spin?: number };
   /** Where the camera looks, and its lead. */
   focus: number;
   lead: number;
@@ -111,7 +112,7 @@ function frame(play: Play, t: number): TapeFrame {
     men: play.players.map((p) => ({
       x: p.pos.x, y: p.pos.y, vx: p.vel.x, vy: p.vel.y, facing: p.facing, pose: poseOf(p, presnap), look: lookOf(play, p), juke: p.juke,
     })),
-    ball: { state: b.state, x: b.pos.x, y: b.pos.y, z: b.pos.z, carrier: b.carrier ? play.players.indexOf(b.carrier) : -1 },
+    ball: { state: b.state, x: b.pos.x, y: b.pos.y, z: b.pos.z, carrier: b.carrier ? play.players.indexOf(b.carrier) : -1, spin: b.spin },
     focus: play.focusX(),
     lead,
   };

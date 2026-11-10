@@ -18,6 +18,7 @@ import {
   timingGreen,
   type FgResult, type KickFlight, type KickParams, type KickPrediction, type Wind,
 } from '../sim/kicking';
+import { celebrateWant, startCelebration } from '../sim/celebrate';
 import { knockDown, makePlayer, maxSpeed, seek, seekTimed, setPose, stepPlayer, tickTimers, type Player } from '../sim/player';
 import { MIN_DRAG_PX, type Aim } from '../sim/passing';
 import { returnTackleChance, TACKLE_RANGE } from '../sim/tackling';
@@ -681,7 +682,7 @@ export class KickPlay {
     const c = this.carrier!;
     if (c.down) return;
     if (c.pos.x <= OWN_GOAL) {
-      setPose(c, 'catch', 5);
+      startCelebration(c, ['leap']); // the kick play's ball stays in his hands
       this.endWith('returnTd', c.pos, 'RETURN TD', `#${c.num} ${c.name} takes it to the house`);
       return;
     }
@@ -745,7 +746,7 @@ export class KickPlay {
     }
     if (p.engagedBy.length) return; // blocked: the engagement drives him
     if (this.phase === 'over') {
-      p.want = scale(p.vel, 0.9);
+      p.want = p.celebrate ? celebrateWant(p) : scale(p.vel, 0.9);
       return;
     }
     if (p === this.carrier) {

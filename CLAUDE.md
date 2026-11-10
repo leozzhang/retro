@@ -84,6 +84,7 @@ Controls are listed in [README.md](README.md).
   - zone read and option: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH`, `KEEP_INSIDE`, `OPTION_CUT`; screens `SCREEN_SET` (`game/playState.ts`)
   - `pitchOdds`, `PITCH_REACH`, `HANDOFF_ODDS` (`sim/catching.ts`)
   - `AIM_TIME_SCALE` (`game/game.ts`)
+  - touchdown celebrations (display only, no rng): `CELEBRATE` (`sim/celebrate.ts`), poses and `POSE_LIFT` (`render/sprites.ts`), the tape's `scoreTail` (`game/tape.ts`)
   - quarter lengths `QUARTER_OPTIONS`, `QUARTER_DRIVES`; the accelerated clock `SNAP_AT`, `HURRY_AT` (`game/clock.ts`)
   - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd`; the kick timing meter `METER_HALF`, `MISTIME_DIR`, `MISTIME_CURVE`, `GREEN_BASE`, `GREEN_KAC` (`sim/kicking.ts`)
   - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `ST_SPEED_GAP`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF` (`game/kickPlay.ts`)

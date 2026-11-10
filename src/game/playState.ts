@@ -10,6 +10,7 @@ import { teamUniform } from '../render/sprites';
 import { cutKeep, eyesOf, facingQB, FIND, isRusher, matchZones, PREVENT, readyAt, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
 import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
+import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
 import {
   accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
   startGather,
@@ -775,8 +776,23 @@ export class Play {
 
     if (this.ball.state === 'held' && this.carrier) {
       const c = this.carrier;
-      this.ball.pos = { x: c.pos.x + c.facing * 0.25, y: c.pos.y + 0.05, z: c.down ? 0.2 : 1.1 };
+      const up = heldBall(c);
+      this.ball.pos = up
+        ? { x: c.pos.x + c.facing * up.dx, y: c.pos.y + 0.05, z: up.z }
+        : { x: c.pos.x + c.facing * 0.25, y: c.pos.y + 0.05, z: c.down ? 0.2 : 1.1 };
+      if (c.celebrate?.released && c.celebrate.kind === 'spin') {
+        // Stood on its tip in front of him, to spin.
+        this.ball.state = 'dead';
+        this.ball.carrier = null;
+        this.ball.pos = { x: c.pos.x + c.facing * CELEBRATE.spin.ball.dx, y: c.pos.y + 0.05, z: CELEBRATE.spin.ball.z };
+      } else if (c.celebrate?.released) {
+        // Spiked or tossed: the ball bounces free.
+        this.ball.state = 'bounce';
+        this.ball.carrier = null;
+        this.ball.vel = releaseVel(c.celebrate);
+      }
     }
+    if (this.carrier?.celebrate) this.ball.spin = spinTurns(this.carrier.celebrate) ?? undefined;
     if (this.phase === 'live' || this.phase === 'run') {
       this.checkBounds();
       if ((this.phase as Phase) !== 'over') this.checkTackles(); // checkBounds may have ended the play
@@ -1476,7 +1492,7 @@ export class Play {
     const out = c.pos.y < 0 || c.pos.y > FIELD_W;
     if (c.side === 'off') {
       if (c.pos.x >= OPP_GOAL) {
-        setPose(c, 'catch', 5);
+        startCelebration(c);
         this.end({ type: 'td', spot: OPP_GOAL, spotY: c.pos.y, text: 'TOUCHDOWN!', sub: `#${c.num} ${c.name}`, color: '#ffd23f' });
       } else if (out || c.pos.x < 0) {
         const spot = c.pos.x;
@@ -1484,7 +1500,7 @@ export class Play {
         else this.end({ type: 'oob', spot, spotY: c.pos.y, text: yardsText(spot - this.los), sub: 'Out of bounds', color: '#ffffff' });
       }
     } else if (c.pos.x <= OWN_GOAL) {
-      setPose(c, 'catch', 5);
+      startCelebration(c);
       this.end({ type: 'pick6', spot: OWN_GOAL, spotY: c.pos.y, text: 'PICK SIX', sub: `#${c.num} ${c.name} takes it to the house`, color: '#ff5a5a' });
     } else if (out || c.pos.x > FIELD_LEN) {
       const touchback = c.pos.x >= OPP_GOAL;

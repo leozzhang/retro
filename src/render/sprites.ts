@@ -6,7 +6,12 @@ export type Pose =
   // blocking: driving a man back, locked up even, knocked off balance
   | 'drive' | 'fight' | 'stumble'
   // special teams
-  | 'kick' | 'hold' | 'puntDrop' | 'fairCatch';
+  | 'kick' | 'hold' | 'puntDrop' | 'fairCatch'
+  // touchdown celebrations (sim/celebrate.ts)
+  | 'spikeUp' | 'spikeDown' | 'crouch' | 'leap' | 'cheer' | 'spinBall';
+
+/** Pixels a pose draws above the player's spot, off his shadow: the leap. */
+export const POSE_LIFT: Partial<Record<Pose, number>> = { leap: 3 };
 
 export interface Uniform {
   key: string;
@@ -58,14 +63,15 @@ export type Look = 'fwd' | 'back' | 'hands' | 'backHands';
 function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = 'fwd'): void {
   const running = pose.startsWith('run');
   const bob = pose === 'run1' || pose === 'run3' ? -1 : 0;
-  const ux = running || pose === 'fight' ? 1 : pose === 'stumble' ? -1 : 0;
-  const uy = bob;
+  const ux = running || pose === 'fight' || pose === 'spikeDown' || pose === 'spinBall' ? 1 : pose === 'stumble' ? -1 : 0;
+  const uy = bob + (pose === 'crouch' || pose === 'spinBall' ? 1 : 0);
 
   // Legs
   P(5, 12, 6, 2, u.pants);
   switch (pose) {
     case 'run0':
     case 'run2':
+    case 'spikeDown':
       P(9, 14, 2, 1, u.pants); P(10, 15, 2, 1, u.socks); P(11, 16, 2, 2, u.socks); P(12, 18, 2, 1, u.shoe);
       P(5, 14, 2, 1, u.pants); P(4, 15, 2, 1, u.socks); P(3, 16, 2, 1, u.socks); P(1, 17, 3, 1, u.shoe);
       break;
@@ -86,6 +92,12 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = '
       P(5, 14, 2, 1, u.pants); P(5, 15, 2, 3, u.socks); P(5, 18, 3, 1, u.shoe);
       P(8, 14, 2, 1, u.pants); P(9, 15, 2, 2, u.socks); P(10, 17, 2, 1, u.socks); P(11, 18, 3, 1, u.shoe);
       break;
+    case 'leap':
+      // In the air: back leg kicked up behind, front knee driven up.
+      P(5, 14, 2, 1, u.pants); P(4, 15, 2, 1, u.socks); P(2, 16, 3, 1, u.socks); P(0, 16, 2, 1, u.shoe);
+      P(8, 13, 3, 1, u.pants); P(10, 14, 2, 2, u.socks); P(10, 16, 3, 1, u.shoe);
+      break;
+    case 'crouch':
     case 'fight':
       // Wide, sunk base.
       P(4, 14, 2, 1, u.pants); P(3, 15, 2, 3, u.socks); P(2, 18, 3, 1, u.shoe);
@@ -184,6 +196,24 @@ function drawArm(P: Px, u: Uniform, skin: string, pose: Pose, ux: number, uy: nu
     case 'stumble':
       // Arms flung back for balance.
       P(3, 6, 2, 2, u.jersey); P(1, 4, 2, 2, skin);
+      break;
+    case 'spikeUp':
+      // Ball raised high over his head (the ball sprite sits in this hand).
+      P(11, 4, 2, 3, u.jersey); P(11, 1, 2, 3, u.jersey); P(11, -1, 2, 2, skin);
+      break;
+    case 'spikeDown':
+      // Arm whipped down and out in front: the ball's gone into the turf.
+      P(10 + ux, 8, 2, 2, u.jersey); P(12 + ux, 10, 2, 2, u.jersey); P(13 + ux, 12, 2, 2, skin);
+      break;
+    case 'spinBall':
+      // A quick dip: hand reached down to the top of the ball spinning on its tip.
+      P(11, 9, 2, 2, u.jersey); P(12, 11, 2, 1, u.jersey); P(13, 12, 2, 1, skin);
+      break;
+    case 'leap':
+    case 'cheer':
+      // Both arms thrown up in a V.
+      P(11, 5, 2, 2, u.jersey); P(12, 3, 2, 2, u.jersey); P(13, 1, 2, 2, skin);
+      P(3, 5, 2, 2, u.jersey); P(2, 3, 2, 2, u.jersey); P(1, 1, 2, 2, skin);
       break;
     default:
       P(9 + ux, 8 + uy, 2, 2, u.jersey); P(10 + ux, 10 + uy, 2, 2, skin);
@@ -316,12 +346,18 @@ export function getSprite(u: Uniform, skin: string, pose: Pose, facing: 1 | -1, 
 
 const ballSprites: HTMLCanvasElement[] = [];
 
+/** A ball spun on its tip, by quarter turns: the laces sweep across the front, then around the back. */
+const SPIN_FRAMES = [4, 5, 6, 7];
+export function spinFrame(spin: number | undefined): number {
+  return spin === undefined ? 0 : SPIN_FRAMES[Math.floor(spin) % 4];
+}
+
 /**
  * Ball sprite. Frame 0 is the ball on its side (carried, passes); frames 1-3
- * tilt it end over end for kicks. All are 8x8 with the ball centered at (4, 4).
+ * tilt it end over end for kicks; frames 4-7 are the ball spinning upright on its tip, the laces at the left, middle, right, then behind. All are 8x8 with the ball centered at (4, 4).
  */
 export function getBallSprite(frame = 0): HTMLCanvasElement {
-  const f = frame % 4;
+  const f = frame >= 4 && frame <= 7 ? frame : frame % 4;
   if (ballSprites[f]) return ballSprites[f];
   const c = document.createElement('canvas');
   c.width = 8;
@@ -341,6 +377,10 @@ export function getBallSprite(frame = 0): HTMLCanvasElement {
     for (const [x, y] of [[2, 5], [3, 4], [4, 3], [5, 2], [3, 5], [4, 4], [5, 3], [2, 4], [4, 2]] as const) px(m(x), y, 1, 1, BR);
     px(m(4), 3, 1, 1, HI);
     px(m(3), 4, 1, 1, '#ffffff');
+  } else if (f >= 4) {
+    // Upright on its tip, spinning: the laces sweep across the front (none showing when they're around back).
+    px(3, 2, 3, 4, BR); px(4, 1, 1, 6, BR); px(3, 2, 1, 1, HI);
+    if (f < 7) px(f - 1, 3, 1, 2, '#ffffff');
   } else {
     // Nose up.
     px(3, 2, 3, 4, BR); px(4, 1, 1, 6, BR); px(3, 2, 1, 2, HI); px(4, 3, 1, 2, '#ffffff');
