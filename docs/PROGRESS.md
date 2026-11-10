@@ -1,6 +1,32 @@
 # Progress
 
-_Last updated: 2026-11-09_
+_Last updated: 2026-11-10_
+
+## Fixed: office names and the league banner (2026-11-10)
+- **TO THE LEAGUE:** at level 3 and up, THE LEAGUE banner was 30 px wide for 39 px of text. It now spans the board.
+- **RING OF HONOR jerseys:** the full last name shows on the same 36 px jersey. Every name is the same 5 px tall, like a real nameplate. A long one is set narrower: `JERSEY_FITS` steps from the micro font down to half-pixel columns and gaps, drawn in the fine pass (`FINE` in `render/officeArt.ts`). It keeps a pixel clear of each sleeve. A hyphenated or two-word name too long even at the narrowest (COLEMAN-WILLIAMS) breaks onto the body under the sleeves, and the number moves down.
+- **Plates:** the year on the conference and national trophies, the Heisman's name, the bowl count and THE LONG HAUL's years now sit on 7 px plates. `plate` centers the text by its ink, so an apostrophe's blank sides don't count, and leaves a pixel clear all round. Before, the text touched or ran past the plate's edges, so it looked cut off. The national trophy's spire is a pixel shorter to make room, and THE LONG HAUL's plate is 28 px (was 20, for 23 px of text).
+- **The canvas draws at 2x** (`RENDER_SCALE` in `engine/constants.ts`). The canvas is 1280x720, `main.ts` scales each frame by 2, and everything still draws in 640x360 view pixels. The mouse maps to view pixels (`engine/input.ts`). `itemSprite` returns `{ img, w, h }`, and an item with a fine pass is a 2x canvas.
+  - Checked in a headless browser: the field, play call and office look the same as before. Render time on the field was ~0.6-1.2 ms a frame at 1x and at 2x alike.
+- **Suffix bug:** names ending in IV, III, Jr. and the like showed the suffix as the last name. `lastName` (`render/officeArt.ts`) drops the suffix and keeps a particle (DEL RIO-WILSON). The Heisman bust's nameplate uses it too.
+
+## Fixed: hub navigation and text that spilled or got cut off (2026-11-09)
+- **Sidebar:** SCHEDULE is now first under MY PROGRAM, above PROGRAM. W/S steps through the panels only (HOME, SCHEDULE, then the AROUND THE FBS items), so S on SCHEDULE goes straight to SCORES. Pages open with a click or their hotkey. SETTINGS has one now, G.
+- **Home matchup:** the two players always face each other. Before, the away side's player faced away.
+- **Text fixes, found with a headless audit** (Edge over CDP: it recorded every `fillText`, flagged overlaps, text past the screen edge or its card, and team or game names cut mid-word, across every hub panel, page, tab and offseason stage for several teams):
+  - The hub SCHEDULE sizes its columns to the longest opponent and result. A long rivalry or bowl name wraps under itself.
+  - The program page's SEASON schedule shows the opponent's abbreviation when the school name won't fit, and puts a long game name on its own line.
+  - Recruiting: the RK column fits 4-digit ranks. Hometowns get 11 characters with no trailing space. STANDING and STATUS no longer touch.
+  - Signing day's STILL NEEDS listed a position twice. It now shows four needs a line.
+  - Smaller fixes:
+    - POLLS no longer cuts long schools.
+    - The roster's POS and OVR headers are apart.
+    - The portal's MY ROOM headers sit over their columns, and LEAVING names get 11 characters, with where the player went right-aligned.
+    - Departures: column spacing, the RUN THE DRAFT and MEET buttons fit their labels, and draft names no longer reach the POS column.
+    - The game page's PLAYS tab drops the team names from the score when a long play needs the room.
+    - The program page's leaders card shows just NO STATS YET before any games.
+  - `drawHint` closes up double spaces in a hint too wide for the bar. The roster hint was.
+- **Note:** a full `npm test` run while a browser and dev server are also running can time out five season-sim tests. They pass on their own.
 
 ## Done: the ball sits in the carrier's hands (2026-11-09)
 

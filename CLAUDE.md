@@ -63,6 +63,7 @@ Controls are listed in [README.md](README.md).
 
 ## Conventions
 - **World units are yards.** x runs 0–120 along the field: 0–10 is the user's end zone and 110–120 is the opponent's. The user always attacks toward +x. y runs 0–53.3 across the field, with 0 at the far (top) sideline.
+- **Rendering is in 640x360 view pixels;** the canvas holds `RENDER_SCALE` (2) device pixels for each, so fine detail can use half pixels (the office's `FINE` pass). Mouse coordinates are view pixels.
 - **Fixed 60 Hz timestep.** Each step, AI and user input set `player.want` (desired velocity), then `stepPlayer` accelerates toward it. Don't move players' positions directly; the exception is blockers anchored during an engagement.
 - **Separate data, sim and render.** Plays, routes and defensive calls are plain data in `data/`. Sim code never touches the DOM, so the balance harness can run it headlessly.
 - **Every rating must change something on the field.** Don't add a rating without the mechanic that reads it. Overall formulas (`OVR_WEIGHTS`) only weight ratings that matter at that position; check with `npm run ratings`.

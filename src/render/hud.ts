@@ -46,7 +46,10 @@ export function drawBanner(g: CanvasRenderingContext2D, title: string, sub: stri
 export function drawHint(g: CanvasRenderingContext2D, s: string): void {
   g.fillStyle = 'rgba(8,10,14,0.65)';
   g.fillRect(0, 346, VIEW_W, 14);
-  text(g, s, VIEW_W / 2, 349, { size: 8, align: 'center', color: '#cfd6df' });
+  // A hint too wide for the bar closes up its double spaces, then is cut at the edge.
+  const max = Math.floor((VIEW_W - 8) / 8);
+  const fit = s.length > max ? s.replace(/ {2,}/g, ' ').slice(0, max) : s;
+  text(g, fit, VIEW_W / 2, 349, { size: 8, align: 'center', color: '#cfd6df' });
 }
 
 /** Play clock box under the scorebug's right edge: red at 10, flashing at 5. */

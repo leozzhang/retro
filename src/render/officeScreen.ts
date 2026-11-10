@@ -113,10 +113,10 @@ function drawRoom(g: CanvasRenderingContext2D, s: SeasonState, team: Team, items
   let hoverBox: Box | undefined;
   for (const { item, at } of lay.placed) {
     const spr = itemSprite(item);
-    const x = ox + at.x + Math.floor((at.w - spr.width) / 2);
-    const y = oy + at.y + at.h - spr.height;
-    g.drawImage(spr, x, y);
-    const b = { x, y, w: spr.width, h: spr.height };
+    const x = ox + at.x + Math.floor((at.w - spr.w) / 2);
+    const y = oy + at.y + at.h - spr.h;
+    g.drawImage(spr.img, x, y, spr.w, spr.h);
+    const b = { x, y, w: spr.w, h: spr.h };
     const link = item.game && item.year === s.year && !v.show ? gameLink(item.game) : undefined;
     const over = link ? addLink(b.x, b.y, b.w, b.h, link) : inBox(b, v.mx, v.my);
     if (over) {
@@ -506,9 +506,9 @@ function drawList(g: CanvasRenderingContext2D, s: SeasonState, v: OfficeView): v
     g.fillRect(8, y, VIEW_W - 16, LIST_ROW - 2);
     if (last) {
       const spr = itemSprite(last);
-      const k = Math.min(1, 22 / spr.width, 22 / spr.height);
-      const w = Math.round(spr.width * k), h = Math.round(spr.height * k);
-      g.drawImage(spr, 23 - Math.round(w / 2), y + 12 - Math.round(h / 2), w, h);
+      const k = Math.min(1, 22 / spr.w, 22 / spr.h);
+      const w = Math.round(spr.w * k), h = Math.round(spr.h * k);
+      g.drawImage(spr.img, 23 - Math.round(w / 2), y + 12 - Math.round(h / 2), w, h);
     }
     else {
       g.fillStyle = '#1a2230';

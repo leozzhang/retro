@@ -1,3 +1,4 @@
+import { VIEW_H, VIEW_W } from './constants';
 import type { Vec } from './math';
 
 const BLOCKED = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F1', 'Tab', 'Backquote']);
@@ -50,8 +51,9 @@ export class Input {
 
   private updatePos(e: MouseEvent): void {
     const r = this.canvas.getBoundingClientRect();
-    this.mouse.x = ((e.clientX - r.left) * this.canvas.width) / r.width;
-    this.mouse.y = ((e.clientY - r.top) * this.canvas.height) / r.height;
+    // In view pixels, whatever the canvas's own resolution.
+    this.mouse.x = ((e.clientX - r.left) * VIEW_W) / r.width;
+    this.mouse.y = ((e.clientY - r.top) * VIEW_H) / r.height;
   }
 
   isDown(...codes: string[]): boolean {

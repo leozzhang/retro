@@ -184,7 +184,8 @@ export function drawRecruit(g: CanvasRenderingContext2D, s: SeasonState, v: Recr
   else drawList(g, s, v);
 }
 
-const cols = { stars: 8, rk: 54, name: 84, pos: 204, home: 236, stand: 348, status: 466, flag: 586 };
+// RK fits a four-digit rank (the class runs past 1,000).
+const cols = { stars: 8, rk: 54, name: 94, pos: 212, home: 242, stand: 370, status: 490, flag: 596 };
 
 function drawList(g: CanvasRenderingContext2D, s: SeasonState, v: RecruitView): void {
   const rs = s.recruiting!;
@@ -213,7 +214,7 @@ function drawList(g: CanvasRenderingContext2D, s: SeasonState, v: RecruitView): 
     text(g, String(p.rank), cols.rk, y, { color: SOFT, shadow: false });
     text(g, `${p.a.first[0]}. ${p.a.last}`.toUpperCase().slice(0, 14), cols.name, y, { color: top.has(id) ? GOLD : '#ffffff', shadow: false });
     text(g, p.pos, cols.pos, y, { color: SOFT, shadow: false });
-    text(g, `${p.a.hometown.city.toUpperCase().slice(0, 9)}, ${p.a.hometown.state}`, cols.home, y, { color: SOFT, shadow: false });
+    text(g, `${p.a.hometown.city.toUpperCase().slice(0, 11).trimEnd()}, ${p.a.hometown.state}`, cols.home, y, { color: SOFT, shadow: false });
     const st = statusOf(s, id);
     if (st.kind === 'open' || (st.kind === 'committed' && st.team !== u)) {
       const tag = standingOf3(marketRank(s, p, u));
@@ -222,7 +223,7 @@ function drawList(g: CanvasRenderingContext2D, s: SeasonState, v: RecruitView): 
     const [t, c] = st.kind === 'signed' ? [`SIGNED ${teamById(st.team!).abbr}`, st.team === u ? GOLD : DIM]
       : st.kind === 'committed' ? [`COMMIT ${teamById(st.team!).abbr}`, st.team === u ? GOLD : ORANGE]
       : st.kind === 'gone' ? ['UNSIGNED', DIM] : ['OPEN', GREEN];
-    text(g, t.slice(0, 13), cols.status, y, { color: c, shadow: false });
+    text(g, t.slice(0, 12), cols.status, y, { color: c, shadow: false });
     const flags = `${offered.has(id) ? 'O' : ''}${visitGame(s, id) ? 'V' : ''}${rs.homes[u]?.includes(id) ? 'H' : ''}`;
     text(g, flags, cols.flag, y, { color: ACCENT, shadow: false });
   });
@@ -290,7 +291,7 @@ function drawClass(g: CanvasRenderingContext2D, s: SeasonState, v: RecruitView):
   const ids = recruitRows(s, v);
   const ranks = classRanks(s);
   const mine = ranks.findIndex((r) => r.team === u);
-  const c = { stars: 8, rk: 54, name: 84, pos: 204, home: 236, status: 336 };
+  const c = { stars: 8, rk: 54, name: 94, pos: 212, home: 242, status: 336 };
   for (const [k, x] of Object.entries(c)) text(g, ({ stars: 'STAR', rk: 'RK', name: 'NAME', pos: 'POS', home: 'FROM', status: '' } as Record<string, string>)[k], x, LIST_Y - 12, { color: DIM, shadow: false });
   if (!ids.length) text(g, 'NO COMMITS YET', 170, 120, { align: 'center', color: SOFT });
   ids.slice(v.top, v.top + 22).forEach((id, i) => {
@@ -310,12 +311,14 @@ function drawClass(g: CanvasRenderingContext2D, s: SeasonState, v: RecruitView):
   // Right panel: the class's rank, needs left, and the national top 10.
   const x = 430;
   const me = ranks[mine];
-  text(g, `CLASS: NO. ${mine + 1}, ${me.n} COMMITS`, x, LIST_Y - 12, { color: GOLD, shadow: false });
+  text(g, `CLASS NO. ${mine + 1}: ${me.n} COMMITS`, x, LIST_Y - 12, { color: GOLD, shadow: false });
   text(g, `5*${me.stars[5]} 4*${me.stars[4]} 3*${me.stars[3]} 2*${me.stars[2]}`, x, LIST_Y, { color: SOFT, shadow: false });
   const need = [...userNeeds(s)].filter(([, n]) => n >= 0.5).sort((a, b) => b[1] - a[1]).slice(0, 8);
   text(g, 'STILL NEEDS', x, LIST_Y + 16, { color: DIM, shadow: false });
-  text(g, need.length ? need.map(([p, n]) => `${p} ${Math.round(n)}`).join(' ').slice(0, 25) : 'NOTHING', x, LIST_Y + 27, { color: SOFT, shadow: false });
-  if (need.length > 4) text(g, need.slice(4).map(([p, n]) => `${p} ${Math.round(n)}`).join(' '), x, LIST_Y + 38, { color: SOFT, shadow: false });
+  // Needs, four to a line.
+  const needText = (part: typeof need) => part.map(([p, n]) => `${p} ${Math.round(n)}`).join(' ');
+  text(g, need.length ? needText(need.slice(0, 4)) : 'NOTHING', x, LIST_Y + 27, { color: SOFT, shadow: false });
+  if (need.length > 4) text(g, needText(need.slice(4)), x, LIST_Y + 38, { color: SOFT, shadow: false });
   text(g, 'NATIONAL TOP 10', x, LIST_Y + 56, { color: DIM, shadow: false });
   ranks.slice(0, 10).forEach((r, i) => {
     text(g, `${String(i + 1).padStart(2)} ${teamById(r.team).abbr.padEnd(5)} ${String(r.n).padStart(2)} ${r.pts}`, x, LIST_Y + 68 + i * 11, { color: r.team === u ? GOLD : SOFT, shadow: false });

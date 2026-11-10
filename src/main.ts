@@ -1,5 +1,5 @@
 import '@fontsource/press-start-2p/400.css';
-import { STEP, VIEW_H, VIEW_W } from './engine/constants';
+import { RENDER_SCALE, STEP, VIEW_H, VIEW_W } from './engine/constants';
 import { Input } from './engine/input';
 import { initStore, onStoreError } from './engine/storage';
 import { Game } from './game/game';
@@ -9,6 +9,8 @@ import { text } from './render/text';
 import { BOOT_KEYS, migrateLegacySave } from './season/save';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
+canvas.width = VIEW_W * RENDER_SCALE;
+canvas.height = VIEW_H * RENDER_SCALE;
 const g = canvas.getContext('2d')!;
 
 function resize(): void {
@@ -47,6 +49,8 @@ async function boot(): Promise<void> {
       input.endStep();
       acc -= STEP;
     }
+    // Everything draws in view pixels; the canvas holds RENDER_SCALE of its own for each.
+    g.setTransform(RENDER_SCALE, 0, 0, RENDER_SCALE, 0, 0);
     game.render(g);
     canvas.style.cursor = overLink() ? 'pointer' : '';
     if (now - saveFailed < SAVE_ERROR_MS) drawSaveError(g);

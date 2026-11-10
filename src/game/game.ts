@@ -1006,7 +1006,8 @@ export class Game {
       return;
     }
     const items = navItems(s);
-    const live = items.filter((it) => !it.off);
+    // W/S step through the panels only (HOME, SCHEDULE, then AROUND THE FBS); pages open by click or hotkey.
+    const live = items.filter((it) => !it.off && !it.page);
     const select = (id: string) => {
       if (id !== v.nav) Object.assign(v, { nav: id, sub: 0, scroll: 0 });
     };
@@ -1031,7 +1032,7 @@ export class Game {
       const step = m.wheel * 3 + (input.hit('KeyE') ? 3 : 0) - (input.hit('KeyQ') ? 3 : 0);
       if (step) v.scroll = Math.max(0, Math.min(newsMaxScroll(s, v.sub), v.scroll + step));
     }
-    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'program', KeyR: 'recruit', KeyC: 'office' };
+    const hot: Record<string, string> = { KeyT: 'team', KeyP: 'playbook', KeyO: 'prep', KeyH: 'program', KeyR: 'recruit', KeyC: 'office', KeyG: 'settings' };
     for (const [key, id] of Object.entries(hot)) {
       const it = items.find((x) => x.id === id);
       if (it && !it.off && input.hit(key)) {

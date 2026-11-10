@@ -270,23 +270,40 @@ function drawSeasonTab(g: CanvasRenderingContext2D, s: SeasonState, v: ProgramVi
   text(g, 'WK', L_X + 8, TOP + 20, { color: DIM, shadow: false });
   text(g, 'OPPONENT', L_X + 32, TOP + 20, { color: DIM, shadow: false });
   text(g, 'RESULT', L_X + L_W - 8, TOP + 20, { align: 'right', color: DIM, shadow: false });
-  games.slice(0, 22).forEach((x, i) => {
-    const y = TOP + 32 + i * 11;
+  // The opponent and the result (or the game's name) share the line; a school that won't fit shows its
+  // abbreviation, and a name that won't fit goes on its own line under the game.
+  const room = Math.floor((L_W - 40) / 8);
+  let y = TOP + 32;
+  for (const x of games) {
+    if (y > BOTTOM - 12) break;
     const opp = x.home === id ? x.away : x.home;
     const cur = x.week === s.week && !x.result;
     const vs = x.neutral ? 'VS' : x.home === id ? 'VS' : '@';
-    const school = teamById(opp).school.toUpperCase().slice(0, 16);
     const r = rankIn(ap, opp);
     const head = `${vs.padEnd(3)}${r ? `#${r} ` : ''}`;
-    text(g, String(x.week).padStart(2), L_X + 8, y, { color: cur ? GOLD : SOFT, shadow: false });
-    drawRich(g, { t: head + school, spans: [{ start: head.length, len: school.length, link: teamLink(opp) }] }, L_X + 32, y, { color: cur ? GOLD : '#ffffff', shadow: false });
+    let res = '';
     if (x.result) {
       const us = x.home === id ? x.result.home : x.result.away;
       const them = x.home === id ? x.result.away : x.result.home;
-      const res = `${us > them ? 'W' : 'L'} ${us}-${them}${x.result.ot ? ' OT' : ''}`;
-      linkText(g, res, L_X + L_W - 8, y, { align: 'right', color: us > them ? GREEN : RED, shadow: false }, gameLink(x.id));
-    } else if (x.name) text(g, x.name.toUpperCase().slice(0, 12), L_X + L_W - 8, y, { align: 'right', color: ACCENT, shadow: false });
-  });
+      res = `${us > them ? 'W' : 'L'} ${us}-${them}${x.result.ot ? ' OT' : ''}`;
+    }
+    const full = teamById(opp).school.toUpperCase();
+    const school = head.length + full.length + (res ? res.length + 1 : 0) <= room ? full : teamById(opp).abbr;
+    text(g, String(x.week).padStart(2), L_X + 8, y, { color: cur ? GOLD : SOFT, shadow: false });
+    drawRich(g, { t: head + school, spans: [{ start: head.length, len: school.length, link: teamLink(opp) }] }, L_X + 32, y, { color: cur ? GOLD : '#ffffff', shadow: false });
+    if (x.result) {
+      const won = res.startsWith('W');
+      linkText(g, res, L_X + L_W - 8, y, { align: 'right', color: won ? GREEN : RED, shadow: false }, gameLink(x.id));
+    } else if (x.name) {
+      const name = x.name.toUpperCase();
+      if (head.length + school.length + 1 + name.length <= room) text(g, name, L_X + L_W - 8, y, { align: 'right', color: ACCENT, shadow: false });
+      else {
+        y += 10;
+        text(g, name.slice(0, room), L_X + L_W - 8, y, { align: 'right', color: ACCENT, shadow: false });
+      }
+    }
+    y += 11;
+  }
   if (!games.length) text(g, 'NO GAMES ON THE SCHEDULE', L_X + 8, TOP + 32, { color: DIM, shadow: false });
 
   // The standing.
@@ -324,7 +341,8 @@ function drawLeaders(g: CanvasRenderingContext2D, s: SeasonState, id: string, y0
     const y = y0 + 20 + i * 13;
     text(g, label, x, y, { color: DIM, shadow: false });
     if (!l) {
-      text(g, '-', x + 44, y, { color: DIM, shadow: false });
+      // With no stats at all, NO STATS YET stands alone.
+      if (stats.length) text(g, '-', x + 44, y, { color: DIM, shadow: false });
       return;
     }
     const on = squad.athletes.some((a) => a.id === l.id);

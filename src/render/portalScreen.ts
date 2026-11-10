@@ -300,7 +300,9 @@ function drawRoom(g: CanvasRenderingContext2D, s: SeasonState, board: Board): vo
   text(g, `ROSTER ${school.size}/${PORTAL.rosterMax}  ROOM ${rosterRoom(board, u)}  OPEN TO TRANSFERS ${round ? Math.max(0, openSpots(board, u)) : '-'}`, 10, y0, { color: GOLD });
   text(g, `TRANSFERS CAN FILL ${Math.round(PORTAL.signShare * 100)}% OF DEPARTURES; WALK-ONS FILL THE REST`, 10, y0 + 12, { color: DIM });
   // Depth by position against its usual count and minimum.
-  text(g, 'POS  HAVE/USUAL  TOP  OUT  IN', 10, y0 + 28, { color: DIM, shadow: false });
+  // Each header sits over its column.
+  const col = { pos: 10, have: 50, top: 138, out: 170, in: 202 };
+  ([['POS', col.pos], ['HAVE/USUAL', col.have], ['TOP', col.top], ['OUT', col.out], ['IN', col.in]] as const).forEach(([h, hx]) => text(g, h, hx, y0 + 28, { color: DIM, shadow: false }));
   const out = new Map<string, number>();
   const inn = new Map<string, number>();
   for (const e of p.entrants) {
@@ -312,28 +314,32 @@ function drawRoom(g: CanvasRenderingContext2D, s: SeasonState, board: Board): vo
     const have = school.count.get(pos) ?? 0;
     const top = school.chart.get(pos)?.[0];
     const c = have < MIN_COUNT[pos] ? RED : have < usual ? ORANGE : '#ffffff';
-    text(g, pos.padEnd(4), 10, y, { color: SOFT, shadow: false });
-    text(g, `${have}/${usual}`, 50, y, { color: c, shadow: false });
-    text(g, top ? String(top) : '-', 106, y, { color: top ? ovrColor(top) : DIM, shadow: false });
-    text(g, String(out.get(pos) ?? ''), 146, y, { color: RED, shadow: false });
-    text(g, String(inn.get(pos) ?? ''), 178, y, { color: GREEN, shadow: false });
+    text(g, pos, col.pos, y, { color: SOFT, shadow: false });
+    text(g, `${have}/${usual}`, col.have, y, { color: c, shadow: false });
+    text(g, top ? String(top) : '-', col.top, y, { color: top ? ovrColor(top) : DIM, shadow: false });
+    text(g, String(out.get(pos) ?? ''), col.out, y, { color: RED, shadow: false });
+    text(g, String(inn.get(pos) ?? ''), col.in, y, { color: GREEN, shadow: false });
   });
   // Who's coming and going.
-  const x = 256;
+  const x = 226;
   text(g, 'SIGNED', x, y0 + 28, { color: GREEN, shadow: false });
   const signed = p.entrants.filter((e) => e.out === 'commit' && p.commits[e.id] === u && e.from !== u).sort((a, b) => b.ovr - a.ovr);
   signed.slice(0, 11).forEach((e, i) => {
     const a = board.players.get(e.id)?.a;
-    if (a) text(g, `${e.pos} ${shortName(a, 13)} ${e.ovr} ${teamById(e.from).abbr}`, x, y0 + 40 + i * 10, { shadow: false });
+    if (a) text(g, `${e.pos} ${shortName(a, 10)} ${e.ovr} ${teamById(e.from).abbr}`, x, y0 + 40 + i * 10, { shadow: false });
   });
   if (!signed.length) text(g, 'NONE YET', x, y0 + 40, { color: DIM, shadow: false });
-  const x2 = 452;
+  // Leaving: position, name and overall, then where he went (up to 9 characters) against the edge.
+  const x2 = 408;
   text(g, 'LEAVING', x2, y0 + 28, { color: RED, shadow: false });
   const gone = p.entrants.filter((e) => e.from === u).sort((a, b) => b.ovr - a.ovr);
   gone.slice(0, 22).forEach((e, i) => {
     const a = board.players.get(e.id)?.a;
     const st = statusOf(s, e);
-    if (a) text(g, `${e.pos} ${shortName(a, 10)} ${e.ovr} ${st.t}`, x2, y0 + 40 + i * 10, { color: e.out ? SOFT : '#ffffff', shadow: false });
+    if (!a) return;
+    const y = y0 + 40 + i * 10;
+    text(g, `${e.pos.padEnd(3)} ${shortName(a, 11).padEnd(11)} ${e.ovr}`, x2, y, { color: e.out ? SOFT : '#ffffff', shadow: false });
+    text(g, st.t, VIEW_W - 8, y, { align: 'right', color: st.c, shadow: false });
   });
   if (!gone.length) text(g, round ? 'NO ONE ENTERED' : 'NOT OPEN YET', x2, y0 + 40, { color: DIM, shadow: false });
 }

@@ -45,8 +45,8 @@ const LINE = 11;
 export const DEPARTURE_ROWS = 18;
 const CARD_Y = LIST_Y + 14 * LINE + 4;
 
-export const DEPARTURES_ADVANCE = { x: VIEW_W - 108, y: 5, w: 100, h: 13 };
-export const MEET_BTN = { x: VIEW_W - 136, y: CARD_Y + 2, w: 130, h: 13 };
+export const DEPARTURES_ADVANCE = { x: VIEW_W - 124, y: 5, w: 116, h: 13 };
+export const MEET_BTN = { x: VIEW_W - 176, y: CARD_Y + 2, w: 170, h: 13 };
 
 export function departuresTabAt(x: number, y: number): number {
   if (y < TAB_Y || y >= TAB_Y + TAB_H) return -1;
@@ -137,7 +137,7 @@ function drawWatch(g: CanvasRenderingContext2D, s: SeasonState, v: DeparturesVie
   const gone = new Set((d?.gone ?? []).map((x) => x.id));
   const picks = new Map(draftOf(s).map((p) => [p.id, p]));
   const roster = new Map(squadFor(s, u).athletes.map((a) => [a.id, a]));
-  const cols = { name: 10, pos: 132, ovr: 164, cls: 192, proj: 240, odds: 310, lean: 360, act: 466 };
+  const cols = { name: 10, pos: 132, ovr: 164, cls: 196, proj: 252, odds: 340, lean: 388, act: 486 };
   heads(g, cols, { name: 'NAME', pos: 'POS', ovr: 'OVR', cls: 'CLASS', proj: 'PROJECTS', odds: 'ODDS', lean: 'LEAN', act: '' });
   if (!ids.length) {
     text(g, s.config.delegate.departures ? 'YOUR STAFF IS HANDLING IT (F: TAKE IT BACK)' : 'NOBODY ON YOUR ROSTER IS THINKING ABOUT THE NFL', VIEW_W / 2, 120, { align: 'center', color: SOFT });
@@ -162,7 +162,7 @@ function drawWatch(g: CanvasRenderingContext2D, s: SeasonState, v: DeparturesVie
     let c = GREEN;
     if (done(s)) {
       const pk = picks.get(id);
-      act = gone.has(id) ? (pk ? `NFL: RD ${pk.round} ${pk.city.toUpperCase()}` : 'NFL: UNDRAFTED') : 'STAYS';
+      act = gone.has(id) ? (pk ? `RD ${pk.round} ${pk.city.toUpperCase()}` : 'UNDRAFTED') : 'STAYS';
       c = gone.has(id) ? RED : GREEN;
     } else if (e.met) {
       act = e.ok ? 'MET: LEANING BACK' : 'MET: NOT SWAYED';
@@ -213,7 +213,7 @@ function drawSeniors(g: CanvasRenderingContext2D, s: SeasonState, v: DeparturesV
     return;
   }
   const sr = seniorsLeaving(s, u);
-  text(g, `${sr.length} SENIORS ARE OUT OF ELIGIBILITY AFTER THIS SEASON`, VIEW_W - 10, LIST_Y - 12, { align: 'right', color: SOFT, shadow: false });
+  text(g, `${sr.length} SENIORS OUT OF ELIGIBILITY`, VIEW_W - 10, LIST_Y - 12, { align: 'right', color: SOFT, shadow: false });
   sr.slice(v.top, v.top + DEPARTURE_ROWS).forEach((a, i) => {
     const y = LIST_Y + i * LINE;
     rowBg(g, v, i);
@@ -235,7 +235,7 @@ function drawDraft(g: CanvasRenderingContext2D, s: SeasonState, v: DeparturesVie
     drawHint(g, v.note || 'A/D: TAB  SPACE: RUN THE DRAFT  ESC: HUB');
     return;
   }
-  const cols = { pick: 10, rd: 46, city: 82, name: 206, pos: 358, school: 392, ovr: 540 };
+  const cols = { pick: 10, rd: 46, city: 82, name: 206, pos: 366, school: 400, ovr: 548 };
   heads(g, cols, { pick: 'PICK', rd: 'RD', city: 'TEAM', name: 'PLAYER', pos: 'POS', school: 'SCHOOL', ovr: 'OVR' });
   const mine = picks.filter((p) => p.team === u).length;
   text(g, `${picks.length} PICKS, ${picks.filter((p) => p.early).length} EARLY ENTRANTS.  YOURS: ${mine}`, 10, LIST_Y + DEPARTURE_ROWS * LINE + 4, { color: mine ? GOLD : SOFT, shadow: false });

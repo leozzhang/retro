@@ -186,7 +186,7 @@ export function drawTeam(g: CanvasRenderingContext2D, s: SeasonState, squad: Squ
   const sel = view.rows[Math.min(v.sel, view.rows.length - 1)];
   if (sel) drawCard(g, s, sel, prog[sel.id], slotOf.get(sel.id), mc, v);
 
-  drawHint(g, 'DRAG: REORDER  A/D: POSITION  W/S: PLAYER  G: STAFF/YOURS  C OR NAME: REGISTRY  ESC: BACK');
+  drawHint(g, 'DRAG: REORDER  A/D: POS  W/S: PLAYER  G: STAFF/YOURS  C: REGISTRY  ESC: BACK');
 }
 
 function drawDepth(
@@ -196,7 +196,7 @@ function drawDepth(
   text(g, 'SLOT', LIST_X + 8, hy, { color: DIM, shadow: false });
   text(g, 'NO', LIST_X + 46, hy, { color: DIM, shadow: false });
   text(g, 'NAME', LIST_X + 78, hy, { color: DIM, shadow: false });
-  text(g, 'POS', LIST_X + 196, hy, { color: DIM, shadow: false });
+  text(g, 'POS', LIST_X + 190, hy, { color: DIM, shadow: false });
   text(g, 'OVR', LIST_X + LIST_W - 6, hy, { align: 'right', color: DIM, shadow: false });
   const dragging = v.drag?.moved ? v.drag : null;
   const { rows, avail } = view;
@@ -260,15 +260,15 @@ function drawPlayerTab(
   text(g, `#${a.num}`, x + 46, ty, { color: SOFT, shadow: false });
   // Unhappy: a small frown between his number and his name.
   if (o.unhappy) face(g, x + 71, ty + 1, -1, 5);
-  text(g, shortName(a, 14), x + 78, ty, { color: hurt ? RED : a.real ? GOLD : '#ffffff' });
+  text(g, shortName(a, 13), x + 78, ty, { color: hurt ? RED : a.real ? GOLD : '#ffffff' });
   // Banged up: his health where his position goes.
-  if (!hurt && hp < 100) text(g, `${hp}%`, x + 196, ty, { color: ORANGE, shadow: false });
-  else text(g, a.pos, x + 196, ty, { color: SOFT, shadow: false });
+  if (!hurt && hp < 100) text(g, `${hp}%`, x + 190, ty, { color: ORANGE, shadow: false });
+  else text(g, a.pos, x + 190, ty, { color: SOFT, shadow: false });
   const o2 = overall(a.r, a.pos);
   text(g, String(o2), x + LIST_W - 6, ty, { align: 'right', color: hurt ? DIM : ovrColor(o2) });
   // Confidence: a chevron up (green) or down (red) when it's strong either way.
   const c = a.conf ?? 0;
-  if (!hurt && Math.abs(c) >= CHEVRON) chevron(g, x + 189, ty + 2, c > 0);
+  if (!hurt && Math.abs(c) >= CHEVRON) chevron(g, x + 183, ty + 2, c > 0);
   // Leveled up last week.
   if (o.up) upArrow(g, x + LIST_W - 30, ty);
   g.globalAlpha = 1;

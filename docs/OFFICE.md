@@ -76,7 +76,7 @@ Classics, one item each:
 | CONFERENCE TROPHY | case | Each conference title game won. A gold cup, the year on its plate. |
 | NATIONAL CHAMPIONSHIP | case | Each national title. A gold ball on a crystal spire; first in the case. |
 | THE BRONZE MAN | shelf | Each Heisman winner. A bronze bust with his name. |
-| RING OF HONOR | jersey | Each first-round pick. His framed jersey. |
+| RING OF HONOR | jersey | Each first-round pick. His framed jersey: the full last name across the shoulders (no suffix: ROBINSON, not IV), every name the same height, a long one in narrower half-pixel lettering, a very long hyphenated name finishing on a second line on the body. |
 
 Leveled:
 | Item | Slot | When | Levels | Grows by |

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { anchorsOf, ROOMS, SLOT_SIZE } from './data/office';
 import { ACHIEVEMENTS, achievement, checkOffice, layoutOffice, levelOf, newOffice, officeTier, sampleOffice, toNextLevel } from './season/achievements';
-import { drawnIds, paintItem } from './render/officeArt';
+import { drawnIds, lastName, paintItem } from './render/officeArt';
 import { simOffseason } from './season/offseason';
 import { defaultConfig, newSeason, simSeason } from './season/season';
 import type { GamePlay, OfficeItem, SeasonGame, SeasonState, TeamYear } from './season/types';
@@ -280,5 +280,16 @@ describe('leveled items', () => {
       expect(toNextLevel(it)).toBeUndefined();
       expect(achievement(a.id)).toBe(a);
     }
+  });
+});
+
+describe('office art names', () => {
+  it('a last name skips the suffix and keeps its particle', () => {
+    expect(lastName('Ellis Robinson IV')).toBe('ROBINSON');
+    expect(lastName('JC French IV')).toBe('FRENCH');
+    expect(lastName('Mark Fletcher Jr.')).toBe('FLETCHER');
+    expect(lastName('Tyler Del Rio-Wilson')).toBe('DEL RIO-WILSON');
+    expect(lastName('Ryan Coleman-Williams')).toBe('COLEMAN-WILLIAMS');
+    expect(lastName('John Henry Daley')).toBe('DALEY');
   });
 });

@@ -378,9 +378,14 @@ function drawPlays(g: CanvasRenderingContext2D, game: SeasonGame, v: GameView): 
     const off = teamById(p.off).abbr.toUpperCase();
     text(g, playClock(p), L_X + 8, y, { color: DIM, shadow: false });
     text(g, off, L_X + 80, y, { color: SOFT, shadow: false });
-    const cap = captionOf(game, p).slice(0, 48);
+    // The score takes the right edge; a caption too long to sit beside it drops the score's team names.
+    const full = captionOf(game, p);
+    const room = (n: string) => Math.floor((W - 136 - (n ? n.length * 8 + 8 : 0)) / 8);
+    const long = p.pts ? `${a} ${p.score[1]}-${p.score[0]} ${h}` : '';
+    const score = long && full.length > room(long) ? `${p.score[1]}-${p.score[0]}` : long;
+    const cap = full.slice(0, room(score));
     const color = p.pts ? '#ffffff' : p.for || ['int', 'fumble', 'fourthStop', 'sack', 'redZoneStop', 'twoPtStop', 'missedFg'].includes(p.kind) ? ACCENT : SOFT;
     text(g, cap, L_X + 128, y, { color, shadow: false });
-    if (p.pts) text(g, `${a} ${p.score[1]}-${p.score[0]} ${h}`, L_X + W - 8, y, { align: 'right', color: GOLD, shadow: false });
+    if (score) text(g, score, L_X + W - 8, y, { align: 'right', color: GOLD, shadow: false });
   });
 }

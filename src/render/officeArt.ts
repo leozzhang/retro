@@ -1,4 +1,5 @@
 import { SLOT_SIZE } from '../data/office';
+import { RENDER_SCALE } from '../engine/constants';
 import { teamById, type Team } from '../data/teams';
 import { hashString, mulberry32 } from '../engine/math';
 import { achievement, levelOf, maxLevel, STATE_NAME } from '../season/achievements';
@@ -46,6 +47,47 @@ export function micro(P: Px, s: string, x: number, y: number, col: string, scale
 /** `micro` centered on `cx`. */
 export const microC = (P: Px, s: string, cx: number, y: number, col: string, scale = 1): number =>
   micro(P, s, Math.round(cx - microWidth(s, scale) / 2), y, col, scale);
+
+/** The columns of `s` that have ink, from its left edge: an apostrophe's blank sides don't count. */
+function inkSpan(s: string): [number, number] {
+  const cols = (ch: string) => [0, 1, 2].filter((c) => [0, 1, 2, 3, 4].some((r) => (GLYPHS[ch.toUpperCase()] ?? GLYPHS[' '])[r * 3 + c] === '1'));
+  const t = s.trimEnd();
+  if (!t) return [0, 0];
+  const first = cols(t[0]), last = cols(t[t.length - 1]);
+  return [first.length ? first[0] : 0, (t.length - 1) * 4 + (last.length ? last[last.length - 1] : 2)];
+}
+
+/** A plate from (x, y), `w` by 7, with `s` centered on its ink and a pixel clear all round. */
+function plate(P: Px, x: number, y: number, w: number, s: string, fill: string, ink: string): void {
+  P(x, y, w, 7, fill);
+  const [a, b] = inkSpan(s);
+  micro(P, s, x + Math.floor((w - (b - a + 1)) / 2) - a, y + 1, ink);
+}
+
+/**
+ * `micro` at full height but narrower, for a name too long for it: columns `cw` wide and `gap`
+ * between letters, in view pixels (halves need the fine pass). Centered on `cx`.
+ */
+function microNarrow(P: Px, s: string, cx: number, y: number, col: string, cw: number, gap: number): void {
+  const adv = 3 * cw + gap;
+  const x0 = Math.round((cx - (s.length * adv - gap) / 2) * 2) / 2;
+  [...s.toUpperCase()].forEach((ch, i) => {
+    const bits = GLYPHS[ch] ?? GLYPHS[' '];
+    for (let k = 0; k < 15; k++) if (bits[k] === '1') P(x0 + i * adv + (k % 3) * cw, y + Math.floor(k / 3), cw, 1, col);
+  });
+}
+
+/** Particles that belong to the last name ("Del Rio-Wilson", "St. Brown"). */
+const PARTICLES = new Set(['DE', 'DEL', 'DA', 'DI', 'LA', 'LE', 'VAN', 'VON', 'ST.', 'MC', 'MAC']);
+
+/** A name's last name, without a suffix: "Ellis Robinson IV" is ROBINSON. */
+export function lastName(full: string): string {
+  const w = full.toUpperCase().split(' ').filter(Boolean);
+  while (w.length > 2 && /^(JR\.?|SR\.?|II|III|IV|V|VI)$/.test(w[w.length - 1])) w.pop();
+  let i = w.length - 1;
+  while (i > 1 && PARTICLES.has(w[i - 1])) i--;
+  return w.slice(Math.max(1, i)).join(' ') || w[0] || '';
+}
 
 // ------------------------------------------------------------ palette
 
@@ -174,10 +216,9 @@ const confCup: Draw = (P, w, h, it, team) => {
   P(8, 13, 6, 1, shade(team.colors.primary, -0.35));
   P(6, 16, 10, 2, b);
   P(6, 16, 10, 1, hi);
-  P(3, 18, 16, 9, '#1b1b1f');
+  P(3, 18, 16, 10, '#1b1b1f');
   P(3, 18, 16, 1, '#34343c');
-  P(5, 20, 12, 6, GOLD[1]);
-  microC(P, `'${String(it.year).slice(2)}`, 11, 20, '#3a2808');
+  plate(P, 4, 20, 14, `'${String(it.year).slice(2)}`, GOLD[1], '#3a2808');
 };
 
 /** The national title: a gold ball on a crystal spire, on a walnut base. */
@@ -192,15 +233,14 @@ const natty: Draw = (P, w, h, it) => {
   P(9, 4, 4, 1, GOLD[0]);
   // The spire, crystal.
   P(9, 8, 4, 2, '#cfe8f2');
-  P(8, 10, 6, 10, '#a9d6ea');
-  P(8, 10, 2, 10, '#eaf7fc');
-  P(12, 10, 2, 10, '#6fa9c4');
-  P(7, 20, 8, 1, '#cfe8f2');
+  P(8, 10, 6, 8, '#a9d6ea');
+  P(8, 10, 2, 8, '#eaf7fc');
+  P(12, 10, 2, 8, '#6fa9c4');
+  P(7, 18, 8, 1, '#cfe8f2');
   // The base and its plate.
-  P(3, 21, 16, 6, WOOD[0]);
-  P(3, 21, 16, 1, WOOD[2]);
-  P(5, 22, 12, 4, GOLD[2]);
-  microC(P, `'${String(it.year).slice(2)}`, 11, 22, '#3a2808');
+  P(3, 19, 16, 9, WOOD[0]);
+  P(3, 19, 16, 1, WOOD[2]);
+  plate(P, 4, 20, 14, `'${String(it.year).slice(2)}`, GOLD[2], '#3a2808');
 };
 
 /** The Bronze Man: a player's bust on a base with his name. */
@@ -221,10 +261,9 @@ const heisman: Draw = (P, w, h, it, team) => {
   // Base, with the school's band.
   P(2, 18, 16, 8, '#1b1b1f');
   P(2, 18, 16, 1, team.colors.primary);
-  P(3, 19, 14, 7, GOLD[1]);
+  const last = lastName(String(it.data?.name ?? '')).slice(0, 3);
+  plate(P, 3, 19, 14, last, GOLD[1], '#3a2808');
   P(3, 19, 14, 1, GOLD[2]);
-  const last = String(it.data?.name ?? '').split(' ').slice(-1)[0].slice(0, 3);
-  microC(P, last, 10, 20, '#3a2808');
 };
 
 /** Stop the Presses: a framed front page; more pages tucked behind it each level, then gold. */
@@ -392,8 +431,7 @@ const haul: Draw = (P, w, h, it, team, lv, top) => {
   P(cx + 1, 14, 2, 1, INK);
   P(cx - 2, 19, 4, 1, '#7a4a3a');
   // The plate with his years.
-  P(cx - 10, h - 9, 20, 6, GOLD[1]);
-  microC(P, `${it.data?.n} YRS`, cx, h - 9 + 0.5, '#3a2808');
+  plate(P, cx - 14, h - 11, 28, `${it.data?.n} YRS`, GOLD[1], '#3a2808');
   studs(P, w, h, lv, top);
 };
 
@@ -403,7 +441,8 @@ const league: Draw = (P, w, h, it, team, lv, top) => {
   const rng = mulberry32(7);
   for (let i = 0; i < 40; i++) P(2 + Math.floor(rng() * (w - 4)), 2 + Math.floor(rng() * (h - 4)), 1, 1, shade(CORK, -0.2));
   if (lv >= 3) {
-    P(10, 3, w - 20, 6, lv >= top ? GOLD[2] : '#f2efe6');
+    // The banner spans the board: THE LEAGUE is 39 px.
+    P(4, 3, w - 8, 6, lv >= top ? GOLD[2] : '#f2efe6');
     microC(P, 'THE LEAGUE', w / 2, 3.5, INK);
   }
   const k = it.log?.length ?? 1;
@@ -618,9 +657,8 @@ const bowl: Draw = (P, w, h, it, team, lv) => {
       P(w - 2 - i, 12 - i * 2, 1, 2, '#3f8a3a');
     }
   }
-  P(2, 20, 16, 5, '#1b1b1f');
-  P(2, 20, 16, 1, '#34343c');
-  micro(P, String(Math.min(99, it.log?.length ?? 1)), it.log && it.log.length >= 10 ? 7 : 9, 20, metal[3]);
+  plate(P, 2, 19, 16, String(Math.min(99, it.log?.length ?? 1)), '#1b1b1f', metal[3]);
+  P(2, 19, 16, 1, '#34343c');
 };
 
 /** Marathon: a cracked stopwatch; one more watch at each level. */
@@ -778,7 +816,43 @@ const forsale: Draw = (P, w, h, _it, _t, lv) => {
   }
 };
 
-/** A first-round pick's jersey in a gold frame: name across the shoulders, number on the back. */
+/** Room for a jersey's name: across the shoulders and sleeves (x 4 to 32, a pixel clear of each edge), and on the body under them. */
+const JERSEY_NAME_W = 26;
+const JERSEY_BODY_W = 16;
+
+/**
+ * Lettering for a long name, widest first, as [column width, gap] in view pixels: every name stands
+ * the same 5 pixels tall, and a long one is set narrower, like a real nameplate. [1, 1] is the micro
+ * font itself; the rest need half pixels.
+ */
+const JERSEY_FITS: [number, number][] = [[1, 1], [1, 0.5], [0.5, 1], [0.5, 0.5]];
+
+const fitWidth = (n: number, [cw, gap]: [number, number]) => n * (3 * cw + gap) - gap;
+const fitIn = (t: string, room: number) => JERSEY_FITS.find((f) => fitWidth(t.length, f) <= room);
+
+/**
+ * How a jersey's last name is lettered: one line across the shoulders in the widest lettering that
+ * fits. A hyphenated or two-word name too long even at the narrowest breaks after its last hyphen or
+ * space, the rest on the body under it, and the number moves down.
+ */
+function jerseyName(name: string): { lines: { s: string; fit: [number, number] }[]; numY: number } {
+  const one = fitIn(name, JERSEY_NAME_W);
+  if (one) return { lines: [{ s: name, fit: one }], numY: 17 };
+  const cut = name.search(/[- ](?=[^- ]*$)/);
+  if (cut > 0) {
+    const top = name.slice(0, cut + (name[cut] === '-' ? 1 : 0)), rest = name.slice(cut + 1);
+    const f1 = fitIn(top, JERSEY_NAME_W), f2 = fitIn(rest, JERSEY_BODY_W);
+    if (f1 && f2) return { lines: [{ s: top, fit: f1 }, { s: rest, fit: f2 }], numY: 22 };
+  }
+  const last = JERSEY_FITS[JERSEY_FITS.length - 1];
+  const n = Math.floor((JERSEY_NAME_W + last[1]) / (3 * last[0] + last[1]));
+  return { lines: [{ s: name.slice(0, n), fit: last }], numY: 17 };
+}
+
+/** A name line's top: one line at 9; two at 8, and 16 on the body under the sleeves' trim. */
+const nameY = (nm: ReturnType<typeof jerseyName>, i: number) => (nm.lines.length > 1 ? (i ? 16 : 8) : 9);
+
+/** A first-round pick's jersey in a gold frame: his last name across the shoulders, number on the back. */
 const jersey: Draw = (P, w, h, it, team) => {
   frame(P, w, h, GOLD, '#10141c', 2);
   const c = team.colors;
@@ -791,11 +865,21 @@ const jersey: Draw = (P, w, h, it, team) => {
   P(9, 10, 18, 26, body);
   P(9, 34, 18, 2, dark);
   P(15, 6, 6, 1, dark);
-  const name = String(it.data?.name ?? '').split(' ').slice(-1)[0].slice(0, 5);
-  microC(P, name, 18, 9, trim);
-  const num = String(it.data?.num ?? '');
-  microC(P, num, 18, 17, trim, 2);
+  // Whole-pixel lettering here; narrower lettering needs half pixels, in the fine pass (`FINE`).
+  const nm = jerseyName(lastName(String(it.data?.name ?? '')));
+  nm.lines.forEach((l, i) => {
+    if (l.fit.every((v) => Number.isInteger(v))) microNarrow(P, l.s, 18, nameY(nm, i), trim, l.fit[0], l.fit[1]);
+  });
+  microC(P, String(it.data?.num ?? ''), 18, nm.numY, trim, 2);
   P(12, h - 5, 12, 3, GOLD[2]);
+};
+
+/** The jersey's name where it needs half pixels. */
+const jerseyFine: Draw = (P, _w, _h, it, team) => {
+  const nm = jerseyName(lastName(String(it.data?.name ?? '')));
+  nm.lines.forEach((l, i) => {
+    if (!l.fit.every((v) => Number.isInteger(v))) microNarrow(P, l.s, 18, nameY(nm, i), team.colors.trimHome, l.fit[0], l.fit[1]);
+  });
 };
 
 /** Anything without its own art yet. */
@@ -814,6 +898,12 @@ const DRAW: Record<string, Draw> = {
 /** Every achievement drawn. For the tests. */
 export const drawnIds = (): string[] => Object.keys(DRAW);
 
+/**
+ * Detail drawn at half-pixel size after the item is outlined, on a canvas of RENDER_SCALE pixels per
+ * view pixel. `P` takes view pixels, halves included.
+ */
+const FINE: Record<string, Draw> = { jersey: jerseyFine };
+
 /** Paint an item with `P` at its slot's size; returns the size. `itemSprite` paints onto a canvas, the tests onto a checker. */
 export function paintItem(P: Px, it: OfficeItem): { w: number; h: number } {
   const size = SLOT_SIZE[achievement(it.id)?.slot ?? 'shelf'];
@@ -821,10 +911,10 @@ export function paintItem(P: Px, it: OfficeItem): { w: number; h: number } {
   return size;
 }
 
-const cache = new Map<string, HTMLCanvasElement>();
+const cache = new Map<string, { img: HTMLCanvasElement; w: number; h: number }>();
 
-/** An item's picture at its slot's size (where it's placed may be a fallback spot, so it's drawn to its own). */
-export function itemSprite(it: OfficeItem): HTMLCanvasElement {
+/** An item's picture, `w` by `h` view pixels (its slot's size; where it's placed may be a fallback spot, so it's drawn to its own). */
+export function itemSprite(it: OfficeItem): { img: HTMLCanvasElement; w: number; h: number } {
   const key = `${it.key}|${it.log?.length ?? 0}|${it.year}|${it.team}`;
   const hit = cache.get(key);
   if (hit) return hit;
@@ -839,6 +929,24 @@ export function itemSprite(it: OfficeItem): HTMLCanvasElement {
   };
   paintItem(P, it);
   outline(g, size.w, size.h);
-  cache.set(key, c);
-  return c;
+  let img = c;
+  const fine = FINE[it.id];
+  if (fine) {
+    // The whole-pixel picture scaled up, then the fine detail on top in half pixels.
+    const k = RENDER_SCALE;
+    img = document.createElement('canvas');
+    img.width = size.w * k;
+    img.height = size.h * k;
+    const fg = img.getContext('2d')!;
+    fg.imageSmoothingEnabled = false;
+    fg.drawImage(c, 0, 0, img.width, img.height);
+    const F: Px = (x, y, w, h, col) => {
+      fg.fillStyle = col;
+      fg.fillRect(Math.round(x * k), Math.round(y * k), Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+    };
+    fine(F, size.w, size.h, it, teamById(it.team), levelOf(it), maxLevel(it.id));
+  }
+  const out = { img, w: size.w, h: size.h };
+  cache.set(key, out);
+  return out;
 }

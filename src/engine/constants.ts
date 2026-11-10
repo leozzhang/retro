@@ -11,6 +11,8 @@ export const HASH_BOT = FIELD_W - 20;
 // Internal render resolution (scaled up with pixelated filtering).
 export const VIEW_W = 640;
 export const VIEW_H = 360;
+/** The canvas's pixels per view pixel: everything draws in view pixels, scaled up, so fine detail (an office jersey's name) can use half pixels. */
+export const RENDER_SCALE = 2;
 
 // Projection: horizontal yards are wider than vertical yards, giving the tilted
 // Retro Bowl style top-down look. Height (z) lifts sprites up the screen.

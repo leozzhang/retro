@@ -91,14 +91,14 @@ function navGroups(s: SeasonState): { head: string; items: NavItem[] }[] {
     {
       head: 'MY PROGRAM',
       items: [
-        { id: 'program', label: 'PROGRAM', page: 'program', key: 'H' },
         panel('SCHEDULE'),
+        { id: 'program', label: 'PROGRAM', page: 'program', key: 'H' },
         { id: 'team', label: 'ROSTER', page: 'team', key: 'T' },
         { id: 'playbook', label: 'PLAYBOOK', page: 'playbook', key: 'P' },
         { id: 'prep', label: 'GAME PREP', page: 'prep', key: 'O', off: s.phase === 'offseason' },
         ...(s.recruiting ? [{ id: 'recruit', label: 'RECRUITING', page: 'recruit', key: 'R' } as NavItem] : []),
         { id: 'office', label: 'OFFICE', page: 'office', key: 'C', dot: officeNews(s) },
-        { id: 'settings', label: 'SETTINGS', page: 'settings' },
+        { id: 'settings', label: 'SETTINGS', page: 'settings', key: 'G' },
       ],
     },
     { head: 'AROUND THE FBS', items: ['SCORES', 'STANDINGS', 'POLLS', 'NEWS', 'LEADERS', 'AWARDS', 'PLAYOFF'].map(panel) },
@@ -241,7 +241,6 @@ export function nextGameText(s: SeasonState): string {
 
 function hintFor(s: SeasonState, v: SeasonView, item: NavItem | undefined): string {
   const parts = ['W/S MENU'];
-  if (item?.page) parts.push('ENTER OPEN');
   if (SUB_PANELS.has(v.nav) && (v.nav !== 'POLLS' || latestPoll(s, 'cfp'))) parts.push(`A/D ${v.nav === 'STANDINGS' ? 'CONF' : v.nav === 'POLLS' ? 'POLL' : 'WEEK'}`);
   if (v.nav === 'NEWS') parts.push('Q/E SCROLL');
   const act = primaryAction(s);
@@ -377,14 +376,15 @@ function drawHome(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): v
 const CARD_Y = 36;
 const CARD_H = 112;
 
-function teamSide(g: CanvasRenderingContext2D, s: SeasonState, id: string, cx: number, home: boolean): void {
+/** One side of the matchup card; `facing` turns the player toward the other side. */
+function teamSide(g: CanvasRenderingContext2D, s: SeasonState, id: string, cx: number, home: boolean, facing: 1 | -1 = 1): void {
   const t = teamById(id);
   const ap = latestPoll(s, 'ap');
   const rank = rankIn(ap, id);
   const rec = records(s).get(id)!;
   const ovr = teamRatings(squadFor(s, id)).ovr;
-  g.drawImage(getSprite(teamUniform(t, home), '#c68a5e', 'stand', home ? 1 : -1), cx - 30, CARD_Y + 18, 60, 66);
-  linkText(g, `${rank ? `#${rank} ` : ''}${t.school.toUpperCase()}`.slice(0, 19), cx, CARD_Y + 88, { align: 'center', color: '#ffffff' }, teamLink(id));
+  g.drawImage(getSprite(teamUniform(t, home), '#c68a5e', 'stand', facing), cx - 30, CARD_Y + 18, 60, 66);
+  linkText(g, `${rank ? `#${rank} ` : ''}${t.school.toUpperCase()}`, cx, CARD_Y + 88, { align: 'center', color: '#ffffff' }, teamLink(id));
   text(g, `${recordText(rec)}  OVR ${ovr}`, cx, CARD_Y + 99, { align: 'center', color: SOFT, shadow: false });
 }
 
@@ -405,8 +405,8 @@ function drawMatchup(g: CanvasRenderingContext2D, s: SeasonState): void {
     return;
   }
   const opp = game.home === u ? game.away : game.home;
-  teamSide(g, s, u, PX + 96, game.home === u || !!game.neutral);
-  teamSide(g, s, opp, PR - 96, game.home === opp && !game.neutral);
+  teamSide(g, s, u, PX + 96, game.home === u || !!game.neutral, 1);
+  teamSide(g, s, opp, PR - 96, game.home === opp && !game.neutral, -1);
   text(g, vsText(game, u), PCX, CARD_Y + 44, { size: 16, align: 'center', color: '#ffffff' });
   const where = game.neutral ? 'NEUTRAL SITE' : game.home === u ? 'HOME' : 'AWAY';
   text(g, where, PCX, CARD_Y + 66, { align: 'center', color: SOFT, shadow: false });
@@ -542,23 +542,51 @@ function drawConfMini(g: CanvasRenderingContext2D, s: SeasonState): void {
 
 // ------------------------------------------------------------ panels
 
+/** Words split to `n`-character lines. */
+function wrapWords(t: string, n: number): string[] {
+  const out: string[] = [];
+  let cur = '';
+  for (const w of t.split(' ')) {
+    if (cur && cur.length + 1 + w.length > n) {
+      out.push(cur);
+      cur = '';
+    }
+    cur = cur ? `${cur} ${w}` : w;
+  }
+  if (cur) out.push(cur);
+  return out.flatMap((l) => (l.length > n ? [l.slice(0, n)] : [l]));
+}
+
+/** The user's games; the columns fit the longest opponent and result, and a long game name wraps under itself. */
 function drawSchedule(g: CanvasRenderingContext2D, s: SeasonState): void {
   const u = s.config.userTeamId;
   const ap = latestPoll(s, 'ap');
   const games = s.games.filter((x) => x.home === u || x.away === u).sort((a, b) => a.week - b.week);
-  text(g, 'WK  OPPONENT                     RESULT', PX, TOP - 6, { color: DIM, shadow: false });
-  games.forEach((x, i) => {
-    const y = TOP + 6 + i * LINE;
-    const opp = x.home === u ? x.away : x.home;
+  const oppOf = (x: SeasonGame) => (x.home === u ? x.away : x.home);
+  const oppW = Math.max(8, ...games.map((x) => 3 + teamLabel(oppOf(x), ap).length));
+  const resW = Math.max(6, ...games.map((x) => resultText(x, u).length));
+  const oppX = PX + 32;
+  const resX = oppX + (oppW + 2) * 8;
+  const nameX = resX + (resW + 2) * 8;
+  const nameN = Math.floor((PR - nameX) / 8);
+  text(g, 'WK', PX, TOP - 6, { color: DIM, shadow: false });
+  text(g, 'OPPONENT', oppX, TOP - 6, { color: DIM, shadow: false });
+  text(g, 'RESULT', resX, TOP - 6, { color: DIM, shadow: false });
+  let y = TOP + 6;
+  for (const x of games) {
+    const opp = oppOf(x);
     const cur = x.week === s.week && !x.result;
     text(g, String(x.week).padStart(2), PX, y, { color: cur ? GOLD : SOFT });
     const label = teamLabel(opp, ap).toUpperCase();
     const school = teamById(opp).school.toUpperCase();
-    drawRich(g, lineWith(`${vsText(x, u).padEnd(3)}${label}`, 3 + label.length - school.length, school.length, teamLink(opp)), PX + 32, y, { color: cur ? GOLD : '#ffffff' });
+    drawRich(g, lineWith(`${vsText(x, u).padEnd(3)}${label}`, 3 + label.length - school.length, school.length, teamLink(opp)), oppX, y, { color: cur ? GOLD : '#ffffff' });
     const res = resultText(x, u);
-    linkText(g, res, PX + 262, y, { color: res.startsWith('W') ? GREEN : RED }, x.result ? gameLink(x.id) : undefined);
-    if (x.name) text(g, x.name.toUpperCase().slice(0, 16), PX + 352, y, { color: ACCENT });
-  });
+    linkText(g, res, resX, y, { color: res.startsWith('W') ? GREEN : RED }, x.result ? gameLink(x.id) : undefined);
+    const full = x.name?.toUpperCase() ?? '';
+    const name = full ? wrapWords(full.length > nameN ? full.replace(/CHAMPIONSHIP$/, 'CHAMP') : full, nameN) : [];
+    name.forEach((l, i) => text(g, l, nameX, y + i * 9, { color: ACCENT }));
+    y += LINE + Math.max(0, name.length - 1) * 9;
+  }
 }
 
 /** Results around the country for one week (A/D steps back through the weeks), ranked games first. */
@@ -612,15 +640,15 @@ function drawPolls(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): 
   if (cfp) drawSubHeader(g, title, v);
   else text(g, title, PCX, TOP - 6, { align: 'center', color: ACCENT });
   const prev = latestPoll(s, kind, poll.week);
-  const x = PX + 60;
+  const x = PX + 48;
   poll.ranks.forEach((e, i) => {
     const y = TOP + 6 + i * LINE;
     const was = rankIn(prev, e.team);
     const move = !prev ? '' : !was ? 'NEW' : was === i + 1 ? '' : was > i + 1 ? `+${was - i - 1}` : `-${i + 1 - was}`;
     const me = e.team === s.config.userTeamId;
-    const school = teamById(e.team).school.toUpperCase().slice(0, 17);
+    const school = teamById(e.team).school.toUpperCase();
     drawRich(g, lineWith(`${String(i + 1).padStart(2)}. ${school}`, 4, school.length, teamLink(e.team)), x, y, { color: me ? GOLD : '#ffffff' });
-    text(g, recordText(recs.get(e.team)!), x + 176, y, { color: me ? GOLD : '#ffffff' });
+    text(g, recordText(recs.get(e.team)!), x + 184, y, { color: me ? GOLD : '#ffffff' });
     if (kind === 'ap') text(g, String(e.points), x + 294, y, { align: 'right', color: DIM, shadow: false });
     text(g, move, x + 304, y, { color: move.startsWith('-') ? RED : GREEN });
   });
