@@ -1483,6 +1483,13 @@ describe('aim feel', () => {
     expect(aimLag(qb(70), 1, 0).tau).toBeGreaterThan(aimLag(qb(70), 0, 0).tau);
     expect(aimLag(qb(70, 50), 1, 0).tau).toBeGreaterThan(aimLag(qb(70, 95), 1, 0).tau);
     expect(aimLag(qb(70), 0, 1).tau).toBeGreaterThan(aimLag(qb(70), 0, 0).tau);
+    // A pocket passer: crisp set, heavy rolling out. A scrambler keeps it on the move.
+    const pocket = qb(90, 80, 58);
+    const scrambler = qb(74, 74, 86);
+    expect(aimLag(pocket, 0, 0).tau).toBeLessThan(0.03);
+    expect(aimLag(pocket, 0, 1).tau).toBeGreaterThan(0.18);
+    expect(aimLag(pocket, 0, 1).tau).toBeGreaterThan(aimLag(scrambler, 0, 1).tau);
+    expect(aimLag(scrambler, 0, 0).tau).toBeGreaterThan(aimLag(pocket, 0, 0).tau);
     expect(aimLag(qb(55), 0, 0).vmax).toBeLessThan(aimLag(qb(90), 0, 0).vmax);
   });
   it('the line catches up to the mouse', () => {

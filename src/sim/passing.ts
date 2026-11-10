@@ -6,6 +6,8 @@ import { THROWS, type ThrowKind } from './ball';
 
 /** Screen-space multiplier: the target lands this many times the pull-back distance in front of the QB. */
 export const AIM_GAIN = 2.6;
+/** A QB moving this fast (yd/s) is fully on the move for throw error and aim lag: the jog he aims at (about 3.4). */
+export const MOVE_FULL = 3.4;
 export const MIN_DRAG_PX = 6;
 
 export interface Aim {
@@ -74,23 +76,35 @@ export function throwErrorSd(dist: number, r: PasserRatings, pressure: number, m
 }
 
 /**
- * Aim feel: a worse passer's pull-back line trails the mouse, heavier under pressure and on the move.
- * The ball goes where the lagged line is. Lag `tau` (s) from the accuracy average `A`:
- * `(tauTop - A) * tauPer`, times the pressure (`pac`) and moving (`tup`) terms through `composure`.
- * `vmax` caps how fast the line can move, in view px per second.
+ * Aim feel: a worse passer's pull-back line trails the mouse. The lag `tau` (s) is three costs added up,
+ * each from its own rating, so QB types feel different: a pocket passer is crisp set in the pocket and
+ * heavy rolling out; a scrambler is a bit heavy everywhere but keeps it on the move.
+ * - set: `(accTop - A) * accPer`, `A` the short/medium/deep accuracy average
+ * - pressure (0-1): `(pacTop - pac) * pacPer`
+ * - moving (0-1, his speed over `MOVE_FULL`): `(tupTop - tup) * tupPer`
+ * - plus `nerves` (a shaken QB on a big snap, data/confidence.ts), worse under pressure.
+ * `vmax` caps how fast the line can move, in view px per second. The ball goes where the line is.
  */
-export const AIM_FEEL = { on: true, tauPer: 0.0036, tauTop: 95, pressure: 0.9, moving: 0.5, vBase: 600, vPer: 40 };
+export const AIM_FEEL = {
+  on: true,
+  accTop: 95, accPer: 0.0036,
+  pacTop: 92, pacPer: 0.0045,
+  tupTop: 92, tupPer: 0.0055,
+  vBase: 600, vPer: 40,
+};
 
-/** `nerves`: extra seconds of lag from a shaken QB on a big snap (data/confidence.ts `shakenAimLag`). */
+/** `moving`: 0-1 (`Play.passContext`); `nerves`: extra seconds from a shaken QB on a big snap (`shakenAimLag`). */
 export function aimLag(r: PasserRatings, pressure: number, moving: number, nerves = 0): { tau: number; vmax: number } {
   const f = AIM_FEEL;
   if (!f.on) return { tau: 0, vmax: Infinity };
   const a = (r.sac + r.mac + r.dac) / 3;
   const tau =
-    (Math.max(0, f.tauTop - a) * f.tauPer + nerves) * (1 + pressure * f.pressure * composure(r.pac)) * (1 + moving * f.moving * composure(r.tup));
+    Math.max(0, f.accTop - a) * f.accPer +
+    pressure * Math.max(0, f.pacTop - r.pac) * f.pacPer +
+    moving * Math.max(0, f.tupTop - r.tup) * f.tupPer +
+    nerves * (1 + pressure);
   return { tau, vmax: Math.max(200, f.vBase + (a - 50) * f.vPer) };
 }
-
 /** One real-time step of the lagged aim point toward the mouse. */
 export function stepAimCursor(cur: Vec, mouse: Vec, tau: number, vmax: number, step: number): Vec {
   if (tau <= 0 && vmax === Infinity) return { x: mouse.x, y: mouse.y };

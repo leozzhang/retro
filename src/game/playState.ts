@@ -15,7 +15,7 @@ import {
   accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
   startGather,
 } from '../sim/player';
-import { aimLag, aimTarget, MIN_DRAG_PX, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
+import { aimLag, aimTarget, MIN_DRAG_PX, MOVE_FULL, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
 import {
   ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, pileCap, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
@@ -866,7 +866,7 @@ export class Play {
     if (!this.aim) return;
     // Aim feel: the line chases the mouse, slower for a worse passer (one real-time step, so SLOW AIM doesn't add to it).
     this.aim.mouse = { x: m.x, y: m.y };
-    const { pressure, moving } = this.passContext();
+    const { pressure, moving } = this.passContext(true);
     const lag = aimLag(qb.r, pressure, moving, this.aimNerves);
     this.aim.cur = stepAimCursor(this.aim.cur, this.aim.mouse, lag.tau, lag.vmax, STEP);
     if (!canThrow) {
@@ -878,7 +878,7 @@ export class Play {
       const drag = len(sub(this.aim.start, this.aim.cur));
       const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm, this.throwKind);
       this.aim = null;
-      if (drag >= MIN_DRAG_PX) this.throwBall(tgt);
+      if (drag >= MIN_DRAG_PX) this.throwBall(tgt, this.throwKind, true);
     } else {
       // Pulling back to throw turns him to face it, as if stepping into it (D), even on the drop.
       const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm, this.throwKind);
@@ -1121,21 +1121,25 @@ export class Play {
     return { aim: { x: Math.min(aim.x, 119), y: clamp(aim.y, 1.5, FIELD_W - 1.5) }, kind: k };
   }
 
-  /** The QB's pressure (a free rusher inside 4 yd) and movement, 0-1, for throw error and aim feel. */
-  passContext(): { pressure: number; moving: number } {
+  /**
+   * The QB's pressure (a free rusher inside 4 yd) and movement, 0-1, for throw error and aim feel.
+   * `aimed`: the user is pulling back, which slows him to a jog, so that jog (`MOVE_FULL`) is fully on
+   * the move; otherwise (the CPU QB, the harness) movement is full at 6 yd/s.
+   */
+  passContext(aimed = false): { pressure: number; moving: number } {
     const qb = this.qb;
     let nearest = Infinity;
     for (const d of this.def) {
       if (!d.down && !d.engagedBy.length) nearest = Math.min(nearest, dist(d.pos, qb.pos));
     }
-    return { pressure: clamp((4 - nearest) / 4, 0, 1), moving: clamp(len(qb.vel) / 6, 0, 1) };
+    return { pressure: clamp((4 - nearest) / 4, 0, 1), moving: clamp(len(qb.vel) / (aimed ? MOVE_FULL : 6), 0, 1) };
   }
 
-  /** Throw to `target` (the user's aim, or the CPU's on a replay) with the given throw type. */
-  throwBall(target: Vec, kind: ThrowKind = this.throwKind): void {
+  /** Throw to `target` (the user's aim, or the CPU's on a replay) with the given throw type; `aimed` for the user's (`passContext`). */
+  throwBall(target: Vec, kind: ThrowKind = this.throwKind, aimed = false): void {
     const qb = this.qb;
     const rng = this.rng;
-    const { pressure, moving } = this.passContext();
+    const { pressure, moving } = this.passContext(aimed);
     const sd = throwErrorSd(dist(qb.pos, target), qb.r, pressure, moving, kind);
     const to = { x: target.x + gauss(rng) * sd, y: target.y + gauss(rng) * sd * 0.8, z: 1.2 };
     const from = { x: qb.pos.x + qb.facing * 0.3, y: qb.pos.y, z: 2.0 };

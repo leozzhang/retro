@@ -120,14 +120,17 @@ A touch dump-off under 10 yards thrown with a rusher in the QB's face still gets
 
 A worse passer's pull-back line trails the mouse instead of following it 1:1, so the gap between QBs is felt in the hand. The line eases toward the mouse with time constant `tau` and a speed cap `vmax`, stepped in real time (SLOW AIM doesn't add to it). **The ball goes where the lagged line is**, so a quick flick with a bad QB lands short or off-line; holding a beat lets it settle. A faint dot shows the mouse while the line drags.
 
-| Input | Rating | Effect |
+The lag `tau` is three costs added up, each from its own rating, so QB types feel different. A pocket passer is crisp set in the pocket and heavy rolling out; a scrambler is a bit heavy everywhere but keeps it on the move.
+
+| Cost | Rating | Seconds of lag |
 |---|---|---|
-| Base lag | `A = (sac+mac+dac)/3` | `tau = max(0, 95 − A) × 0.0036 s` (A 95: 0, 85: 0.036, 75: 0.072, 65: 0.11, 50: 0.16) |
-| Pressure | `pac` through `composure` | `× (1 + pressure × 0.9 × composure(pac))` |
-| Moving | `tup` through `composure` | `× (1 + moving × 0.5 × composure(tup))` |
+| Set | `A = (sac+mac+dac)/3` | `max(0, 95 − A) × 0.0036` (A 90: 0.018, 80: 0.054, 70: 0.09) |
+| Pressure (0–1, a free rusher inside 4 yd) | `pac` | `pressure × max(0, 92 − pac) × 0.0045` (pac 60: 0.14, 75: 0.077, 90: 0.009) |
+| Moving (speed / `MOVE_FULL` 3.4 yd/s, the aiming jog) | `tup` | `moving × max(0, 92 − tup) × 0.0055` (tup 60: 0.18, 70: 0.12, 80: 0.066, 90: 0.011) |
+| Nerves (CONFIDENCE.md) | confidence | `shakenAimLag × (1 + pressure)` |
 | Speed cap | `A` | `vmax = 600 + (A − 50) × 40` view px/s |
 
-`pressure` and `moving` are `Play.passContext()`, the same values the throw error uses. The headless harness and the CPU QB don't aim with the mouse, so the balance and ratings reports don't see it. In dev builds, `window.AIM_FEEL` tunes it live (`on = false` to compare).
+`pressure` and `moving` are `Play.passContext()`, the same values the throw error uses. On the user's aimed throws, moving is full at the aiming jog (`MOVE_FULL`), for the lag and the throw error alike. It used to be speed / 6, which a QB aiming on the move never got near (about 0.57), so the user's throws on the run were undercharged. The CPU QB and the harness keep speed / 6. The headless harness and the CPU QB don't aim with the mouse, so the balance and ratings reports don't see it. In dev builds, `window.AIM_FEEL` tunes it live (`on = false` to compare).
 
 ## Animation (render/renderer.ts `lookOf`, render/sprites.ts `Look`)
 Nothing new on the HUD. It's all in the players:

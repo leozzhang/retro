@@ -4,6 +4,8 @@ _Last updated: 2026-11-10_
 
 ## In progress: aim feel, the gap between QBs in the hand (2026-11-10)
 - Experiment for playtesting: a worse passer's drag-back line lags the mouse (accuracy average sets the lag, poise adds under pressure, throw-on-the-run adds on the move), and the ball goes where the lagged line is. Constants `AIM_FEEL` (sim/passing.ts), design in PASSING.md "Aim feel". `window.AIM_FEEL` in dev to tune or switch off.
+- Retuned: the lag is now set + pressure + moving costs added up, each from its own rating (accuracy, poise, throw on the run), with moving measured against the aiming jog, so a pocket passer with low TUP drags rolling out. Before, pressure and moving only multiplied the accuracy lag, so an accurate QB barely felt them.
+- Fixed: the user's throws on the move counted as about half moving (speed / 6, but aiming slows him to a 3.4 yd/s jog). Aimed throws are now fully moving at that jog, for throw error (`tup`) as well as the lag. The CPU QB and the harness keep speed / 6, so the balance report is unchanged.
 - Confidence: the user's shaken QB doesn't lose accuracy on big snaps any more; he gets extra aim lag instead (`CONF.shakenLag`, `shakenAimLag`; CONFIDENCE.md section 1). `window.CONF` in dev to tune it.
 - Next: playtest high vs. low QBs on quick flicks, blitzes and rollouts; tune `tauPer`/`vBase`, or drop it.
 
