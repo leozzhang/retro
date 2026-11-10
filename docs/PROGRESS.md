@@ -2,6 +2,10 @@
 
 _Last updated: 2026-11-10_
 
+## Fixed: kits swapped on the CPU's drives (2026-11-10)
+- `Play` and `KickPlay` gave kits by role: the offense or kicking team wore home, the other team away. The CPU's key-play replays put the CPU on offense, so both teams swapped kits whenever the CPU had the ball. On the road, the user's own snaps also showed the user in home.
+- `PlaySetup.homeId` and `KickSetup.homeId` now name the home team, and it wears home on either side of the ball. `setupField` sets it from the season game's `home` (a watched sim passes `game.home`; exhibitions make the user home), and `ReplaySide.home` carries it into replays and FG replays. The postgame tapes record each man's kit, so they come out right too. When it's missing (the harness and the tests), the offense still wears home, so the headless reports don't change.
+
 ## Fixed: office names and the league banner (2026-11-10)
 - **TO THE LEAGUE:** at level 3 and up, THE LEAGUE banner was 30 px wide for 39 px of text. It now spans the board.
 - **RING OF HONOR jerseys:** the full last name shows on the same 36 px jersey. Every name is the same 5 px tall, like a real nameplate. A long one is set narrower: `JERSEY_FITS` steps from the micro font down to half-pixel columns and gaps, drawn in the fine pass (`FINE` in `render/officeArt.ts`). It keeps a pixel clear of each sleeve. A hyphenated or two-word name too long even at the narrowest (COLEMAN-WILLIAMS) breaks onto the body under the sleeves, and the number moves down.

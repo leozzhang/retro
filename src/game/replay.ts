@@ -42,7 +42,12 @@ export const REPLAY = {
 export interface ReplaySide {
   team: Team;
   roster: Record<string, RosterPlayer>;
+  /** The home team, which wears the home kit. */
+  home?: boolean;
 }
+
+/** The home team's id for a replay's kits: whichever side is home, else the offense. */
+const homeOf = (off: ReplaySide, def: ReplaySide): string => (def.home ? def.team.id : off.team.id);
 
 export interface ReplayTarget {
   off: ReplaySide;
@@ -85,7 +90,7 @@ const QB_RUNS = PLAYBOOK.filter((p) => p.qbRun || (p.kind === 'run' && (p.read =
 
 export function makeReplay(t: ReplayTarget, s: ReplaySetup): Play {
   return new Play({
-    offTeam: t.off.team, defTeam: t.def.team, offRoster: t.off.roster, defRoster: t.def.roster,
+    offTeam: t.off.team, defTeam: t.def.team, homeId: homeOf(t.off, t.def), offRoster: t.off.roster, defRoster: t.def.roster,
     play: s.play, defCall: s.call, tags: s.tags, press: s.press, los: OWN_GOAL + t.yard, ballY: FIELD_W / 2, rng: mulberry32(s.seed),
   });
 }
@@ -244,7 +249,7 @@ export function fgTargetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide): FgTar
 /** The kick lined up, not yet snapped (the snap is `release`). Calm air: the sim's kicks have no wind. */
 export function makeFg(t: FgTarget, s: FgSetup): KickPlay {
   return new KickPlay({
-    kickTeam: t.off.team, recvTeam: t.def.team, kickRoster: t.off.roster, recvRoster: t.def.roster,
+    kickTeam: t.off.team, recvTeam: t.def.team, homeId: homeOf(t.off, t.def), kickRoster: t.off.roster, recvRoster: t.def.roster,
     def: kickDef('fg'), los: OPP_GOAL - (t.dist - 17), ballY: FIELD_W / 2, wind: CALM, rng: mulberry32(s.seed),
   });
 }

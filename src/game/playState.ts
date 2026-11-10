@@ -37,6 +37,8 @@ export interface Popup {
 export interface PlaySetup {
   offTeam: Team;
   defTeam: Team;
+  /** The home team's id: it wears the home kit, the other team the away kit. Missing: the offense is home. */
+  homeId?: string;
   offRoster: Record<string, RosterPlayer>;
   defRoster: Record<string, RosterPlayer>;
   play: PlayDef;
@@ -291,8 +293,9 @@ export class Play {
     this.defCall = s.defCall;
     this.rng = s.rng;
 
-    const offU = teamUniform(s.offTeam, true);
-    const defU = teamUniform(s.defTeam, false);
+    const offHome = s.homeId === undefined || s.homeId === s.offTeam.id;
+    const offU = teamUniform(s.offTeam, offHome);
+    const defU = teamUniform(s.defTeam, !offHome);
     const bySlot = new Map<string, Player>();
 
     for (const slot of OFF_SLOTS) {

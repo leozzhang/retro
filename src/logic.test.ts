@@ -182,6 +182,15 @@ describe('route running', () => {
     expect(q.rb.passRoute).toBe(false);
     expect(q.off.some((o) => o.passRoute && o.role === 'WR')).toBe(true);
   });
+  it('the home team wears the home kit on either side of the ball', () => {
+    const base = { offRoster: offR, defRoster: defR, play: PLAYBOOK.find((x) => x.id === 'inside-zone')!, defCall: DEF_CALLS[0], press: {}, los: 35, ballY: 26.65, rng: mulberry32(1) };
+    const away = new Play({ ...base, offTeam: UGA, defTeam: BAMA, homeId: BAMA.id });
+    expect(away.off[0].uniform.key).toBe(`${UGA.id}-a`);
+    expect(away.def[0].uniform.key).toBe(`${BAMA.id}-h`);
+    const home = new Play({ ...base, offTeam: UGA, defTeam: BAMA, homeId: UGA.id });
+    expect(home.off[0].uniform.key).toBe(`${UGA.id}-h`);
+    expect(home.def[0].uniform.key).toBe(`${BAMA.id}-a`);
+  });
 });
 
 describe('tackling', () => {

@@ -346,6 +346,8 @@ export class Game {
   /** The season in progress (the hub screen), and the season game being played on the field. */
   private season: SeasonState | null = null;
   private seasonGame: SeasonGame | null = null;
+  /** The home team on the field (`setupField`), which wears the home kit. */
+  private homeId = '';
   /** A season game's drives for the progression grades: the user's snaps and kicks first, then each CPU drive. */
   private liveDrives: DriveLog[] | null = null;
   /** A season game's weekly emphases for the user's team: the user's defense plays them in the CPU's simulated drives. */
@@ -783,7 +785,7 @@ export class Game {
   }
 
   /** Put two teams on the field: squads, rosters, crowd, and how the key plays show them. */
-  private setupField(user: Team, cpu: Team, squads?: { user: Squad; cpu: Squad }): void {
+  private setupField(user: Team, cpu: Team, squads?: { user: Squad; cpu: Squad }, homeId = this.seasonGame?.home ?? user.id): void {
     this.user = user;
     this.cpu = cpu;
     this.userSquad = squads?.user ?? buildSquad(user);
@@ -794,8 +796,11 @@ export class Game {
     this.crowdKey = '';
     const s = this.season;
     const own = this.seasonGame && s && !s.config.delegate.gamePlan ? s.teamState[user.id]?.plan : undefined;
+    // A season game's home team wears the home kit on every snap and replay; in an exhibition, the user's team.
+    this.homeId = homeId;
+    const userHome = this.homeId === user.id;
     this.showCtx = {
-      user, cpu, userSide: { team: user, roster: this.userRoster }, cpuSide: { team: cpu, roster: this.cpuRoster },
+      user, cpu, userSide: { team: user, roster: this.userRoster, home: userHome }, cpuSide: { team: cpu, roster: this.cpuRoster, home: !userHome },
       userPass: (own ?? autoGamePlan(this.userSquad, this.cpuSquad)).passShare, cpuPass: autoGamePlan(this.cpuSquad, this.userSquad).passShare,
     };
   }
@@ -922,7 +927,7 @@ export class Game {
     this.seasonGame = null;
     this.watchOnly = true;
     this.watchGame = game.id;
-    this.setupField(teamById(u), teamById(opp), squads);
+    this.setupField(teamById(u), teamById(opp), squads, game.home);
     this.notices = [];
     this.score = { user: game.home === u ? r.home : r.away, cpu: game.home === u ? r.away : r.home };
     this.ot = null;
@@ -2393,6 +2398,7 @@ export class Game {
     this.play = new Play({
       offTeam: this.user,
       defTeam: this.cpu,
+      homeId: this.homeId,
       offRoster: clutchRoster(this.userRoster, this.snapLev),
       defRoster: clutchRoster(this.cpuRoster, this.snapLev),
       play: def,
@@ -2439,6 +2445,7 @@ export class Game {
     this.kick = new KickPlay({
       kickTeam: this.user,
       recvTeam: this.cpu,
+      homeId: this.homeId,
       kickRoster: clutchRoster(this.userRoster, this.snapLev),
       recvRoster: clutchRoster(this.cpuRoster, this.snapLev),
       def,

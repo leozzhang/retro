@@ -30,6 +30,8 @@ export type KickPhase = 'presnap' | 'snap' | 'set' | 'approach' | 'flight' | 'lo
 export interface KickSetup {
   kickTeam: Team;
   recvTeam: Team;
+  /** The home team's id: it wears the home kit, the other team the away kit. Missing: the kicking team is home. */
+  homeId?: string;
   kickRoster: Record<string, RosterPlayer>;
   recvRoster: Record<string, RosterPlayer>;
   def: KickDef;
@@ -154,8 +156,9 @@ export class KickPlay {
       x: Math.min(s.los + sp.dx, FIELD_LEN - 0.5),
       y: clamp(sp.mode === 'abs' ? sp.y : s.ballY + sp.y, 1, FIELD_W - 1),
     });
-    const kU = teamUniform(s.kickTeam, true);
-    const rU = teamUniform(s.recvTeam, false);
+    const kickHome = s.homeId === undefined || s.homeId === s.kickTeam.id;
+    const kU = teamUniform(s.kickTeam, kickHome);
+    const rU = teamUniform(s.recvTeam, !kickHome);
     for (const sp of kickUnit) {
       const p = makePlayer('off', s.kickRoster[sp.slot], kU, place(sp));
       p.job = sp.job;
