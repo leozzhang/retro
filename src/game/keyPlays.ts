@@ -25,7 +25,9 @@ export type KeyView = 'defense' | 'sim';
 
 export type KeyKind =
   | 'td' | 'int' | 'fumble' | 'fourthConv' | 'fourthStop' | 'explosive' | 'thirdConv' | 'thirdStop'
-  | 'redZoneStop' | 'sack' | 'fg' | 'missedFg' | 'gain' | 'twoPt' | 'twoPtStop';
+  | 'redZoneStop' | 'sack' | 'fg' | 'missedFg' | 'gain' | 'twoPt' | 'twoPtStop'
+  /** A CPU extra point in a played game: shown on its own, never picked from a drive. */
+  | 'xp' | 'xpMiss';
 
 export interface KeyPlay {
   drive: StoryDrive;
@@ -162,6 +164,7 @@ export const KEY_TITLE: Record<KeyKind, string> = {
   td: 'TOUCHDOWN', int: 'INTERCEPTION', fumble: 'FUMBLE', fourthConv: '4TH DOWN CONVERSION', fourthStop: 'STOPPED ON 4TH DOWN',
   explosive: 'BIG PLAY', thirdConv: '3RD DOWN CONVERSION', thirdStop: 'STOPPED ON 3RD DOWN', redZoneStop: 'RED ZONE STOP',
   sack: 'SACK', fg: 'FIELD GOAL', missedFg: 'FIELD GOAL NO GOOD', gain: 'NICE GAIN', twoPt: 'TWO-POINT TRY GOOD', twoPtStop: 'TWO-POINT TRY STOPPED',
+  xp: 'EXTRA POINT', xpMiss: 'EXTRA POINT NO GOOD',
 };
 
 const ORD = ['1ST', '2ND', '3RD', '4TH'];

@@ -3,8 +3,8 @@ import { buildSquad } from './data/depth';
 import { defIdentity, preventLevel, situationDials, situationMix, shellShares, pressureShare } from './data/identity';
 import { teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
-import { simulateDrive, type SimPlay } from './game/rules';
-import { desperate, fourthDown, kickNow, passOdds, tempo, type Situation } from './game/situation';
+import { PAT, simulateDrive, xpOdds, type SimPlay } from './game/rules';
+import { desperate, fourthDown, goForTwo, kickNow, passOdds, tempo, type Situation } from './game/situation';
 import { castSnap, type Lineup } from './season/cast';
 import { lineupOf } from './season/simGame';
 import { autoGamePlan } from './season/staff';
@@ -150,5 +150,28 @@ describe('casting', () => {
     }
     expect(deepPass / 2000).toBeGreaterThan(0.7);
     expect(sacks).toBeGreaterThan(0);
+  });
+});
+
+describe('the CPU try after a touchdown', () => {
+  const sit = (lead: number, secsLeft: number, finalHalf = true): Situation => ({ down: 1, toGo: 3, yardsToGoal: 3, secsLeft, qSecs: 900, finalHalf, lead });
+
+  it('kicks before the 4th quarter and reads the chart in it', () => {
+    expect(goForTwo(sit(-2, 1200))).toBe(false);
+    expect(goForTwo(sit(-2, 300, false))).toBe(false);
+    expect(goForTwo(sit(-2, 300))).toBe(true);
+    expect(goForTwo(sit(-1, 300))).toBe(false);
+    expect(goForTwo(sit(1, 300))).toBe(true);
+    expect(goForTwo(sit(-5, 300))).toBe(true);
+    expect(goForTwo(sit(6, 300))).toBe(false);
+    expect(goForTwo({ ...sit(-2, Infinity), ot: 'first' })).toBe(false);
+  });
+
+  it('makes about 97% of extra points, more with a better kicker', () => {
+    expect(xpOdds(PAT.mid)).toBeCloseTo(0.97, 3);
+    expect(xpOdds(55)).toBeGreaterThan(0.89);
+    expect(xpOdds(55)).toBeLessThan(0.93);
+    expect(xpOdds(97)).toBe(0.99);
+    expect(xpOdds(70)).toBeLessThan(xpOdds(85));
   });
 });

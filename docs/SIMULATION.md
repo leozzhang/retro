@@ -136,5 +136,5 @@ As tries run out the match loosens (`REPLAY.relaxAt`): after 45% of them, anyone
 ## Not done
 - No mid-game "sim the rest".
 - A drive continued at the quarter break starts a new set of downs.
-- Punts never show, and extra points aren't key plays.
+- Punts never show. Extra points aren't picked as key plays. In a played game, the CPU's try after a touchdown is shown on its own (`cpuTry`, game.ts).
 - The longest plays (40+ yards) sometimes find no replay and show as cards.

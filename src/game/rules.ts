@@ -448,6 +448,19 @@ export function simulateDrive(
  */
 export const OVERTIME = { start: 75, mustGoForTwo: 2, shootout: 3, twoPt: 0.45, twoPtPerPoint: 0.012, twoPtRange: [0.25, 0.7] };
 
+/**
+ * A simulated extra point (the CPU's, in a played game): FBS kickers make about 97% from the 3 (a
+ * 20-yard kick, `dist`). `base` is the odds for a kicker of `mid` accuracy (the median FBS starter),
+ * plus `perPoint` per point of kick accuracy (and of the kicker's confidence edge), within `range`:
+ * the weakest starters (55) make about 91%, the best (95+) nearly all. Blocks are among the misses.
+ */
+export const PAT = { dist: 20, base: 0.97, mid: 77, perPoint: 0.0025, range: [0.85, 0.99] };
+
+export function xpOdds(kac: number, kEdge = 0): number {
+  const [lo, hi] = PAT.range;
+  return clamp(PAT.base + (kac + kEdge - PAT.mid) * PAT.perPoint, lo, hi);
+}
+
 /** Whether a simulated two-point try is good. */
 export function simTwoPoint(offOvr: number, defOvr: number, rng: Rng): boolean {
   const [lo, hi] = OVERTIME.twoPtRange;

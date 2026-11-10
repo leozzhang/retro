@@ -66,7 +66,7 @@ export interface KeyShow {
 }
 
 /** Kinds that are good news for the defense. */
-const DEFENSIVE = new Set<KeyKind>(['int', 'fumble', 'fourthStop', 'thirdStop', 'redZoneStop', 'sack', 'missedFg', 'twoPtStop']);
+const DEFENSIVE = new Set<KeyKind>(['int', 'fumble', 'fourthStop', 'thirdStop', 'redZoneStop', 'sack', 'missedFg', 'twoPtStop', 'xpMiss']);
 
 export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: Tape; label?: string } = {}): KeyShow {
   const d = k.drive;
@@ -77,7 +77,7 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: T
   const target = fg || tape ? null : targetFor(k, off, def, userBall ? ctx.userPass : ctx.cpuPass);
   const search = fg ? new FgSearch(fg, seed) : target ? new ReplaySearch(target, seed) : null;
   const before = { user: d.score[ctx.user.id] ?? 0, cpu: d.score[ctx.cpu.id] ?? 0 };
-  const pts = k.kind === 'td' || k.kind === 'twoPt' ? d.points : k.kind === 'fg' ? 3 : 0;
+  const pts = k.kind === 'td' || k.kind === 'twoPt' ? d.points : k.kind === 'fg' ? 3 : k.kind === 'xp' ? 1 : 0;
   const after = { user: before.user + (userBall ? pts : 0), cpu: before.cpu + (userBall ? 0 : pts) };
   const c = storyClock(d, k.play.t);
   // Cut straight to the new spot: the camera starts there rather than panning from the last play.
@@ -168,7 +168,7 @@ function cardX(sh: KeyShow): number {
   const from = OWN_GOAL + sh.k.play.yard;
   if (sh.phase !== 'card') return from;
   const k = sh.k.kind;
-  const still = k === 'fg' || k === 'missedFg' || k === 'int' || k === 'fumble';
+  const still = k === 'fg' || k === 'missedFg' || k === 'xp' || k === 'xpMiss' || k === 'int' || k === 'fumble';
   const to = still ? from : k === 'td' || k === 'twoPt' ? OPP_GOAL + 3 : Math.min(OPP_GOAL, from + shownGain(sh.k.play));
   const f = Math.min(1, sh.t / SHOW.cardMove);
   return from + (to - from) * (1 - (1 - f) * (1 - f));
@@ -209,6 +209,9 @@ function playLine(sh: KeyShow): string {
     case 'fg':
     case 'missedFg':
       return `${p.fg?.dist ?? ''}-YARD TRY ${k.kind === 'fg' ? 'IS GOOD' : 'IS NO GOOD'}`;
+    case 'xp':
+    case 'xpMiss':
+      return `THE EXTRA POINT ${k.kind === 'xp' ? 'IS GOOD' : 'IS NO GOOD'}`;
     default:
       if (o?.type === 'incomplete') return 'PASS FALLS INCOMPLETE';
       if (yds <= 0) return by(yds === 0 ? 'STOPPED FOR NO GAIN' : `STOPPED FOR A ${yardsWord(yds)} LOSS`);

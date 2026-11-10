@@ -104,6 +104,20 @@ export function kickNow(s: Situation): boolean {
   return lastSnap(s) && fgDistance(s) <= SITUATION.fgMax && fieldGoalHelps(s);
 }
 
+/**
+ * The two-point chart, by the margin after the touchdown's six: go for two when ahead by `ahead` (to
+ * lead by 3, 7, 14, 17 or 21, or by 6 so a touchdown and kick can't beat you) or behind by `behind` (to
+ * tie, need only a field goal, a touchdown and kick, a touchdown and field goal, or two touchdowns and
+ * kicks). Coaches use it from `fromSecs` left in the game; before that they kick.
+ */
+export const TWO_POINT = { ahead: [1, 4, 5, 12, 15, 19], behind: [2, 5, 9, 12, 16], fromSecs: 900 };
+
+/** After a touchdown (`s.lead` counts the six, `s.secsLeft` is what the drive left): go for two? Regulation only; overtime has its own rules. */
+export function goForTwo(s: Situation): boolean {
+  if (s.ot || !s.finalHalf || s.secsLeft > Math.min(TWO_POINT.fromSecs, s.qSecs)) return false;
+  return s.lead > 0 ? TWO_POINT.ahead.includes(s.lead) : TWO_POINT.behind.includes(-s.lead);
+}
+
 /** The offense's tempo this snap. Overtime is untimed. */
 export function tempo(s: Situation): 'normal' | 'hurry' | 'milk' | 'kneel' {
   if (s.ot) return 'normal';

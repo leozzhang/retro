@@ -1,9 +1,9 @@
 import { disguiseName, pickDefCall, pickDisguise, type DefCall, type DefTags, type Disguise } from '../data/defenses';
-import type { Situation } from './situation';
+import { goForTwo, type Situation } from './situation';
 import { defIdentity, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
-import { clutchRoster, confLabel, lateAndClose, leverage } from '../data/confidence';
+import { clutchRoster, confLabel, lateAndClose, leverage, unitEdge } from '../data/confidence';
 import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, teamRatings, type Squad } from '../data/depth';
 import type { Athlete } from '../data/athletes';
 import { POSITIONS } from '../data/positions';
@@ -96,7 +96,7 @@ import { KickPlay } from './kickPlay';
 import { HARD_COUNT, Play } from './playState';
 import { personnelOf } from './resolvePlay';
 import {
-  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, simTwoPoint, simulateDrive, startDrive, userStartAfter,
+  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, PAT, simTwoPoint, xpOdds, simulateDrive, startDrive, userStartAfter,
   type Applied, type Drive, type DriveClock, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
@@ -2799,19 +2799,69 @@ export class Game {
     this.otNext();
   }
 
-  /** A CPU two-point try in overtime, simulated (`simTwoPoint`) and shown as a key play. */
-  private cpuTwoPoint(): void {
+  /**
+   * A CPU two-point try, simulated (`simTwoPoint`) and shown as a key play: in overtime, or after a
+   * regulation touchdown (`at`: that drive's half and the half's seconds when it ended).
+   */
+  private cpuTwoPoint(at?: { half: number; left: number }): void {
     const good = simTwoPoint(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, this.rng);
     const plays: SimPlay[] = [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }];
+    const lead = this.score.cpu - this.score.user;
+    const tryClock: DriveClock = at
+      ? { timeLeft: at.left, hurry: false, milk: false, lead, finalHalf: at.half >= 1, qSecs: this.clock.qSecs }
+      : { timeLeft: Infinity, hurry: false, milk: false, lead, ot: 'second' };
     const told: StoryDrive = {
-      off: this.cpu.id, half: this.otPeriods() + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
+      off: this.cpu.id, half: at?.half ?? this.otPeriods() + 1, left: at?.left ?? 0, qSecs: this.clock.qSecs,
+      score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
       start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, plays,
-      credit: this.castCpu(plays, { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: 'second' }, 97),
+      credit: this.castCpu(plays, tryClock, 97),
     };
     if (this.liveBox) storyCpuDrive(this.liveBox, told);
     this.showCpuDrive(told);
     if (good) this.score.cpu += 2;
     this.notify({ title: `${this.cpu.abbr} TWO-POINT TRY: ${good ? 'GOOD' : 'NO GOOD'}`, sub: this.scoreLine(), extra: '', color: good ? '#ff5a5a' : '#ffd23f' });
+  }
+
+  /**
+   * The try after a CPU touchdown in regulation: the coach reads the two-point chart (`goForTwo`), then
+   * either goes for two or kicks. The kick is good by the kicker's accuracy and confidence (`xpOdds`),
+   * counts on the touchdown's drive, and is shown as a replay of the kick unless key plays are off.
+   */
+  private cpuTry(td: StoryDrive, late: boolean): void {
+    const c = this.clock;
+    const left = timeLeftInHalf(c);
+    const half = c.quarter <= 2 ? 0 : 1;
+    // The drive's grades log has the kick in it, always good (`driveLog`): make it the real try.
+    const log = this.liveDrives?.[this.liveDrives.length - 1]?.plays;
+    const xpAt = log ? log.findIndex((p) => p.kick?.unit === 'xp') : -1;
+    const sit: Situation = {
+      down: 1, toGo: 3, yardsToGoal: 3, secsLeft: left, qSecs: c.qSecs, finalHalf: half === 1, lead: this.score.cpu - this.score.user,
+    };
+    if (goForTwo(sit)) {
+      this.notify({ title: `${this.cpu.abbr} GOING FOR TWO`, sub: this.scoreLine(), extra: 'One play from the 3', color: '#9ad7ff' });
+      if (xpAt >= 0) log!.splice(xpAt, 1);
+      this.cpuTwoPoint({ half, left });
+      return;
+    }
+    const k = starters(this.cpuSquad).K;
+    const lev = leverage(1, 3, late, PAT.dist);
+    const made = this.rng() < xpOdds(k?.r.kac ?? PAT.mid, unitEdge(teamConf(this.cpuSquad).k, lev));
+    if (this.keyLevel('defense') !== 'off') {
+      // Shown as its own kick from the score after the six; the story keeps it on the touchdown's drive.
+      const play: SimPlay = { gain: 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: td.left - left, fg: { dist: PAT.dist, made }, lev };
+      const drive: StoryDrive = { ...td, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user }, points: made ? 1 : 0, plays: [play], credit: { snaps: [] } };
+      this.queueShows([{ drive, play, kind: made ? 'xp' : 'xpMiss', priority: 3 }]);
+    }
+    if (xpAt >= 0) log![xpAt].kick!.good = made;
+    if (made) {
+      td.points += 1;
+      this.score.cpu += 1;
+    }
+    const name = k ? `${k.first[0]}. ${k.last}`.toUpperCase() : 'THE KICK';
+    this.notify({
+      title: `${this.cpu.abbr} EXTRA POINT: ${made ? 'GOOD' : 'NO GOOD'}`, sub: this.scoreLine(), extra: made ? `${name} adds the point` : `${name} misses`,
+      color: made ? '#ff5a5a' : '#ffd23f',
+    });
   }
 
   /**
@@ -3058,16 +3108,21 @@ export class Game {
       off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
       start, result: sim.result, points: sim.points, plays, credit,
     };
+    // The drive sim's touchdown counts the kick: here the six goes up first and the try is its own play.
+    const td = sim.result === 'TOUCHDOWN';
+    if (td) told.points = 6;
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
     const level = this.keyLevel('defense');
     if (level !== 'off') this.queueShows(pickDrive(told, level, 'defense'));
     const { halfOver } = advanceSim(c, sim.secs);
-    this.score.cpu += sim.points;
+    this.score.cpu += told.points;
     const notice = this.notify({
       title: `${this.cpu.abbr} DRIVE: ${sim.result}`,
       sub: `${sim.plays} plays, ${sim.yards} yards, ${mmss(sim.secs)}`,
       extra: '',
     });
+    // A touchdown that wins the game on the final play needs no try (NCAA rules).
+    if (td && !(halfOver && c.quarter >= 4 && this.score.cpu > this.score.user)) this.cpuTry(told, conf.late);
     if (halfOver) {
       if (c.quarter === 2) {
         this.halftime();

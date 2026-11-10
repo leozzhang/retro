@@ -2,6 +2,13 @@
 
 _Last updated: 2026-11-10_
 
+## Done: the CPU's try after a touchdown (2026-11-10)
+- A CPU touchdown in a played game used to add 7 at once. Now `cpuDrive` puts up the six, and `cpuTry` decides the try and shows it. The drive sim and simulated games still count a touchdown as 7, so the season report doesn't change.
+- **The call** (`goForTwo`, `TWO_POINT` in `game/situation.ts`): in the 4th quarter the coach follows the classic two-point chart, by the margin after the six. He goes for two when ahead by 1, 4, 5, 12, 15 or 19, or behind by 2, 5, 9, 12 or 16. Before the 4th quarter he always kicks. A touchdown on the last play that wins the game has no try.
+- **The odds:** an extra point (`xpOdds`, `PAT` in `game/rules.ts`) is 97% for a median kicker (77 kick accuracy) and moves 0.25% per point of accuracy and of the kicker's confidence edge, within 85–99%. FBS starters run 55–97 kick accuracy, so they make about 91% to 99%. A two-point try uses the overtime sim (`simTwoPoint`): 45% plus 1.2% per point of overall gap.
+- **On screen:** a GOING FOR TWO notice, then the two-point key play and its result (the same path as overtime, now taking the half and clock). A kick shows as a replayed 20-yard kick (new key kinds `xp` / `xpMiss`) with an EXTRA POINT: GOOD / NO GOOD notice naming the kicker. Replays are skipped when the DEFENSE key-play level is OFF, but the notice still shows. The story keeps the kick's point on the touchdown's drive, and the two-point try is its own try drive, so the scoring plays still add up to the final. The grades log's always-good `xp` entry now holds the real result, and it's removed when the CPU goes for two.
+- Tests: `situation.test.ts` covers the chart and the odds. A 20-yard replay finds a make on the first seed and a miss within about 2.5 seeds.
+
 ## Fixed: the QB faces his throw (2026-11-10)
 - The QB faced wherever he was moving, so on the drop he faced backward through the whole throw. Now pulling back to aim turns him toward the target, like pressing D, and `stepPlayer` holds his facing through the `throw` and `throwEnd` poses even while he drifts back. The user's ball now leaves from his front hand.
 - After a throw, the CPU QB in a replay also turns toward it. His release point is computed before the turn, so the headless reports don't change.
