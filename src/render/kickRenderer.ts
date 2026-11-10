@@ -56,17 +56,24 @@ export function drawKickPlay(g: CanvasRenderingContext2D, cam: Camera, kp: KickP
   const onTee = (kp.unit === 'kickoff' && (presnap || kp.phase === 'approach')) || ((kp.unit === 'fg' || kp.unit === 'xp') && kp.phase === 'set');
   const frame = onTee ? 2 : ballFrame(kp);
   const bs = getBallSprite(frame);
+  // A ball at rest (on the tee, in the hold) is drawn in depth order, so the holder's hand is over it.
+  let resting = ball.state === 'dead';
+  const drawLoose = () => {
+    const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
+    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
+  };
   for (const p of sorted) {
-    drawPlayer(g, cam, p, presnap);
-    if (ball.state === 'held' && ball.carrier === p) {
+    if (resting && p.pos.y > ball.pos.y) {
+      drawLoose();
+      resting = false;
+    }
+    const held = ball.state === 'held' && ball.carrier === p;
+    if (!drawPlayer(g, cam, p, presnap, 'fwd', held) && held) {
       const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
       g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
     }
   }
-  if (loose) {
-    const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
-    g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
-  }
+  if (resting || (loose && ball.state !== 'dead')) drawLoose();
 
   if (kp.unit === 'punt' && (kp.phase === 'set' || kp.phase === 'snap' || kp.phase === 'approach')) drawGetOff(g, cam, kp);
   drawPreview(g, cam, kp);

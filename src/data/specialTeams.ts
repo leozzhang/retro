@@ -94,15 +94,17 @@ const a = (slot: string, dx: number, y: number, job: StJob): StSpot => ({ slot, 
 
 const LINE = [r('LT', -0.6, -2.4, 'protect'), r('LG', -0.6, -1.2, 'protect'), r('C', -0.5, 0, 'protect'), r('RG', -0.6, 1.2, 'protect'), r('RT', -0.6, 2.4, 'protect')];
 
-/** Holder 7 yards behind the line; the kicker steps in from the left. */
+/** The spot 7 yards behind the line; the kicker steps in from the left. */
 export const HOLD_DEPTH = 7;
+/** Where the holder kneels off the spot (yd back, yd toward the camera), so his hand in the hold pose is on the ball. */
+const HOLDER_OFF = { x: 0.45, y: 0.4 };
 export const PUNT_DEPTH = 14.5;
 
 export const FG_UNIT: StSpot[] = [
   ...LINE,
   r('TE', -0.7, -3.6, 'protect'), r('SL', -0.7, 3.6, 'protect'),
   r('RB', -1.5, -4.7, 'protect'), r('Z', -1.5, 4.7, 'protect'),
-  r('QB', -HOLD_DEPTH, 0, 'holder'), r('K', -HOLD_DEPTH - 2.3, -1.7, 'kicker'),
+  r('QB', -HOLD_DEPTH - HOLDER_OFF.x, HOLDER_OFF.y, 'holder'), r('K', -HOLD_DEPTH - 2.3, -1.7, 'kicker'),
 ];
 
 export const FG_BLOCK: StSpot[] = [

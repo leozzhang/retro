@@ -60,7 +60,7 @@ export type Look = 'fwd' | 'back' | 'hands' | 'backHands';
 
 // All poses are authored facing right in a 16x20 local box, then offset into
 // the 20x22 canvas so the outline pass has room.
-function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = 'fwd'): void {
+function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = 'fwd', ball = false): void {
   const running = pose.startsWith('run');
   const bob = pose === 'run1' || pose === 'run3' ? -1 : 0;
   const ux = running || pose === 'fight' || pose === 'spikeDown' || pose === 'spinBall' ? 1 : pose === 'stumble' ? -1 : 0;
@@ -141,7 +141,55 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = '
     P(X(10, 2), 4 + uy, 2, 2, u.jersey); P(X(11, 2), 0 + uy, 2, 3, u.jersey); P(X(12, 2), -1 + uy, 2, 2, skin);
     return;
   }
-  drawArm(P, u, skin, pose, ux, uy);
+  if (ball) drawCarry(P, u, skin, pose, ux, uy);
+  else drawArm(P, u, skin, pose, ux, uy);
+}
+
+/** Poses whose sprite can draw the ball in his hands (`getSprite`'s `ball`); any other pose leaves it to the ball's spot. */
+const CARRY_POSES = new Set<Pose>(['stand', 'run0', 'run1', 'run2', 'run3', 'throw', 'catch', 'stumble', 'fight', 'puntDrop']);
+
+export function carriesBall(pose: Pose, look: Look = 'fwd'): boolean {
+  return look === 'fwd' && CARRY_POSES.has(pose);
+}
+
+const BALL_BR = '#7a3e14';
+const BALL_HI = '#a65a24';
+
+/** A carried ball, 5x3 from (x, y), ringed in the outline color so it reads against the jersey. */
+function drawHeldBall(P: Px, x: number, y: number): void {
+  P(x + 1, y - 1, 3, 1, OUTLINE); P(x, y, 5, 1, OUTLINE); P(x - 1, y + 1, 7, 1, OUTLINE);
+  P(x, y + 2, 5, 1, OUTLINE); P(x + 1, y + 3, 3, 1, OUTLINE);
+  P(x + 1, y, 3, 1, BALL_BR); P(x, y + 1, 5, 1, BALL_BR); P(x + 1, y + 2, 3, 1, BALL_BR);
+  P(x + 1, y, 2, 1, BALL_HI); P(x + 2, y + 1, 1, 1, '#ffffff');
+}
+
+/** The near arm with the ball in it. */
+function drawCarry(P: Px, u: Uniform, skin: string, pose: Pose, ux: number, uy: number): void {
+  switch (pose) {
+    case 'throw':
+      // Cocked back by his ear, the ball in his raised hand.
+      P(4, 4, 2, 4, u.jersey);
+      drawHeldBall(P, 0, 0);
+      P(3, 2, 2, 2, skin);
+      break;
+    case 'catch':
+      // Just pulled in: the ball in both hands out in front of his face.
+      P(10, 4, 2, 3, u.jersey);
+      drawHeldBall(P, 11, 1);
+      P(11, 3, 2, 1, skin); P(15, 2, 1, 1, skin);
+      break;
+    case 'puntDrop':
+      // Held out in front, about to drop it on the foot.
+      P(10, 8, 3, 1, u.jersey);
+      drawHeldBall(P, 12, 9);
+      P(13, 8, 2, 1, skin);
+      break;
+    default:
+      // Tucked high and tight against the chest, the forearm cradling it from underneath.
+      drawHeldBall(P, 10 + ux, 8 + uy);
+      P(9 + ux, 8 + uy, 2, 2, u.jersey);
+      P(10 + ux, 10 + uy, 4, 1, skin);
+  }
 }
 
 function drawHelmet(P: Px, u: Uniform, skin: string, ux: number, uy: number): void {
@@ -291,7 +339,12 @@ function drawDown(P: Px, u: Uniform, skin: string): void {
 export function outline(g: CanvasRenderingContext2D, w: number, h: number): void {
   const img = g.getImageData(0, 0, w, h);
   const d = img.data;
-  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] > 0;
+  // Pixels already in the outline color (a held ball's ring) count as edge, not body, so it isn't outlined twice.
+  const solid = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= w || y >= h) return false;
+    const i = (y * w + x) * 4;
+    return d[i + 3] > 0 && !(d[i] === 0x14 && d[i + 1] === 0x14 && d[i + 2] === 0x14);
+  };
   const edge: [number, number][] = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -302,7 +355,7 @@ export function outline(g: CanvasRenderingContext2D, w: number, h: number): void
   for (const [x, y] of edge) g.fillRect(x, y, 1, 1);
 }
 
-function paint(u: Uniform, skin: string, pose: Pose, look: Look): HTMLCanvasElement {
+function paint(u: Uniform, skin: string, pose: Pose, look: Look, ball: boolean): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = SPR_W;
   c.height = SPR_H;
@@ -317,21 +370,23 @@ function paint(u: Uniform, skin: string, pose: Pose, look: Look): HTMLCanvasElem
   else if (pose === 'stance') drawStance(P, u, skin);
   else if (pose === 'hold') drawHold(P, u, skin);
   else if (pose === 'drive') drawDrive(P, u, skin);
-  else drawUpright(P, u, skin, pose, look);
+  else drawUpright(P, u, skin, pose, look, ball && carriesBall(pose, look));
   outline(g, SPR_W, SPR_H);
   return c;
 }
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-export function getSprite(u: Uniform, skin: string, pose: Pose, facing: 1 | -1, look: Look = 'fwd'): HTMLCanvasElement {
-  const key = `${u.key}|${skin}|${pose}|${facing}|${look}`;
+/** `ball`: he has the ball, drawn in his hands when `carriesBall` says the pose can. */
+export function getSprite(u: Uniform, skin: string, pose: Pose, facing: 1 | -1, look: Look = 'fwd', ball = false): HTMLCanvasElement {
+  const carry = ball && carriesBall(pose, look);
+  const key = `${u.key}|${skin}|${pose}|${facing}|${look}${carry ? '|b' : ''}`;
   let s = cache.get(key);
   if (s) return s;
   if (facing === 1) {
-    s = paint(u, skin, pose, look);
+    s = paint(u, skin, pose, look, carry);
   } else {
-    const base = getSprite(u, skin, pose, 1, look);
+    const base = getSprite(u, skin, pose, 1, look, carry);
     s = document.createElement('canvas');
     s.width = SPR_W;
     s.height = SPR_H;

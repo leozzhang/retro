@@ -8,7 +8,7 @@ import { CATCH_REACH } from '../sim/catching';
 import { endurance, isEligible, poseOf, type Player } from '../sim/player';
 import type { Tape, TapeFrame } from '../game/tape';
 import { laneScores, levered } from '../sim/runBlocking';
-import { ANCHOR_X, ANCHOR_Y, getBallSprite, getSprite, POSE_LIFT, spinFrame, type Look } from './sprites';
+import { ANCHOR_X, ANCHOR_Y, carriesBall, getBallSprite, getSprite, POSE_LIFT, spinFrame, type Look } from './sprites';
 import { text } from './text';
 
 const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
@@ -278,10 +278,14 @@ export function lookOf(play: Play, p: Player): Look {
   return head && play.phase !== 'presnap' && play.phase !== 'run' && play.phase !== 'over' ? 'back' : 'fwd';
 }
 
-export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean, look: Look = 'fwd'): void {
+/**
+ * `ball`: he has it. Returns whether his sprite drew it in his hands; if not, the caller draws it at the
+ * ball's spot.
+ */
+export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, presnap: boolean, look: Look = 'fwd', ball = false): boolean {
   const s = cam.toScreen(p.pos.x, p.pos.y);
   const pose = poseOf(p, presnap);
-  const spr = getSprite(p.uniform, p.skin, pose, (cam.mirror ? -p.facing : p.facing) as 1 | -1, look);
+  const spr = getSprite(p.uniform, p.skin, pose, (cam.mirror ? -p.facing : p.facing) as 1 | -1, look, ball);
   const lift = POSE_LIFT[pose] ?? 0;
   if (p.juke > 0) {
     // A cut leaves fading afterimages behind him.
@@ -293,6 +297,7 @@ export function drawPlayer(g: CanvasRenderingContext2D, cam: Camera, p: Player, 
     g.globalAlpha = 1;
   }
   g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y - lift));
+  return ball && carriesBall(pose, look);
 }
 
 /** One frame of a tape of a played snap (game/tape.ts): the men as they were, then the ball. */
@@ -312,7 +317,8 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
   for (const i of order) {
     const m = f.men[i];
     const c = tape.cast[i];
-    const spr = getSprite(c.uniform, c.skin, m.pose, (cam.mirror ? -m.facing : m.facing) as 1 | -1, m.look);
+    const held = b.state === 'held' && b.carrier === i;
+    const spr = getSprite(c.uniform, c.skin, m.pose, (cam.mirror ? -m.facing : m.facing) as 1 | -1, m.look, held);
     const s = cam.toScreen(m.x, m.y);
     if (m.juke > 0) {
       for (let k = 3; k >= 1; k--) {
@@ -323,7 +329,7 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
       g.globalAlpha = 1;
     }
     g.drawImage(spr, Math.round(s.x - ANCHOR_X), Math.round(s.y - ANCHOR_Y - (POSE_LIFT[m.pose] ?? 0)));
-    if (b.state === 'held' && b.carrier === i) {
+    if (held && !carriesBall(m.pose, m.look)) {
       const bp = cam.toScreen(b.x, b.y, b.z);
       g.drawImage(bs, Math.round(bp.x - 4), Math.round(bp.y - 4));
     }
@@ -381,8 +387,8 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
   const sorted = [...play.players].sort((a, b) => a.pos.y - b.pos.y);
   const bs = getBallSprite();
   for (const p of sorted) {
-    drawPlayer(g, cam, p, presnap, lookOf(play, p));
-    if (ball.state === 'held' && ball.carrier === p) {
+    const held = ball.state === 'held' && ball.carrier === p;
+    if (!drawPlayer(g, cam, p, presnap, lookOf(play, p), held) && held) {
       const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
       g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
     }

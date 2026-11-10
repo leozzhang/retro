@@ -2,6 +2,13 @@
 
 _Last updated: 2026-11-09_
 
+## Done: the ball sits in the carrier's hands (2026-11-09)
+
+- The carried ball is now drawn into the player's sprite (`getSprite`'s `ball`, `drawCarry` in `render/sprites.ts`) instead of at a fixed spot in front of his chest: tucked high under the near arm with the forearm cradling it (standing, running, stumbling, in a block), up by his ear in the cocked hand while the QB pulls back to throw (and back down to the tuck when he cancels), in both hands on a catch, and held out on the punter's drop. The held ball has a dark ring so it reads against any jersey; `outline` skips that color so it isn't outlined twice.
+- Poses without a carry drawing (`carriesBall` false: the spike, leap, cheer, spin, down, holder) still draw the ball at its sim spot. Render only: the sim's ball position is unchanged, so balance and tapes are untouched.
+- **The hold:** the holder used to kneel right on the kick spot, so the ball sat on his knee and was drawn over him. He now kneels just off it (`HOLDER_OFF` in `data/specialTeams.ts`: 0.45 yd back, 0.4 yd toward the camera) with his hand on the ball's top, and a resting ball (`dead`: the hold, the tee) is drawn in depth order in `kickRenderer`. The FG snap aims at the spot as before (`kickSpot.x + 0.3`, the same distance), so kick timing doesn't change; nothing else reads the holder's position.
+- Note: under a full `npm test` run, four season-sim tests (career, confidence, highlights, injuries save/continue) can hit vitest's 5 s timeout from load; they pass alone.
+
 ## Done: touchdown celebrations (2026-11-09)
 - **The problem:** a scorer froze in the arm-up `catch` pose for 5 s and glided through the end zone. Pick sixes and kick-return TDs glided the same way.
 - **Now** (`sim/celebrate.ts`, `CELEBRATE`): the scorer keeps his running frames as he eases to a stop about 4 yd deep, then does one of three celebrations:

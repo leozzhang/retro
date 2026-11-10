@@ -208,9 +208,10 @@ export class KickPlay {
     this.phase = 'snap';
     this.snapTime = this.time;
     const c = this.center!;
-    const tgt = this.unit === 'punt' ? this.kicker : this.holder!;
+    // The holder kneels just off the spot, so his hand is on the ball: the snap goes to the spot.
+    const tgt = this.unit === 'punt' ? this.kicker.pos : this.kickSpot;
     const from = { x: c.pos.x + 0.3, y: c.pos.y, z: 0.4 };
-    const to = { x: tgt.pos.x + 0.3, y: tgt.pos.y, z: this.unit === 'punt' ? 1.2 : 0.6 };
+    const to = { x: tgt.x + 0.3, y: tgt.y, z: this.unit === 'punt' ? 1.2 : 0.6 };
     launch(this.ball, from, to, dist(from, to) / SNAP_SPEED, 0.3, 'snap');
     if (this.unit === 'fg' || this.unit === 'xp') this.assignFgProtection();
   }
