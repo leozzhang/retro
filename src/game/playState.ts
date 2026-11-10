@@ -871,6 +871,9 @@ export class Play {
       this.aim = null;
       if (drag >= MIN_DRAG_PX) this.throwBall(tgt);
     } else {
+      // Pulling back to throw turns him to face it, as if stepping into it (D), even on the drop.
+      const tgt = aimTarget(this.aim, qb.pos, cam, qb.r.arm, this.throwKind);
+      qb.facing = tgt.x < qb.pos.x - 0.5 ? -1 : 1;
       setPose(qb, 'throw', 0.05);
     }
   }
@@ -1132,6 +1135,8 @@ export class Play {
     this.thrown = true;
     this.phase = 'air';
     setPose(qb, 'throwEnd', 0.35);
+    // He follows through toward his throw (display only: the release point is set above).
+    qb.facing = to.x < qb.pos.x - 0.5 ? -1 : 1;
 
     let best: Player | null = null;
     let bd = 15;

@@ -2,6 +2,10 @@
 
 _Last updated: 2026-11-10_
 
+## Fixed: the QB faces his throw (2026-11-10)
+- The QB faced wherever he was moving, so on the drop he faced backward through the whole throw. Now pulling back to aim turns him toward the target, like pressing D, and `stepPlayer` holds his facing through the `throw` and `throwEnd` poses even while he drifts back. The user's ball now leaves from his front hand.
+- After a throw, the CPU QB in a replay also turns toward it. His release point is computed before the turn, so the headless reports don't change.
+
 ## Fixed: kits swapped on the CPU's drives (2026-11-10)
 - `Play` and `KickPlay` gave kits by role: the offense or kicking team wore home, the other team away. The CPU's key-play replays put the CPU on offense, so both teams swapped kits whenever the CPU had the ball. On the road, the user's own snaps also showed the user in home.
 - `PlaySetup.homeId` and `KickSetup.homeId` now name the home team, and it wears home on either side of the ball. `setupField` sets it from the season game's `home` (a watched sim passes `game.home`; exhibitions make the user home), and `ReplaySide.home` carries it into replays and FG replays. The postgame tapes record each man's kit, so they come out right too. When it's missing (the harness and the tests), the offense still wears home, so the headless reports don't change.

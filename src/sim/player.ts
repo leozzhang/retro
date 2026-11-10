@@ -370,7 +370,9 @@ export function stepPlayer(p: Player, dt: number): void {
   const dv = limit(sub(want, p.vel), decel * dt);
   p.vel = add(p.vel, dv);
   p.pos = add(p.pos, scale(p.vel, dt));
-  if (!p.down) {
+  // A QB winding up or following through keeps facing his throw, even drifting back.
+  const throwing = (p.pose === 'throw' || p.pose === 'throwEnd') && p.poseTimer > 0;
+  if (!p.down && !throwing) {
     if (p.vel.x > 0.3) p.facing = 1;
     else if (p.vel.x < -0.3) p.facing = -1;
   }
