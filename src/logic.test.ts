@@ -18,7 +18,8 @@ import { overall, overallBreakdown, overallRaw, OVR_WEIGHTS, POSITIONS, SLOT_POS
 import { passBlockValue, RATING_INFO, RATING_KEYS, runBlockValue, type Ratings } from './data/ratings';
 import { COMPOSITION } from './data/rosterGen';
 import { DEF_EXTRA, DEF_SLOTS, OFF_EXTRA, OFF_SLOTS, ST_SLOTS, teamById, TEAMS } from './data/teams';
-import { accuracyAt, composure, throwErrorSd } from './sim/passing';
+import { accuracyAt, AIM_FEEL, aimLag, composure, stepAimCursor, throwErrorSd } from './sim/passing';
+import { clutchRoster, shakenAimLag } from './data/confidence';
 import { HASH_BOT, HASH_TOP, STEP } from './engine/constants';
 import type { Input } from './engine/input';
 import { handoffKind, Play } from './game/playState';
@@ -1471,5 +1472,53 @@ describe('coverage disguise and presnap motion', () => {
     p.hardCount();
     run(p, 0.3);
     p.def.forEach((x, i) => expect(dist(x.pos, before[i])).toBeLessThan(0.01));
+  });
+});
+
+describe('aim feel', () => {
+  const qb = (a: number, pac = 80, tup = 80) => ({ sac: a, mac: a, dac: a, pac, tup });
+  it('lags more for a worse passer, under pressure and on the move', () => {
+    expect(aimLag(qb(96), 0, 0).tau).toBe(0);
+    expect(aimLag(qb(60), 0, 0).tau).toBeGreaterThan(aimLag(qb(80), 0, 0).tau);
+    expect(aimLag(qb(70), 1, 0).tau).toBeGreaterThan(aimLag(qb(70), 0, 0).tau);
+    expect(aimLag(qb(70, 50), 1, 0).tau).toBeGreaterThan(aimLag(qb(70, 95), 1, 0).tau);
+    expect(aimLag(qb(70), 0, 1).tau).toBeGreaterThan(aimLag(qb(70), 0, 0).tau);
+    expect(aimLag(qb(55), 0, 0).vmax).toBeLessThan(aimLag(qb(90), 0, 0).vmax);
+  });
+  it('the line catches up to the mouse', () => {
+    const { tau, vmax } = aimLag(qb(55), 1, 1);
+    let cur = { x: 0, y: 0 };
+    const mouse = { x: -80, y: 30 };
+    cur = stepAimCursor(cur, mouse, tau, vmax, STEP);
+    expect(Math.hypot(mouse.x - cur.x, mouse.y - cur.y)).toBeGreaterThan(50);
+    for (let i = 0; i < 240; i++) cur = stepAimCursor(cur, mouse, tau, vmax, STEP);
+    expect(Math.hypot(mouse.x - cur.x, mouse.y - cur.y)).toBeLessThan(0.5);
+  });
+  it('switched off, the line is the mouse', () => {
+    AIM_FEEL.on = false;
+    const { tau, vmax } = aimLag(qb(40), 1, 1);
+    AIM_FEEL.on = true;
+    expect(stepAimCursor({ x: 0, y: 0 }, { x: -80, y: 30 }, tau, vmax, STEP)).toEqual({ x: -80, y: 30 });
+  });
+});
+
+describe('a shaken QB aims slow', () => {
+  it('lag only when shaken, growing with leverage', () => {
+    expect(shakenAimLag(0.8, 1)).toBe(0);
+    expect(shakenAimLag(0, 1)).toBe(0);
+    expect(shakenAimLag(-1, 0.8)).toBeGreaterThan(shakenAimLag(-1, 0) * 4);
+    expect(shakenAimLag(-1, 1)).toBeGreaterThan(shakenAimLag(-0.4, 1));
+    const r = { sac: 96, mac: 96, dac: 96, pac: 80, tup: 80 };
+    expect(aimLag(r, 0, 0, shakenAimLag(-1, 1)).tau).toBeGreaterThan(0.1);
+  });
+  it("the user's shaken QB keeps his passing ratings; a confident one still gets the boost", () => {
+    const base = { sac: 80, mac: 80, dac: 80, pac: 80, tup: 80, elu: 70 };
+    const qb = (conf: number) => ({ QB: { conf, r: { ...base } } }) as never;
+    const shaken = clutchRoster(qb(-1), 1, true).QB.r;
+    expect(shaken.sac).toBe(80);
+    expect(shaken.pac).toBe(80);
+    expect(shaken.elu).toBeLessThan(70);
+    expect(clutchRoster(qb(-1), 1).QB.r.sac).toBeLessThan(80);
+    expect(clutchRoster(qb(1), 1, true).QB.r.sac).toBeGreaterThan(80);
   });
 });

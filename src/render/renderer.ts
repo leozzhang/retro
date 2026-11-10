@@ -235,6 +235,12 @@ function drawAim(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
   g.moveTo(play.aim.start.x, play.aim.start.y);
   g.lineTo(play.aim.cur.x, play.aim.cur.y);
   g.stroke();
+  // Aim feel: a faint dot where the mouse is while the line drags behind it.
+  const ms = play.aim.mouse;
+  if (ms && Math.hypot(ms.x - play.aim.cur.x, ms.y - play.aim.cur.y) > 3) {
+    g.fillStyle = 'rgba(255,255,255,0.3)';
+    g.fillRect(Math.round(ms.x) - 1, Math.round(ms.y) - 1, 2, 2);
+  }
 
   // Dotted arc
   g.fillStyle = '#ffffff';

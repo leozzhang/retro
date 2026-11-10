@@ -1,4 +1,6 @@
 import '@fontsource/press-start-2p/400.css';
+import { AIM_FEEL } from './sim/passing';
+import { CONF } from './data/confidence';
 import { RENDER_SCALE, STEP, VIEW_H, VIEW_W } from './engine/constants';
 import { Input } from './engine/input';
 import { initStore, onStoreError } from './engine/storage';
@@ -38,6 +40,7 @@ async function boot(): Promise<void> {
   const input = new Input(canvas);
   const game = new Game();
   if (import.meta.env.DEV) (window as unknown as { game: Game }).game = game; // console debugging
+  if (import.meta.env.DEV) Object.assign(window, { AIM_FEEL, CONF }); // live-tune the aim feel and CONF.shakenLag
   let acc = 0;
   let last = performance.now();
 

@@ -116,6 +116,19 @@ A touch dump-off under 10 yards thrown with a rusher in the QB's face still gets
 
 `cpuAim` leads the receiver by the old touch lead (distance / 22 s) scaled by the type's flight time. The balance rows were tuned with that lead, which is short of the ball's real flight time. Leading by the real flight time adds about 3 YPP to every pass row.
 
+## Aim feel (`AIM_FEEL`, `aimLag` in sim/passing.ts) — experiment
+
+A worse passer's pull-back line trails the mouse instead of following it 1:1, so the gap between QBs is felt in the hand. The line eases toward the mouse with time constant `tau` and a speed cap `vmax`, stepped in real time (SLOW AIM doesn't add to it). **The ball goes where the lagged line is**, so a quick flick with a bad QB lands short or off-line; holding a beat lets it settle. A faint dot shows the mouse while the line drags.
+
+| Input | Rating | Effect |
+|---|---|---|
+| Base lag | `A = (sac+mac+dac)/3` | `tau = max(0, 95 − A) × 0.0036 s` (A 95: 0, 85: 0.036, 75: 0.072, 65: 0.11, 50: 0.16) |
+| Pressure | `pac` through `composure` | `× (1 + pressure × 0.9 × composure(pac))` |
+| Moving | `tup` through `composure` | `× (1 + moving × 0.5 × composure(tup))` |
+| Speed cap | `A` | `vmax = 600 + (A − 50) × 40` view px/s |
+
+`pressure` and `moving` are `Play.passContext()`, the same values the throw error uses. The headless harness and the CPU QB don't aim with the mouse, so the balance and ratings reports don't see it. In dev builds, `window.AIM_FEEL` tunes it live (`on = false` to compare).
+
 ## Animation (render/renderer.ts `lookOf`, render/sprites.ts `Look`)
 Nothing new on the HUD. It's all in the players:
 - A route runner's helmet turns back over his shoulder toward the QB once he's looking (`eyes` > 0.5, running away from the QB).

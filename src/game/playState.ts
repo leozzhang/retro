@@ -3,7 +3,7 @@ import { ROUTES, type PlayDef, type RunScheme } from '../data/plays';
 import { passBlockValue } from '../data/ratings';
 import { DEF_SLOTS, OFF_SLOTS, type DefSlot, type OffSlot, type RosterPlayer, type Team } from '../data/teams';
 import type { Camera } from '../engine/camera';
-import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
+import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, STEP } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
@@ -15,7 +15,7 @@ import {
   accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
   startGather,
 } from '../sim/player';
-import { aimTarget, MIN_DRAG_PX, throwErrorSd, type Aim } from '../sim/passing';
+import { aimLag, aimTarget, MIN_DRAG_PX, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
 import {
   ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, pileCap, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
@@ -55,6 +55,8 @@ export interface PlaySetup {
   flip?: boolean;
   /** The look the defense shows before the snap, if it's disguising its call (data/defenses.ts). */
   disguise?: Disguise | null;
+  /** Extra aim lag (s) from a shaken QB on this snap (data/confidence.ts `shakenAimLag`). */
+  aimNerves?: number;
   rng: Rng;
 }
 
@@ -192,6 +194,8 @@ export class Play {
   readonly def: Player[] = [];
   readonly players: Player[];
   readonly qb: Player;
+  /** Extra aim lag (s) from the QB's nerves this snap. */
+  readonly aimNerves: number;
   readonly center: Player;
   readonly rb: Player;
   /** Where the run is designed to hit (end of the RB's run path); run fits and blocks key on it. Moves on a QB keep. */
@@ -292,6 +296,7 @@ export class Play {
     const rp = (this.resolved = resolvePlay(s.play, s.ballY, s.flip ?? false));
     this.defCall = s.defCall;
     this.rng = s.rng;
+    this.aimNerves = s.aimNerves ?? 0;
 
     const offHome = s.homeId === undefined || s.homeId === s.offTeam.id;
     const offU = teamUniform(s.offTeam, offHome);
@@ -857,9 +862,13 @@ export class Play {
       this.throwKind = THROW_KINDS[clamp(i, 0, THROW_KINDS.length - 1)];
     }
     if (canThrow && input.hit('Digit1')) this.throwKind = THROW_KINDS[(THROW_KINDS.indexOf(this.throwKind) + 1) % THROW_KINDS.length];
-    if (canThrow && m.pressed) this.aim = { start: { x: m.downX, y: m.downY }, cur: { x: m.x, y: m.y } };
+    if (canThrow && m.pressed) this.aim = { start: { x: m.downX, y: m.downY }, cur: { x: m.downX, y: m.downY } };
     if (!this.aim) return;
-    this.aim.cur = { x: m.x, y: m.y };
+    // Aim feel: the line chases the mouse, slower for a worse passer (one real-time step, so SLOW AIM doesn't add to it).
+    this.aim.mouse = { x: m.x, y: m.y };
+    const { pressure, moving } = this.passContext();
+    const lag = aimLag(qb.r, pressure, moving, this.aimNerves);
+    this.aim.cur = stepAimCursor(this.aim.cur, this.aim.mouse, lag.tau, lag.vmax, STEP);
     if (!canThrow) {
       this.aim = null;
     } else if (input.hit('Space')) {
@@ -1112,16 +1121,21 @@ export class Play {
     return { aim: { x: Math.min(aim.x, 119), y: clamp(aim.y, 1.5, FIELD_W - 1.5) }, kind: k };
   }
 
-  /** Throw to `target` (the user's aim, or the CPU's on a replay) with the given throw type. */
-  throwBall(target: Vec, kind: ThrowKind = this.throwKind): void {
+  /** The QB's pressure (a free rusher inside 4 yd) and movement, 0-1, for throw error and aim feel. */
+  passContext(): { pressure: number; moving: number } {
     const qb = this.qb;
-    const rng = this.rng;
     let nearest = Infinity;
     for (const d of this.def) {
       if (!d.down && !d.engagedBy.length) nearest = Math.min(nearest, dist(d.pos, qb.pos));
     }
-    const pressure = clamp((4 - nearest) / 4, 0, 1);
-    const moving = clamp(len(qb.vel) / 6, 0, 1);
+    return { pressure: clamp((4 - nearest) / 4, 0, 1), moving: clamp(len(qb.vel) / 6, 0, 1) };
+  }
+
+  /** Throw to `target` (the user's aim, or the CPU's on a replay) with the given throw type. */
+  throwBall(target: Vec, kind: ThrowKind = this.throwKind): void {
+    const qb = this.qb;
+    const rng = this.rng;
+    const { pressure, moving } = this.passContext();
     const sd = throwErrorSd(dist(qb.pos, target), qb.r, pressure, moving, kind);
     const to = { x: target.x + gauss(rng) * sd, y: target.y + gauss(rng) * sd * 0.8, z: 1.2 };
     const from = { x: qb.pos.x + qb.facing * 0.3, y: qb.pos.y, z: 2.0 };

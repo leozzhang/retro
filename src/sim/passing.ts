@@ -10,7 +10,10 @@ export const MIN_DRAG_PX = 6;
 
 export interface Aim {
   start: Vec;
+  /** The aim's pull point: trails the mouse by the QB's aim feel (AIM_FEEL). */
   cur: Vec;
+  /** The raw mouse, which `cur` chases. */
+  mouse?: Vec;
 }
 
 export function maxThrowDist(arm: number, kind: ThrowKind = 'touch'): number {
@@ -68,4 +71,33 @@ export function throwErrorSd(dist: number, r: PasserRatings, pressure: number, m
     (1.6 - accuracyAt(dist, r) / 100) *
     (1 + pressure * 1.2 * composure(r.pac) * THROWS[kind].pressure + moving * 0.6 * composure(r.tup))
   );
+}
+
+/**
+ * Aim feel: a worse passer's pull-back line trails the mouse, heavier under pressure and on the move.
+ * The ball goes where the lagged line is. Lag `tau` (s) from the accuracy average `A`:
+ * `(tauTop - A) * tauPer`, times the pressure (`pac`) and moving (`tup`) terms through `composure`.
+ * `vmax` caps how fast the line can move, in view px per second.
+ */
+export const AIM_FEEL = { on: true, tauPer: 0.0036, tauTop: 95, pressure: 0.9, moving: 0.5, vBase: 600, vPer: 40 };
+
+/** `nerves`: extra seconds of lag from a shaken QB on a big snap (data/confidence.ts `shakenAimLag`). */
+export function aimLag(r: PasserRatings, pressure: number, moving: number, nerves = 0): { tau: number; vmax: number } {
+  const f = AIM_FEEL;
+  if (!f.on) return { tau: 0, vmax: Infinity };
+  const a = (r.sac + r.mac + r.dac) / 3;
+  const tau =
+    (Math.max(0, f.tauTop - a) * f.tauPer + nerves) * (1 + pressure * f.pressure * composure(r.pac)) * (1 + moving * f.moving * composure(r.tup));
+  return { tau, vmax: Math.max(200, f.vBase + (a - 50) * f.vPer) };
+}
+
+/** One real-time step of the lagged aim point toward the mouse. */
+export function stepAimCursor(cur: Vec, mouse: Vec, tau: number, vmax: number, step: number): Vec {
+  if (tau <= 0 && vmax === Infinity) return { x: mouse.x, y: mouse.y };
+  const k = tau > 0 ? 1 - Math.exp(-step / tau) : 1;
+  let d = scale(sub(mouse, cur), k);
+  const l = len(d);
+  const cap = vmax * step;
+  if (l > cap) d = scale(d, cap / l);
+  return { x: cur.x + d.x, y: cur.y + d.y };
 }

@@ -2,6 +2,11 @@
 
 _Last updated: 2026-11-10_
 
+## In progress: aim feel, the gap between QBs in the hand (2026-11-10)
+- Experiment for playtesting: a worse passer's drag-back line lags the mouse (accuracy average sets the lag, poise adds under pressure, throw-on-the-run adds on the move), and the ball goes where the lagged line is. Constants `AIM_FEEL` (sim/passing.ts), design in PASSING.md "Aim feel". `window.AIM_FEEL` in dev to tune or switch off.
+- Confidence: the user's shaken QB doesn't lose accuracy on big snaps any more; he gets extra aim lag instead (`CONF.shakenLag`, `shakenAimLag`; CONFIDENCE.md section 1). `window.CONF` in dev to tune it.
+- Next: playtest high vs. low QBs on quick flicks, blitzes and rollouts; tune `tauPer`/`vBase`, or drop it.
+
 ## Done: the CPU's try after a touchdown (2026-11-10)
 - A CPU touchdown in a played game used to add 7 at once. Now `cpuDrive` puts up the six, and `cpuTry` decides the try and shows it. The drive sim and simulated games still count a touchdown as 7, so the season report doesn't change.
 - **The call** (`goForTwo`, `TWO_POINT` in `game/situation.ts`): in the 4th quarter the coach follows the classic two-point chart, by the margin after the six. He goes for two when ahead by 1, 4, 5, 12, 15 or 19, or behind by 2, 5, 9, 12 or 16. Before the 4th quarter he always kicks. A touchdown on the last play that wins the game has no try.

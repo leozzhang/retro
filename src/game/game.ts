@@ -3,7 +3,7 @@ import { goForTwo, type Situation } from './situation';
 import { defIdentity, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
-import { clutchRoster, confLabel, lateAndClose, leverage, unitEdge } from '../data/confidence';
+import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
 import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, teamRatings, type Squad } from '../data/depth';
 import type { Athlete } from '../data/athletes';
 import { POSITIONS } from '../data/positions';
@@ -2399,8 +2399,10 @@ export class Game {
       offTeam: this.user,
       defTeam: this.cpu,
       homeId: this.homeId,
-      offRoster: clutchRoster(this.userRoster, this.snapLev),
+      // The user's QB: when he's shaken, his nerves are aim lag rather than lost accuracy.
+      offRoster: clutchRoster(this.userRoster, this.snapLev, true),
       defRoster: clutchRoster(this.cpuRoster, this.snapLev),
+      aimNerves: shakenAimLag(this.userRoster.QB?.conf ?? 0, this.snapLev),
       play: def,
       defCall: this.defCall!,
       press: this.press,

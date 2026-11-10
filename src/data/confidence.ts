@@ -18,6 +18,9 @@ import type { RosterPlayer } from './teams';
  * - Leverage parts: `third`, `fourth` down, `redZone` (`redZoneYards` from the goal), `lateClose`
  *   (fourth quarter or overtime within `closeMargin` points), `longFg` (from `longFgDist` yards); capped at 1.
  * - `fgPerPoint`: drive-sim make odds per rating point of the kicker's shift.
+ * - `shakenLag`: the user's QB, when shaken, plays with his passing ratings (`AIM_NERVE`) unshifted and
+ *   this much extra aim lag (seconds) instead, at confidence -1 and full leverage, scaled like the shift
+ *   (`confScale`), so a nervous QB's pull-back line drags on fourth down (sim/passing.ts `aimLag`).
  * - `staff`: overall points the staff depth chart gives per unit of confidence, so a slumping starter
  *   can lose his job to a close backup; `incumbent`: the edge last game's starter keeps, so it doesn't
  *   flip-flop.
@@ -34,6 +37,7 @@ export const CONF = {
   longFg: 0.5,
   longFgDist: 45,
   fgPerPoint: 0.005,
+  shakenLag: 0.15,
   staff: 3,
   incumbent: 1.5,
 };
@@ -88,10 +92,29 @@ export const CONF_OVR: Record<Position, number> = Object.fromEntries(POSITIONS.m
   return [pos, moved / norm];
 })) as Record<Position, number>;
 
-/** The roster as it plays one snap: everyone's ratings shifted by his confidence at this leverage. */
-export function clutchRoster(roster: Record<string, RosterPlayer>, lev: number): Record<string, RosterPlayer> {
+/** The passing ratings a shaken user QB keeps: his nerves show up as aim lag instead (`shakenLag`). */
+export const AIM_NERVE: readonly RatingKey[] = ['sac', 'mac', 'dac', 'pac', 'tup'];
+
+/** Extra aim lag (seconds) for the user's QB: only when shaken, more on a bigger snap. */
+export function shakenAimLag(conf: number, lev: number): number {
+  return Math.max(0, -conf) * (confScale(lev) / confScale(1)) * CONF.shakenLag;
+}
+
+/**
+ * The roster as it plays one snap: everyone's ratings shifted by his confidence at this leverage.
+ * `aimQb`: the user aims this QB, so when he's shaken his passing ratings stay put (the lag is his nerves).
+ */
+export function clutchRoster(roster: Record<string, RosterPlayer>, lev: number, aimQb = false): Record<string, RosterPlayer> {
   const out: Record<string, RosterPlayer> = {};
-  for (const [slot, p] of Object.entries(roster)) out[slot] = p.conf ? { ...p, r: confRatings(p.r, p.conf, lev) } : p;
+  for (const [slot, p] of Object.entries(roster)) {
+    if (!p.conf) {
+      out[slot] = p;
+      continue;
+    }
+    const r = confRatings(p.r, p.conf, lev);
+    if (aimQb && slot === 'QB' && p.conf < 0) for (const k of AIM_NERVE) r[k] = p.r[k];
+    out[slot] = { ...p, r };
+  }
   return out;
 }
 
