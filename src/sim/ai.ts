@@ -6,6 +6,7 @@ import { accelOf, isEligible, LEAN_FX, maxSpeed, seek, seekTimed, setPose, start
 import { CATCH_REACH, PLACEMENT } from './catching';
 import { THROWS } from './ball';
 import { pickLane, runBlock } from './runBlocking';
+import { passSet, PROT, protecting, rushPath } from './passPro';
 import { celebrateWant } from './celebrate';
 
 const ZERO: Vec = { x: 0, y: 0 };
@@ -133,6 +134,7 @@ export function thinkOffense(play: Play, p: Player): void {
     p.want = celebrateWant(p);
     return;
   }
+  p.faceLock = 0; // a pass set turns it back on (sim/passPro.ts `passSet`)
   if (p.down || p.stun > 0 || play.phase === 'presnap' || play.phase === 'over') {
     p.want = ZERO;
     return;
@@ -322,6 +324,8 @@ function pickRusher(play: Play, p: Player): Player | null {
     if (d.down || !isRusher(d)) continue;
     const dd = dist(d.pos, p.pos);
     if (dd > 8) continue;
+    // In the pocket a lineman with no man helps on his side; he doesn't cross the formation (`PROT.spareReach`).
+    if (p.role === 'OL' && protecting(play) && Math.abs(d.pos.y - p.start.y) > PROT.spareReach) continue;
     const helpers = play.off.filter((o) => o.mark === d).length;
     const score = dd + helpers * 6;
     if (score < bestScore) {
@@ -340,7 +344,8 @@ function passBlock(play: Play, p: Player): void {
     let tgt = add(r.pos, scale(norm(sub(qb.pos, r.pos)), 0.9));
     // A back who's only selling pass before his route (screen, draw, check-release) stays near his spot.
     if (!p.isBlocker) tgt = add(p.start, limit(sub(tgt, p.start), DELAY_SET_RANGE));
-    p.want = seek(p, tgt, maxSpeed(p) * 0.95, 0.4);
+    // Linemen take their pass sets (sim/passPro.ts): the tackles vertical on the edge, the interior short.
+    p.want = passSet(play, p, r) ?? seek(p, tgt, maxSpeed(p) * 0.95, 0.4);
   } else {
     p.want = seek(p, { x: Math.max(qb.pos.x + 1.5, play.los - 2), y: p.start.y }, maxSpeed(p) * 0.6);
   }
@@ -627,9 +632,16 @@ function rush(play: Play, d: Player): void {
     d.want = seek(d, tgt, maxSpeed(d) * 0.95, 0.3);
     return;
   }
-  d.goal = play.qb.pos;
   // Sitting on the run or a screen, he rushes the passer a step slower.
-  pursue(d, play.qb, 0.95 * (1 - LEAN_FX.rushSoft * Math.max(0, d.lean.run, d.lean.screen)));
+  const soft = 0.95 * (1 - LEAN_FX.rushSoft * Math.max(0, d.lean.run, d.lean.screen));
+  // A lineman rushes his lane: the edge around the arc, the interior through his gap (sim/passPro.ts).
+  const path = rushPath(play, d, maxSpeed(d) * soft);
+  if (path) {
+    d.want = path;
+    return;
+  }
+  d.goal = play.qb.pos;
+  pursue(d, play.qb, soft);
 }
 
 function cover(play: Play, d: Player): void {

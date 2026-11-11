@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
 import { adaptiveRows } from './adaptive';
-import { CORE_CALLS, DEF_CALLS, disguiseName, type DefCall } from './data/defenses';
+import { CORE_CALLS, DEF_CALLS, disguiseName, type DefCall, type GameKind } from './data/defenses';
 import { PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
 import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
@@ -16,6 +16,7 @@ import { newWind } from './game/wind';
 import { CALM, type KickParams, type Wind } from './sim/kicking';
 import type { Player } from './sim/player';
 import { THROW_KINDS, type ThrowKind } from './sim/ball';
+import { RUSH } from './sim/passPro';
 import * as H from './harness';
 import { cam, fakeInput, LOS, median } from './harness';
 
@@ -537,6 +538,66 @@ function fgRows(rng: Rng): string[] {
  * `BAL_ONLY=a,b` limits the per-play rows (RUN, SHORT, PLAY) to plays whose id or kind is listed,
  * for checking one family at a time. The aggregate PASS / PA rows always use the whole book.
  */
+/**
+ * The pocket (docs/PROTECTION.md): dropbacks the QB never throws, against each core call, Fire Zone and
+ * Bear, then each line game against 2 Man Under. Its shape at 2.5 s (yards behind the LOS: the tackles,
+ * the interior, the cup between them, the QB; the edge rushers' angle around the QB, 90 = level with
+ * him), how often he steps up, the first pressure (a free
+ * defender within `PRESSURE_RANGE`) and who brought it, sacks by 3.2 s, and the tackles' win rate at 2.5 s
+ * (ESPN's pass block win: still on his man).
+ */
+function pocketRows(pass: PlayDef[], rng: Rng): string[] {
+  const plays = pass.filter((p) => !p.screen);
+  const rows = CORE_CALLS.concat(DEF_CALLS.filter((c) => c.id === 'fire-zone' || c.id === 'bear')).map((call) => `POCKET ${call.name.padEnd(15)} | ${pocketLine(plays, call, rng)}`);
+  // Line games (stunts) against 2 Man Under, each side; ZONE / MAN = how the line blocked the stunt's side.
+  rows.push('');
+  for (const kind of ['TE', 'ET', 'TT'] as const) {
+    for (const side of [-1, 1] as const) rows.push(`STUNT ${kind} ${side > 0 ? '+' : '-'}${''.padEnd(12)} | ${pocketLine(plays, CORE_CALLS[0], rng, { kind, side })}`);
+  }
+  return rows;
+}
+
+/** One POCKET or STUNT row: `REPS` dropbacks the QB never throws (`H.pocketRep`). */
+function pocketLine(plays: PlayDef[], call: DefCall, rng: Rng, game?: { kind: GameKind; side: 1 | -1 }): string {
+  const pct = (k: number, n: number) => `${((k / Math.max(1, n)) * 100).toFixed(0)}%`;
+  const s = { n: 0, t: 0, il: 0, qb: 0, edges: [] as number[], held: 0, blocks: 0, climb: 0, pr: [] as number[], by: { edge: 0, interior: 0, other: 0 }, sack: 0 };
+  const prot = { zone: [0, 0], man: [0, 0] };
+  for (let i = 0; i < REPS; i++) {
+    const r = H.pocketRep(M, plays[i % plays.length], call, rng, 2.5, 5, game ? { tags: { game } } : undefined);
+    if (!Number.isNaN(r.shape.qb)) {
+      s.n++;
+      s.t += r.shape.tackles;
+      s.il += r.shape.interior;
+      s.qb += r.shape.qb;
+      s.edges.push(...r.shape.edges);
+      s.held += r.shape.held;
+      s.blocks += r.shape.blocks;
+    }
+    if (r.play.climbed) s.climb++;
+    if (r.pressure) {
+      s.pr.push(r.pressure.t);
+      s.by[r.pressure.by]++;
+    }
+    const sacked = r.sack !== null && r.sack < 3.2;
+    if (sacked) s.sack++;
+    if (game) {
+      const ol = r.play.off.filter((o) => o.role === 'OL' && o.pro && (o.start.y - r.play.ballY) * game.side > 0.5);
+      const k = ol.every((o) => o.pro!.zone) ? 'zone' : 'man';
+      prot[k][0]++;
+      if (sacked) prot[k][1]++;
+    }
+  }
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+  const n = Math.max(1, s.n);
+  return (
+    `2.5s: T ${(s.t / n).toFixed(1)} IL ${(s.il / n).toFixed(1)} cup ${((s.t - s.il) / n).toFixed(1)} QB ${(s.qb / n).toFixed(1)} ` +
+    `edge ${avg(s.edges).toFixed(0)}deg (${pct(s.edges.filter((a) => a >= RUSH.pastAngle).length, s.edges.length)} past) tackles win ${pct(s.held, s.blocks)} | climb ${pct(s.climb, REPS)} | ` +
+    `pressure ${pct(s.pr.filter((t) => t < 2.5).length, REPS)} <2.5s ${pct(s.pr.length, REPS)} all, avg ${avg(s.pr).toFixed(2)}s ` +
+    `(edge ${pct(s.by.edge, s.pr.length)} int ${pct(s.by.interior, s.pr.length)} other ${pct(s.by.other, s.pr.length)}) | sack <3.2s ${pct(s.sack, REPS)}` +
+    (game ? ` | ZONE ${prot.zone[0]} sack ${pct(prot.zone[1], prot.zone[0])}, MAN ${prot.man[0]} sack ${pct(prot.man[1], prot.man[0])}` : '')
+  );
+}
+
 const only = process.env.BAL_ONLY?.split(',').map((s) => s.trim()).filter(Boolean);
 const picked = (p: PlayDef) => !only || only.includes(p.id) || only.includes(p.kind);
 
@@ -547,7 +608,8 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   const pa = PLAYBOOK.filter((p) => p.kind === 'pa' && p.block === 'pass');
   // RPOs ride along as runs: the auto-QB always gives, so their rows measure the run half only.
   const runs = PLAYBOOK.filter((p) => (p.kind === 'run' || p.read === 'rpo') && picked(p));
-  const rows = [...passRows('PASS', pass, rng), '', ...passRows('PA  ', pa, rng), '', ...runRows(runs, rng)];
+  // Runs get their own RNG, so a change to the pass game doesn't shift the run rows.
+  const rows = [...passRows('PASS', pass, rng), '', ...passRows('PA  ', pa, rng), '', ...runRows(runs, mulberry32(43))];
   // Kicks use their own RNG so they don't shift the scrimmage rows.
   const krng = mulberry32(7);
   rows.push('', ...puntRows(krng), '', ...kickoffRows(krng), '', ...fgRows(krng));
@@ -560,5 +622,6 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   if (!only || only.includes('adaptive')) rows.push('', ...adaptiveRows());
   if (!only || only.includes('disguise')) rows.push('', ...disguiseRows(pass, runs));
   if (!only || only.includes('throw')) rows.push('', ...throwRows(pass, mulberry32(37)));
+  if (!only || only.includes('pocket')) rows.push('', ...pocketRows(pass, mulberry32(47)));
   writeFileSync(process.env.BAL_OUT ?? 'balance.txt', rows.join('\n'));
 }, 1_200_000);

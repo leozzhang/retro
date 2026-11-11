@@ -7,6 +7,8 @@ export type Pose =
   | 'reach' | 'dive'
   // blocking: driving a man back, locked up even, knocked off balance
   | 'drive' | 'fight' | 'stumble'
+  // feet stepping on a moving block (one foot up, then the other), and a pass set (hands up, the kick slide)
+  | 'drive1' | 'drive2' | 'fight1' | 'fight2' | 'set0' | 'set1' | 'set2'
   // special teams
   | 'kick' | 'hold' | 'puntDrop' | 'fairCatch'
   // touchdown celebrations (sim/celebrate.ts)
@@ -65,7 +67,8 @@ export type Look = 'fwd' | 'back' | 'hands' | 'backHands';
 function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = 'fwd', ball = false): void {
   const running = pose.startsWith('run');
   const bob = pose === 'run1' || pose === 'run3' ? -1 : 0;
-  const ux = running || pose === 'fight' || pose === 'spikeDown' || pose === 'spinBall' ? 1 : pose === 'stumble' ? -1 : 0;
+  const fighting = pose === 'fight' || pose === 'fight1' || pose === 'fight2';
+  const ux = running || fighting || pose === 'spikeDown' || pose === 'spinBall' ? 1 : pose === 'stumble' ? -1 : 0;
   const uy = bob + (pose === 'crouch' || pose === 'spinBall' ? 1 : 0);
 
   // Legs
@@ -101,9 +104,30 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = '
       break;
     case 'crouch':
     case 'fight':
+    case 'set0':
       // Wide, sunk base.
       P(4, 14, 2, 1, u.pants); P(3, 15, 2, 3, u.socks); P(2, 18, 3, 1, u.shoe);
       P(9, 14, 2, 1, u.pants); P(10, 15, 2, 3, u.socks); P(10, 18, 3, 1, u.shoe);
+      break;
+    case 'fight1':
+      // The wide base, back foot up and coming forward.
+      P(4, 14, 2, 1, u.pants); P(4, 15, 2, 2, u.socks); P(4, 17, 3, 1, u.shoe);
+      P(9, 14, 2, 1, u.pants); P(10, 15, 2, 3, u.socks); P(10, 18, 3, 1, u.shoe);
+      break;
+    case 'fight2':
+      // The wide base, front foot up and stepping.
+      P(4, 14, 2, 1, u.pants); P(3, 15, 2, 3, u.socks); P(2, 18, 3, 1, u.shoe);
+      P(9, 14, 2, 1, u.pants); P(10, 15, 2, 2, u.socks); P(11, 17, 3, 1, u.shoe);
+      break;
+    case 'set1':
+      // The kick slide: feet gathered under him.
+      P(5, 14, 2, 1, u.pants); P(5, 15, 2, 3, u.socks); P(4, 18, 3, 1, u.shoe);
+      P(8, 14, 2, 1, u.pants); P(8, 15, 2, 2, u.socks); P(8, 17, 3, 1, u.shoe);
+      break;
+    case 'set2':
+      // The kick slide: back foot reaching, front foot dragging after it.
+      P(4, 14, 2, 1, u.pants); P(3, 15, 2, 2, u.socks); P(1, 17, 3, 1, u.shoe);
+      P(9, 14, 2, 1, u.pants); P(9, 15, 2, 3, u.socks); P(9, 18, 3, 1, u.shoe);
       break;
     case 'stumble':
       // Feet caught under him, the front one kicked up.
@@ -239,9 +263,18 @@ function drawArm(P: Px, u: Uniform, skin: string, pose: Pose, ux: number, uy: nu
       P(9, 1, 2, 5, u.jersey); P(9, -1, 2, 2, skin);
       break;
     case 'fight':
+    case 'fight1':
+    case 'fight2':
       // Both hands locked on the man in front of him.
       P(11, 7, 3, 2, u.jersey); P(14, 7, 2, 2, skin);
       P(11, 9, 2, 1, u.jersey); P(13, 9, 2, 1, skin);
+      break;
+    case 'set0':
+    case 'set1':
+    case 'set2':
+      // Hands up and in close, ready to punch.
+      P(10, 8, 2, 1, u.jersey); P(12, 6, 2, 2, skin);
+      P(10, 10, 2, 1, u.jersey); P(12, 9, 2, 2, skin);
       break;
     case 'stumble':
       // Arms flung back for balance.
@@ -270,11 +303,20 @@ function drawArm(P: Px, u: Uniform, skin: string, pose: Pose, ux: number, uy: nu
   }
 }
 
-function drawDrive(P: Px, u: Uniform, skin: string): void {
-  // Low and leaning in, back leg driving, hands at the man's chest.
-  P(1, 16, 3, 1, u.socks); P(0, 17, 2, 1, u.shoe);
-  P(3, 14, 2, 2, u.pants); P(2, 15, 2, 1, u.socks);
-  P(9, 14, 2, 1, u.pants); P(10, 15, 2, 3, u.socks); P(10, 18, 3, 1, u.shoe);
+function drawDrive(P: Px, u: Uniform, skin: string, step = 0): void {
+  // Low and leaning in, back leg driving, hands at the man's chest. Stepping: the back foot comes up
+  // under him (1), then the front foot reaches (2).
+  if (step === 1) {
+    P(3, 14, 2, 2, u.pants); P(3, 16, 2, 1, u.socks); P(3, 17, 3, 1, u.shoe);
+  } else {
+    P(1, 16, 3, 1, u.socks); P(0, 17, 2, 1, u.shoe);
+    P(3, 14, 2, 2, u.pants); P(2, 15, 2, 1, u.socks);
+  }
+  if (step === 2) {
+    P(9, 14, 2, 1, u.pants); P(10, 15, 2, 2, u.socks); P(11, 17, 3, 1, u.shoe);
+  } else {
+    P(9, 14, 2, 1, u.pants); P(10, 15, 2, 3, u.socks); P(10, 18, 3, 1, u.shoe);
+  }
   P(4, 11, 7, 3, u.pants);
   P(6, 8, 7, 3, u.jersey);
   P(7, 9, 3, 2, u.trim);
@@ -416,7 +458,7 @@ function paint(u: Uniform, skin: string, pose: Pose, look: Look, ball: boolean):
   if (pose === 'down') drawDown(P, u, skin);
   else if (pose === 'stance') drawStance(P, u, skin);
   else if (pose === 'hold') drawHold(P, u, skin);
-  else if (pose === 'drive') drawDrive(P, u, skin);
+  else if (pose === 'drive' || pose === 'drive1' || pose === 'drive2') drawDrive(P, u, skin, pose === 'drive' ? 0 : pose === 'drive1' ? 1 : 2);
   else if (pose === 'reach') drawReach(P, u, skin, ball && carriesBall(pose, look));
   else if (pose === 'dive') drawDive(P, u, skin, ball && carriesBall(pose, look));
   else drawUpright(P, u, skin, pose, look, ball && carriesBall(pose, look));

@@ -5,6 +5,7 @@ import type { Ratings, Role, RosterPlayer } from '../data/teams';
 import { add, clamp, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Pose, Uniform } from '../render/sprites';
 import { celebrationPose, tickCelebration, type Celebrating } from './celebrate';
+import type { ProtectJob, RushRole } from './passPro';
 
 export type Side = 'off' | 'def';
 
@@ -168,6 +169,12 @@ export interface Player {
   /** Run blocks: the defender's edge over his blockers last step (negative = the blockers are winning), for the renderer. */
   blockPower: number;
   goal: Vec | null;
+  /** Pass rush: his role this snap, the edge around the arc or an interior gap, and his plan (sim/passPro.ts `assignRushRoles`). */
+  rushRole: RushRole | null;
+  /** Pass pro: his gap or his man in the line's protection call (sim/passPro.ts `callProtection`). */
+  pro: ProtectJob | null;
+  /** Keeps him facing this way whatever he's moving (a lineman's pass set faces upfield); 0 = off. */
+  faceLock: 0 | 1 | -1;
   /** Run fit window: from `fitAt` until `fitUntil` the defender attacks the run (run read or PA bite). */
   fitAt: number;
   fitUntil: number;
@@ -256,6 +263,9 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     blockControl: 1,
     blockPower: 0,
     goal: null,
+    rushRole: null,
+    pro: null,
+    faceLock: 0,
     fitAt: Infinity,
     fitUntil: 0,
     job: null,
@@ -451,12 +461,16 @@ export function stepPlayer(p: Player, dt: number): void {
   const throwing = (p.pose === 'throw' || p.pose === 'throwEnd') && p.poseTimer > 0;
   // Turning out of a catch, he faces the way his hips do.
   if (p.hips && !p.down && Math.abs(p.hips.x) > 0.2) p.facing = p.hips.x > 0 ? 1 : -1;
+  else if (p.faceLock && !p.down) p.facing = p.faceLock;
   else if (!p.down && !throwing) {
     if (p.vel.x > 0.3) p.facing = 1;
     else if (p.vel.x < -0.3) p.facing = -1;
   }
   p.anim += len(p.vel) * dt;
 }
+
+/** Steps on a block or a pass set: moving faster than `moving` yd/s, a step every 1 / `rate` yd. */
+const BLOCK_STEP = { moving: 0.5, rate: 2.4 };
 
 /** Block power (rating points) past which the winning side of a block shows the drive pose. */
 const BLOCK_POSE_WIN = 4;
@@ -470,9 +484,16 @@ export function poseOf(p: Player, presnap: boolean): Pose {
   if (p.pose) return p.pose;
   if (presnap && (p.role === 'OL' || p.role === 'DL')) return 'stance';
   // Blocks: whoever's winning drives, an even block is locked up, a blocker who just got shed stumbles.
+  // Moving on a block or in a pass set, his feet keep stepping (`BLOCK_STEP`).
+  const step = len(p.vel) > BLOCK_STEP.moving ? Math.floor(p.anim * BLOCK_STEP.rate) % 2 : -1;
   const fightingFor = p.engaged ? -p.engaged.blockPower : p.engagedBy.length ? p.blockPower : null;
-  if (fightingFor !== null) return fightingFor > BLOCK_POSE_WIN ? 'drive' : 'fight';
+  if (fightingFor !== null) {
+    const base = fightingFor > BLOCK_POSE_WIN ? 'drive' : 'fight';
+    return step < 0 ? base : (`${base}${step + 1}` as Pose);
+  }
   if (p.stun > 0 && p.side === 'off') return 'stumble';
+  // A lineman in his pass set: hands up, shuffling (the kick slide) while he moves.
+  if (p.faceLock && p.role === 'OL') return step < 0 ? 'set0' : step ? 'set2' : 'set1';
   if (len(p.vel) < 0.6) return 'stand';
   const frames: Pose[] = ['run0', 'run1', 'run2', 'run3'];
   return frames[Math.floor(p.anim * 1.1) % 4];

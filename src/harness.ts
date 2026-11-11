@@ -17,6 +17,7 @@ import { KickPlay } from './game/kickPlay';
 import { Play, type PlaySetup } from './game/playState';
 import type { ThrowKind } from './sim/ball';
 import type { KickParams, Wind } from './sim/kicking';
+import { arcAngle } from './sim/passPro';
 import { isEligible } from './sim/player';
 import { DRAW_SET } from './sim/runBlocking';
 import { TACKLE_RANGE } from './sim/tackling';
@@ -172,3 +173,46 @@ export const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
   return s.length ? s[Math.floor(s.length / 2)] : 0;
 };
+
+/** A free defender this close to the QB is pressure (the POCKET rows). */
+export const PRESSURE_RANGE = 2;
+
+/**
+ * One dropback the QB never throws (the POCKET rows): the pocket's shape at `at` s (the tackles' and the
+ * interior's depth behind the LOS, the QB's, each edge rusher's angle around the QB), the first pressure
+ * (when, and who: an edge rusher, an interior lineman or anyone else), and the sack, if any, by `until`.
+ */
+export function pocketRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, at = 2.5, until = 5, x?: DefExtras) {
+  const play = newPlay(m, playDef, call, rng, LOS, x);
+  play.snap();
+  const shape = { tackles: NaN, interior: NaN, qb: NaN, edges: [] as number[], held: 0, blocks: 0 };
+  let pressure: { t: number; by: 'edge' | 'interior' | 'other' } | null = null;
+  for (let t = 0; t < until && play.phase !== 'over'; t += STEP) {
+    play.update(STEP, fakeInput, cam);
+    const since = play.time - play.snapTime;
+    if (play.phase !== 'live') continue;
+    const qb = play.qb.pos;
+    if (!pressure) {
+      const d = play.def.find((d) => !d.down && !d.engagedBy.length && dist(d.pos, qb) < PRESSURE_RANGE);
+      if (d) pressure = { t: since, by: d.rushRole?.kind === 'edge' ? 'edge' : d.role === 'DL' ? 'interior' : 'other' };
+    }
+    if (Number.isNaN(shape.qb) && since >= at) {
+      const depth = (slots: string[]) => {
+        const ps = play.off.filter((o) => slots.includes(o.slot));
+        return ps.reduce((s, o) => s + (play.los - o.pos.x), 0) / ps.length;
+      };
+      shape.tackles = depth(['LT', 'RT']);
+      shape.interior = depth(['LG', 'C', 'RG']);
+      shape.qb = play.los - qb.x;
+      for (const d of play.def) if (d.rushRole?.kind === 'edge' && !d.down) shape.edges.push(arcAngle(d, qb));
+      // ESPN's pass block win: the tackles still on a rusher at the mark (one who has a man to block).
+      for (const o of play.off) {
+        if ((o.slot !== 'LT' && o.slot !== 'RT') || !o.mark) continue;
+        shape.blocks++;
+        if (o.engaged) shape.held++;
+      }
+    }
+  }
+  const o = play.outcome;
+  return { play, shape, pressure, sack: o?.type === 'sack' ? play.time - play.snapTime : null };
+}

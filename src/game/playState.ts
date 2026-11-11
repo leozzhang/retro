@@ -20,6 +20,7 @@ import {
   ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, pileCap, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
 import { fallForward, jukeTackleMul, TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import { assignRushRoles, callProtection, inPocket, passEngagement, pocketSpot, PROT, protectStep, protecting, startRep } from '../sim/passPro';
 import { matchDefense } from './matchups';
 import { alignY, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
@@ -216,6 +217,8 @@ export class Play {
   readonly defCall: DefCall;
   /** The defense is in prevent (`DefTags.prevent`): no press, deeper cushions and deep zones (`PREVENT`). */
   readonly prevent: boolean;
+  /** The DC's tags on the call (spy, contain, prevent, a line game). */
+  readonly tags: DefTags;
   /** Defensive personnel for this snap, matched to the offense's. */
   readonly defPackage: DefPackage;
   readonly qbDrop: Vec;
@@ -236,6 +239,8 @@ export class Play {
   ballTarget: Vec | null = null;
   intended: Player | null = null;
   scramble = false;
+  /** The QB (nobody steering him) has stepped up into the pocket. */
+  climbed = false;
   thrown = false;
   /** The last offensive player to hold the ball, and whether a pass was caught: for the box score. */
   ballMan: Player | null = null;
@@ -342,6 +347,7 @@ export class Play {
           : { x: this.los + 1.5, y: this.ballY };
 
     this.prevent = !!s.tags?.prevent;
+    this.tags = s.tags ?? {};
     this.disguise = s.disguise ?? null;
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
@@ -680,7 +686,10 @@ export class Play {
     launch(this.ball, from, to, dist(from, to) / 16, 0.15, 'snap');
     if (this.readKey) this.keyCrash = this.rng() < KEY_CRASH;
     if (this.playDef.block === 'run' && this.runScheme !== 'draw') assignRunBlocks(this);
-    else this.assignProtection();
+    else {
+      assignRushRoles(this);
+      this.assignProtection();
+    }
     for (const d of this.def) {
       const r = d.manTarget;
       if (d.press && r && this.rng() < 0.5 + (d.r.prs - r.r.rls) / 100) r.jam = 0.45;
@@ -706,6 +715,13 @@ export class Play {
    * up blitzers. A spare lineman helps or takes any blitzer the backs can't.
    */
   private assignProtection(): void {
+    if (protecting(this)) {
+      // The line's own call: man, half slide or slide (sim/passPro.ts).
+      const s = this.playDef.scheme?.slide;
+      const sign = s ? (s === 'strong' ? this.resolved.strongSign : -this.resolved.strongSign) : undefined;
+      callProtection(this, sign as 1 | -1 | undefined);
+      return;
+    }
     const byY = (a: Player, b: Player) => a.pos.y - b.pos.y;
     const rushers = this.def.filter(isRusher);
     const dl = rushers.filter((d) => d.role === 'DL').sort(byY);
@@ -782,6 +798,7 @@ export class Play {
       for (const d of this.def) if (d.engagedBy.some((b) => b.role === 'OL')) this.release(d);
       for (const o of this.off) if (o.role === 'OL') o.mark = null;
     }
+    protectStep(this);
     this.updateEngagements(dt);
     this.blockCut();
     for (const p of this.players) stepPlayer(p, dt);
@@ -1348,7 +1365,10 @@ export class Play {
     const pocket = this.phase === 'live' && c === this.qb;
     if (ax.x || ax.y) c.manual = true;
     if (pocket && !c.manual) {
-      c.want = seek(c, this.qbDrop, maxSpeed(c) * 0.8, 0.8);
+      // Nobody steering: his drop, and a step up once the edge is ridden past (sim/passPro.ts `POCKET`).
+      const { spot, climbed } = pocketSpot(this, this.climbed);
+      this.climbed = climbed;
+      c.want = seek(c, spot, maxSpeed(c) * 0.8, 0.8);
       return;
     }
     // Space with W or S held: a back's hard cut up or down the screen on a called run (once a play).
@@ -1402,9 +1422,11 @@ export class Play {
         const man = b.mark ?? (b.poaJob ? b.poa : null);
         if (d.engagedBy.length === 1 && man !== d) continue;
         if (b.isBlocker && man && !man.down && man !== d && (!downfield || dist(b.pos, man.pos) < 4)) continue;
-        if (dist(b.pos, d.pos) < (man === d && this.runBlocking() ? RUN_ENGAGE : 1.0)) {
+        const reach = man === d && this.runBlocking() ? RUN_ENGAGE : man === d && inPocket(this) ? PROT.engage : 1.0;
+        if (dist(b.pos, d.pos) < reach) {
           if (b.pull) b.pull = null;
           if (!b.mark && b.poaJob) b.mark = d;
+          if (!d.engagedBy.length && inPocket(this)) startRep(this, d);
           if (!d.engagedBy.length && this.runBlocking()) {
             // A new run block: note which side the blocker has him from, and roll how it goes.
             d.blockDir = norm(sub(b.pos, d.pos));
@@ -1464,6 +1486,11 @@ export class Play {
       }
       if (this.runBlocking()) {
         if (this.rng() < runEngagement(this, d) * dt) this.shed(d);
+        continue;
+      }
+      // In the pocket a block is a rep that wears down (sim/passPro.ts `REP`).
+      if (inPocket(this)) {
+        if (passEngagement(this, d, dt)) this.shed(d);
         continue;
       }
       const n = d.engagedBy.length;

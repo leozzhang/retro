@@ -5,6 +5,7 @@ import type { Play } from '../game/playState';
 import { facingQB } from '../sim/ai';
 import { flightPos, passParams, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
+import { arcAngle, RUSH } from '../sim/passPro';
 import { endurance, isEligible, poseOf, type Player } from '../sim/player';
 import type { Tape, TapeFrame } from '../game/tape';
 import { laneScores, levered } from '../sim/runBlocking';
@@ -100,6 +101,36 @@ function drawDebug(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
       g.lineTo(s.x, s.y);
       g.stroke();
     }
+  }
+  // The pocket: a line through the linemen, and each edge rusher's angle around the QB (PAST once he's run by).
+  const ol = play.off.filter((o) => o.role === 'OL').sort((a, b) => a.pos.y - b.pos.y);
+  if (ol.length > 1) {
+    g.strokeStyle = 'rgba(255,210,63,0.8)';
+    g.beginPath();
+    ol.forEach((o, i) => {
+      const s = cam.toScreen(o.pos.x, o.pos.y);
+      if (i) g.lineTo(s.x, s.y);
+      else g.moveTo(s.x, s.y);
+    });
+    g.stroke();
+  }
+  // Each rusher's role and plan (a game's crash or loop), his block's control, and the edge's angle around the QB.
+  const ROLE = { edge: 'E', aGap: 'A', bGap: 'B' } as const;
+  for (const d of play.def) {
+    const r = d.rushRole;
+    if (!r || d.down) continue;
+    const a = cam.toScreen(d.pos.x, d.pos.y);
+    const ang = arcAngle(d, play.qb.pos);
+    const where = r.kind === 'edge' ? (ang >= RUSH.pastAngle ? ' PAST' : ` ${ang.toFixed(0)}`) : '';
+    const ctl = d.engagedBy.length ? ` ${Math.round(Math.max(0, d.blockControl) * 100)}` : '';
+    const label = `${ROLE[r.kind]}:${r.game ? r.game.toUpperCase() : r.plan.toUpperCase()}${r.countered ? '!' : ''}${where}${ctl}`;
+    text(g, label, a.x, a.y - 22, { size: 6, color: '#ffd23f', align: 'center' });
+  }
+  // Each lineman's protection: Z for a gap he owns, M for a man; a pass-off in progress shows '>'.
+  for (const o of ol) {
+    if (!o.pro) continue;
+    const a = cam.toScreen(o.pos.x, o.pos.y);
+    text(g, `${o.pro.zone ? 'Z' : 'M'}${o.pro.next ? '>' : ''}`, a.x, a.y + 6, { size: 6, color: o.pro.zone ? '#7dd3ff' : '#ffb07d', align: 'center' });
   }
   // Route runners: current speed (yd/s), and SET once squared up to the QB on a settle route.
   for (const o of play.off) {

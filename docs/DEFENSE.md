@@ -35,6 +35,7 @@ Each call has a front, a shell (the pre-snap tell), a coverage, a box count, and
 **Tags** go on any call that can spare the defender:
 - **SPY:** the call's `spyFrom` defender mirrors the QB at 5 yards. He reacts to a scramble in 0.05 s.
 - **CONTAIN:** the ends rush to the QB's outside shoulder and stay level with him until they're close.
+- **GAME** (`DefTags.game`): a line stunt on one side of a 4-man rush. TE: the tackle crashes out and the end loops inside; ET: the end crashes in and the tackle loops out; TT: the tackles exchange. The CPU DC runs one on `IDENTITY.games.rate` (0.25) of its 4-man rushes × its style (aggressive 1.3, soft 0.8), split TE 52%, ET 24%, TT 24% (`pickLineGame`, in `Game.toCall`). How the line handles it: PROTECTION.md. The harness passes no tags, so the core rows have no games; the STUNT rows measure them.
 
 **Zone coverage** (`sim/ai.ts`):
 - **Landmarks:** `mid`, `hook`, `curl` and `flat` (`ZONE`). Deep zones are the existing `deep` kind with a band: halves, thirds or quarters. Thirds and quarters play 3 yards over the top (`DEEP_OVER_NARROW`); halves play 5.

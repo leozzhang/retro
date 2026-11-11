@@ -1,7 +1,7 @@
 import { clamp, hashString } from '../engine/math';
 import { desperate, tempo, type Situation } from '../game/situation';
 import { buildStaff, dcAdjust } from './coaches';
-import { DEF_CALLS, rushers, type DefCall } from './defenses';
+import { DEF_CALLS, rushers, type DefCall, type GameKind } from './defenses';
 import type { Team } from './teams';
 
 /**
@@ -35,6 +35,8 @@ export interface DefIdentity {
   longBlitz: number;
   /** Share of snaps it disguises its call (`IDENTITY.disguise`, `pickDisguise`), when the call has a disguise. */
   disguise: number;
+  /** Share of 4-man rushes it runs a line game on (`IDENTITY.games`, `pickLineGame`); missing = the league rate. */
+  games?: number;
 }
 
 /**
@@ -60,6 +62,8 @@ export interface DefIdentity {
  * - `disguise`: how often a call is shown as another look (data/defenses.ts `Disguise`): `base`, plus
  *   `perAdjust` a point of the DC's ADJUST over `adjustMid` (the smart DCs move their safeties around),
  *   plus `perUnit` a point of the secondary (the CB and S units' mean), held to `min`..`max`.
+ * - `games`: line games (stunts, `DefTags.game`) on a 4-man rush: `rate` of them × the style's `style`
+ *   multiplier, split by `mix` (SIS charting: TE about 13% of pass plays, ET and TT about 6% each).
  */
 export const IDENTITY = {
   prior: {
@@ -94,7 +98,23 @@ export const IDENTITY = {
   preventDials: { twoHigh: 0.9, blitz: -0.8, man: -0.6 },
   selloutDials: { box: 0.5, blitz: 0.4 },
   disguise: { base: 0.3, adjustMid: 60, perAdjust: 0.006, perUnit: 0.03, min: 0.1, max: 0.55 },
+  games: {
+    rate: 0.25,
+    mix: { TE: 0.52, ET: 0.24, TT: 0.24 } as Record<GameKind, number>,
+    style: { aggressive: 1.3, balanced: 1, soft: 0.8 } as Record<DefStyle, number>,
+  },
 };
+
+/** A line game for this snap's 4-man rush, or none: one draw, and a second for which game and side. */
+export function pickLineGame(rng: () => number, id: DefIdentity): { kind: GameKind; side: 1 | -1 } | undefined {
+  const G = IDENTITY.games;
+  if (rng() >= (id.games ?? G.rate)) return undefined;
+  let r = rng();
+  const side: 1 | -1 = r < 0.5 ? -1 : 1;
+  r = (r % 0.5) * 2;
+  for (const k of ['TE', 'ET', 'TT'] as const) if ((r -= G.mix[k]) <= 0) return { kind: k, side };
+  return { kind: 'TT', side };
+}
 
 /** A call's traits the dials weigh: extra rushers, man or zone, two-high or not, and box count against 7. */
 export function callTraits(c: DefCall): Dials {
@@ -153,7 +173,8 @@ export function defIdentity(team: Team): DefIdentity {
   const D = IDENTITY.disguise;
   const secondary = ((team.profile.units.CB ?? 0) + (team.profile.units.S ?? 0)) / 2;
   const disguise = clamp(D.base + D.perAdjust * (dcAdjust(dc) - D.adjustMid) + D.perUnit * secondary, D.min, D.max);
-  const id: DefIdentity = { style, dials, mix: mixFor(dials), press, longBlitz: S.longBlitz, disguise };
+  const games = IDENTITY.games.rate * IDENTITY.games.style[style];
+  const id: DefIdentity = { style, dials, mix: mixFor(dials), press, longBlitz: S.longBlitz, disguise, games };
   cache.set(team.id, id);
   return id;
 }

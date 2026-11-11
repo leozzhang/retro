@@ -2,6 +2,59 @@
 
 _Last updated: 2026-11-11_
 
+## In progress: pass rush and protection (2026-11-11)
+Two rounds in `sim/passPro.ts`; design, constants and sources are in PROTECTION.md.
+
+**Round 1** gave the line a cup: rush lanes, the edge's arc, the tackles' vertical sets, and the QB stepping up.
+
+**Round 2** came from playtest feedback that it was too simple. Edges were always the two outer linemen, blocks held rushers still, the pocket looked disconnected, and blockers slid without moving their legs.
+- **Rush roles from alignment**, any position:
+  - The widest rusher each side is the edge (a blitzing backer on a fire zone), and the rest work the A or B gap.
+  - Each rolls a plan from his ratings: speed, power or counter on the edge; bull or quick inside.
+- **Line games** (`DefTags.game`: TE, ET, TT). A crasher drags his blocker across and picks a man blocker (odds by `pbk`), and a looper slips behind him.
+  - The CPU DC runs them on about 25% of 4-man rushes, more for aggressive DCs (`IDENTITY.games`, `pickLineGame` in `Game.toCall`). The harness passes no tags.
+- **The line's own protection call** (`callProtection`):
+  - With a back: a half slide toward the heavier side, the back on the man side.
+  - Five-man: man (big on big).
+  - A play's `scheme.slide`: a full slide, the back on the backside edge.
+  - Zone blockers are matched to rushers one to one each step (`zoneTargets`). They pass a man off only when he leaves the gap, after a recognition beat (`pbk`, `acc`), and never let go of a man still in their gap for a new threat.
+- **Blocks wear down** (`REP`): control drains with power and a per-rep roll, plus moves and counters.
+  - The rusher always drives at his aim point; the blocker slows and steers him.
+  - Edges keep their speed up the arc; the tackle fights the turn, and a tackle in control keeps him wide and deep (`TURN`). A bull push builds over 1.5 s.
+  - One dial, `REP.pace` (0.47), was tuned so sacks didn't move.
+- **The pocket is connected:** at 2.5 s the tackles are about 5 yd deep, the interior about 2.5, and the edges about 60° around the QB (was 5.5 yd of cup with the edges behind the QB).
+- **Pocket rules apply only in the pocket:**
+  - Not on screens (the line lets the rush go), and not with the QB outside the tackle box (bootlegs).
+  - Sets never go upfield of the stance, and interior blockers set to their man's gap rather than mirroring a backer in space.
+  - The QB doesn't climb from a drop shallower than 5 yd.
+- **Legs:** blockers and rushers on a moving block step (`fight1/2`, `drive1/2`), and a lineman in his set shuffles with his hands up, facing upfield (`set0–2`, `Player.faceLock`).
+- **F1 overlay:** each rusher's role and plan, block control, and the edge's angle; each lineman's Z or M job and pass-offs.
+
+**Measured** (`npm run balance`, against round 1):
+- RUN, GAP and the pure-run ADAPT rows are byte-identical.
+- Sacks on 3.2 s holds:
+  - Plain dropbacks went down: 51 → 35 and 45 → 39 per 120. No more five-man slides leaving an edge free.
+  - Play-action went up: 25 → 39 and 28 → 44. A shallower QB holds 3.2 s after a fake. **Flag:** watch this in play.
+  - The four rows average 37 → 39.
+- Cover 0 at 2.2 s: 87 → 88. Quick throws against Cover 0 take no sacks.
+- DEF rows at 2.2 s: Cover 1 Fire 9 → 3, Fire Zone 4 → 3.
+- POCKET (2 Man Under, Cover 1 Robber):
+  - tackles win 93–95% at 2.5 s (real: 79–90%)
+  - first pressure averages 2.9–3.0 s (real: about 2.9)
+  - sacks before 3.2 s: 34–35%
+- STUNT: no game is stronger than a straight rush (21–48% sacks before 3.2 s vs 34%). Zone handles the TE and ET toward the slide side better than man does (15–18% vs 25–26%); TT is about even. The samples are small.
+- `RAT_ONLY=OL,DL npm run ratings`:
+  - DL `rsh` is now positive (+0.12; was −0.32), and DL `str` is significant (+0.32).
+  - DL `spd` and `acc` are still slightly negative, as before. **Flag**, not tuned.
+  - OL `pbk` +0.25 (−9 sacks).
+
+**Checked in headless Chrome:** the cup, a TE stunt picking a man blocker, the leg frames, and the tackles facing upfield.
+
+**Next:**
+- Playtest stepping up and the play-action sack rate.
+- A QB who reacts to pressure (the CPU QB and the harness) would let `REP.pace` come up toward real tackle win rates.
+- Games in the scouting report and a DC line.
+
 ## In progress: harder catches, the turn after the catch, crowds (2026-11-11)
 Passing was too strong: a perimeter catch ran for big yards, and a ball thrown up into two or three defenders was caught too often. Everything here applies only to passes and the moments after a catch. The run game is unchanged: with their own seed, all 61 RUN rows and the GAP rows are byte-identical, and so are the run-only ADAPT rows. Design is in PASSING.md "Crowds", "Placement" and "Out of the catch".
 - **Crowds** (`CROWD`, sim/catching.ts): every defender in reach contests the ball, not just the closest, on every throw type. Each one counts by `pos³`, so a defender at the edge of his reach adds almost nothing, and a ball led a step past the crowd is as safe as one man on him. Touch pass into a tight double: 22% caught, 16% picked; tight triple: 14% and 20%; one man: 48% and 9%.

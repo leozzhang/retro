@@ -213,7 +213,15 @@ export interface DefTags {
   contain?: boolean;
   /** Prevent: late, with a lead to protect, play soft and deep (`PREVENT`, sim/ai.ts). */
   prevent?: boolean;
+  /** A game up front (a stunt) on one side of the ball (`GAME`, sim/passPro.ts). */
+  game?: { kind: GameKind; side: 1 | -1 };
 }
+
+/**
+ * Line games (stunts): TE, the tackle crashes out and the end loops inside behind him; ET, the end
+ * crashes in and the tackle loops out; TT, the two tackles exchange.
+ */
+export type GameKind = 'TE' | 'ET' | 'TT';
 
 /** The call's assignments with its tags laid on: the spy comes from `spyFrom`, contain goes to the ends. */
 export function taggedAssign(call: DefCall, assign: Record<DefSlot, Assign>, tags: DefTags | undefined): Record<DefSlot, Assign> {

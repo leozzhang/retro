@@ -1,6 +1,6 @@
-import { disguiseName, pickDefCall, pickDisguise, type DefCall, type DefTags, type Disguise } from '../data/defenses';
+import { disguiseName, pickDefCall, pickDisguise, rushers, type DefCall, type DefTags, type Disguise } from '../data/defenses';
 import { goForTwo, type Situation } from './situation';
-import { defIdentity, preventLevel, situationMix } from '../data/identity';
+import { defIdentity, pickLineGame, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
@@ -2202,6 +2202,11 @@ export class Game {
     } else {
       this.defCall = pickDefCall(this.rng, situationMix(ident, this.drive.down, toGo, OPP_GOAL - this.drive.los, undefined, false, sit));
       this.defTags = preventLevel(sit) ? { prevent: true } : {};
+    }
+    // A line game on a 4-man rush, as often as this defense runs them (`IDENTITY.games`).
+    if (mode === 'normal' && !this.defTags.prevent && rushers(this.defCall) === 4) {
+      const game = pickLineGame(this.rng, ident);
+      if (game) this.defTags = { ...this.defTags, game };
     }
     const pr = ident.press;
     this.press = { CB1: this.rng() < pr.CB1, CB2: this.rng() < pr.CB2, NB: this.rng() < pr.NB };
