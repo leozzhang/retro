@@ -114,7 +114,50 @@ A touch dump-off under 10 yards thrown with a rusher in the QB's face still gets
 - BULLET into a tight window (a defender within 2.5 yd) inside 24 yards
 - TOUCH otherwise
 
-`cpuAim` leads the receiver by the old touch lead (distance / 22 s) scaled by the type's flight time. The balance rows were tuned with that lead, which is short of the ball's real flight time. Leading by the real flight time adds about 3 YPP to every pass row.
+`cpuAim` leads the receiver by the ball's real flight time to the led spot (solved in `CPU_THROW.leadIters` passes). It used to lead by distance / 22 s, short of the flight time, which put the median go ball 3.4 yd behind the man. Once placement started deciding the catch, that turned every CPU deep ball into a reach (2026-11-11). Every pass baseline before then used the old lead.
+
+## Crowds (`CROWD` in sim/catching.ts)
+Every defender in reach at the arrival contests the ball, not just the closest (`resolveArrival` passes them all to `catchOdds`). This applies to every throw type.
+- Each defender past the best one counts by `w = pos^CROWD.posExp` (3). `pos` is how well he's under the ball, so one at the edge of his reach adds almost nothing. **Placement decides it:** a ball led a step past the crowd plays like one man on him.
+- Each one adds `extra` × w of his contest skill to the defense's side, takes `hands` × w off the receiver's open-catch odds (bodies and the hit at the catch point), and is another set of hands for a pick (`pick` × w of his own pick odds, combined).
+- Receiver at 0.9, touch pass, catch / int:
+
+| Defenders (pos) | Touch | Lob |
+|---|---|---|
+| one at 1.0 | 48% / 9% | 55% / 14% |
+| led past them (0.5, 0.3, 0.3) | 54% / 6% | 59% / 10% |
+| double (0.8, 0.7) | 35% / 11% | 40% / 19% |
+| tight double (0.9, 0.9) | 22% / 16% | 26% / 27% |
+| tight triple (0.9, 0.9, 0.8) | 14% / 20% | 17% / 34% |
+
+One defender is numerically identical to the old single-defender `catchOdds`.
+
+## Placement: in stride, reach, dive (`PLACEMENT`, `catchGrade` in sim/catching.ts)
+When the intended receiver finds the ball, he records where he'd have been at its arrival on his own path and the way he was going (`Player.track`, sim/ai.ts `adjustToBall`). At the catch, the ball's placement against that grades it:
+- `adjust` = yards off his line sideways, plus `behind` × yards behind him. A ball led ahead costs nothing unless he can't get there.
+- **IN STRIDE:** `adjust` under `stride` (1.2) and still moving over `strideSpeed`. Only `strideRamp` of the catch ramp applies, and his hips already point his way.
+- **CLEAN:** in between. The full ramp; his hips face the QB if he was squared up or coming back, otherwise his way.
+- **REACH:** `adjust` over `reach` (2.6), or caught at the edge of his reach (`pos` under `edge`).
+  - He keeps `reachKeep` (45%) of his speed, and his hips twist back toward the ball (`reachTwist`, `reachTwistBehind` for a ball behind him).
+  - `hands` × `reachLunge` comes off his open-catch odds.
+  - Shown as the `reach` pose (lunging, arms out low) and FINGERTIPS!
+- **DIVE:** in the last `diveWindow` (0.32 s), if he can't get within `diveFrom` of his reach on his feet but can by laying out, he dives.
+  - He goes airborne toward the spot at `diveSpeed` or better, with no steering, and gains `diveReach` (0.9 yd) of reach. `hands` comes off his open-catch odds.
+  - Caught, he's **down where he lands** (the college rule): no yards after the catch, or a touchdown in the end zone. DIVING CATCH! shows.
+  - Missed, he ends up on the turf.
+- **Why it doesn't look random:** the dive and the reach start from where the ball is coming down, which the player can see, and the dive starts before the ball arrives. The popup names what happened.
+- A tipped ball isn't graded.
+- **Running through the catch** (`throughCos`, `throughSpeed`) is **off** (`throughCos` over 1). On, a receiver with the ball led ahead on his line times it at a steady speed instead of pulling up on the spot (`seekTimed`). It's the realistic in-stride catch, but it raised the most-open receiver's mean YAC from 11.2 to 13.0, so it waits until open-field YAC is tamed.
+
+## Out of the catch (`CATCH` in sim/player.ts)
+A receiver has to turn his hips to where he's going, and get going. Only the offense's caught passes get this; runs, returns and picks don't.
+- `Player.hips` is the way his body faces at the catch (from the grade above). It turns toward his `want` at `hipTurnRate`: `turn.lo` (5 rad/s) at a turn skill (half `acc`, half `rte`) of 60 to `turn.hi` (8) at 95.
+- Until his hips come around, he has `turnAccel` (30%) of his acceleration and is capped at `turnCap` (2.5 yd/s). Both ease to full by alignment, `(1 + cos) / 2`. The sprite faces the way his hips do, so the turn shows.
+- Every catch: his acceleration is `ramp` (60%) of normal, easing back over `rampTime` (0.8 s), while he secures the ball.
+- Squared up to the QB is a half turn, about 0.5 s for an average receiver before he's really going. A bullet's `GATHER` stacks on top.
+- **Defenders on the ball** (`onTime` in sim/ai.ts, `CATCH_PURSUIT` in game/playState.ts):
+  - a defender breaking on a throw gets there on time and at speed, instead of pulling up on the spot
+  - one within `near` (5 yd) of the catch who was on the ball reacts in `react` (0.05 s); everyone else still takes 0.12–0.47 s by `prc`
 
 ## Aim feel (`AIM_FEEL`, `aimLag` in sim/passing.ts) — experiment
 
@@ -124,9 +167,9 @@ The lag `tau` is three costs added up, each from its own rating, so QB types fee
 
 | Cost | Rating | Seconds of lag |
 |---|---|---|
-| Set | `A = (sac+mac+dac)/3` | `max(0, 95 − A) × 0.0036` (A 90: 0.018, 80: 0.054, 70: 0.09) |
-| Pressure (0–1, a free rusher inside 4 yd) | `pac` | `pressure × max(0, 92 − pac) × 0.0045` (pac 60: 0.14, 75: 0.077, 90: 0.009) |
-| Moving (speed / `MOVE_FULL` 3.4 yd/s, the aiming jog) | `tup` | `moving × max(0, 92 − tup) × 0.0055` (tup 60: 0.18, 70: 0.12, 80: 0.066, 90: 0.011) |
+| Set | `A = (sac+mac+dac)/3` | `max(0, 95 − A) × 0.0043` (A 90: 0.022, 80: 0.065, 70: 0.11) |
+| Pressure (0–1, a free rusher inside 4 yd) | `pac` | `pressure × max(0, 92 − pac) × 0.0054` (pac 60: 0.17, 75: 0.092, 90: 0.011) |
+| Moving (speed / `MOVE_FULL` 3.4 yd/s, the aiming jog) | `tup` | `moving × max(0, 92 − tup) × 0.0066` (tup 60: 0.21, 70: 0.15, 80: 0.079, 90: 0.013) |
 | Nerves (CONFIDENCE.md) | confidence | `shakenAimLag × (1 + pressure)` |
 | Speed cap | `A` | `vmax = 600 + (A − 50) × 40` view px/s |
 

@@ -9,11 +9,11 @@ import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Ve
 import { teamUniform } from '../render/sprites';
 import { cutKeep, eyesOf, facingQB, FIND, isRusher, matchZones, PREVENT, readyAt, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
-import { HANDOFF_ODDS, PITCH_REACH, pitchOdds, reachScore, resolveCatch } from '../sim/catching';
+import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
 import {
   accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
-  startGather,
+  startCatch, startGather,
 } from '../sim/player';
 import { aimLag, aimTarget, MIN_DRAG_PX, MOVE_FULL, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
 import {
@@ -67,6 +67,12 @@ export const PITCH_RANGE = 8;
 const PITCH_SPEED = 13;
 /** Tackle odds multiplier for a defender still engaged with a blocker (an arm tackle). */
 const ARM_TACKLE = 0.5;
+
+/**
+ * After a catch: a defender who'd broken on the ball and is within `near` yd of the catch was converging
+ * on it the whole way, so he's on the man after `react` s instead of the reaction everyone else needs.
+ */
+export const CATCH_PURSUIT = { near: 5, react: 0.05 };
 /**
  * Seconds of full sprint from a full bar, from the least to the most enduring player, eased by
  * `endurance` squared: a pocket QB about 1.5 s, a mobile QB about 2.3, a WR about 2.9.
@@ -169,10 +175,11 @@ export const TIP = {
 
 /**
  * The CPU QB's throw types (`cpuThrowKind`): LOB past `lobFrom` yd, BULLET into a defender within `tight`
- * yd of the spot inside `bulletMax`. He leads a receiver by distance / `lead` seconds on a touch throw
- * (`cpuAim`; short of the ball's real flight time, which the balance rows were tuned with).
+ * yd of the spot inside `bulletMax`. He leads a receiver by the ball's real flight time to the led spot
+ * (`cpuAim`, solved in `leadIters` passes). It used to be distance / 22 s, short of that, which put every
+ * deep ball 3+ yd behind the man once placement started to matter (docs/PASSING.md).
  */
-export const CPU_THROW = { lobFrom: 30, tight: 2.5, bulletMax: 24, lead: 22 };
+export const CPU_THROW = { lobFrom: 30, tight: 2.5, bulletMax: 24, leadIters: 4 };
 
 export type HandoffKind = 'handoff' | 'pitch';
 
@@ -1114,9 +1121,10 @@ export class Play {
   cpuAim(p: Player, kind?: ThrowKind, dir?: Vec, speed?: number): { aim: Vec; kind: ThrowKind } {
     const k = kind ?? this.cpuThrowKind(p.pos);
     const v = dir ? scale(dir, speed ?? len(p.vel)) : p.vel;
-    // The CPU's old touch lead (distance / CPU_THROW.lead), scaled by how much longer or shorter this type's ball is in the air.
-    const d = dist(this.qb.pos, p.pos);
-    const t = (d / CPU_THROW.lead) * (passParams(d, this.qb.r.arm, k).dur / passParams(d, this.qb.r.arm).dur);
+    // Led by the ball's real flight time to where he'll be (the flight is to the led spot, so solve for it):
+    // with placement deciding the catch (sim/catching.ts `PLACEMENT`), an under-led ball is a reach.
+    let t = passParams(dist(this.qb.pos, p.pos), this.qb.r.arm, k).dur;
+    for (let i = 0; i < CPU_THROW.leadIters; i++) t = passParams(dist(this.qb.pos, add(p.pos, scale(v, t))), this.qb.r.arm, k).dur;
     const aim = add(p.pos, scale(v, t));
     return { aim: { x: Math.min(aim.x, 119), y: clamp(aim.y, 1.5, FIELD_W - 1.5) }, kind: k };
   }
@@ -1194,6 +1202,42 @@ export class Play {
     }
   }
 
+  /**
+   * The catch state (sim/player.ts `CATCH`) by how the ball was placed: in stride, his hips already go his
+   * way and he skips most of the ramp; squared up to the QB (a settle route) or coming back to the ball,
+   * his hips face the QB; a reach twists them back toward the ball and costs most of his speed.
+   */
+  private startCatchState(p: Player, grade: CatchGrade, behind: number): void {
+    const v = len(p.vel);
+    const dir = v > 0.5 ? scale(p.vel, 1 / v) : { x: 1, y: 0 };
+    const toQb = norm(sub(this.ball.from, p.pos));
+    if (grade === 'stride') {
+      startCatch(p, dir, PLACEMENT.strideRamp);
+      return;
+    }
+    if (grade === 'reach') {
+      p.vel = scale(p.vel, PLACEMENT.reachKeep);
+      const twist = behind > 0.3 ? PLACEMENT.reachTwistBehind : PLACEMENT.reachTwist;
+      startCatch(p, add(scale(dir, 1 - twist), scale(toQb, twist)));
+      return;
+    }
+    const squared = this.catchSet > 0.3 || v < 1 || dir.x * toQb.x + dir.y * toQb.y > 0.3;
+    startCatch(p, squared ? toQb : dir);
+  }
+
+  /** Caught laid out: down where he lands (the college rule), or a touchdown if that's in the end zone. */
+  private divingCatch(p: Player, land: Vec): void {
+    p.pos = { x: land.x, y: land.y };
+    knockDown(p);
+    this.popup('DIVING CATCH!', p.pos, '#ffd23f');
+    if (land.x >= OPP_GOAL) {
+      this.end({ type: 'td', spot: OPP_GOAL, spotY: land.y, text: 'TOUCHDOWN!', sub: `#${p.num} ${p.name}, diving`, color: '#ffd23f' });
+      return;
+    }
+    const yards = land.x - this.los;
+    this.end({ type: 'tackle', spot: land.x, spotY: land.y, text: yardsText(yards), sub: `Diving catch by #${p.num} ${p.name}`, color: yards >= 0 ? '#ffffff' : '#ff9a5a' });
+  }
+
   private resolveArrival(): void {
     const land = this.ballTarget!;
     if (this.pitch) {
@@ -1213,27 +1257,38 @@ export class Play {
     let bestD: Player | null = null;
     let so = 0;
     let sd = 0;
+    // Every defender in reach contests it (sim/catching.ts `CROWD`), the best one first.
+    const defs: { p: Player; s: number }[] = [];
     for (const p of this.players) {
       if (p.down || p.engaged || p.engagedBy.length) continue;
-      const s = reachScore(dist(p.pos, land), this.passTipped ? 1 : THROWS[this.thrownKind].reach);
+      const reach = this.passTipped ? 1 : THROWS[this.thrownKind].reach;
+      // A diving receiver has his full length to reach with (sim/catching.ts `PLACEMENT`).
+      const s = p.diving ? Math.max(0, 1 - dist(p.pos, land) / (CATCH_REACH * reach + PLACEMENT.diveReach)) : reachScore(dist(p.pos, land), reach);
       if (s <= 0) continue;
       if (isEligible(p) && s > so) {
         so = s;
         bestO = p;
-      } else if (p.side === 'def' && s > sd) {
-        sd = s;
-        bestD = p;
+      } else if (p.side === 'def') {
+        defs.push({ p, s });
+        if (s > sd) {
+          sd = s;
+          bestD = p;
+        }
       }
     }
     this.catchSet = bestO ? facingQB(bestO, this.qb, this.time) : 0;
     this.catchReady = bestO ? readyAt(bestO, this.time) : 1;
     // A bullet on a short throw comes in hot (a tipped ball has none of that left).
     const hot = this.passTipped ? 0 : hotness(this.thrownKind, dist(this.ball.from, this.ball.to), this.qb.r.arm);
+    // How the ball was placed for him: in stride, a reach, a dive (`PLACEMENT`). A tipped ball is a scramble for it.
+    const graded = bestO && !this.passTipped ? catchGrade(bestO === this.intended ? bestO.track : null, land, so, len(bestO.vel), bestO.diving) : null;
+    const grade = graded?.grade ?? 'clean';
+    const lunge = grade === 'dive' ? 1 : grade === 'reach' ? PLACEMENT.reachLunge : 0;
     const res = oob
       ? 'miss'
       : resolveCatch(
-          bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet, ready: this.catchReady, hot } : null,
-          bestD ? { pos: sd, cth: bestD.r.cth, prc: bestD.r.prc, ready: readyAt(bestD, this.time) } : null,
+          bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet, ready: this.catchReady, hot, lunge } : null,
+          defs.map(({ p, s }) => ({ pos: s, cth: p.r.cth, prc: p.r.prc, ready: readyAt(p, this.time) })),
           this.rng,
           this.passTipped ? 0 : THROWS[this.thrownKind].jump,
         );
@@ -1243,10 +1298,20 @@ export class Play {
       this.giveBall(bestO);
       this.controlled = bestO;
       this.phase = 'run';
-      setPose(bestO, 'catch', 0.25);
+      if (grade === 'dive') {
+        this.divingCatch(bestO, land);
+        return;
+      }
+      setPose(bestO, grade === 'reach' ? 'reach' : 'catch', grade === 'reach' ? 0.4 : 0.25);
       if (!this.passTipped) startGather(bestO, THROWS[this.thrownKind].gather);
-      for (const d of this.def) d.reactAt = this.time + 0.12 + (1 - d.r.prc / 100) * 0.35;
-      this.popup('CATCH!', bestO.pos, '#ffffff');
+      this.startCatchState(bestO, grade, graded?.behind ?? 0);
+      for (const d of this.def) {
+        const onIt = this.time >= d.reactAt && dist(d.pos, land) < CATCH_PURSUIT.near;
+        d.reactAt = this.time + (onIt ? CATCH_PURSUIT.react : 0.12 + (1 - d.r.prc / 100) * 0.35);
+      }
+      if (grade === 'reach') this.popup('FINGERTIPS!', bestO.pos, '#9ad8ff');
+      else if (grade === 'stride' && len(bestO.vel) > PLACEMENT.strideSpeed + 1) this.popup('IN STRIDE!', bestO.pos, '#7dff7d');
+      else this.popup('CATCH!', bestO.pos, '#ffffff');
       return;
     }
     if (res === 'int' && bestD) {
@@ -1268,6 +1333,8 @@ export class Play {
       setPose(bestO, 'catch', 0.3);
       sub = `Dropped by #${bestO.num} ${bestO.name}`;
     }
+    // A diver who didn't come up with it ends up on the turf all the same.
+    for (const p of this.off) if (p.diving) knockDown(p, 0.9);
     startBounce(this.ball);
     this.end({ type: 'incomplete', spot: this.los, spotY: this.ballY, text: 'INCOMPLETE', sub, color: '#ffffff' });
   }

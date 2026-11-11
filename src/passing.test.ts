@@ -7,8 +7,8 @@ import * as H from './harness';
 import { cam, fakeInput } from './harness';
 import { eyesOf, FIND, readyAt, receiverFind } from './sim/ai';
 import { hotness, kindSpeed, passParams, THROWS } from './sim/ball';
-import { catchOdds, reachScore } from './sim/catching';
-import { GATHER, startGather } from './sim/player';
+import { catchGrade, catchOdds, PLACEMENT, reachScore } from './sim/catching';
+import { GATHER, hipTurnRate, maxSpeed, startCatch, startGather, stepPlayer } from './sim/player';
 import { maxThrowDist, throwErrorSd } from './sim/passing';
 
 const QB = { sac: 85, mac: 82, dac: 78, tup: 80, pac: 80 };
@@ -172,5 +172,75 @@ describe('throw types on the field', () => {
     const lob = reps('lob', 200);
     expect(bullet).toBeGreaterThan(0);
     expect(lob).toBeLessThan(bullet);
+  });
+});
+
+describe('crowds, placement and the turn after the catch', () => {
+  const o = { pos: 0.9, cth: 80, cit: 75 };
+  const D = (pos: number) => ({ pos, cth: 70, prc: 75 });
+
+  it('one defender in a list plays exactly as one defender', () => {
+    for (const jump of [0, 1]) expect(catchOdds(o, [D(0.8)], jump)).toEqual(catchOdds(o, D(0.8), jump));
+    expect(catchOdds(o, [], 0)).toEqual(catchOdds(o, null, 0));
+  });
+
+  it('every extra defender under the ball costs catches and adds picks, on every throw type', () => {
+    for (const jump of [0, 1]) {
+      const one = catchOdds(o, [D(0.9)], jump);
+      const two = catchOdds(o, [D(0.9), D(0.9)], jump);
+      const three = catchOdds(o, [D(0.9), D(0.9), D(0.8)], jump);
+      expect(two.catch).toBeLessThan(one.catch * 0.6);
+      expect(three.catch).toBeLessThan(two.catch);
+      expect(two.int).toBeGreaterThan(one.int * 1.4);
+      expect(three.int).toBeGreaterThan(two.int);
+    }
+    // Into a double, a touch pass is mostly broken up or picked.
+    const dbl = catchOdds(o, [D(0.9), D(0.9)]);
+    expect(dbl.catch).toBeLessThan(0.3);
+    expect(dbl.int).toBeGreaterThan(0.12);
+  });
+
+  it('a ball led away from the crowd stays safe: defenders at the edge of their reach barely count', () => {
+    const alone = catchOdds(o, [D(0.5)]);
+    const crowd = catchOdds(o, [D(0.5), D(0.3), D(0.3)]);
+    expect(crowd.catch).toBeGreaterThan(alone.catch - 0.04);
+    expect(crowd.int).toBeLessThan(alone.int + 0.02);
+  });
+
+  it('grades the catch from placement: in stride, clean, a reach for a ball behind him, a dive', () => {
+    const track = { at: { x: 50, y: 20 }, dir: { x: 1, y: 0 } };
+    expect(catchGrade(track, { x: 50.5, y: 20.3 }, 0.9, 7, false).grade).toBe('stride');
+    expect(catchGrade(track, { x: 50.5, y: 20.3 }, 0.9, 2, false).grade).toBe('clean');
+    const behind = catchGrade(track, { x: 47, y: 20 }, 0.9, 5, false);
+    expect(behind.grade).toBe('reach');
+    expect(behind.behind).toBeCloseTo(3);
+    expect(catchGrade(track, { x: 50, y: 20 }, 0.2, 7, false).grade).toBe('reach');
+    expect(catchGrade(track, { x: 50, y: 20 }, 0.9, 7, true).grade).toBe('dive');
+    expect(catchOdds({ ...o, lunge: 1 }, null).catch).toBeLessThan(catchOdds(o, null).catch);
+  });
+
+  it('squared up to the QB he turns before he runs; caught in stride he barely slows', () => {
+    const wr = () => {
+      const p = H.newPlay(H.referenceMatchup(), PLAYBOOK.find((q) => q.kind === 'pass')!, DEF_CALLS[0], mulberry32(1)).off.find((q) => q.role === 'WR')!;
+      p.vel = { x: 0, y: 0 };
+      p.want = { x: maxSpeed(p), y: 0 };
+      return p;
+    };
+    const run = (p: ReturnType<typeof wr>, t: number) => {
+      for (let s = 0; s < t / STEP; s++) stepPlayer(p, STEP);
+      return p.vel.x;
+    };
+    const squared = wr();
+    startCatch(squared, { x: -1, y: 0 });
+    const stride = wr();
+    stride.vel = { x: maxSpeed(stride), y: 0 };
+    startCatch(stride, { x: 1, y: 0 }, PLACEMENT.strideRamp);
+    const fresh = wr(); // no catch state: how a back gets going
+    expect(run(squared, 0.4)).toBeLessThan(run(fresh, 0.4) * 0.5);
+    expect(squared.facing).toBe(1); // turned around by then
+    expect(run(stride, 0.4)).toBeGreaterThan(maxSpeed(stride) * 0.97);
+    run(squared, 1.5);
+    expect(squared.hips).toBeNull();
+    expect(hipTurnRate({ ...squared, r: { ...squared.r, acc: 95, rte: 95 } })).toBeGreaterThan(hipTurnRate({ ...squared, r: { ...squared.r, acc: 60, rte: 60 } }));
   });
 });

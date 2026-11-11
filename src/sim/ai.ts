@@ -2,7 +2,9 @@ import { FIELD_W, STEP } from '../engine/constants';
 import { add, clamp, dist, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Assign } from '../data/defenses';
 import type { Play } from '../game/playState';
-import { isEligible, LEAN_FX, maxSpeed, seek, seekTimed, startJuke, type Player } from './player';
+import { accelOf, isEligible, LEAN_FX, maxSpeed, seek, seekTimed, setPose, startJuke, type Player } from './player';
+import { CATCH_REACH, PLACEMENT } from './catching';
+import { THROWS } from './ball';
 import { pickLane, runBlock } from './runBlocking';
 import { celebrateWant } from './celebrate';
 
@@ -76,6 +78,55 @@ export function pursue(p: Player, c: Player, speedMul = 1, lead = 1.2): void {
 
 // ---------------------------------------------------------------- offense
 
+/**
+ * The intended receiver going to the ball: first where he'd have been on his own path (`Player.track`,
+ * for the catch's grade), then timing his way to it, and laying out for it if he can't get there on his
+ * feet (sim/catching.ts `PLACEMENT`).
+ */
+function adjustToBall(play: Play, p: Player, land: Vec): void {
+  const left = play.ballTimeLeft();
+  if (!p.track) {
+    const v = len(p.vel);
+    p.track = { at: add(p.pos, scale(p.vel, left)), dir: v > 1 ? scale(p.vel, 1 / v) : null };
+  }
+  if (p.diving) {
+    p.want = p.vel; // in the air: no steering
+    return;
+  }
+  const gap = dist(p.pos, land);
+  if (!play.passTipped && left < PLACEMENT.diveWindow && left > 0) {
+    // What he can still cover on his feet, against his reach and what a dive adds.
+    const v = len(p.vel);
+    const run = Math.min(maxSpeed(p) * left, v * left + 0.5 * accelOf(p) * left * left);
+    const reach = CATCH_REACH * THROWS[play.thrownKind].reach;
+    const short = gap - run - reach * (1 - PLACEMENT.diveFrom);
+    if (short > 0 && gap - Math.max(v, PLACEMENT.diveSpeed) * left < reach + PLACEMENT.diveReach) {
+      p.diving = true;
+      const dir = scale(sub(land, p.pos), 1 / gap);
+      p.vel = scale(dir, Math.max(v, Math.min(PLACEMENT.diveSpeed, (gap - reach * 0.4) / left)));
+      p.want = p.vel;
+      setPose(p, 'dive', left + 0.6);
+      return;
+    }
+  }
+  // A ball out ahead of him on his line he runs through, on time, instead of pulling up on the spot: the
+  // catch in stride. Anything behind him or off to the side he sets up for.
+  const v = len(p.vel);
+  if (v > PLACEMENT.throughSpeed && gap > 0.05 && (p.vel.x * (land.x - p.pos.x) + p.vel.y * (land.y - p.pos.y)) / (v * gap) > PLACEMENT.throughCos) {
+    p.want = onTime(p, land, left);
+    return;
+  }
+  p.want = seekTimed(p, land, left);
+}
+
+/** Velocity that gets him to `target` in `timeLeft` s at a steady speed (capped at his top speed), not pulling up there. */
+function onTime(p: Player, target: Vec, timeLeft: number): Vec {
+  const d = sub(target, p.pos);
+  const l = len(d);
+  if (l < 0.05) return p.vel;
+  return scale(d, Math.min(maxSpeed(p), l / Math.max(timeLeft, STEP)) / l);
+}
+
 export function thinkOffense(play: Play, p: Player): void {
   if (p.celebrate && !p.down) {
     // The scorer runs it through instead of stopping dead on the goal line, then celebrates.
@@ -114,7 +165,7 @@ export function thinkOffense(play: Play, p: Player): void {
     // A pitch is led to where the back gets at full tilt, so he runs through the spot rather than timing it.
     const d = sub(play.ballTarget, p.pos);
     if (play.pitch) p.want = len(d) > 0.3 ? scale(norm(d), maxSpeed(p)) : p.vel;
-    else p.want = seekTimed(p, play.ballTarget, play.ballTimeLeft());
+    else adjustToBall(play, p, play.ballTarget);
     return;
   }
   if (p.routeDelay && play.time - play.snapTime < p.routeDelay) {
@@ -349,7 +400,9 @@ export function thinkDefense(play: Play, d: Player): void {
     return;
   }
   if (play.phase === 'air' && play.ballTarget && play.time >= d.reactAt) {
-    d.want = seekTimed(d, play.ballTarget, play.ballTimeLeft());
+    // Broken on the ball, he gets there on time and at speed, through the catch point: he's there to
+    // hit the man, not to stop on the spot (a receiver who runs through his catch would leave him standing).
+    d.want = onTime(d, play.ballTarget, play.ballTimeLeft());
     return;
   }
   if (play.scramble && c === play.qb && play.time >= d.reactAt) {

@@ -3,6 +3,8 @@ import type { Team } from '../data/teams';
 export type Pose =
   | 'stand' | 'stance' | 'run0' | 'run1' | 'run2' | 'run3'
   | 'throw' | 'throwEnd' | 'catch' | 'down'
+  // a hard catch (docs/PASSING.md, placement): stretched out for it on his feet, laid out in the air
+  | 'reach' | 'dive'
   // blocking: driving a man back, locked up even, knocked off balance
   | 'drive' | 'fight' | 'stumble'
   // special teams
@@ -11,7 +13,7 @@ export type Pose =
   | 'spikeUp' | 'spikeDown' | 'crouch' | 'leap' | 'cheer' | 'spinBall';
 
 /** Pixels a pose draws above the player's spot, off his shadow: the leap. */
-export const POSE_LIFT: Partial<Record<Pose, number>> = { leap: 3 };
+export const POSE_LIFT: Partial<Record<Pose, number>> = { leap: 3, dive: 3 };
 
 export interface Uniform {
   key: string;
@@ -146,7 +148,7 @@ function drawUpright(P: Px, u: Uniform, skin: string, pose: Pose, look: Look = '
 }
 
 /** Poses whose sprite can draw the ball in his hands (`getSprite`'s `ball`); any other pose leaves it to the ball's spot. */
-const CARRY_POSES = new Set<Pose>(['stand', 'run0', 'run1', 'run2', 'run3', 'throw', 'catch', 'stumble', 'fight', 'puntDrop']);
+const CARRY_POSES = new Set<Pose>(['stand', 'run0', 'run1', 'run2', 'run3', 'throw', 'catch', 'stumble', 'fight', 'puntDrop', 'reach', 'dive']);
 
 export function carriesBall(pose: Pose, look: Look = 'fwd'): boolean {
   return look === 'fwd' && CARRY_POSES.has(pose);
@@ -322,6 +324,51 @@ function drawHold(P: Px, u: Uniform, skin: string): void {
   P(6, 6, 2, 2, u.logo);
 }
 
+/**
+ * Stretched out for a ball off his line, on his feet: lunging onto the front foot, the back leg trailing,
+ * body leaning in and both arms reaching out low in front (the ball at his fingertips when he has it).
+ */
+function drawReach(P: Px, u: Uniform, skin: string, ball: boolean): void {
+  // Front leg bent under him, back leg stretched out behind.
+  P(8, 13, 3, 2, u.pants); P(10, 15, 2, 3, u.socks); P(10, 18, 3, 1, u.shoe);
+  P(4, 13, 3, 2, u.pants); P(2, 15, 3, 1, u.socks); P(0, 16, 3, 1, u.socks); P(-1, 17, 2, 1, u.shoe);
+  P(4, 11, 6, 2, u.pants);
+  // Torso leaning forward.
+  P(5, 7, 7, 4, u.jersey);
+  P(7, 8, 3, 2, u.trim);
+  // Helmet out ahead of the body, looking at the ball.
+  P(10, 2, 4, 1, u.stripe);
+  P(9, 3, 6, 1, u.helmet);
+  P(9, 4, 4, 2, u.helmet);
+  P(13, 4, 2, 2, skin);
+  P(15, 4, 1, 3, u.mask);
+  P(13, 6, 2, 1, u.mask);
+  P(9, 6, 4, 1, u.helmet);
+  P(10, 4, 2, 2, u.logo);
+  // Both arms at full length, out and down.
+  P(11, 8, 3, 1, u.jersey); P(14, 9, 2, 1, u.jersey); P(15, 10, 2, 1, skin);
+  P(11, 10, 2, 1, u.jersey); P(13, 11, 2, 1, u.jersey); P(15, 12, 2, 1, skin);
+  if (ball) drawHeldBall(P, 12, 9);
+}
+
+/** Laid out in the air, body flat and parallel to the turf, arms out past his helmet (the ball in his hands). */
+function drawDive(P: Px, u: Uniform, skin: string, ball: boolean): void {
+  P(-2, 12, 2, 2, u.shoe);
+  P(0, 12, 3, 2, u.socks);
+  P(3, 11, 4, 3, u.pants);
+  P(7, 10, 5, 4, u.jersey);
+  P(8, 11, 3, 2, u.trim);
+  P(12, 9, 4, 1, u.stripe);
+  P(11, 10, 5, 1, u.helmet);
+  P(11, 11, 3, 2, u.helmet);
+  P(14, 11, 2, 2, skin);
+  P(16, 11, 1, 2, u.mask);
+  P(12, 11, 2, 1, u.logo);
+  // Arms stretched out ahead, over the helmet.
+  P(12, 8, 3, 1, u.jersey); P(15, 7, 2, 1, u.jersey); P(17, 7, 1, 2, skin);
+  if (ball) drawHeldBall(P, 12, 4);
+}
+
 function drawDown(P: Px, u: Uniform, skin: string): void {
   // Lying face down after a tackle, head to the right.
   P(-1, 17, 1, 2, u.shoe);
@@ -370,6 +417,8 @@ function paint(u: Uniform, skin: string, pose: Pose, look: Look, ball: boolean):
   else if (pose === 'stance') drawStance(P, u, skin);
   else if (pose === 'hold') drawHold(P, u, skin);
   else if (pose === 'drive') drawDrive(P, u, skin);
+  else if (pose === 'reach') drawReach(P, u, skin, ball && carriesBall(pose, look));
+  else if (pose === 'dive') drawDive(P, u, skin, ball && carriesBall(pose, look));
   else drawUpright(P, u, skin, pose, look, ball && carriesBall(pose, look));
   outline(g, SPR_W, SPR_H);
   return c;

@@ -87,9 +87,9 @@ export function throwErrorSd(dist: number, r: PasserRatings, pressure: number, m
  */
 export const AIM_FEEL = {
   on: true,
-  accTop: 95, accPer: 0.0036,
-  pacTop: 92, pacPer: 0.0045,
-  tupTop: 92, tupPer: 0.0055,
+  accTop: 95, accPer: 0.0043,
+  pacTop: 92, pacPer: 0.0054,
+  tupTop: 92, tupPer: 0.0066,
   vBase: 600, vPer: 40,
 };
 

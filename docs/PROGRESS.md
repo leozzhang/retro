@@ -1,11 +1,36 @@
 # Progress
 
-_Last updated: 2026-11-10_
+_Last updated: 2026-11-11_
+
+## In progress: harder catches, the turn after the catch, crowds (2026-11-11)
+Passing was too strong: a perimeter catch ran for big yards, and a ball thrown up into two or three defenders was caught too often. Everything here applies only to passes and the moments after a catch. The run game is unchanged: with their own seed, all 61 RUN rows and the GAP rows are byte-identical, and so are the run-only ADAPT rows. Design is in PASSING.md "Crowds", "Placement" and "Out of the catch".
+- **Crowds** (`CROWD`, sim/catching.ts): every defender in reach contests the ball, not just the closest, on every throw type. Each one counts by `pos³`, so a defender at the edge of his reach adds almost nothing, and a ball led a step past the crowd is as safe as one man on him. Touch pass into a tight double: 22% caught, 16% picked; tight triple: 14% and 20%; one man: 48% and 9%.
+- **Placement** (`PLACEMENT`, `catchGrade`): the intended receiver records his path when he finds the ball (`Player.track`). At the catch, the throw's placement grades it:
+  - IN STRIDE: skips most of the catch ramp
+  - REACH: a ball behind him or at the edge of his reach. He keeps 45% of his speed, his hips twist back toward the ball, there's a hands penalty, the `reach` pose and a FINGERTIPS! popup.
+  - DIVE: he can't get there on his feet in the last 0.32 s. He lays out (`dive` pose, more reach, a hands penalty), and if he catches it he's down at the spot (the college rule) or scores in the end zone. A diver who misses ends up on the turf.
+- **Out of the catch** (`CATCH`, sim/player.ts): his hips (`Player.hips`) turn toward where he wants to go at 5–8 rad/s (by `acc` and `rte`). Until they come around he has 30% of his acceleration and is capped near 2.5 yd/s, and he faces the way his hips do. Every catch also ramps his acceleration from 60% over 0.8 s. Squared up to the QB (curl, hitch, comeback, screen) is a half turn.
+- **Defenders on the ball** (sim/ai.ts `onTime`, `CATCH_PURSUIT` in game/playState.ts): a defender breaking on a throw arrives at speed instead of pulling up on the spot. One within 5 yd of the catch who was on the ball reacts in 0.05 s instead of 0.12–0.47.
+- **The CPU QB leads by the real flight time** (`cpuAim`, `CPU_THROW.leadIters`). The old distance / 22 s lead put the median go ball 3.4 yd behind the receiver. Once placement counts, that turned every CPU deep ball into a reach, so the harness stopped measuring what a user who leads well sees. **This moves every pass baseline.** Compare against "old code + new lead" (A below), not the old balance.txt.
+- **Measured**, A = old code with the new lead, F = this:
+  - THROW ALL TOUCH 2.2 s vs 2 Man Under: 11.9 → 7.1 YPP; AUTO vs Tampa 2: 16.1 → 13.0; LOB 2.2 s vs Tampa 2: 61% / 11.4% int → 49% / 17.5%
+  - ADAPT quick only: 7.7 → 7.1 YPP early, TD/drive 0.43 → 0.27; screens 0.46 → 0.37
+  - ROUTE (thrown to one route regardless of coverage): curl vs 2 Man Under 57% → 31% caught, in 54% → 31%, go 55% → 29%
+  - YAC experiment (every pass play × 5 calls, most-open receiver, 1.2 s): mean YAC 11.2 → 8.9, 20+ yd YAC 22% → 18%; with a scripted sidestep at the first defender, 9.2 → 6.6
+- **Flag:** INT rates are high when the ROUTE rows throw into two-deep coverage: post and corner vs 2 Man Under at 15–20%. That's the harness throwing into a double blind, which is what's meant to be punished, but it's well above NFL route INT rates (4–6%).
+- **Off, for now: the receiver running through the catch** (`PLACEMENT.throughCos` over 1). `seekTimed` makes a receiver pull up on the spot, so nearly every ball was caught at about 3 yd/s. Running through a ball led ahead of him is the realistic in-stride catch, but it took mean YAC from 11.2 to 13.0, a buff to passing. Turn it on once the open-field YAC is tamed.
+- **Not reproduced headless:** the user's sprint-and-sidestep past the first defender. A scripted sidestep at 3.5 yd doesn't beat running straight. Playtest it.
+- **Not checked in a browser yet:** the `reach` and `dive` sprites, and the hip turn (facing).
+- Next:
+  - playtest perimeter throws (hitch, out, flat), balls led behind, overthrows, lobs into a double
+  - if open-field YAC still feels too high, the next lever is a post-catch pursuit breakdown (a shorter lead within 4 yd), then the tackle radius, both scoped to caught passes
+  - then turn the run-through back on
 
 ## In progress: aim feel, the gap between QBs in the hand (2026-11-10)
 - Experiment for playtesting: a worse passer's drag-back line lags the mouse (accuracy average sets the lag, poise adds under pressure, throw-on-the-run adds on the move), and the ball goes where the lagged line is. Constants `AIM_FEEL` (sim/passing.ts), design in PASSING.md "Aim feel". `window.AIM_FEEL` in dev to tune or switch off.
 - Retuned: the lag is now set + pressure + moving costs added up, each from its own rating (accuracy, poise, throw on the run), with moving measured against the aiming jog, so a pocket passer with low TUP drags rolling out. Before, pressure and moving only multiplied the accuracy lag, so an accurate QB barely felt them.
 - Fixed: the user's throws on the move counted as about half moving (speed / 6, but aiming slows him to a 3.4 yd/s jog). Aimed throws are now fully moving at that jog, for throw error (`tup`) as well as the lag. The CPU QB and the harness keep speed / 6, so the balance report is unchanged.
+- Tuned (2026-11-11): about 20% more lag across the board (`accPer` 0.0043, `pacPer` 0.0054, `tupPer` 0.0066).
 - Confidence: the user's shaken QB doesn't lose accuracy on big snaps any more; he gets extra aim lag instead (`CONF.shakenLag`, `shakenAimLag`; CONFIDENCE.md section 1). `window.CONF` in dev to tune it.
 - Next: playtest high vs. low QBs on quick flicks, blitzes and rollouts; tune `tauPer`/`vBase`, or drop it.
 

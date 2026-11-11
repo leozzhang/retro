@@ -2,7 +2,7 @@ import type { Assign } from '../data/defenses';
 import type { PoaJob, RouteName } from '../data/plays';
 import type { StJob } from '../data/specialTeams';
 import type { Ratings, Role, RosterPlayer } from '../data/teams';
-import { add, clamp, len, lerp, limit, scale, sub, type Vec } from '../engine/math';
+import { add, clamp, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Pose, Uniform } from '../render/sprites';
 import { celebrationPose, tickCelebration, type Celebrating } from './celebrate';
 
@@ -98,6 +98,19 @@ export interface Player {
   findAt: number;
   /** Seconds left gathering a bullet he just caught: his acceleration is cut (`GATHER`). */
   gather: number;
+  /**
+   * After a catch (`CATCH`): which way his body faces (a unit vector, turning toward where he wants to go),
+   * null once he's squared away and up to speed. Seconds since the catch in `caughtFor`.
+   */
+  hips: Vec | null;
+  caughtFor: number;
+  /**
+   * The intended receiver, when he found the ball: where he'd have been at its arrival on his own path,
+   * and the way he was going (sim/catching.ts `catchGrade`). Null until then.
+   */
+  track: { at: Vec; dir: Vec | null } | null;
+  /** Laid out for a ball he can't get to on his feet (`PLACEMENT`): airborne, no steering. */
+  diving: boolean;
   isBlocker: boolean;
   /** Turns into a pass blocker once the route (a play-action fake) is done. */
   thenBlock: boolean;
@@ -204,6 +217,10 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     eyes: 0,
     findAt: Infinity,
     gather: 0,
+    hips: null,
+    caughtFor: 0,
+    track: null,
+    diving: false,
     isBlocker: false,
     thenBlock: false,
     lateBlock: false,
@@ -304,6 +321,64 @@ export function startGather(p: Player, amount: number): void {
   p.gather = GATHER.time * hit;
 }
 
+/**
+ * Out of a catch (docs/PASSING.md): a receiver has to turn his hips to where he's going, and get going.
+ * - His hips turn toward his `want` at `turn` rad/s, from `turn.lo` at a turn skill (half `acc`, half
+ *   `rte`) of `skill.lo` to `turn.hi` at `skill.hi`. Squared up to the QB, that's a half turn: about 0.5 s
+ *   for an average receiver.
+ * - With his hips the wrong way, he has `turnAccel` of his acceleration and can't go faster than
+ *   `turnCap` yd/s, both easing to full as his hips come around (by alignment, `(1 + cos) / 2`).
+ * - For `rampTime` s after any catch, his acceleration is `ramp` of it, easing back to full: securing the
+ *   ball. A catch in stride (`startCatch`'s `ramp` 0) skips it.
+ * Runs, kick returns and interceptions never get it: only the offense's caught passes.
+ */
+export const CATCH = {
+  turn: { lo: 5, hi: 8 },
+  skill: { lo: 60, hi: 95 },
+  turnAccel: 0.3,
+  turnCap: 2.5,
+  ramp: 0.6,
+  rampTime: 0.8,
+};
+
+/** Start the catch state: `hips` the way his body faces at the catch, `ramp` 0..1 of `CATCH.ramp`'s cut. */
+export function startCatch(p: Player, hips: Vec, ramp = 1): void {
+  p.hips = len(hips) > 0.01 ? norm(hips) : { x: 1, y: 0 };
+  p.caughtFor = (1 - clamp(ramp, 0, 1)) * CATCH.rampTime;
+}
+
+/** His hips' turn rate (rad/s) out of a catch. */
+export function hipTurnRate(p: Player): number {
+  const t = clamp(((p.r.acc + p.r.rte) / 2 - CATCH.skill.lo) / (CATCH.skill.hi - CATCH.skill.lo), 0, 1);
+  return lerp(CATCH.turn.lo, CATCH.turn.hi, t);
+}
+
+/**
+ * One step of the catch state: turn his hips toward his `want`; returns his acceleration multiplier and
+ * caps his `want`. Clears it once he's squared away and the ramp is done.
+ */
+function catchStep(p: Player, want: Vec, dt: number): { mul: number; want: Vec } {
+  const hips = p.hips!;
+  p.caughtFor += dt;
+  const w = len(want);
+  let align = 1;
+  if (w > 0.3) {
+    const dir = scale(want, 1 / w);
+    const cur = Math.atan2(hips.y, hips.x);
+    let d = Math.atan2(dir.y, dir.x) - cur;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    const step = hipTurnRate(p) * dt;
+    const a = cur + clamp(d, -step, step);
+    p.hips = { x: Math.cos(a), y: Math.sin(a) };
+    align = (1 + Math.cos(d - clamp(d, -step, step))) / 2;
+  }
+  const ramp = lerp(CATCH.ramp, 1, clamp(p.caughtFor / CATCH.rampTime, 0, 1));
+  if (align > 0.999 && p.caughtFor >= CATCH.rampTime) p.hips = null;
+  const cap = lerp(CATCH.turnCap, maxSpeed(p), align * align);
+  return { mul: lerp(CATCH.turnAccel, 1, align) * ramp, want: w > cap ? scale(want, cap / w) : want };
+}
+
 export function accelOf(p: Player): number {
   return 10 + (p.r.acc / 100) * 10;
 }
@@ -364,15 +439,19 @@ export function tickTimers(p: Player, dt: number): void {
 }
 
 export function stepPlayer(p: Player, dt: number): void {
-  const want = p.down ? { x: 0, y: 0 } : p.want;
-  const decel = p.down ? 18 : accelOf(p) * (p.juke > 0 ? JUKE.accel : 1) * (p.gather > 0 ? GATHER.accel : 1);
+  let want = p.down ? { x: 0, y: 0 } : p.want;
+  let caught = 1;
+  if (p.hips && !p.down) ({ mul: caught, want } = catchStep(p, want, dt));
+  const decel = p.down ? 18 : accelOf(p) * (p.juke > 0 ? JUKE.accel : 1) * (p.gather > 0 ? GATHER.accel : 1) * caught;
   if (p.gather > 0) p.gather = Math.max(0, p.gather - dt);
   const dv = limit(sub(want, p.vel), decel * dt);
   p.vel = add(p.vel, dv);
   p.pos = add(p.pos, scale(p.vel, dt));
   // A QB winding up or following through keeps facing his throw, even drifting back.
   const throwing = (p.pose === 'throw' || p.pose === 'throwEnd') && p.poseTimer > 0;
-  if (!p.down && !throwing) {
+  // Turning out of a catch, he faces the way his hips do.
+  if (p.hips && !p.down && Math.abs(p.hips.x) > 0.2) p.facing = p.hips.x > 0 ? 1 : -1;
+  else if (!p.down && !throwing) {
     if (p.vel.x > 0.3) p.facing = 1;
     else if (p.vel.x < -0.3) p.facing = -1;
   }
