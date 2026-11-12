@@ -152,7 +152,7 @@ export const MOTION = { speed: 0.5, depth: 7, gap: 2.5, trail: 0.8, bumpOdds: 0.
 export const HARD_COUNT = { share: 0.6, time: 0.55, flinch: 0.55, jump: 0.5, offside: 0.1, perDrive: 2, clock: 1.5 };
 
 /** Routes that make a receiver the target of a screen (the others stalk-block for him). */
-const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble'];
+const SCREEN_ROUTES: readonly string[] = ['smoke', 'tunnel', 'screen', 'bubble', 'slip'];
 
 /**
  * In-flight tips (`Play.inFlight`), rolled once per defender at the ball's closest pass by him:

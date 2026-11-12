@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
 import { CORE_CALLS as DEF_CALLS } from './data/defenses';
-import { PLAYBOOK } from './data/plays';
+import { LEGACY } from './data/plays';
 import { RATING_INFO, RATING_KEYS, type RatingKey } from './data/ratings';
 import { kickDef } from './data/specialTeams';
 import type { RosterPlayer } from './data/teams';
@@ -49,8 +49,8 @@ function bumped(roster: Roster, slots: string[], k: RatingKey | null): Roster {
   return out;
 }
 
-const pass = PLAYBOOK.filter((p) => p.kind === 'pass' || (p.kind === 'pa' && p.block === 'pass'));
-const runs = PLAYBOOK.filter((p) => p.kind === 'run');
+const pass = LEGACY.filter((p) => p.kind === 'pass' || (p.kind === 'pa' && p.block === 'pass'));
+const runs = LEGACY.filter((p) => p.kind === 'run');
 
 /** Per-rep results, indexed by rep so a variant pairs with the base rep for rep (null: no outcome). */
 interface Sample {

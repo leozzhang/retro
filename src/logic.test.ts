@@ -7,6 +7,7 @@ import {
   tickBetween, tickLive, timeLeftInHalf, type Clock,
 } from './game/clock';
 import { DEF_CALLS, packageFor, type DefCall, type Disguise } from './data/defenses';
+import { tags } from './data/playTags';
 import { ACE, EMPTY, FORMATIONS, GUN_TRIPS, I_FORM, PLAYBOOK, type Formation, type PlayDef } from './data/plays';
 import {
   athleteName, buildSquad, freshSquad, onField, PICK_ORDER, positionOrder, reorderPosition, rosterFor, SLOT_CANDIDATES, starters, teamRatings,
@@ -715,14 +716,14 @@ describe('playbook', () => {
     ];
     for (const [f, slot, who, pers] of cases) {
       expect(personnelOf(f)).toBe(pers);
-      const p = snapPlay({ id: 't', name: 'T', kind: 'pass', formation: f, block: 'pass', read: 'none', flip: 'fixed', drop: 1, tip: '' });
+      const p = snapPlay({ id: 't', name: 'T', kind: 'pass', formation: f, block: 'pass', read: 'none', flip: 'fixed', drop: 1, tags: tags('dropback', 'smash'), tip: '' });
       expect(p.off).toHaveLength(11);
       expect(p.resolved.cast[slot]).toBe(who);
       expect(p.off.find((o) => o.slot === who)?.role).toBe(offR[who].role);
     }
     expect(offR.FB.role).toBe('RB');
     expect(offR.FB.r.rbk).toBeGreaterThan(offR.RB.r.rbk);
-    expect(FORMATIONS.map(personnelOf)).toEqual(['11', '11', '11', '11', '21', '12', '10']);
+    expect(FORMATIONS.map(personnelOf)).toEqual(['11', '11', '11', '11', '21', '12', '10', '11', '11', '11', '12', '12', '21', '22']);
     // In Empty the split-out back counts as the weak side's #2 receiver.
     expect(resolvePlay({ ...play('mesh'), formation: EMPTY, weak: 'slant-drag', backs: {} }, MID, false).routes.RB).toBe('drag');
     expect(GUN_TRIPS.sub).toBeUndefined();
@@ -751,7 +752,7 @@ describe('playbook', () => {
   });
 
   // ---------------------------------------------------------------- Phase 2: personnel, power, zone read
-  const inForm = (f: Formation): PlayDef => ({ id: 't', name: 'T', kind: 'pass', formation: f, block: 'pass', read: 'none', flip: 'fixed', drop: 1, tip: '' });
+  const inForm = (f: Formation): PlayDef => ({ id: 't', name: 'T', kind: 'pass', formation: f, block: 'pass', read: 'none', flip: 'fixed', drop: 1, tags: tags('dropback', 'smash'), tip: '' });
 
   it('the defense picks its package from offensive personnel', () => {
     expect(['21', '12', '22', '11', '20', '10'].map(packageFor)).toEqual(['base', 'base', 'base', 'nickel', 'nickel', 'dime']);
@@ -1115,9 +1116,9 @@ describe('playbook validity', () => {
     }
   });
 
-  it('has 60-80 scrimmage plays across every formation, with each tab filled', () => {
-    expect(PLAYBOOK.length).toBeGreaterThanOrEqual(60);
-    expect(PLAYBOOK.length).toBeLessThanOrEqual(80);
+  // Each style book is held to its own size (src/playbook.test.ts); the library is every book's plays.
+  it('the library has every formation in use, with each tab filled', () => {
+    expect(PLAYBOOK.length).toBeGreaterThanOrEqual(90);
     for (const f of FORMATIONS) expect(PLAYBOOK.some((p) => p.formation === f), f.name).toBe(true);
     for (const k of ['pass', 'run', 'pa'] as const) expect(PLAYBOOK.filter((p) => p.kind === k).length, k).toBeGreaterThanOrEqual(15);
   });

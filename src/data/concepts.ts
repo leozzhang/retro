@@ -58,7 +58,21 @@ export const CONCEPTS = {
   slice: { name: 'Slice', routes: { 2: 'slice' } },
   // Runs: the inline TE (#2) arcs around the read end for the force player (power read)
   arc: { name: 'Arc', routes: { 2: 'arc' } },
+  // Batch 6 (docs/PLAYBOOKS.md)
+  'fade-out': { name: 'Fade Out', routes: { 1: 'fade', 2: 'quickOut' } },
+  // Classic snag from a bunch: corner outside, snag on the point, flat inside.
+  'snag-flat': { name: 'Snag Flat', routes: { 1: 'corner', 2: 'hitch', 3: 'flat' } },
+  'whip-go': { name: 'Whip', routes: { 1: 'go', 2: 'whip', 3: 'drag' } },
+  'out-up-seam': { name: 'Out-and-Up Seam', routes: { 1: 'outUp', 2: 'seam' } },
+  'pa-dig': { name: 'PA Dig', routes: { 1: 'in', 2: 'post', 3: 'seam' } },
+  'go-flat': { name: 'Go Flat', routes: { 1: 'go', 2: 'flat' } },
+  'go-leak': { name: 'Go Leak', routes: { 1: 'go', 2: 'leak' } },
+  // RPO tag: the slot's arrow to the flat
+  arrow: { name: 'Arrow', routes: { 2: 'arrow' } },
+  // Screen: the #2 (TE) slips out behind the line
+  slip: { name: 'Slip', routes: { 2: 'slip' } },
   // Backside solo tags
+  fade: { name: 'Fade', routes: { 1: 'fade' } },
   go: { name: 'Go', routes: { 1: 'go' } },
   post: { name: 'Post', routes: { 1: 'post' } },
   curl: { name: 'Curl', routes: { 1: 'curl' } },

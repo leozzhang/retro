@@ -1,7 +1,7 @@
 import type { Athlete } from '../data/athletes';
 import { starters, teamRatings, type Squad } from '../data/depth';
 import { overall } from '../data/positions';
-import { PLAYBOOK, playsOfKind, ROUTES, type PlayDef, type PlayKind, type ReadType, type RouteName, type RunScheme } from '../data/plays';
+import { playsOfKind, ROUTES, type PlayDef, type PlayKind, type ReadType, type RouteName, type RunScheme } from '../data/plays';
 import type { OffSlot } from '../data/teams';
 import { FIELD_W, VIEW_W } from '../engine/constants';
 import { clamp } from '../engine/math';
@@ -92,13 +92,13 @@ export function bookCardAt(x: number, y: number, n: number): number {
 }
 
 /** The plays on a tab: every starred play on STARRED, else that kind in playbook order. */
-export function bookPlays(tab: number, starred: Set<string>): PlayDef[] {
+export function bookPlays(tab: number, starred: Set<string>, book: readonly PlayDef[]): PlayDef[] {
   const kind = BOOK_TABS[tab].kind;
-  return kind === 'starred' ? PLAYBOOK.filter((p) => starred.has(p.id)) : playsOfKind(kind);
+  return kind === 'starred' ? book.filter((p) => starred.has(p.id)) : playsOfKind(kind, book);
 }
 
-export function bookPages(tab: number, starred: Set<string>): number {
-  return Math.max(1, Math.ceil(bookPlays(tab, starred).length / BOOK_PAGE));
+export function bookPages(tab: number, starred: Set<string>, book: readonly PlayDef[]): number {
+  return Math.max(1, Math.ceil(bookPlays(tab, starred, book).length / BOOK_PAGE));
 }
 
 // ------------------------------------------------------------ jobs
@@ -107,7 +107,8 @@ const ROUTE_LABEL: Record<RouteName, string> = {
   go: 'GO', seam: 'SEAM', slant: 'SLANT', quickOut: 'OUT', deepOut: 'DEEP OUT', in: 'IN', post: 'POST',
   corner: 'CORNER', curl: 'CURL', hitch: 'HITCH', comeback: 'COMEBACK', flat: 'FLAT', drag: 'DRAG',
   wheel: 'WHEEL', swing: 'SWING', bubble: 'BUBBLE', block: 'BLOCK', cross: 'CROSS', glance: 'GLANCE',
-  smoke: 'SMOKE', tunnel: 'TUNNEL', checkFlat: 'CHK FLAT', screen: 'SCREEN', angle: 'ANGLE',
+  smoke: 'SMOKE', tunnel: 'TUNNEL', fade: 'FADE', whip: 'WHIP', arrow: 'ARROW', outUp: 'OUT-UP', slip: 'SLIP', leak: 'LEAK',
+  checkFlat: 'CHK FLAT', screen: 'SCREEN', angle: 'ANGLE',
   iz: 'CARRY', oz: 'CARRY', power: 'CARRY', toss: 'CARRY', paFake: 'PA FAKE', izDeep: 'CARRY',
   stretch: 'CARRY', counter: 'CARRY', trap: 'CARRY', draw: 'CARRY', iso: 'CARRY', sweep: 'CARRY',
   pitchPath: 'PITCH', lead: 'LEAD', kickOut: 'KICK OUT', leadWide: 'LEAD', slice: 'SLICE', qbLead: 'LEAD', arc: 'ARC',
@@ -157,31 +158,40 @@ const PANEL_SLOTS: OffSlot[] = ['QB', 'RB', 'X', 'SL', 'TE', 'Z', 'LT', 'LG', 'C
 
 // ------------------------------------------------------------ draw
 
-export function drawPlaybook(g: CanvasRenderingContext2D, squad: Squad, v: BookView, starred: Set<string>): void {
+/** Whose book it is: the OC who calls it and his style (`data/offStyles.ts`). */
+export interface BookOwner {
+  book: readonly PlayDef[];
+  oc: string;
+  style: string;
+}
+
+export function drawPlaybook(g: CanvasRenderingContext2D, squad: Squad, v: BookView, starred: Set<string>, own: BookOwner): void {
+  const { book } = own;
   g.fillStyle = '#0d1117';
   g.fillRect(0, 0, VIEW_W, 360);
   const t = squad.team;
   g.fillStyle = t.colors.primary;
   g.fillRect(0, 0, VIEW_W, 30);
   text(g, `${t.school.toUpperCase()} PLAYBOOK`, 10, 6, { size: 8 });
-  text(g, `${PLAYBOOK.length} PLAYS  ${starred.size} STARRED`, 10, 18, { color: '#e6e6e6' });
+  const stars = book.filter((p) => starred.has(p.id)).length;
+  text(g, `${own.style.toUpperCase()} (OC ${own.oc.toUpperCase()})  ${book.length} PLAYS  ${stars} STARRED`, 10, 18, { color: '#e6e6e6' });
   const tr = teamRatings(squad);
   text(g, `OFF ${tr.off}`, VIEW_W - 10, 6, { align: 'right', color: GOLD });
 
-  const open = v.open ? PLAYBOOK.find((p) => p.id === v.open) : undefined;
+  const open = v.open ? book.find((p) => p.id === v.open) : undefined;
   if (open) {
-    const list = bookPlays(v.tab, starred);
+    const list = bookPlays(v.tab, starred, book);
     const at = list.findIndex((p) => p.id === open.id);
     text(g, `${BOOK_TABS[v.tab].label} ${at + 1}/${list.length}`, VIEW_W - 10, 18, { align: 'right', color: '#e6e6e6' });
     drawDetail(g, squad, open, v, starred.has(open.id));
     drawHint(g, `A/D: PREV/NEXT  SPACE: STAR  F: FLIP${v.flip ? ' (ON)' : ''}  ESC: PLAYBOOK`);
     return;
   }
-  drawGrid(g, v, starred, t.colors.primary);
+  drawGrid(g, v, starred, t.colors.primary, book);
   drawHint(g, 'CLICK: OPEN PLAY  CLICK THE STAR TO SAVE IT  A/D: TAB  W/S: PAGE  ESC: BACK');
 }
 
-function drawGrid(g: CanvasRenderingContext2D, v: BookView, starred: Set<string>, primary: string): void {
+function drawGrid(g: CanvasRenderingContext2D, v: BookView, starred: Set<string>, primary: string, book: readonly PlayDef[]): void {
   const x0 = (VIEW_W - (BOOK_TABS.length * TAB_W + (BOOK_TABS.length - 1) * 4)) / 2;
   BOOK_TABS.forEach((tb, i) => {
     const x = x0 + i * (TAB_W + 4);
@@ -196,11 +206,11 @@ function drawGrid(g: CanvasRenderingContext2D, v: BookView, starred: Set<string>
     text(g, tb.label, x + TAB_W / 2 + (star ? 5 : 0), TAB_Y + 3, { align: 'center', color: on ? '#ffffff' : SOFT, shadow: on ? undefined : false });
     if (star) drawStar(g, x + 18, TAB_Y + 3, on || starred.size > 0);
   });
-  const pages = bookPages(v.tab, starred);
+  const pages = bookPages(v.tab, starred, book);
   const page = Math.min(v.page, pages - 1);
   if (pages > 1) text(g, `${page + 1}/${pages}`, VIEW_W - 8, TAB_Y + 3, { align: 'right', color: SOFT, shadow: false });
 
-  const plays = bookPlays(v.tab, starred).slice(page * BOOK_PAGE, page * BOOK_PAGE + BOOK_PAGE);
+  const plays = bookPlays(v.tab, starred, book).slice(page * BOOK_PAGE, page * BOOK_PAGE + BOOK_PAGE);
   if (!plays.length) {
     text(g, 'NO STARRED PLAYS YET', VIEW_W / 2, 150, { size: 8, align: 'center', color: '#ffffff' });
     text(g, 'CLICK THE STAR ON ANY PLAY CARD TO ADD IT HERE.', VIEW_W / 2, 168, { align: 'center', color: SOFT, shadow: false });

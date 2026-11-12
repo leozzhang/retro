@@ -7,4 +7,6 @@ analysis/cache/
 analysis/out/route_metrics.csv
 __pycache__/
 season.txt
+film.txt
+film.json
 release/

@@ -2,6 +2,65 @@
 
 _Last updated: 2026-11-11_
 
+## Done: the expanded playbook and OC styles, batch 1 (2026-11-11)
+See PLAYBOOKS.md and FILM.md.
+
+**Tags and features:**
+- Every play carries hand tags (`PlayDef.tags`: `family`, `concept`, `beats`; `data/playTags.ts`).
+- Derived features sit next to them (`playFeatures`, `featureVector`, `FEATURE_KEYS`; `game/playFeatures.ts`), and scouting's `playTraits` is a view over them.
+- `src/playbook.test.ts` holds each tag to the data, and each style book to the book rules: size, a sneak, short yardage, screens, quick game, shots, run families, two-minute routes, and personnel within the style's targets.
+
+**Five OC styles** (`data/offStyles.ts`): Air Raid, Spread RPO, Spread Option, Pro Style, Power.
+- The OC's style comes from his id (`ocIdentity`). A program's own OC runs its profile's; a hire runs the program's 60% of the time, otherwise a league draw. He keeps it for life.
+- **His style fixes your book** (`ocBook`: the style book plus 2–3 signature plays).
+- The book drives:
+  - the call screen, with a scrolling chip row for many formations
+  - the playbook page header
+  - the staff's play picks
+  - the CPU's key-play replays, weighted by the style's family calls and the situation
+  - the season sim's pass share, by the OC's scheme. Year one is unchanged; later years move as OCs move.
+- The OC's style shows on the prep page's STAFF tab, the carousel's OC card, and the scouting report's offense line.
+
+**Batch 6** (36 plays, 98 in the library) builds the Spread RPO (66) and Pro Style (57) books.
+- 7 formations: Gun Trey, Bunch and Wing, Pistol Ace, Ace Wing, Strong I, Heavy I (22)
+- 6 routes: fade, whip, arrow, out-and-up, slip, leak
+
+Air Raid, Spread Option and Power still run the legacy 62 (batch 2).
+
+**Film room:**
+- each row's tags, books and features
+- per-throw stats per cell
+- `FILM_EXPLAIN` and `FILM_BASE`
+- new sections: BEATS (`TAG MISS` and `TAG EXTRA`, noise-scaled), ROUTES (against the NFL route table) and BOOKS
+- the film QB reads high to low (`H.READ`)
+
+**Balance:** the aggregate rows run over `LEGACY` and are byte-identical. New plays get per-play rows on their own streams, and each built book gets BOOK rows.
+
+**Fixed:**
+- The Cover 2 corner no longer chases a slant 9 yd inside his flat (`FLAT_INSIDE`). Only zone calls with a flat defender move (Cover 2, Tampa 2, Fire Zone), plus ADAPT rows within noise. The core rows are unchanged.
+- Ace Wing Counter's handoff.
+
+**Next, by the film room's flags:**
+- **Deep completions get about 20 yd of YAC** (go, post, corner), so vertical concepts beat every call once the QB reads. This is the biggest balance issue in the passing game: deep coverage and pursuit after a deep catch.
+- Out and hitch concepts don't beat Cover 3 the way they should.
+- 3rd and 1 runs are too automatic.
+- Slant Flat and Fade Out are strong; Strong I Toss and Counter GT are weak.
+- Then batch 2: the Air Raid (with an option route), Spread Option and Power books.
+- Then the ML defense on the tags.
+
+**Not checked in a browser yet:** the call screen with the book and the chip row's scrolling, the playbook header, and the STAFF and carousel labels.
+
+## Done: the film room (2026-11-11)
+`npm run film` (`src/film.ts`, FILM.md): every play against every call, with RPOs split into the give and the pull and tagged columns for pass-first and spy, 80 snaps a cell with stable per-cell seeds. It writes `film.txt` (grids, calls, families, tags, flags) and `film.json` (the table for the ML defense). About 70 s.
+
+**The order agreed for what's next:** the playbook expansion and OC styles, vetted batch by batch with the film room; then the ML defense on the final playbook. Store each play's family and concept as data, and keep personnel fixed per formation.
+
+**First run's flags** (not tuned; details in FILM.md):
+- Slant Flat beats every call (80% mean, never under 69%).
+- RPO Stick's pull (74%+), Empty Spacing, PA Post and PA Crossers beat every call too.
+- QB Sneak and Power on 3rd and 1 are near-automatic.
+- Pass-first against Cover 3 makes the RPO glance better (the curl defender drops wide).
+
 ## In progress: a smarter defense, part 1: the RPO, leverage, the look (2026-11-11)
 Playtest: RPO Glance could be called over and over and the receiver was never covered. Details and numbers are in DEFENSE.md.
 

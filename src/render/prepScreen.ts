@@ -1,4 +1,5 @@
 import type { Athlete } from '../data/athletes';
+import { ocBook, ocStyle, STYLES } from '../data/offStyles';
 import { COACH_ROLES, COACH_TITLE, coachName, GROUPS, type CoachRole, type Group, type Staff } from '../data/coaches';
 import { emphasisById, groupEmphases, STANDARD } from '../data/emphasis';
 import { bangedUp, fitRatings, healthOf, healthy, starters, type Squad } from '../data/depth';
@@ -311,6 +312,8 @@ function drawStaff(g: CanvasRenderingContext2D, r: ScoutReport, v: PrepView, sta
       text(g, (em?.label ?? 'STANDARD').slice(0, 17), 252, y, { color: em ? GOLD : DIM, shadow: em ? undefined : false });
     } else if (role === 'DC' && c.style) {
       text(g, `${c.style.toUpperCase()} D`, 252, y, { color: SOFT, shadow: false });
+    } else if (role === 'OC') {
+      text(g, STYLES[ocStyle(c)].name.toUpperCase(), 252, y, { color: SOFT, shadow: false });
     }
   });
   const foot = ROW_Y + STAFF_ROLES.length * ROW_H + 6;
@@ -324,7 +327,9 @@ function drawStaff(g: CanvasRenderingContext2D, r: ScoutReport, v: PrepView, sta
   text(g, `${coachName(c)}, AGE ${c.age}`.slice(0, 30), x, TOP + LINE + 1);
   text(g, `SCOUT ${c.r.scout}: ${scoutReach(c.r.scout)}`.slice(0, 30), x, TOP + 2 * LINE + 2, { color: SOFT, shadow: false });
   if (!isGroup(role)) {
-    const job = role === 'DC' && c.style ? `${ROLE_JOB.DC} HE RUNS A${c.style === 'aggressive' ? 'N' : ''} ${c.style.toUpperCase()} DEFENSE.` : ROLE_JOB[role]!;
+    const job = role === 'DC' && c.style ? `${ROLE_JOB.DC} HE RUNS A${c.style === 'aggressive' ? 'N' : ''} ${c.style.toUpperCase()} DEFENSE.`
+      : role === 'OC' ? `${ROLE_JOB.OC} HE RUNS THE ${STYLES[ocStyle(c)].name.toUpperCase()}: HIS ${ocBook(c).length}-PLAY BOOK IS OURS.`
+      : ROLE_JOB[role]!;
     wrap(job, 30).forEach((t, i) => text(g, t, x, TOP + 4 * LINE + i * LINE, { color: '#e6e6e6' }));
     return;
   }

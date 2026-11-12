@@ -5,7 +5,7 @@
  */
 import { pickDefCall } from './data/defenses';
 import { defIdentity, situationMix } from './data/identity';
-import { PLAYBOOK, type PlayDef } from './data/plays';
+import { LEGACY, PLAYBOOK, type PlayDef } from './data/plays';
 import { DEF_SLOTS } from './data/teams';
 import { OPP_GOAL } from './engine/constants';
 import { mulberry32, type Rng } from './engine/math';
@@ -23,12 +23,12 @@ const book = (id: string) => {
 /** An offense's play-caller: the snap number and the situation in, a play out. */
 export type Script = (n: number, down: number, toGo: number, rng: Rng) => PlayDef;
 
-const runs = PLAYBOOK.filter((p) => p.kind === 'run' && !p.qbRun && !p.short);
-const passes = PLAYBOOK.filter((p) => p.kind === 'pass');
-const pas = PLAYBOOK.filter((p) => p.kind === 'pa' && p.block === 'pass');
+const runs = LEGACY.filter((p) => p.kind === 'run' && !p.qbRun && !p.short);
+const passes = LEGACY.filter((p) => p.kind === 'pass');
+const pas = LEGACY.filter((p) => p.kind === 'pa' && p.block === 'pass');
 const quick = passes.filter((p) => playTraits(p).has('quick'));
 const screens = passes.filter((p) => playTraits(p).has('screen'));
-const qbRuns = PLAYBOOK.filter((p) => p.qbRun && !p.short);
+const qbRuns = LEGACY.filter((p) => p.qbRun && !p.short);
 const any = <T>(xs: T[], rng: Rng) => xs[Math.floor(rng() * xs.length)];
 
 export const SCRIPTS: Record<string, Script> = {
@@ -68,8 +68,8 @@ const COUNTER: Record<string, (p: PlayDef) => boolean> = {
   'glance x8 then give': () => true,
 };
 
-/** Hold a quick throw or screen 1.2 s, everything else 2.2 s. */
-const holdFor = (p: PlayDef) => (playTraits(p).has('quick') || playTraits(p).has('screen') ? 1.2 : 2.2);
+/** Hold a quick throw or screen 1.2 s, everything else 2.2 s (the ADAPT rows and the film room). */
+export const holdFor = (p: PlayDef) => (playTraits(p).has('quick') || playTraits(p).has('screen') ? 1.2 : 2.2);
 
 export interface AdaptiveResult {
   /** Yards per play in windows of snaps: 1-6, 7-15, 16+. */

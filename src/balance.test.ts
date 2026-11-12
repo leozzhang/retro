@@ -2,7 +2,8 @@ import { writeFileSync } from 'node:fs';
 import { it } from 'vitest';
 import { adaptiveRows } from './adaptive';
 import { CORE_CALLS, DEF_CALLS, disguiseName, type DefCall, type GameKind } from './data/defenses';
-import { PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
+import { LEGACY, PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
+import { OFF_STYLES, STYLES, styleBook } from './data/offStyles';
 import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
 import { teamById } from './data/teams';
@@ -109,7 +110,7 @@ function routeRows(rng: Rng): string[] {
   const rows: string[] = [];
   const nearest = (play: Play, p: Player) => Math.min(...play.def.map((d) => dist(d.pos, p.pos)));
   for (const [route, brk, nflComp, nflSep] of ROUTE_CHECKS) {
-    const plays = PLAYBOOK.filter((pd) => {
+    const plays = LEGACY.filter((pd) => {
       if (pd.kind === 'run') return false;
       const r = resolvePlay(pd, 26.6, false).routes;
       return Object.entries(r).some(([slot, rn]) => rn === route && slot !== 'RB' && slot !== 'FB');
@@ -179,7 +180,7 @@ function throwRows(pass: PlayDef[], rng: Rng): string[] {
   const calls = DEF_CALLS.filter((c) => !c.situational);
   const byCov = { man: calls.filter((c) => c.coverage === 'man'), zone: calls.filter((c) => c.coverage === 'zone') };
   for (const [route, brk] of THROW_ROUTES) {
-    const plays = PLAYBOOK.filter((pd) => {
+    const plays = LEGACY.filter((pd) => {
       if (pd.kind === 'run') return false;
       const r = resolvePlay(pd, 26.6, false).routes;
       return Object.entries(r).some(([slot, rn]) => rn === route && slot !== 'RB' && slot !== 'FB');
@@ -358,6 +359,27 @@ function shortRows(plays: PlayDef[], rng: Rng): string[] {
   return rows;
 }
 
+/** Each built style book as a whole: its passes at a normal hold and its runs, against the core calls. */
+function bookRows(rng: Rng): string[] {
+  const rows: string[] = [];
+  for (const st of OFF_STYLES.filter((x) => STYLES[x].book)) {
+    const book = styleBook(st);
+    const pass = book.filter((p) => p.kind === 'pass' || (p.kind === 'pa' && p.block === 'pass'));
+    const runs = book.filter((p) => p.kind === 'run' && !p.short);
+    const tag = `BOOK ${STYLES[st].name.padEnd(13)}`;
+    for (const call of CORE_CALLS) {
+      rows.push(`${tag} ${call.name.padEnd(15)} pass 2.2s | ${passLine(pass, call, 2.2, REPS, rng)}`);
+      const list: number[] = [];
+      for (const p of runs) for (let i = 0; i < RUN_REPS; i++) {
+        const r = runRep(p, call, rng);
+        if (r.o && r.ran) list.push(r.yds);
+      }
+      rows.push(`${tag} ${call.name.padEnd(15)} run       | ${runLine(list)}`);
+    }
+  }
+  return rows;
+}
+
 /**
  * The whole defensive playbook, one block per call: the pass book at a quick and a normal hold, the
  * PA book, every run, and the short-yardage runs on 3rd and 1. The core rows above stay on the
@@ -365,7 +387,7 @@ function shortRows(plays: PlayDef[], rng: Rng): string[] {
  */
 function defenseRows(pass: PlayDef[], pa: PlayDef[], runs: PlayDef[], rng: Rng): string[] {
   const rows: string[] = [];
-  const short = PLAYBOOK.filter((p) => p.short);
+  const short = LEGACY.filter((p) => p.short);
   for (const call of DEF_CALLS) {
     const tag = `DEF  ${call.name.padEnd(15)}`;
     rows.push(`${tag} pass 1.2s | ${passLine(pass, call, 1.2, REPS, rng)}`);
@@ -604,10 +626,13 @@ const picked = (p: PlayDef) => !only || only.includes(p.id) || only.includes(p.k
 // Run with `npm run balance`; results go to balance.txt.
 it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => {
   const rng = mulberry32(42);
-  const pass = PLAYBOOK.filter((p) => p.kind === 'pass');
-  const pa = PLAYBOOK.filter((p) => p.kind === 'pa' && p.block === 'pass');
+  // The aggregate rows run over the legacy 62, so new plays don't move the baseline (docs/PLAYBOOKS.md);
+  // the new plays get per-play rows of their own below, and each style book a BOOK block.
+  const pass = LEGACY.filter((p) => p.kind === 'pass');
+  const pa = LEGACY.filter((p) => p.kind === 'pa' && p.block === 'pass');
   // RPOs ride along as runs: the auto-QB always gives, so their rows measure the run half only.
-  const runs = PLAYBOOK.filter((p) => (p.kind === 'run' || p.read === 'rpo') && picked(p));
+  const runs = LEGACY.filter((p) => (p.kind === 'run' || p.read === 'rpo') && picked(p));
+  const added = PLAYBOOK.slice(LEGACY.length);
   // Runs get their own RNG, so a change to the pass game doesn't shift the run rows.
   const rows = [...passRows('PASS', pass, rng), '', ...passRows('PA  ', pa, rng), '', ...runRows(runs, mulberry32(43))];
   // Kicks use their own RNG so they don't shift the scrimmage rows.
@@ -615,7 +640,14 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   rows.push('', ...puntRows(krng), '', ...kickoffRows(krng), '', ...fgRows(krng));
   // Per-play rows also get their own RNG, after everything else.
   rows.push('', ...perPlayRows([...pass, ...pa].filter(picked), mulberry32(11)));
-  rows.push('', ...shortRows(PLAYBOOK.filter((p) => p.short && picked(p)), mulberry32(13)));
+  rows.push('', ...shortRows(LEGACY.filter((p) => p.short && picked(p)), mulberry32(13)));
+  // The new plays, on streams of their own after the legacy rows.
+  const addedPass = added.filter((p) => (p.kind === 'pass' || (p.kind === 'pa' && p.block === 'pass')) && picked(p));
+  const addedRuns = added.filter((p) => (p.kind === 'run' || p.read === 'rpo') && picked(p));
+  if (addedPass.length) rows.push('', ...perPlayRows(addedPass, mulberry32(53)));
+  if (addedRuns.length) rows.push('', ...runRows(addedRuns, mulberry32(59)));
+  if (added.some((p) => p.short && picked(p))) rows.push('', ...shortRows(added.filter((p) => p.short && picked(p)), mulberry32(61)));
+  if (!only || only.includes('book')) rows.push('', ...bookRows(mulberry32(67)));
   if (!only || only.includes('gap')) rows.push('', ...gapRows(mulberry32(23)));
   if (!only || only.includes('route')) rows.push('', ...routeRows(mulberry32(17)));
   if (!only || only.includes('defense')) rows.push('', ...defenseRows(pass, pa, runs, mulberry32(19)));

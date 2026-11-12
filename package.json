@@ -14,6 +14,7 @@
     "balance": "vitest run src/balance.test.ts",
     "ratings": "vitest run src/ratings.test.ts",
     "season": "vitest run src/seasonReport.test.ts",
+    "film": "vitest run src/film.test.ts",
     "app": "node scripts/app-dev.mjs",
     "app:build": "tsc --noEmit && vite build && electron-builder --win portable && electron-builder --win nsis"
   },

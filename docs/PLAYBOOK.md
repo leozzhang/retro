@@ -1,6 +1,6 @@
 # Playbook system
 
-A play is **formation + a concept on each side + backfield jobs + read + blocking scheme**. It's plain data in `src/data/plays.ts` and `src/data/concepts.ts`. `resolvePlay` (`src/game/resolvePlay.ts`) turns it into a slot-by-slot layout for one snap. `Play` and the play-card diagrams both build from that layout, so the two always agree.
+A play is **formation + a concept on each side + backfield jobs + read + blocking scheme**, plus its hand **tags** (family, concept, what it beats). Which plays a team can call is its OC's style book; see [PLAYBOOKS.md](PLAYBOOKS.md) for the books, the tags, the derived features and the book rules. It's plain data in `src/data/plays.ts` and `src/data/concepts.ts`. `resolvePlay` (`src/game/resolvePlay.ts`) turns it into a slot-by-slot layout for one snap. `Play` and the play-card diagrams both build from that layout, so the two always agree.
 
 ## Slots vs. cast
 - **`OFF_SLOTS`** are the 11 positions on the field: `QB RB X Z SL TE` and the five linemen. Defensive calls key their man assignments on these slots.
@@ -128,8 +128,26 @@ A play is **formation + a concept on each side + backfield jobs + read + blockin
   - **Run phase:** once the QB has the snap the play is a run, after `QB_RUN_WAIT` for gap and draw schemes.
   - **The hole:** comes from `qbPath`.
 
+## Formations
+| Formation | Personnel | Notes |
+| --- | --- | --- |
+| Gun Doubles, Gun Trips Rt, Pistol, Singleback | 11 | the original four |
+| I-Form | 21 | FB in the SL slot |
+| Ace | 12 | TE2 inline left |
+| Gun Empty | 10 | the back split out, WR4 in the TE slot |
+| Gun Trey | 11 | 3x1 with the TE attached as #3 |
+| Gun Bunch | 11 | Z outside, the slot on the point, the TE inside |
+| Gun Wing | 11 | the TE off the line as a wing (H-back) |
+| Pistol Ace | 12 | |
+| Ace Wing | 12 | TE2 as a wing off the left tackle |
+| Strong I | 21 | the FB offset to the TE side |
+| Heavy I | 22 | FB in SL, TE2 in Z: one receiver |
+
+New routes in batch 6: `fade`, `whip`, `arrow`, `outUp`, `slip` (a delayed slip screen; it's a screen route, so `screenTarget`), and `leak` (the boot's delayed Y-leak).
+
 ## Call screen
-- **Formation chips:** under the PASS / RUN / PLAY ACTION tabs: ALL, then each formation that tab uses.
+- **The book:** the tabs list only your OC's book (`ocBook`).
+- **Formation chips:** under the PASS / RUN / PLAY ACTION tabs: ALL, then each formation that tab uses. When they don't fit one row, the row shows the run of chips around the current one (`chipWindow`), with arrows, and A/D scrolls it.
   - Switch with A/D, the mouse wheel, or a click.
   - The default is the first formation, and the chip is remembered per tab.
 - **Grid:** cards are 3×3, so 9 per page, and W/S pages.

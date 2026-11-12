@@ -138,7 +138,7 @@ const prep: WeekStep = (state, ctx) => {
   for (const g of gamesInWeek(state, ctx.week)) {
     for (const [id, opp] of [[g.home, g.away], [g.away, g.home]]) {
       const own = id === user && !state.config.delegate.gamePlan ? state.teamState[user]?.plan : undefined;
-      ctx.plans.set(id, own ?? autoGamePlan(squadFor(state, id), squadFor(state, opp)));
+      ctx.plans.set(id, own ?? autoGamePlan(squadFor(state, id), squadFor(state, opp), staffFor(state, id).OC));
     }
   }
   const mods = emphasisMods(staffFor(state, user), state.teamState[user]?.emph);

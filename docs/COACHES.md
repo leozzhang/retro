@@ -23,6 +23,12 @@ Staffs are generated from the team id and never stored, like rosters (`buildStaf
 - **Ages:** 32–66.
 - **Names:** from the player name pools.
 - **`staffFor(state, id)`:** the season's staff, with chairs and rating changes laid over the generated one, the way `squadFor` does for rosters (see "Coaches over time").
+- **The OC's style** (`ocIdentity`, `data/offStyles.ts`; [PLAYBOOKS.md](PLAYBOOKS.md)) comes from his id, never stored:
+  - A program's own OC runs its profile's style.
+  - An outside hire runs the hiring program's style 60% of the time, and otherwise a style drawn from the league.
+  - He keeps it wherever he goes.
+  - His style fixes the book the user calls from (`ocBook`) and the season sim's pass share (`autoGamePlan`).
+  - The prep page's STAFF tab and the carousel's OC card show it.
 
 ### Coaches over time
 Head coaches, offseason growth, and the coaching carousel (plan: [CAROUSEL_PLAN.md](CAROUSEL_PLAN.md)).
@@ -244,6 +250,5 @@ A pick does two things:
   - `staffFor` lays the changes over the generated staff
   - a new DC brings his own style (so `defIdentity` needs the state then)
 - **Specializations:** recruiter, motivator (morale), developer (a group XP multiplier: the "development" bonus deliberately left out of emphases).
-- **OC scheme identities,** possibly with playbook variants by identity.
 - **CPU emphases:** an `autoEmphasis` from the same suggestions, once it's worth the league-wide recalibration.
 - **Opponent-aware offensive emphases** (see the flag above).

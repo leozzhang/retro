@@ -2,13 +2,12 @@ import type { Athlete } from '../data/athletes';
 import { coachName, dcAdjust, type Coach, type CoachRole, type Group, type Staff } from '../data/coaches';
 import { fitRatings, healthOf, healthy, returnRating, starters, teamRatings, type Squad, type TeamRatings } from '../data/depth';
 import { defIdentity, defLabel, manShare, pressureShare, shellShares, situationMix, type DefIdentity } from '../data/identity';
-import { PLAYBOOK, ROUTES, type PlayDef, type RouteName } from '../data/plays';
+import { ocBook, ocIdentity, ocStyle, STYLES } from '../data/offStyles';
 import { overall, SLOT_POS } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
 import { emphasisById } from '../data/emphasis';
 import { DEF_SLOTS, OFF_SLOTS, TEAMS, teamById } from '../data/teams';
-import { FIELD_W } from '../engine/constants';
-import { resolvePlay } from '../game/resolvePlay';
+import { traitsOf, type Trait } from '../game/playFeatures';
 import { latestPoll, rankIn } from './polls';
 import { QB_RUN_SHARE, TARGETS } from './simGame';
 import { SCHEME_PASS } from './staff';
@@ -90,9 +89,8 @@ export interface ScoutReport {
   emphasis: Partial<Record<Group, Suggestion>>;
 }
 
-const OFF_TAG: Record<string, string> = {
-  'air-raid': 'AIR RAID', spread: 'SPREAD', pro: 'PRO STYLE', 'power-run': 'POWER RUN', option: 'RUN-FIRST OPTION',
-};
+/** Their offense, by their OC's style (`data/offStyles.ts`). */
+const offTag = (oc: Coach) => STYLES[ocStyle(oc)].name.toUpperCase();
 const QB_TAG: Record<string, string> = { pocket: 'STAYS IN THE POCKET', dual: 'WILL SCRAMBLE', runner: 'IS A RUNNER FIRST' };
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -103,35 +101,10 @@ const who = (a: Athlete, slot: string) => `${slot} #${a.num} ${short(a)} (${ovrA
 
 // ------------------------------------------------------------ play traits
 
-export type Trait = 'quick' | 'screen' | 'deep' | 'manBeater' | 'zoneBeater' | 'runInside' | 'runOutside' | 'pa' | 'rpo';
+export type { Trait } from '../game/playFeatures';
 
-const SCREEN_ROUTES = new Set<RouteName>(['smoke', 'tunnel', 'bubble', 'screen']);
-const MAN_BEATERS = new Set<RouteName>(['slant', 'drag', 'cross']);
-/** Routes that sit down in a zone's holes or split its defenders. */
-const ZONE_BEATERS = new Set<RouteName>(['hitch', 'curl', 'in', 'seam']);
-const OUTSIDE_PATHS = new Set<RouteName>(['toss', 'sweep', 'pitchPath', 'oz', 'stretch']);
-
-/** What a play is good for, read off its data (routes, scheme, read) rather than hand tags. */
-export function playTraits(p: PlayDef): Set<Trait> {
-  const out = new Set<Trait>();
-  const rp = resolvePlay(p, FIELD_W / 2, false);
-  const routes = Object.values(rp.routes).filter((r): r is RouteName => !!r);
-  const pass = routes.filter((r) => r !== 'block' && !ROUTES[r].run && !ROUTES[r].lead && r !== 'paFake');
-  const depth = (r: RouteName) => Math.max(0, ...ROUTES[r].pts.map(([dn]) => dn));
-  if (p.kind === 'run') {
-    const outside = p.scheme?.run === 'stretch' || p.scheme?.run === 'pin' || p.read === 'pitch' || p.read === 'option' || routes.some((r) => OUTSIDE_PATHS.has(r));
-    out.add(outside ? 'runOutside' : 'runInside');
-    return out;
-  }
-  if (p.read === 'rpo') out.add('rpo');
-  else if (p.kind === 'pa') out.add('pa');
-  if (p.screen || pass.some((r) => SCREEN_ROUTES.has(r))) out.add('screen');
-  else if (pass.length && Math.max(...pass.map(depth)) <= 8) out.add('quick');
-  if (pass.some((r) => depth(r) >= 25)) out.add('deep');
-  if (pass.some((r) => MAN_BEATERS.has(r))) out.add('manBeater');
-  if (pass.some((r) => ZONE_BEATERS.has(r))) out.add('zoneBeater');
-  return out;
-}
+/** What a play is good for, read off its data (routes, scheme, read) rather than hand tags (`game/playFeatures.ts`). */
+export const playTraits = traitsOf;
 
 // ------------------------------------------------------------ the report
 
@@ -248,11 +221,11 @@ function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach): 
 }
 
 /** The DC on their offense: what the defensive coaches' emphases answer. */
-function dcSection(opp: Squad, scout: number): ScoutSection {
+function dcSection(opp: Squad, scout: number, oc: Coach): ScoutSection {
   const prof = opp.team.profile.offense;
-  const passShare = SCHEME_PASS[prof.scheme] ?? 0.5;
+  const passShare = SCHEME_PASS[ocIdentity(oc).scheme] ?? 0.5;
   const on = starters(opp);
-  const items: ScoutItem[] = [{ tier: 1, text: `${OFF_TAG[prof.scheme] ?? 'BALANCED'} OFFENSE: THEY PASS ${pctAt(passShare, scout)}.` }];
+  const items: ScoutItem[] = [{ tier: 1, text: `${offTag(oc)} OFFENSE: THEY PASS ${pctAt(passShare, scout)}.` }];
   if (on.QB) items.push({ tier: 1, text: `QB ${short(on.QB)} (${ovrAt(on.QB, 'QB')}) ${QB_TAG[prof.qbStyle]}: HE RUNS ${pctAt(QB_RUN_SHARE[prof.qbStyle] ?? 0.1, scout)} OF THEIR CARRIES.` });
   const targets = Object.entries(TARGETS).filter(([sl]) => on[sl]);
   if (targets.length) {
@@ -419,7 +392,7 @@ function suggest(id: DefIdentity, m: Matchups, starred: Set<string>, staff: Staf
   if (wr2 && m.routes) rules.push({ trait: 'manBeater', w: 1, why: `${m.routes.slot} WINS HIS ROUTES` });
   // Low-weight staples, so a quiet week still fills the list.
   rules.push({ trait: 'quick', w: 0.4, why: 'STAY ON SCHEDULE' }, { trait: 'runInside', w: 0.3, why: 'KEEP THEM HONEST' });
-  const scored = PLAYBOOK.filter((p) => p.kind !== 'st' && !p.short).map((p, i) => {
+  const scored = ocBook(staff.OC).filter((p) => p.kind !== 'st' && !p.short).map((p, i) => {
     const t = playTraits(p);
     let score = 0;
     let top: { w: number; why: string } | null = null;
@@ -447,7 +420,7 @@ function suggest(id: DefIdentity, m: Matchups, starred: Set<string>, staff: Staf
  * Each position coach's emphasis idea for the week (shown on the staff tab, never applied), from the
  * same reads as the report. A coach under tier-2 scouting has none.
  */
-function suggestEmphasis(user: Squad, opp: Squad, id: DefIdentity, m: Matchups, staff: Staff): Partial<Record<Group, Suggestion>> {
+function suggestEmphasis(user: Squad, opp: Squad, id: DefIdentity, m: Matchups, staff: Staff, oppOc: Coach): Partial<Record<Group, Suggestion>> {
   const out: Partial<Record<Group, Suggestion>> = {};
   const set = (g: Group, sid: string, why: string) => {
     if (finds(staff, g, 2)) out[g] = { id: sid, why };
@@ -456,9 +429,9 @@ function suggestEmphasis(user: Squad, opp: Squad, id: DefIdentity, m: Matchups, 
   const blitz = pressureShare(id.mix);
   const blitzy = blitz >= N.blitz + LEAN;
   const press = (id.press.CB1 + id.press.CB2) / 2;
-  const ourPass = SCHEME_PASS[user.team.profile.offense.scheme] ?? 0.5;
+  const ourPass = SCHEME_PASS[ocIdentity(staff.OC).scheme] ?? 0.5;
   const prof = opp.team.profile.offense;
-  const theirPass = SCHEME_PASS[prof.scheme] ?? 0.5;
+  const theirPass = SCHEME_PASS[ocIdentity(oppOc).scheme] ?? 0.5;
   const worstOl = m.ol.reduce<Edge | null>((w, e) => (!w || e.score < w.score ? e : w), null);
   if (blitzy) set('QB', 'qb-poise', `THEY BRING PRESSURE ${pct(blitz)}`);
   else if (m.deep) set('QB', 'qb-deep', `${m.deep.slot} HAS THE SPEED EDGE`);
@@ -511,8 +484,9 @@ export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<strin
   const id = defIdentity(teamById(oppId));
   const m = matchups(user, opp);
   const prof = opp.team.profile.offense;
-  const emphasis = suggestEmphasis(user, opp, id, m, st);
-  const dc = dcSection(opp, st.DC.r.scout);
+  const oppOc = staffFor(s, oppId).OC;
+  const emphasis = suggestEmphasis(user, opp, id, m, st, oppOc);
+  const dc = dcSection(opp, st.DC.r.scout, oppOc);
   const ideas = (['DL', 'LB', 'DB'] as Group[]).filter((g) => emphasis[g]).map((g) => `${g} ${emphasisById(emphasis[g]!.id)!.label}`);
   dc.note = ideas.length ? `EMPHASIS IDEAS (STAFF TAB): ${ideas.join(', ')}.` : 'SET THE WEEK\'S EMPHASES ON THE STAFF TAB.';
   return {
@@ -522,7 +496,7 @@ export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<strin
     record: recordText(records(s).get(oppId)!),
     rank: rankIn(latestPoll(s, 'ap'), oppId),
     defTag: defLabel(id),
-    offTag: `${OFF_TAG[prof.scheme] ?? 'BALANCED'}, ${prof.qbStyle.toUpperCase()} QB`,
+    offTag: `${offTag(oppOc)}, ${prof.qbStyle.toUpperCase()} QB`,
     recent: recentGames(s, oppId),
     averages: averages(s, oppId),
     sections: scouted([ocSection(opp, id, st.OC.r.scout, staffFor(s, oppId).DC), dc, ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)], st),

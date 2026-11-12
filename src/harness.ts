@@ -78,30 +78,45 @@ export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, l
 }
 
 /**
- * One auto-QB pass rep: throws to the receiver with the most separation after `holdTime`. `catchX` is where
- * he caught it. `kind` is the throw type, or 'auto' for the CPU QB's pick (`cpuThrowKind`); the core rows
- * throw TOUCH, the old single arc.
+ * The film room's QB reads high to low (`pick: 'read'`): the deepest receiver with `open` yd of
+ * separation (depth counted to `cap` yd), else the most open man, the checkdown. The balance report's
+ * QB throws to the most open man (`'open'`), which is nearly always the back in the flat; it keeps that
+ * pick so its baseline doesn't move.
+ */
+export const READ = { open: 2.5, cap: 20 };
+
+/**
+ * One auto-QB pass rep: throws to the receiver with the most separation after `holdTime` (or by `pick`).
+ * `catchX` is where he caught it. `kind` is the throw type, or 'auto' for the CPU QB's pick (`cpuThrowKind`);
+ * the core rows throw TOUCH, the old single arc.
  */
 export function passRep(
   m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng, x?: DefExtras, los = LOS, kind: ThrowKind | 'auto' = 'touch',
-  to?: (o: Player) => boolean,
+  to?: (o: Player) => boolean, pick: 'open' | 'read' = 'open',
 ) {
   const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let thrown = false;
   let catchX = 0;
+  // Who the auto-QB threw to, and the look at the throw: the film room's diagnosis (src/film.ts).
+  let target: { slot: string; route: string; sep: number; pressure: number } | undefined;
   for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
     if (!thrown && play.phase === 'live' && play.time - play.snapTime >= holdTime) {
       let best = null as null | { p: (typeof play.off)[number]; sep: number };
+      let read = null as null | { p: (typeof play.off)[number]; sep: number; depth: number };
       for (const o of play.off) {
         // Not a back still selling pass before his route (screens, check-releases).
         if (!isEligible(o) || o.isBlocker || play.time - play.snapTime < o.routeDelay || (to && !to(o))) continue;
         let sep = Infinity;
         for (const d of play.def) sep = Math.min(sep, dist(d.pos, o.pos));
         if (!best || sep > best.sep) best = { p: o, sep };
+        const depth = Math.min(o.pos.x - los, READ.cap);
+        if (pick === 'read' && sep >= READ.open && (!read || depth > read.depth)) read = { p: o, sep, depth };
       }
+      if (read) best = read;
       if (best) {
         // Led by the ball's flight time, and kept in bounds, or a flat runner near the sideline gets a ball out of bounds.
+        target = { slot: best.p.slot, route: best.p.routeName ?? 'block', sep: best.sep, pressure: play.passContext().pressure };
         const { aim, kind: k } = play.cpuAim(best.p, kind === 'auto' ? undefined : kind);
         play.throwBall(aim, k);
         thrown = true;
@@ -112,7 +127,7 @@ export function passRep(
     // A catch can end the play the same step (out of bounds at the sideline), so check for 'over' too.
     if (before === 'air' && play.phase !== 'air' && play.carrier?.side === 'off') catchX = play.carrier.pos.x;
   }
-  return { play, o: play.outcome, catchX };
+  return { play, o: play.outcome, catchX, target };
 }
 
 /** RPO: the auto-QB pulls it and throws the tagged route this long after the snap. */
@@ -122,15 +137,15 @@ export const RPO_THROW = 1.3;
  * One RPO rep: `give` hands it off at the mesh and the auto-runner carries it (`runRep`); a pull throws the
  * play's tagged route (the receiver whose route is the play's `strong` or `weak` concept route) at `RPO_THROW`.
  */
-export function rpoRep(m: Matchup, playDef: PlayDef, call: DefCall, give: boolean, rng: Rng, los = LOS, x?: DefExtras, hold = RPO_THROW) {
+export function rpoRep(m: Matchup, playDef: PlayDef, call: DefCall, give: boolean, rng: Rng, los = LOS, x?: DefExtras, hold = RPO_THROW, pick: 'open' | 'read' = 'open') {
   if (give) {
     const r = runRep(m, playDef, call, rng, los, x);
     return { play: r.play, o: r.o };
   }
   const tag = new Set<string>();
   for (const c of [playDef.strong, playDef.weak]) if (c) for (const r of Object.values(CONCEPTS[c].routes)) tag.add(r!);
-  const r = passRep(m, playDef, call, hold, rng, x, los, 'auto', (o) => !!o.routeName && tag.has(o.routeName));
-  return { play: r.play, o: r.o };
+  const r = passRep(m, playDef, call, hold, rng, x, los, 'auto', (o) => !!o.routeName && tag.has(o.routeName), pick);
+  return { play: r.play, o: r.o, catchX: r.catchX, target: r.target };
 }
 
 /** Zone read: the auto-QB rides the back this long after the snap before reading the key. */

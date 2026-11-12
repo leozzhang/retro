@@ -6,6 +6,9 @@ export type Conference = 'SEC' | 'Big Ten' | 'ACC' | 'Big 12' | 'Pac-12' | 'Amer
 export const CONFERENCES: Conference[] = ['SEC', 'Big Ten', 'ACC', 'Big 12', 'Pac-12', 'American', 'Mountain West', 'Sun Belt', 'MAC', 'C-USA', 'Independent'];
 
 /** Position groups a profile can call a strength or weakness. */
+export type QbStyle = 'pocket' | 'dual' | 'runner';
+export type OffScheme = 'air-raid' | 'spread' | 'pro' | 'option' | 'power-run';
+
 export type Unit = 'QB' | 'RB' | 'WR' | 'TE' | 'OL' | 'DL' | 'LB' | 'CB' | 'S' | 'K' | 'P';
 
 /** A real player from the research; placed on the roster under his own name. */
@@ -36,7 +39,7 @@ export interface TeamProfile {
   record: string;
   /** Overall of a typical starter on each unit. */
   target: { off: number; def: number; st: number };
-  offense: { qbStyle: 'pocket' | 'dual' | 'runner'; scheme: 'air-raid' | 'spread' | 'pro' | 'option' | 'power-run' };
+  offense: { qbStyle: QbStyle; scheme: OffScheme };
   /** Position groups clearly better (+) or worse (-) than the rest of the team, -2..2. */
   units: Partial<Record<Unit, number>>;
   standouts: Standout[];

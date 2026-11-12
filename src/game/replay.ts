@@ -1,5 +1,6 @@
 import { DEF_CALLS, pickDefCall, type DefCall, type DefTags } from '../data/defenses';
 import { defIdentity, preventLevel, situationMix, type DefIdentity } from '../data/identity';
+import { callWeight, type OffStyle } from '../data/offStyles';
 import { PLAYBOOK, type PlayDef } from '../data/plays';
 import { kickDef } from '../data/specialTeams';
 import type { RosterPlayer, Team } from '../data/teams';
@@ -69,6 +70,8 @@ export interface ReplayTarget {
   /** The game situation (clock and score), for the defense's call. */
   sit?: Situation;
   passShare: number;
+  /** The offense's OC: the book its plays come from, and how his style calls it (`data/offStyles.ts`). */
+  oc?: { book: readonly PlayDef[]; style: OffStyle };
 }
 
 export interface ReplaySetup {
@@ -86,7 +89,28 @@ const isPass = (p: PlayDef) => (p.kind === 'pass' || p.kind === 'pa') && !p.scre
 const PASS_POOL = PLAYBOOK.filter(isPass);
 const RB_RUNS = PLAYBOOK.filter((p) => p.kind === 'run' && !p.qbRun && (p.read === 'none' || p.read === 'handoff' || p.read === 'pitch'));
 // Designed QB runs, and the reads the QB can keep.
-const QB_RUNS = PLAYBOOK.filter((p) => p.qbRun || (p.kind === 'run' && (p.read === 'zoneRead' || p.read === 'option')));
+const isQbRun = (p: PlayDef) => !!p.qbRun || (p.kind === 'run' && (p.read === 'zoneRead' || p.read === 'option'));
+const QB_RUNS = PLAYBOOK.filter(isQbRun);
+const isRbRun = (p: PlayDef) => RB_RUNS.includes(p);
+
+/** The style's call situation for a replay's snap (`CALL_SITUATION`). */
+function callSit(t: ReplayTarget): 'normal' | 'long' | 'short' | 'hurry' {
+  if (t.sit && t.sit.secsLeft <= 120 && t.sit.lead <= 0) return 'hurry';
+  if (t.down >= 3 && t.toGo >= 7) return 'long';
+  if (t.down >= 3 && t.toGo <= 2) return 'short';
+  return 'normal';
+}
+
+/** A play of this kind from the offense's book, weighted by its OC's style; the whole library without one. */
+function bookPick(t: ReplayTarget, pool: PlayDef[], keep: (p: PlayDef) => boolean, r: () => number): PlayDef {
+  const mine = t.oc ? t.oc.book.filter(keep) : [];
+  if (!t.oc || !mine.length) return pool[Math.floor(r() * pool.length)];
+  const sit = callSit(t);
+  const w = mine.map((p) => callWeight(t.oc!.style, p.tags.family, sit));
+  let x = r() * w.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < mine.length; i++) if ((x -= w[i]) <= 0) return mine[i];
+  return mine[mine.length - 1];
+}
 
 export function makeReplay(t: ReplayTarget, s: ReplaySetup): Play {
   return new Play({
@@ -149,7 +173,7 @@ export function matches(t: ReplayTarget, play: Play, relax = 0): boolean {
  * What a key play's replay has to show, with `off` and `def` on the field; null for field goals
  * (`fgTargetFor`). The ball goes to whoever the box score credited; a lost fumble isn't credited, so anyone.
  */
-export function targetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide, passShare: number): ReplayTarget | null {
+export function targetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide, passShare: number, oc?: ReplayTarget['oc']): ReplayTarget | null {
   if (k.play.fg) return null;
   const p = k.play;
   const want = k.kind === 'td' || k.kind === 'twoPt' ? 'td' : k.kind === 'int' ? 'int' : k.kind === 'sack' ? 'sack' : k.kind === 'fumble' ? 'fumble' : 'gain';
@@ -162,7 +186,7 @@ export function targetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide, passShar
   };
   return {
     off, def, defIdent: defIdentity(def.team), yard: p.yard, down: p.down, toGo: p.toGo, gain: shownGain(p), want,
-    pass: cr?.pass, slot: cr?.who?.slot, by: want === 'int' ? cr?.by?.slot : undefined, sit, passShare,
+    pass: cr?.pass, slot: cr?.who?.slot, by: want === 'int' ? cr?.by?.slot : undefined, sit, passShare, ...(oc ? { oc } : {}),
   };
 }
 
@@ -176,7 +200,7 @@ function setupFor(t: ReplayTarget, seed: number, relax = 0): ReplaySetup {
   const pass = t.want === 'int' || t.want === 'sack' || (credited ?? (t.gain >= 20 ? pick() < 0.8 : pick() < share));
   // Loosened, a QB's run may be anyone's: half the tries hand it to the back.
   const qbRun = t.slot === 'QB' && credited === false && (relax === 0 || pick() < 0.5);
-  const play = qbRun ? any(QB_RUNS) : pass ? any(PASS_POOL) : any(RB_RUNS);
+  const play = qbRun ? bookPick(t, QB_RUNS, isQbRun, pick) : pass ? bookPick(t, PASS_POOL, isPass, pick) : bookPick(t, RB_RUNS, isRbRun, pick);
   // The defense calls the situation too: prevent late against a score, a loaded box against the clock.
   const call = pickDefCall(pick, situationMix(t.defIdent, t.down, t.toGo, 100 - t.yard, undefined, false, t.sit)) ?? DEF_CALLS[0];
   const tags: DefTags = preventLevel(t.sit) ? { prevent: true } : {};

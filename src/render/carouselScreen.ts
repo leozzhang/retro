@@ -1,4 +1,5 @@
 import { coachName, COACH_ROLES, parseCoachId, type CoachRole, type RatingName } from '../data/coaches';
+import { ocBook, ocStyle, signatures, STYLES } from '../data/offStyles';
 import { teamById } from '../data/teams';
 import { VIEW_W } from '../engine/constants';
 import {
@@ -212,6 +213,11 @@ function drawHiring(g: CanvasRenderingContext2D, s: SeasonState, v: CarouselView
     text(g, talked ? `INTERVIEWED${talked > 1 ? ' TWICE' : ''}: ${MOTIVE_TEXT[motiveOf(c.id)]}` : 'INTERVIEW HIM TO SHARPEN HIS RATINGS AND LEARN WHAT HE WANTS', 10, CARD_Y + 28, { color: talked ? ACCENT : DIM });
     text(g, 'HE PICKS HIS BEST OFFER WHEN THE ROUND ENDS. A HOT SEAT SCARES ASSISTANTS OFF.', 10, CARD_Y + 44, { color: DIM });
     if (role !== 'HC' && role !== 'OC' && role !== 'DC' && role !== 'TRAINER' && role !== 'ST') text(g, `RECRUITING PIPELINES: ${pipeLabel(coachPipe(s, c.id))}`, 10, CARD_Y + 56, { color: ACCENT });
+    // An OC brings his style, and his style is your playbook (data/offStyles.ts).
+    if (role === 'OC') {
+      const sig = signatures(coach).map((p) => p.name.toUpperCase()).join(', ');
+      text(g, `RUNS ${STYLES[ocStyle(coach)].name.toUpperCase()}: ${ocBook(coach).length} PLAYS${sig ? `, PLUS ${sig}` : ''}`.slice(0, 78), 10, CARD_Y + 56, { color: ACCENT });
+    }
     if (!s.config.delegate.carousel) {
       drawButton(g, carouselActionRect(0), cs.offers[chair] === c.id ? '1 WITHDRAW' : '1 OFFER', v);
       drawButton(g, carouselActionRect(1), `2 INTERVIEW (${cs.talksLeft})`, v);

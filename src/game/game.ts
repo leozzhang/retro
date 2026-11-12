@@ -1,7 +1,8 @@
 import { disguiseName, pickDefCall, pickDisguise, rushers, type DefCall, type DefTags, type Disguise } from '../data/defenses';
 import { goForTwo, type Situation } from './situation';
 import { defIdentity, pickLineGame, preventLevel, situationMix } from '../data/identity';
-import { FORMATIONS, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
+import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
+import { ocBook, ocStyle, STYLES } from '../data/offStyles';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
 import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, teamRatings, type Squad } from '../data/depth';
@@ -25,7 +26,7 @@ import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay, type RunAssist } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
 import {
-  BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookView,
+  BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookOwner, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
 import {
@@ -49,7 +50,7 @@ import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from
 import { ROOMS } from '../data/office';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
-import { buildStaff, dcAdjust, GROUPS, type Group } from '../data/coaches';
+import { buildStaff, coachName, dcAdjust, GROUPS, type Coach, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
@@ -253,6 +254,23 @@ function chipsFor(plays: PlayDef[]): Chip[] {
 }
 
 const chipLabel = (f: Chip) => (f === 'starred' ? 'STARRED' : f.name.toUpperCase());
+
+/** Room the chip row has, leaving the arrows at each end. */
+const CHIP_ROOM = VIEW_W - 40;
+
+/** The chips shown: all of them if they fit, else the widest run around `at` that does. */
+export function chipWindow(widths: number[], gap: number, at: number): [number, number] {
+  const span = (lo: number, hi: number) => widths.slice(lo, hi + 1).reduce((a, b) => a + b, 0) + gap * (hi - lo);
+  if (span(0, widths.length - 1) <= CHIP_ROOM) return [0, widths.length - 1];
+  let lo = at;
+  let hi = at;
+  for (let grew = true; grew; ) {
+    grew = false;
+    if (hi + 1 < widths.length && span(lo, hi + 1) <= CHIP_ROOM) { hi++; grew = true; }
+    if (lo > 0 && span(lo - 1, hi) <= CHIP_ROOM) { lo--; grew = true; }
+  }
+  return [lo, hi];
+}
 /** Room for the star icon in front of the STARRED label. */
 const STAR_ICON_W = 10;
 
@@ -387,6 +405,8 @@ export class Game {
   private recruitView: RecruitView = { tab: 0, chip: 0, filter: 1, sel: 0, top: 0, mx: 0, my: 0, note: '' };
   /** Starred play ids: the playbook page sets them, the call screen's STARRED chip shows them. */
   private starred = loadStarred();
+  /** The user's book for this game: his OC's (`data/offStyles.ts`). */
+  private book: readonly PlayDef[] = LEGACY;
   /** Mouse on the call screen, for the cards' star hover. */
   private callMouse = { x: 0, y: 0 };
   private debug = false;
@@ -804,7 +824,8 @@ export class Game {
     const userHome = this.homeId === user.id;
     this.showCtx = {
       user, cpu, userSide: { team: user, roster: this.userRoster, home: userHome }, cpuSide: { team: cpu, roster: this.cpuRoster, home: !userHome },
-      userPass: (own ?? autoGamePlan(this.userSquad, this.cpuSquad)).passShare, cpuPass: autoGamePlan(this.cpuSquad, this.userSquad).passShare,
+      userPass: (own ?? autoGamePlan(this.userSquad, this.cpuSquad, this.ocOf(this.user))).passShare, cpuPass: autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)).passShare,
+      userOc: { book: ocBook(this.ocOf(user)), style: ocStyle(this.ocOf(user)) }, cpuOc: { book: ocBook(this.ocOf(cpu)), style: ocStyle(this.ocOf(cpu)) },
     };
   }
 
@@ -836,6 +857,7 @@ export class Game {
     this.lastSnap = null;
     const s = this.season;
     this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
+    this.book = ocBook(this.ocOf(user));
     const dc = (this.seasonGame && s ? staffFor(s, cpu.id) : buildStaff(cpu)).DC;
     const qbSpd = this.userRoster.QB?.r.spd ?? 70;
     this.brain = newBrain({
@@ -872,7 +894,7 @@ export class Game {
     const own = !s.config.delegate.gamePlan ? s.teamState[this.user.id]?.plan : undefined;
     const r = simPart(this.userSquad, this.cpuSquad, g.home === this.user.id, this.clock.qSecs / 60, from, this.rng, {
       neutral: g.neutral,
-      plans: { user: own ?? autoGamePlan(this.userSquad, this.cpuSquad), cpu: autoGamePlan(this.cpuSquad, this.userSquad) },
+      plans: { user: own ?? autoGamePlan(this.userSquad, this.cpuSquad, this.ocOf(this.user)), cpu: autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)) },
       emph: { user: this.userEmph },
       drives: this.liveDrives ?? undefined,
       story,
@@ -1599,13 +1621,27 @@ export class Game {
     this.bookView = { tab: this.starred.size ? 0 : 1, page: 0, open: null, flip: false, mx: 0, my: 0 };
   }
 
+  /** A team's OC this game: the season's chair, or the generated staff's in an exhibition. */
+  private ocOf(t: Team): Coach {
+    const s = this.season;
+    return (this.seasonGame && s ? staffFor(s, t.id) : buildStaff(t)).OC;
+  }
+
+  /** The dynasty's book: the user's OC, his style, and the plays he brings. */
+  private userBook(): BookOwner {
+    const s = this.season!;
+    const oc = staffFor(s, s.config.userTeamId).OC;
+    return { book: ocBook(oc), oc: coachName(oc), style: STYLES[ocStyle(oc)].name };
+  }
+
   /** Play cards by tab; click one to see it drawn with your starters, click a star to save it. */
   private updateBook(input: Input): void {
     const v = this.bookView;
     const { x, y } = input.mouse;
     v.mx = x;
     v.my = y;
-    const list = bookPlays(v.tab, this.starred);
+    const book = this.userBook().book;
+    const list = bookPlays(v.tab, this.starred, book);
     if (v.open) {
       const at = list.findIndex((p) => p.id === v.open);
       if (input.hit('Escape', 'Backspace')) {
@@ -1632,7 +1668,7 @@ export class Game {
     if (input.hit('KeyA', 'ArrowLeft')) v.tab = (v.tab + n - 1) % n;
     if (input.hit('KeyD', 'ArrowRight')) v.tab = (v.tab + 1) % n;
     if (v.tab !== tabWas) v.page = 0;
-    const pages = bookPages(v.tab, this.starred);
+    const pages = bookPages(v.tab, this.starred, book);
     v.page = Math.min(v.page, pages - 1);
     if (input.hit('KeyS', 'ArrowDown') || input.mouse.wheel > 0) v.page = (v.page + 1) % pages;
     if (input.hit('KeyW', 'ArrowUp') || input.mouse.wheel < 0) v.page = (v.page + pages - 1) % pages;
@@ -1643,7 +1679,7 @@ export class Game {
       v.page = 0;
       return;
     }
-    const shown = bookPlays(v.tab, this.starred).slice(v.page * BOOK_PAGE, v.page * BOOK_PAGE + BOOK_PAGE);
+    const shown = bookPlays(v.tab, this.starred, book).slice(v.page * BOOK_PAGE, v.page * BOOK_PAGE + BOOK_PAGE);
     const i = bookCardAt(x, y, shown.length);
     if (i < 0) return;
     if (inBox(starRect(bookCardRect(i)), x, y)) toggleStar(this.starred, shown[i].id);
@@ -2268,7 +2304,7 @@ export class Game {
   private tabPlays(): PlayDef[] | null {
     if (this.callMode === 'pat' || this.callMode === 'kickoff') return null;
     const tab = this.tabs()[this.tab];
-    return tab && tab.kind !== 'st' ? playsOfKind(tab.kind) : null;
+    return tab && tab.kind !== 'st' ? playsOfKind(tab.kind, this.book) : null;
   }
 
   /** The chip in use on this tab: STARRED if the tab has starred plays, else the first formation, until the user picks one. */
@@ -2296,8 +2332,13 @@ export class Game {
     if (!plays) return [];
     const widths = chipsFor(plays).map((f) => chipLabel(f).length * 8 + 8 + (f === 'starred' ? STAR_ICON_W : 0));
     const gap = 4;
-    let x = (VIEW_W - (widths.reduce((a, b) => a + b, 0) + gap * (widths.length - 1))) / 2;
-    return widths.map((w) => {
+    // Too many formations for one row: show the run of chips around the current one that fits (the
+    // rest are off the row, marked with arrows), and A/D scrolls it.
+    const [lo, hi] = chipWindow(widths, gap, this.chipIndex());
+    const shown = widths.slice(lo, hi + 1);
+    let x = (VIEW_W - (shown.reduce((a, b) => a + b, 0) + gap * (shown.length - 1))) / 2;
+    return widths.map((w, i) => {
+      if (i < lo || i > hi) return { x: -1000, y: CHIP_Y, w: 0, h: 0 };
       const r = { x, y: CHIP_Y, w, h: CHIP_H };
       x += w + gap;
       return r;
@@ -2800,7 +2841,7 @@ export class Game {
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: true };
     const otClock: DriveClock = { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first' };
     const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, OVERTIME.start, this.rng, otClock,
-      (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
+      (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, true));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
     // otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
@@ -2896,7 +2937,7 @@ export class Game {
    * a stream of its own, seeded by the drive: the game's random stream is untouched.
    */
   private castCpu(plays: SimPlay[], clock: DriveClock, salt: number): DriveCredit {
-    const plan = autoGamePlan(this.cpuSquad, this.userSquad);
+    const plan = autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu));
     const seed = (salt * 7919 + plays.length * 131 + this.score.user * 17 + this.score.cpu * 3 + this.clock.quarter * 1009) >>> 0;
     return { snaps: castDrive(plays, lineupOf(this.cpuSquad, plan), lineupOf(this.userSquad, plan), clock, mulberry32(seed)) };
   }
@@ -3127,7 +3168,7 @@ export class Game {
     const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
     // Watching the snaps (for the grades and the key plays) draws no random numbers.
     const dc: DriveClock = { timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs };
-    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, dc, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad).passShare));
+    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, dc, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)).passShare));
     this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
     const credit = this.castCpu(plays, dc, start + left);
     const told: StoryDrive = {
@@ -3238,7 +3279,7 @@ export class Game {
     }
     if (this.screen === 'playbook') {
       const s = this.season!;
-      drawPlaybook(g, squadFor(s, s.config.userTeamId), this.bookView, this.starred);
+      drawPlaybook(g, squadFor(s, s.config.userTeamId), this.bookView, this.starred, this.userBook());
       return;
     }
     if (this.screen === 'portal') {
@@ -3474,8 +3515,12 @@ export class Game {
     if (plays) {
       const ci = this.chipIndex();
       const rects = this.chipRects();
+      const vis = rects.filter((r) => r.w > 0);
+      if (rects[0].w === 0) text(g, '<', vis[0].x - 10, CHIP_Y + 2, { color: '#8fa0b8', shadow: false });
+      if (rects[rects.length - 1].w === 0) text(g, '>', vis[vis.length - 1].x + vis[vis.length - 1].w + 4, CHIP_Y + 2, { color: '#8fa0b8', shadow: false });
       chipsFor(plays).forEach((f, i) => {
         const r = rects[i];
+        if (!r.w) return;
         const on = i === ci;
         g.fillStyle = on ? '#24324a' : '#101620';
         g.fillRect(r.x, r.y, r.w, r.h);

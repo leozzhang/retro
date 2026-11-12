@@ -14,7 +14,7 @@ import type { KickPlay } from './kickPlay';
 import type { Play } from './playState';
 import { frameAt, tapeLength, type Tape } from './tape';
 import {
-  FgSearch, fgTargetFor, makeFg, makeReplay, ReplaySearch, stepFg, stepReplay, targetFor, type FgSetup, type ReplaySetup, type ReplaySide,
+  FgSearch, fgTargetFor, makeFg, makeReplay, ReplaySearch, stepFg, stepReplay, targetFor, type FgSetup, type ReplaySetup, type ReplaySide, type ReplayTarget,
 } from './replay';
 
 /**
@@ -37,6 +37,9 @@ export interface ShowCtx {
   /** Each offense's pass share (game plans), for snaps without box-score credit. */
   userPass: number;
   cpuPass: number;
+  /** Each offense's OC book and style, for the replays' play calls. */
+  userOc?: ReplayTarget['oc'];
+  cpuOc?: ReplayTarget['oc'];
 }
 
 export interface KeyShow {
@@ -74,7 +77,7 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: T
   const [off, def] = userBall ? [ctx.userSide, ctx.cpuSide] : [ctx.cpuSide, ctx.userSide];
   const tape = opts.tape && opts.tape.frames.length ? opts.tape : null;
   const fg = tape ? null : fgTargetFor(k, off, def);
-  const target = fg || tape ? null : targetFor(k, off, def, userBall ? ctx.userPass : ctx.cpuPass);
+  const target = fg || tape ? null : targetFor(k, off, def, userBall ? ctx.userPass : ctx.cpuPass, userBall ? ctx.userOc : ctx.cpuOc);
   const search = fg ? new FgSearch(fg, seed) : target ? new ReplaySearch(target, seed) : null;
   const before = { user: d.score[ctx.user.id] ?? 0, cpu: d.score[ctx.cpu.id] ?? 0 };
   const pts = k.kind === 'td' || k.kind === 'twoPt' ? d.points : k.kind === 'fg' ? 3 : k.kind === 'xp' ? 1 : 0;

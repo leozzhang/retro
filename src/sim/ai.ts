@@ -602,9 +602,17 @@ function zoneCover(play: Play, d: Player, a: Extract<Assign, { kind: 'zone' }>):
   } else {
     tgt = { x: spot.x, y: lerp(spot.y, qb.y, 0.2) };
   }
+  // A flat defender (the Cover 2 corner) squats: he walls #1 off inside only so far, handing a slant
+  // to the curl, and stays where a throw to the flat lands on him.
+  if (a.spot === 'flat') {
+    const inward = Math.sign(play.ballY - spot.y) || 1;
+    if ((tgt.y - spot.y) * inward > FLAT_INSIDE) tgt = { x: tgt.x, y: spot.y + inward * FLAT_INSIDE };
+  }
   d.goal = tgt;
   d.want = seek(d, tgt, maxSpeed(d) * 0.92, 1);
 }
+/** How far inside his landmark a flat defender follows a receiver before handing him off. */
+const FLAT_INSIDE = 3;
 
 /** Spy: mirror the QB from the second level. The scramble and run branches take over when he goes. */
 function spy(play: Play, d: Player): void {
