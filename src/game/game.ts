@@ -1,7 +1,7 @@
 import { disguiseName, pickDefCall, pickDisguise, rushers, type DefCall, type DefTags, type Disguise } from '../data/defenses';
 import { goForTwo, type Situation } from './situation';
 import { defIdentity, pickLineGame, preventLevel, situationMix } from '../data/identity';
-import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type Formation, type PlayDef } from '../data/plays';
+import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type PlayDef } from '../data/plays';
 import { ocBook, ocStyle, STYLES } from '../data/offStyles';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
@@ -246,14 +246,32 @@ function cardRect(i: number) {
   return { x: CARD_X0 + (i % 3) * (CARD_W + CARD_GAP), y: CARD_Y0 + Math.floor(i / 3) * (CARD_H + CARD_ROW_GAP), w: CARD_W, h: CARD_H };
 }
 
-/** Filter chips for one playbook tab: the user's starred plays, then each formation the tab uses (in `FORMATIONS` order). */
-type Chip = Formation | 'starred';
+/**
+ * Filter chips for one playbook tab: the user's starred plays, then each personnel package the tab uses.
+ * A package is what the defense sees come on the field (`lookOf` keys on it, and an audible can't change
+ * it), so the book is grouped the way a coach calls it: pick the personnel, then the play. Within a
+ * package, plays go formation by formation (`FORMATIONS` order).
+ */
+type Chip = string;
+
+const PACKAGES: { pers: string; label: string }[] = [
+  { pers: '10', label: '10 4-WIDE' },
+  { pers: '11', label: '11 3-WIDE' },
+  { pers: '12', label: '12 2-TE' },
+  { pers: '21', label: '21 2-BACK' },
+  { pers: '22', label: '22 HEAVY' },
+];
 
 function chipsFor(plays: PlayDef[]): Chip[] {
-  return ['starred', ...FORMATIONS.filter((f) => plays.some((p) => p.formation === f))];
+  return ['starred', ...PACKAGES.filter((k) => plays.some((p) => personnelOf(p.formation) === k.pers)).map((k) => k.pers)];
 }
 
-const chipLabel = (f: Chip) => (f === 'starred' ? 'STARRED' : f.name.toUpperCase());
+/** A package's plays, formation by formation. */
+function packagePlays(plays: PlayDef[], pers: string): PlayDef[] {
+  return plays.filter((p) => personnelOf(p.formation) === pers).map((p, i) => ({ p, i })).sort((a, b) => FORMATIONS.indexOf(a.p.formation) - FORMATIONS.indexOf(b.p.formation) || a.i - b.i).map((e) => e.p);
+}
+
+const chipLabel = (f: Chip) => (f === 'starred' ? 'STARRED' : PACKAGES.find((k) => k.pers === f)?.label ?? `${f} PERS`);
 
 /** Room the chip row has, leaving the arrows at each end. */
 const CHIP_ROOM = VIEW_W - 40;
@@ -2307,20 +2325,23 @@ export class Game {
     return tab && tab.kind !== 'st' ? playsOfKind(tab.kind, this.book) : null;
   }
 
-  /** The chip in use on this tab: STARRED if the tab has starred plays, else the first formation, until the user picks one. */
+  /** The chip in use on this tab: STARRED if the tab has starred plays, else the 11 package, until the user picks one. */
   private chipIndex(): number {
     const plays = this.tabPlays();
     if (!plays) return 0;
-    const n = chipsFor(plays).length;
+    const chips = chipsFor(plays);
+    const n = chips.length;
     const starredHere = plays.some((p) => this.starred.has(p.id));
-    return Math.min(this.chip[this.tab] ?? (starredHere || n < 2 ? 0 : 1), n - 1);
+    // Opens on STARRED if the tab has stars, else the base package (11), else the first one.
+    const base = Math.max(1, chips.indexOf('11'));
+    return Math.min(this.chip[this.tab] ?? (starredHere || n < 2 ? 0 : base), n - 1);
   }
 
   /** Plays under the current chip, before paging. */
   private chipPlays(): PlayDef[] {
     const plays = this.tabPlays() ?? [];
     const f = chipsFor(plays)[this.chipIndex()];
-    return f === 'starred' ? plays.filter((p) => this.starred.has(p.id)) : plays.filter((p) => p.formation === f);
+    return f === 'starred' ? plays.filter((p) => this.starred.has(p.id)) : packagePlays(plays, f);
   }
 
   private pageCount(): number {
@@ -3534,7 +3555,7 @@ export class Game {
       });
       if (!cards.length) {
         text(g, 'NO STARRED PLAYS ON THIS TAB', VIEW_W / 2, CARD_Y0 + 40, { size: 8, align: 'center', color: '#ffffff' });
-        text(g, 'A/D: PICK A FORMATION. CLICK THE STAR ON A CARD TO SAVE IT HERE.', VIEW_W / 2, CARD_Y0 + 56, {
+        text(g, 'A/D: PICK A PACKAGE. CLICK THE STAR ON A CARD TO SAVE IT HERE.', VIEW_W / 2, CARD_Y0 + 56, {
           align: 'center', color: '#8fa0b8', shadow: false,
         });
       }

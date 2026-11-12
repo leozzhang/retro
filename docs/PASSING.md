@@ -159,6 +159,26 @@ A receiver has to turn his hips to where he's going, and get going. Only the off
   - a defender breaking on a throw gets there on time and at speed, instead of pulling up on the spot
   - one within `near` (5 yd) of the catch who was on the ball reacts in `react` (0.05 s); everyone else still takes 0.12–0.47 s by `prc`
 
+## After the catch: who gets there (2026-11-12)
+Found with the film room's EXPLAIN and a frame trace. Before these fixes, deep completions averaged about 20 yd of YAC and short ones 10–15.
+- **Breaking on the ball (`BREAK_ON`, game/playState.ts).**
+  - A defender used to react to a throw only within 14 yd of where it was going. A deep safety 17 yd off a 1.7 s seam ball kept playing his zone, then trailed the catch at the same speed for 35 yd.
+  - Now anyone who can get there during the flight breaks: within `near` yd, or within his top speed × the flight + `slack`.
+- **The diving tackle (`DIVE_TACKLE`, `Play.diveAt`).**
+  - It applies only in the open field: the carrier is `past` yd beyond the line, and the tackler isn't in front of him.
+  - A free defender within `range` who's closing slower than `closing` yd/s lays out once, at `odds` of a normal tackle. A miss leaves him on the ground.
+  - Without it, a pursuer one step behind an equally fast runner chased him the length of the field.
+- **Wrapping up at the catch (`AT_CATCH`).** A receiver still turning out of his catch (`hips`) misses tackles at `miss` of the usual rate. A defender on him at the catch now usually finishes the play.
+- **Open-field angles (`pursue`'s `intercept`, `OPEN_FIELD`, sim/ai.ts).**
+  - Once the carrier is 5+ yd past the line, pursuers aim at the intercept point (`interceptTime`) instead of a fixed lead.
+  - In the box, the old lead stays. A perfect angle on a runner who's still cutting took the run game from 5.6 to 4.0 yd a carry.
+- **In bounds (`ROUTE_SIDELINE`).** Route waypoints stop 2 yd inside the sideline, and a continuing route turns upfield 2.5 yd from it. A trips quick out used to run its receiver out of bounds at full speed.
+- **Short throws on a line (`CPU_THROW.shortDepth`).** The CPU QB throws a bullet to anyone 10 yd or less downfield, not only to a covered man. An open quick out used to go as a 1.3 s touch pass.
+- **Measured:**
+  - Against 2 Man Under, YAC is 3.5–3.7 a catch (it was 5.4–6.6).
+  - In the film room: hitch 1.6, out 2.8, flat 4.3, slant 4.8, deep 10–14 (it was 15–21).
+  - Single-high man (Cover 1 Robber, Cover 0) still gives up 12–17 on short throws. That's partly the design, with no help under, and it's the next thing to look at.
+
 ## Aim feel (`AIM_FEEL`, `aimLag` in sim/passing.ts) — experiment
 
 A worse passer's pull-back line trails the mouse instead of following it 1:1, so the gap between QBs is felt in the hand. The line eases toward the mouse with time constant `tau` and a speed cap `vmax`, stepped in real time (SLOW AIM doesn't add to it). **The ball goes where the lagged line is**, so a quick flick with a bad QB lands short or off-line; holding a beat lets it settle. A faint dot shows the mouse while the line drags.

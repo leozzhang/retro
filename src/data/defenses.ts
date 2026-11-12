@@ -71,6 +71,10 @@ export interface DefCall {
   disguises?: Disguise[];
   /** Man calls against presnap motion: the man defender travels with him (`trail`, the default) or the defense bumps over (`bump`). */
   motion?: 'trail' | 'bump';
+  /** The edge against the kick-out on a run (sim/runFits.ts): box or spill; missing is the league's mix (`RUN_FIT.spill`). */
+  runFit?: 'box' | 'spill';
+  /** The front two-gaps: head-up linemen control the man over them (sim/runFits.ts). Missing: one-gap. */
+  twoGap?: boolean;
 }
 
 const RUSH4 = {

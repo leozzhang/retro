@@ -1,3 +1,4 @@
+import type { RunJob } from './runFits';
 import type { Assign } from '../data/defenses';
 import type { PoaJob, RouteName } from '../data/plays';
 import type { StJob } from '../data/specialTeams';
@@ -189,6 +190,11 @@ export interface Player {
   /** Run fit window: from `fitAt` until `fitUntil` the defender attacks the run (run read or PA bite). */
   fitAt: number;
   fitUntil: number;
+  /** Designed runs: his run job, his gap's y, whether his call spills, and when he's read his blocker (sim/runFits.ts). */
+  runJob: RunJob | null;
+  gapY: number;
+  spill: boolean;
+  readAt: number;
 
   /** Special-teams job on kicking plays. */
   job: StJob | null;
@@ -279,6 +285,10 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     faceLock: 0,
     fitAt: Infinity,
     fitUntil: 0,
+    runJob: null,
+    gapY: 0,
+    spill: false,
+    readAt: 0,
     job: null,
   };
 }

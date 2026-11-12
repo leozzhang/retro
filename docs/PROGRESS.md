@@ -1,6 +1,77 @@
 # Progress
 
-_Last updated: 2026-11-11_
+_Last updated: 2026-11-12_
+
+## Done: the run game rework, the line, fits and the edge (2026-11-12)
+RUNGAME.md has the model and the numbers.
+
+**Measurement first:**
+- `npm run runfit` (`src/runfit.ts`; also the RUNFIT section of `npm run balance`): who stops each run (free, shed, blocked, backside, downfield), stuffs, cutbacks.
+- ABLATE rows show what a block is worth: the same play with that block standing down (`PlaySetup.ablate`, harness-only).
+
+**The defense (`sim/runFits.ts`):**
+- Every front player has a run job on a designed run: edge (box or spill), chase (the backside end), one-gap (or two-gap by call), fill, cutback.
+- That replaces the QB beeline.
+- A free man goes and gets the ball.
+- A backer in man on the back fills.
+- Fills are box gaps and key the back's first steps.
+
+**The blocking (`sim/runBlocking.ts`):**
+- the get-off: one-gap penetration, so stuffs and TFLs exist
+- backside cutoff angles
+- climbs on control (the perimeter keeps its clock)
+- backside pickups
+- Duo blocks its backside
+- a lead back with no force man leads on the backer
+
+**Bugs fixed:**
+- Offset backs ran their lead blocks to the wrong side. Strong I Toss went from 1.5 to 4.4 yd a carry, and Strong I Power is fixed too.
+- Lanes now see a closing defender.
+- The sneak reads the A gaps.
+
+**Measured:**
+- RUN ALL 4.6–4.7 ypc with 14% stuffs (was 5.4 and 6%).
+- Power without its hinge loses 1.3 yd a carry (was 0.4). Inside zone without its backside loses 5.4.
+- The pass rows and the season are unchanged.
+
+**Open:**
+- Defense-heavy matchups (+10, +20) run a little too hard.
+- Gun counters are 3.3–3.8 yd a carry: the backers' read after the handoff isn't modeled.
+- The Goal Line front: Power converts 87%, the sneak 62%, QB Power about 15%.
+- Not played by hand yet.
+
+## Done: the film room's fixes, and the call screen by package (2026-11-12)
+**Passing (PASSING.md, "After the catch"):**
+- Defenders break on any ball they can reach in its flight (`BREAK_ON`).
+- A diving tackle ends open-field chases (`DIVE_TACKLE`).
+- A receiver still in his catch is easier to wrap up (`AT_CATCH`).
+- Pursuers take the intercept angle in the open field only (`OPEN_FIELD`).
+- Routes stay in bounds (`ROUTE_SIDELINE`).
+- The CPU QB throws short throws on a line.
+- **Measured:** short-route YAC is near NFL (hitch 1.6, out 2.8, flat 4.3, slant 4.8), and deep YAC fell from about 20 to 10–14.
+
+**Plays:** Trips Outs now clears #1 deep and runs the outs from #2 and #3 (`clear-outs`). Its #1 used to run a quick out into the field sideline. It now beats Cover 3 (63–73%, was 18–20%).
+
+**New balance baseline** (the pass and run rows moved; this is the new reference):
+- PASS 2 Man Under: 1.2 s comp 69%, ypp 7.1, yac 3.5; 2.2 s comp 64%, ypp 7.9, yac 3.7
+- PASS Cover 1 Robber: 1.2 s comp 78%, ypp 16.9, yac 13.9
+- RUN ALL: ypc 5.4, median 2.9, 4+ 38%, 10+ 13% (10+ was 16–17%)
+- ADAPT rows hold to their DEFENSE.md targets: the counter after IZ ×8 pays 13–15 ypp, and a spammed RPO Glance loses about 35%.
+- The season sim is unchanged.
+
+**Film room:**
+- 115 of 144 tags hold.
+- Six plays still beat every call, four of them by a hair (45–51% at worst): Four Verts, Curl Flat, Double Hitch, Drive, RPO Arrow's pull, and QB Sneak.
+- Book means: Spread RPO 51%, Pro 55%.
+
+**Call screen:** chips are personnel packages (10 4-WIDE, 11 3-WIDE, 12 2-TE, 21 2-BACK, 22 HEAVY), with the plays inside each one in formation order. It opens on 11.
+
+**Next:**
+- **The run-blocking and run-defense rework:** done (see above). It was the cause of these remaining flags:
+  - 3rd and 1 against Bear Cover 1 is too easy: Power 81%, the sneak 92%, against targets of about 65–70% and 85%.
+  - The perimeter runs and the gun counters are weak: Strong I Toss 12%, Counter GT 18%, Trey Counter 14%.
+  - Backside blocking and backside pursuit don't matter yet.
+- Short throws against single-high man still give 12–17 YAC.
 
 ## Done: the expanded playbook and OC styles, batch 1 (2026-11-11)
 See PLAYBOOKS.md and FILM.md.
@@ -40,13 +111,7 @@ Air Raid, Spread Option and Power still run the legacy 62 (batch 2).
 - The Cover 2 corner no longer chases a slant 9 yd inside his flat (`FLAT_INSIDE`). Only zone calls with a flat defender move (Cover 2, Tampa 2, Fire Zone), plus ADAPT rows within noise. The core rows are unchanged.
 - Ace Wing Counter's handoff.
 
-**Next, by the film room's flags:**
-- **Deep completions get about 20 yd of YAC** (go, post, corner), so vertical concepts beat every call once the QB reads. This is the biggest balance issue in the passing game: deep coverage and pursuit after a deep catch.
-- Out and hitch concepts don't beat Cover 3 the way they should.
-- 3rd and 1 runs are too automatic.
-- Slant Flat and Fade Out are strong; Strong I Toss and Counter GT are weak.
-- Then batch 2: the Air Raid (with an option route), Spread Option and Power books.
-- Then the ML defense on the tags.
+**Next** (the film room's flags, most since fixed; see above): batch 2, the Air Raid (with an option route), Spread Option and Power books; then the ML defense on the tags.
 
 **Not checked in a browser yet:** the call screen with the book and the chip row's scrolling, the playbook header, and the STAFF and carousel labels.
 

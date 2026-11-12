@@ -82,7 +82,12 @@ The whole library (98 plays, 111 rows) takes about 2 minutes.
 - **The film QB threw the checkdown** (see "How it's measured"). It now reads high to low.
 - **Ace Wing Counter never handed off,** because the gun counter path never reaches an under-center mesh. It now uses the under-center downhill path: 42%, 6.1 ypp.
 
-**Flags now, not tuned:**
+**Fixed on 2026-11-12** (PASSING.md, "After the catch"): deep YAC is down to 10–14 and short-route YAC is near NFL, and Trips Outs runs its outs from #2 and #3. Now:
+- 115 of 144 tags hold.
+- Six plays still beat every call, four of them by a hair (45–51% at worst): Four Verts, Curl Flat, Double Hitch, Drive, RPO Arrow's pull, QB Sneak.
+- The run flags below wait on the run-blocking rework.
+
+**Flags at the time:**
 - **Downfield completions run far too long.** This is the big one, and it's game-wide. With a QB who reads, deep routes dominate:
   - go: 65% caught, 30.5 yards a target, 19.4 YAC
   - post: 26.1 yards a target

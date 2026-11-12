@@ -4,6 +4,7 @@ import { adaptiveRows } from './adaptive';
 import { CORE_CALLS, DEF_CALLS, disguiseName, type DefCall, type GameKind } from './data/defenses';
 import { LEGACY, PLAYBOOK, type PlayDef, type RouteName } from './data/plays';
 import { OFF_STYLES, STYLES, styleBook } from './data/offStyles';
+import { runfitReport } from './runfit';
 import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
 import { teamById } from './data/teams';
@@ -648,6 +649,7 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   if (addedRuns.length) rows.push('', ...runRows(addedRuns, mulberry32(59)));
   if (added.some((p) => p.short && picked(p))) rows.push('', ...shortRows(added.filter((p) => p.short && picked(p)), mulberry32(61)));
   if (!only || only.includes('book')) rows.push('', ...bookRows(mulberry32(67)));
+  if (!only || only.includes('runfit')) rows.push('', ...runfitReport());
   if (!only || only.includes('gap')) rows.push('', ...gapRows(mulberry32(23)));
   if (!only || only.includes('route')) rows.push('', ...routeRows(mulberry32(17)));
   if (!only || only.includes('defense')) rows.push('', ...defenseRows(pass, pa, runs, mulberry32(19)));

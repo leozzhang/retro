@@ -566,10 +566,10 @@ const LEGACY_PLAYS: PlayDef[] = [
   },
   {
     id: 'trips-outs', name: 'Trips Outs', kind: 'pass', formation: GUN_TRIPS,
-    strong: 'double-out', weak: 'go', backs: { RB: 'block' },
+    strong: 'clear-outs', weak: 'go', backs: { RB: 'block' },
     block: 'pass', read: 'none', flip: 'field', drop: 1,
     tags: tags('quick', 'outs', 'cover3'),
-    tip: 'Quick outs to the field, seam holds the safety. Throw early.',
+    tip: 'Z clears the corner deep; the slot and TE run outs under him. Throw early.',
   },
   {
     id: 'empty-spacing', name: 'Empty Spacing', kind: 'pass', formation: EMPTY,

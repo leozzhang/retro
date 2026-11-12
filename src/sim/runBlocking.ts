@@ -1,5 +1,7 @@
 import { STEP } from '../engine/constants';
-import { add, clamp, dist, len, lerp, norm, scale, sub, type Vec } from '../engine/math';
+import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Vec } from '../engine/math';
+
+const ZERO: Vec = { x: 0, y: 0 };
 import type { Play } from '../game/playState';
 import { accelOf, LEAN_FX, maxSpeed, seek, type Player } from './player';
 import { templateValue } from '../data/athletes';
@@ -56,6 +58,13 @@ const WORK_RATE = 0.05;
 export const COMBO_CLIMB: Record<'zone' | 'stretch' | 'gap', number> = { zone: 0.55, stretch: 0.3, gap: 0.5 };
 /** He also comes off early once the backer declares: this close to him, or this close to the line. */
 const CLIMB_TRIGGER = 3;
+/** Climbs on control (`releaseClimbers`): the double has him when his power is under −`margin`; else it holds up to `hold` s more. */
+export const CLIMB = { margin: 2, hold: 0.5 };
+/**
+ * Backside linemen cut off (`runBlock`): a lineman this far backside of the hole takes the angle across his
+ * man's path to the ball (`cutOff`), so a backside tackle slanting playside is walled off, not run past.
+ */
+const CUTOFF_FROM = 1;
 /** Blocker counts as between his man and the ball (leverage) above this alignment (cosine). */
 export const LEVERAGE_DOT = 0.35;
 /** Shed rate (per second) for a blocked defender on the far side of the play, peeling off to pursue. */
@@ -96,6 +105,10 @@ const PEEL_BACKSIDE = 2;
 export const ZONE_READ_W = 6;
 /** Gap runs stay this close to the designed hole. */
 const GAP_READ_W = 2.5;
+/** A sneak's lanes: the A gaps. */
+const SNEAK_READ_W = 1.2;
+/** How far ahead (s) the lane read projects a free defender who's moving (a backside chaser closing the cutback). */
+const LANE_LEAD = 0.35;
 
 const dot = (a: Vec, b: Vec) => a.x * b.x + a.y * b.y;
 
@@ -284,10 +297,11 @@ export function assignRunBlocks(play: Play): void {
   }
 
   // Cut-off: a down lineman nobody has yet goes to the nearest uncovered lineman (preferring the one playside of him).
-  // On gap schemes, linemen well backside of the line (after the pulls) are left to chase from behind.
+  // With a puller, linemen well backside of the line are left to chase from behind (the hinge has the gap he
+  // left); a gap run with nobody pulling (duo) blocks its backside like any other.
   const lastLine = Math.min(...line.map(along));
   for (const d of dl) {
-    if (taken.has(d) || (down && along(d) < lastLine - 1)) continue;
+    if (taken.has(d) || (down && puller && along(d) < lastLine - 1)) continue;
     let best: Player | null = null;
     const cost = (b: Player) => Math.abs(along(d) - along(b)) + (along(b) < along(d) ? 1.5 : 0);
     for (const b of line) if (!b.mark && b.role === 'OL' && (!best || cost(b) < cost(best))) best = b;
@@ -354,6 +368,16 @@ export function assignRunBlocks(play: Play): void {
       if (!best || dist(d.pos, alley) < dist(best.pos, alley)) best = d;
     }
     o.poa = best;
+    // Nobody in the alley for him: he leads on the playside backer nearest the edge instead.
+    if (!best) {
+      const lb = boxDefenders(play)
+        .filter((d) => !tk.has(d) && d.role === 'LB' && along(d) > 0)
+        .sort((a, b) => dist(a.pos, { x: play.los, y: edgeY }) - dist(b.pos, { x: play.los, y: edgeY }))[0];
+      if (lb) {
+        o.poaJob = 'lead';
+        o.poa = lb;
+      }
+    }
   }
 }
 
@@ -476,6 +500,10 @@ function leadBlock(play: Play, p: Player): boolean {
 
 /** Fire off the ball and wall the defender off from the hole. */
 export function runBlock(play: Play, p: Player): void {
+  if (play.idle.has(p)) {
+    p.want = ZERO; // standing down for the harness's ablation
+    return;
+  }
   const hole = play.hole;
   if (!p.mark && p.route.length && leadBlock(play, p)) return;
   if (p.pull && !p.mark && pullBlock(play, p)) return;
@@ -504,8 +532,10 @@ export function runBlock(play: Play, p: Player): void {
     const sp = maxSpeed(p) * 0.95;
     const c = play.carrier;
     const ref = c && c.side === 'off' && play.phase === 'run' ? c.pos : hole;
-    // A puller or lead back steps into his man's path to the ball; everyone else leads his man's movement.
-    const at = p.poaJob ? cutOff(p, r, c && ref === c.pos ? c : null, ref, sp) : add(r.pos, scale(r.vel, clamp(dist(p.pos, r.pos) / sp, 0, 0.6)));
+    // A puller or lead back steps into his man's path to the ball, and so does a backside lineman (the
+    // cutoff, the scoop); everyone else leads his man's movement.
+    const backside = (p.start.y - hole.y) * playSide(play) < -CUTOFF_FROM && p.role === 'OL';
+    const at = p.poaJob || backside ? cutOff(p, r, c && ref === c.pos ? c : null, ref, sp) : add(r.pos, scale(r.vel, clamp(dist(p.pos, r.pos) / sp, 0, 0.6)));
     const tgt = { x: at.x - 0.25, y: at.y + Math.sign(ref.y - at.y) * 0.75 };
     p.want = seek(p, tgt, sp, 0.3);
   } else {
@@ -538,7 +568,14 @@ export function releaseClimbers(play: Play): void {
     const d = b.engaged;
     if (!lb || !d) continue;
     const declared = dist(lb.pos, b.pos) < CLIMB_TRIGGER || lb.pos.x < play.los + CLIMB_TRIGGER;
-    if (play.time < b.comboUntil && !declared && !lb.down) continue;
+    // Off the double on control, not a clock: once the down man is being moved (the double is winning)
+    // after the combo's time, or the backer declares; a down man still winning keeps him on it up to
+    // `CLIMB.hold` s longer.
+    const controlled = (d.blockPower ?? 0) < -CLIMB.margin;
+    // On the perimeter (stretch, pin, the toss) the climb is on the clock: the ball's outside fast.
+    const hold = perimeter(play) ? 0 : CLIMB.hold;
+    const due = play.time >= b.comboUntil && (controlled || play.time >= b.comboUntil + hold);
+    if (!due && !declared && !lb.down) continue;
     d.engagedBy = d.engagedBy.filter((o) => o !== b);
     b.engaged = null;
     b.mark = lb.down ? null : lb;
@@ -554,6 +591,26 @@ function washSign(play: Play, d: Player): number {
 }
 
 const defPower = (r: Ratings) => r.bsh * 0.7 + r.spd * 0.3;
+
+/**
+ * The get-off (docs/RUNGAME.md): the first contact of a run block, in the first `window` s. A one-gap
+ * lineman or the edge who beats his blocker off the ball slips him into his gap, penetration, instead
+ * of being engaged: a roll of `sd` plus `perTalent` × (his power − the block) against `win` (`edge` adds
+ * to it for the edge, `short` in the goal-line and bear fronts, and a sneak takes off `count`: the line fires
+ * on the count; a two-gap player never slips, he's there to control his man). The pass rush
+ * (`passPro.ts`) is untouched.
+ */
+export const RUN_GETOFF = { window: 0.6, sd: 9, perTalent: 0.2, win: 11, edge: 0, short: 7, count: 12 };
+
+export function getOffWins(play: Play, d: Player, b: Player): boolean {
+  if (play.time - play.snapTime > RUN_GETOFF.window || (d.runJob !== 'gap' && d.runJob !== 'edge')) return false;
+  // The short-yardage fronts (goal line, bear) play low, one-gap, attack: `short` more get-off.
+  const front = play.defCall.front === 'goal' || play.defCall.front === 'bear' ? RUN_GETOFF.short : 0;
+  // A sneak is a wedge on the count: the line knows when the ball's snapped and fires first.
+  const count = play.playDef.tags.concept === 'sneak' ? RUN_GETOFF.count : 0;
+  const roll = gauss(play.rng) * RUN_GETOFF.sd + RUN_GETOFF.perTalent * (defPower(d.r) - runBlockValue(b.r)) + (d.runJob === 'edge' ? RUN_GETOFF.edge : 0) + front - count;
+  return roll > RUN_GETOFF.win;
+}
 const evenCache = new Map<string, number>();
 
 /** What a defender's raw edge over a blocker would be with both players at the same level (position templates). */
@@ -680,7 +737,9 @@ export function laneScores(play: Play, c: Player): Lane[] {
   const h = play.hole;
   // Gap runs stay near the hole, except a back on a perimeter path (power read's sweep), who reads wide.
   const outside = c === play.rb && !!c.routeName && PERIMETER_PATHS.has(c.routeName);
-  const w = (play.runScheme === 'gap' || play.runScheme === 'trap') && !outside ? GAP_READ_W : ZONE_READ_W;
+  // A sneak reads the A gaps only: there's nowhere else to go.
+  const sneak = play.playDef.tags.concept === 'sneak';
+  const w = sneak ? SNEAK_READ_W : (play.runScheme === 'gap' || play.runScheme === 'trap') && !outside ? GAP_READ_W : ZONE_READ_W;
   const lx = play.los + 0.5;
   const sp = maxSpeed(c);
   const lanes: Lane[] = [];
@@ -692,7 +751,9 @@ export function laneScores(play: Play, c: Player): Lane[] {
     for (const d of play.def) {
       if (d.down) continue;
       const slow = d.engagedBy.length ? (levered(d, at) ? 3.5 : 1.5) : 1;
-      open = Math.min(open, (dist(d.pos, at) * slow) / maxSpeed(d));
+      // A free defender closing on the lane is nearer than he looks: where he'll be in `LANE_LEAD` s counts.
+      const dd = d.engagedBy.length ? dist(d.pos, at) : Math.min(dist(d.pos, at), dist(add(d.pos, scale(d.vel, LANE_LEAD)), at));
+      open = Math.min(open, (dd * slow) / maxSpeed(d));
       // A blocked pair standing in the lane is a wall, not daylight (`PILE`).
       if (d.engagedBy.length && Math.abs(d.pos.y - y) < PILE.width && d.pos.x > lx - 1.5 && d.pos.x < lx + 1) open = Math.min(open, PILE.lane);
     }

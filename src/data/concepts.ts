@@ -40,6 +40,8 @@ export const CONCEPTS = {
   mills: { name: 'Mills', routes: { 1: 'in', 2: 'post' } },
   'cross-go': { name: 'Y-Cross', routes: { 1: 'go', 2: 'cross' } },
   'double-out': { name: 'Double Out', routes: { 1: 'quickOut', 2: 'quickOut', 3: 'seam' } },
+  // Trips outs: #1 clears the corner deep, #2 and #3 run outs under him (the Cover 3 beater).
+  'clear-outs': { name: 'Clear Outs', routes: { 1: 'go', 2: 'quickOut', 3: 'quickOut' } },
   'corner-out': { name: 'Corner Out', routes: { 1: 'corner', 2: 'quickOut' } },
   spacing: { name: 'Spacing', routes: { 1: 'slant', 2: 'hitch', 3: 'quickOut' } },
   // Screens: the receivers a screen doesn't reach stalk-block

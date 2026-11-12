@@ -147,7 +147,7 @@ New routes in batch 6: `fade`, `whip`, `arrow`, `outUp`, `slip` (a delayed slip 
 
 ## Call screen
 - **The book:** the tabs list only your OC's book (`ocBook`).
-- **Formation chips:** under the PASS / RUN / PLAY ACTION tabs: ALL, then each formation that tab uses. When they don't fit one row, the row shows the run of chips around the current one (`chipWindow`), with arrows, and A/D scrolls it.
+- **Package chips:** under the PASS / RUN / PLAY ACTION tabs: STARRED, then each personnel package the tab uses (10 4-WIDE, 11 3-WIDE, 12 2-TE, 21 2-BACK, 22 HEAVY). A package is what the defense sees come on the field, and an audible won't change it, so you pick the personnel and then the play. Within a package the cards go formation by formation (`FORMATIONS` order), and each card names its formation. It opens on STARRED if the tab has stars, else 11. If the chips ever outgrow the row, it shows the run around the current one (`chipWindow`), with arrows.
   - Switch with A/D, the mouse wheel, or a click.
   - The default is the first formation, and the chip is remembered per tab.
 - **Grid:** cards are 3×3, so 9 per page, and W/S pages.

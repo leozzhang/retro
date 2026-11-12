@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CORE_CALLS } from './data/defenses';
+import { CORE_CALLS, DEF_CALLS } from './data/defenses';
 import { PLAYBOOK } from './data/plays';
 import { Camera } from './engine/camera';
 import { STEP } from './engine/constants';
@@ -206,5 +206,79 @@ describe('run blocks and the talent gap', () => {
     expect(even.ypc).toBeGreaterThan(stronger.ypc);
     expect(stronger.stuff).toBeLessThan(0.35);
     expect(stronger.ypc).toBeGreaterThan(1.5);
+  });
+});
+
+describe('run fits (sim/runFits.ts)', () => {
+  const book = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
+  const snapRun = (id: string, callId = '2-man', seed = 3) => {
+    const call = [...CORE_CALLS, ...DEF_CALLS].find((c) => c.id === callId)!;
+    const play = newPlay(referenceMatchup(), book(id), call, mulberry32(seed));
+    play.snap();
+    return play;
+  };
+
+  it('every front player on a designed run has a job: an edge, a chase end, gaps, and a cutback backer', () => {
+    // Cover 3: zone backers (in 2 Man the WLB is on the back, so he fills and nobody has the cutback).
+    const play = snapRun('inside-zone', 'c3');
+    const dl = play.def.filter((d) => d.role === 'DL');
+    expect(dl.filter((d) => d.runJob === 'edge')).toHaveLength(1);
+    expect(dl.filter((d) => d.runJob === 'chase')).toHaveLength(1);
+    expect(dl.filter((d) => d.runJob === 'gap').length).toBeGreaterThanOrEqual(2);
+    expect(play.def.some((d) => d.runJob === 'cutback')).toBe(true);
+    // The edge is on the play side, the chase end on the other.
+    const side = Math.sign(play.hole.y - play.ballY);
+    const edge = dl.find((d) => d.runJob === 'edge')!;
+    const chase = dl.find((d) => d.runJob === 'chase')!;
+    expect(Math.sign(edge.pos.y - play.ballY)).toBe(side);
+    expect(Math.sign(chase.pos.y - play.ballY)).toBe(-side);
+  });
+
+  it('a pass play leaves the front to rush (no run jobs)', () => {
+    const play = snapRun('smash');
+    expect(play.def.some((d) => d.runJob)).toBe(false);
+  });
+
+  it("the defensive line plays its gaps, not the QB: nobody's chasing the QB at the mesh", () => {
+    const play = snapRun('inside-zone');
+    for (let i = 0; i < 18; i++) play.update(STEP, fakeInput, cam);
+    for (const d of play.def.filter((x) => x.role === 'DL' && x.runJob === 'gap' && !x.engagedBy.length)) {
+      expect(Math.abs(d.goal!.y - d.gapY)).toBeLessThan(2.5);
+    }
+  });
+
+  it('a backside lineman takes the cutoff angle: he aims across his man toward the ball, not at him', () => {
+    const play = snapRun('inside-zone');
+    play.update(STEP, fakeInput, cam);
+    const side = Math.sign(play.hole.y - play.ballY);
+    const back = play.off.filter((o) => o.role === 'OL').sort((a, b) => (a.pos.y - b.pos.y) * side)[0];
+    expect(back.mark).toBeTruthy();
+    // He's moving playside (toward the ball's side of his man).
+    expect(Math.sign(back.want.y) === side || Math.abs(back.want.y) < 0.5).toBe(true);
+  });
+
+  it('a block is worth something: inside zone without its backside blocks loses yards (the ablation)', () => {
+    const m = referenceMatchup();
+    const iz = book('inside-zone');
+    const run = (ablate?: { backside: number }) => {
+      const rng = mulberry32(17);
+      let y = 0;
+      let n = 0;
+      for (let i = 0; i < 40; i++) {
+        const r = runRep(m, iz, CORE_CALLS[0], rng, undefined, ablate ? { ablate } : undefined);
+        if (!r.ran) continue;
+        y += r.yds;
+        n++;
+      }
+      return y / n;
+    };
+    expect(run({ backside: 2 })).toBeLessThan(run() - 1.5);
+  });
+
+  it("a sneak reads only the A gaps", () => {
+    const play = snapRun('qb-sneak', 'goal');
+    for (let i = 0; i < 12 && play.phase !== 'run'; i++) play.update(STEP, fakeInput, cam);
+    const lanes = laneScores(play, play.qb);
+    expect(Math.max(...lanes.map((l) => Math.abs(l.y - play.hole.y)))).toBeLessThanOrEqual(1.3);
   });
 });

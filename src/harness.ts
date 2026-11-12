@@ -16,6 +16,8 @@ import type { Input } from './engine/input';
 import { dist, type Rng } from './engine/math';
 import { KickPlay } from './game/kickPlay';
 import { Play, type PlaySetup } from './game/playState';
+import { playSide } from './sim/runBlocking';
+import { FIELD_W } from './engine/constants';
 import type { ThrowKind } from './sim/ball';
 import type { KickParams, Wind } from './sim/kicking';
 import { arcAngle } from './sim/passPro';
@@ -68,7 +70,7 @@ export function referenceMatchup(off = REF_OFF, def = REF_DEF): Matchup {
 }
 
 /** The DC's tags, the defenders' leans (game/defBrain.ts) and a disguise for a snap; none plays the call as written. */
-export type DefExtras = Pick<PlaySetup, 'tags' | 'reads' | 'disguise'>;
+export type DefExtras = Pick<PlaySetup, 'tags' | 'reads' | 'disguise' | 'ablate'>;
 
 export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras): Play {
   return new Play({
@@ -107,6 +109,7 @@ export function passRep(
       for (const o of play.off) {
         // Not a back still selling pass before his route (screens, check-releases).
         if (!isEligible(o) || o.isBlocker || play.time - play.snapTime < o.routeDelay || (to && !to(o))) continue;
+        if (pick === 'read' && (o.pos.y < 0.5 || o.pos.y > FIELD_W - 0.5)) continue; // out of bounds: not a target
         let sep = Infinity;
         for (const d of play.def) sep = Math.min(sep, dist(d.pos, o.pos));
         if (!best || sep > best.sep) best = { p: o, sep };
@@ -162,6 +165,7 @@ export function runRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, lo
   const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let contact: number | null = null;
+  let cutback: boolean | null = null;
   for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
     const opt = play.handoffOption();
     const since = play.time - play.snapTime;
@@ -176,13 +180,33 @@ export function runRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, lo
     if (play.handedOff || play.kept || (playDef.qbRun && play.phase === 'run')) play.controlled = null;
     play.update(STEP, fakeInput, cam);
     const c = play.carrier;
+    // A cutback: he crosses the line on the far side of the center from the play.
+    if (cutback === null && c && c.side === 'off' && c.pos.x >= los + 1) cutback = (c.pos.y - play.ballY) * playSide(play) < -1;
     if (contact === null && c && c.side === 'off' && play.phase === 'run') {
       if (play.def.some((d) => !d.down && dist(d.pos, c.pos) <= TACKLE_RANGE + 0.3)) contact = c.pos.x - los;
     }
   }
   const o = play.outcome;
   const ran = !!o && (play.handedOff || play.kept || !!playDef.qbRun);
-  return { play, o, ran, yds: o ? o.spot - los : 0, contact: contact ?? (o ? o.spot - los : 0) };
+  return { play, o, ran, yds: o ? o.spot - los : 0, contact: contact ?? (o ? o.spot - los : 0), how: runHow(play, los), cutback };
+}
+
+/**
+ * Who stopped a run (the RUNFIT rows): `downfield` past 5 yd; else `backside` (the tackler lined up on the
+ * far side of the play, the chase), `shed` (he got off a block), `blocked` (still on one), or `free` (nobody
+ * ever blocked him). `none`: no tackle (a TD, out of bounds).
+ */
+export type RunHow = 'downfield' | 'backside' | 'shed' | 'blocked' | 'free' | 'none';
+
+function runHow(play: Play, los: number): RunHow {
+  const t = play.tackler;
+  const o = play.outcome;
+  if (!t || !o || o.type !== 'tackle') return 'none';
+  if (o.spot - los >= 5) return 'downfield';
+  if ((t.start.y - play.ballY) * playSide(play) < -1.5) return 'backside';
+  if (play.gotOff.has(t)) return 'shed';
+  if (play.wasBlocked.has(t)) return 'blocked';
+  return 'free';
 }
 
 /** Auto-kicker: release `params` at the first chance (punts: as soon as the punter has the ball), then time the strike perfectly. */

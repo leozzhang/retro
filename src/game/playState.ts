@@ -8,7 +8,7 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, STEP } from '../engine/constant
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { cutKeep, eyesOf, facingQB, FIND, isRusher, matchZones, PREVENT, readyAt, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
+import { cutKeep, eyesOf, facingQB, FIND, isRusher, matchZones, PREVENT, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
@@ -18,12 +18,13 @@ import {
 } from '../sim/player';
 import { aimLag, aimTarget, MIN_DRAG_PX, MOVE_FULL, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
 import {
-  ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, pileCap, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
+  ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, getOffWins, pileCap, playSide, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
+import { assignRunFits } from '../sim/runFits';
 import { fallForward, jukeTackleMul, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { assignRushRoles, callProtection, inPocket, passEngagement, pocketSpot, PROT, protectStep, protecting, startRep } from '../sim/passPro';
 import { matchDefense } from './matchups';
-import { alignY, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
+import { alignY, BACKFIELD_DX, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
 
 export type Phase = 'presnap' | 'snap' | 'live' | 'air' | 'run' | 'over';
@@ -59,6 +60,12 @@ export interface PlaySetup {
   disguise?: Disguise | null;
   /** Extra aim lag (s) from a shaken QB on this snap (data/confidence.ts `shakenAimLag`). */
   aimNerves?: number;
+  /**
+   * The harness's ablations (`npm run balance`, RUNFIT): blockers who stand down on a run, to measure what a
+   * block is worth. `backside`: that many of the backside-most linemen who stay in; `slots`: by on-field
+   * slot. Never set in a game.
+   */
+  ablate?: { backside?: number; slots?: OffSlot[] };
   rng: Rng;
 }
 
@@ -75,6 +82,21 @@ const ARM_TACKLE = 0.5;
  * on it the whole way, so he's on the man after `react` s instead of the reaction everyone else needs.
  */
 export const CATCH_PURSUIT = { near: 5, react: 0.05 };
+/**
+ * Who breaks on a throw: a defender within `near` yd of where it's going, or one who could get there
+ * before it comes down (his top speed × the flight, plus `slack`). The rest keep their jobs.
+ */
+export const BREAK_ON = { near: 14, slack: 3 };
+/**
+ * The diving tackle (`diveAt`): in the open field (the carrier `past` yd beyond the line, the tackler not
+ * in front of him), from `range` yd, when he's closing slower than `closing` yd/s, at `odds` of a normal tackle; a miss puts him down for `down` s. Without it a pursuer a step behind a runner as
+ * fast as he is chases him the length of the field.
+ */
+/** A tackle on a receiver still in his catch state (hips not around yet) misses at `miss` of the usual rate. */
+export const AT_CATCH = { miss: 0.4 };
+/** A backside lineman on his way to a backer picks up a free down lineman this close to him (playside climbers keep their man). */
+export const RUN_PICKUP = 1.1;
+export const DIVE_TACKLE = { range: 1.7, closing: 1.0, odds: 0.55, down: 1.0, past: 5 };
 /**
  * Seconds of full sprint from a full bar, from the least to the most enduring player, eased by
  * `endurance` squared: a pocket QB about 1.5 s, a mobile QB about 2.3, a WR about 2.9.
@@ -188,7 +210,7 @@ export const TIP = {
  * (`cpuAim`, solved in `leadIters` passes). It used to be distance / 22 s, short of that, which put every
  * deep ball 3+ yd behind the man once placement started to matter (docs/PASSING.md).
  */
-export const CPU_THROW = { lobFrom: 30, tight: 2.5, bulletMax: 24, leadIters: 4 };
+export const CPU_THROW = { lobFrom: 30, tight: 2.5, bulletMax: 24, leadIters: 4, shortDepth: 10 };
 
 export type HandoffKind = 'handoff' | 'pitch';
 
@@ -310,6 +332,7 @@ export class Play {
   clockLeft = Infinity;
 
   constructor(s: PlaySetup) {
+    this.ablate = s.ablate;
     this.los = s.los;
     this.ballY = s.ballY;
     this.playDef = s.play;
@@ -400,11 +423,15 @@ export class Play {
 
   private buildRoute(p: Player, rn: keyof typeof ROUTES): void {
     const r = ROUTES[rn];
-    const side = Math.sign(this.ballY - p.pos.y) || this.resolved.strongSign; // +1 means "inside" is +y
+    // +1 means "inside" is +y. A lead block from the backfield (kick-out, lead, the toss's lead) is drawn
+    // for the strong side, so an offset back (Strong I's fullback) goes there too, not toward the ball.
+    const leadBack = !!r.lead && p.pos.x - this.los <= BACKFIELD_DX;
+    const side = leadBack ? this.resolved.strongSign : Math.sign(this.ballY - p.pos.y) || this.resolved.strongSign;
     let prev = p.pos;
     let last = p.pos;
     for (const [dn, ins] of r.pts) {
-      const pt = { x: Math.min(p.pos.x + dn, 119), y: clamp(p.pos.y + ins * side, 1, FIELD_W - 1) };
+      // Waypoints stay `ROUTE_SIDELINE` inside the sideline, so a receiver at speed doesn't carry out of bounds.
+      const pt = { x: Math.min(p.pos.x + dn, 119), y: clamp(p.pos.y + ins * side, ROUTE_SIDELINE, FIELD_W - ROUTE_SIDELINE) };
       p.route.push(pt);
       prev = last;
       last = pt;
@@ -693,8 +720,11 @@ export class Play {
     const to = { x: this.qb.pos.x, y: this.qb.pos.y, z: 1.2 };
     launch(this.ball, from, to, dist(from, to) / 16, 0.15, 'snap');
     if (this.readKey) this.keyCrash = this.rng() < KEY_CRASH;
-    if (this.playDef.block === 'run' && this.runScheme !== 'draw') assignRunBlocks(this);
-    else {
+    if (this.playDef.block === 'run' && this.runScheme !== 'draw') {
+      assignRunBlocks(this);
+      this.applyAblation();
+      assignRunFits(this);
+    } else {
       assignRushRoles(this);
       this.assignProtection();
     }
@@ -709,7 +739,8 @@ export class Play {
       for (const d of this.def) {
         if (d.role === 'DL') continue;
         const t = d.manTarget;
-        if (t && !t.isBlocker) continue; // still has a receiver (or the back) to mirror
+        // Still has a receiver to mirror; a backer on the back fills on a designed run (he keys him).
+        if (t && !t.isBlocker && !(this.playDef.block === 'run' && t === this.rb && d.role === 'LB')) continue;
         const a = d.assign;
         if (passSide && a?.kind === 'zone' && (a.spot === 'hook' || a.spot === 'curl') && Math.sign(zoneSpot(this, a).y - this.ballY) === passSide) {
           d.fitAt = Infinity;
@@ -741,6 +772,14 @@ export class Play {
   private readonly meshRead = new Map<Player, number>();
   /** RPO: defenders who've read the pull and play the pass now (`zoneCover` stops its read step). */
   readonly passRead = new Set<Player>();
+  /** Blockers standing down for an ablation (`PlaySetup.ablate`): they block nobody. */
+  readonly idle = new Set<Player>();
+  private readonly ablate: PlaySetup['ablate'];
+  /** Defenders who were blocked at some point this snap, and the ones who got off a block (the RUNFIT rows). */
+  readonly wasBlocked = new Set<Player>();
+  readonly gotOff = new Set<Player>();
+  /** Defensive linemen who've had their get-off roll this snap (one each). */
+  private readonly slipped = new Set<Player>();
 
   /** RPO: each defender's mesh read comes due. The QB still has it: he stops fitting the run. */
   private updateMeshReads(): void {
@@ -1172,7 +1211,9 @@ export class Play {
     };
     if (under('bullet')) return under('touch') ? 'lob' : 'touch';
     const tight = this.def.some((x) => !x.down && dist(x.pos, target) < CPU_THROW.tight);
-    return tight && d < CPU_THROW.bulletMax ? 'bullet' : 'touch';
+    // Short throws go on a line, open or not (the quick out, the slant): only a deeper open man gets touch.
+    const short = target.x - this.los <= CPU_THROW.shortDepth;
+    return (tight || short) && d < CPU_THROW.bulletMax ? 'bullet' : 'touch';
   }
 
   /**
@@ -1180,13 +1221,14 @@ export class Play {
    * then leads him by that ball's flight time along `dir` (his velocity unless given) at `speed`.
    */
   cpuAim(p: Player, kind?: ThrowKind, dir?: Vec, speed?: number): { aim: Vec; kind: ThrowKind } {
-    const k = kind ?? this.cpuThrowKind(p.pos);
     const v = dir ? scale(dir, speed ?? len(p.vel)) : p.vel;
+    const ahead = (t: number) => add(p.pos, scale(v, t));
+    const k = kind ?? this.cpuThrowKind(p.pos);
     // Led by the ball's real flight time to where he'll be (the flight is to the led spot, so solve for it):
     // with placement deciding the catch (sim/catching.ts `PLACEMENT`), an under-led ball is a reach.
     let t = passParams(dist(this.qb.pos, p.pos), this.qb.r.arm, k).dur;
-    for (let i = 0; i < CPU_THROW.leadIters; i++) t = passParams(dist(this.qb.pos, add(p.pos, scale(v, t))), this.qb.r.arm, k).dur;
-    const aim = add(p.pos, scale(v, t));
+    for (let i = 0; i < CPU_THROW.leadIters; i++) t = passParams(dist(this.qb.pos, ahead(t)), this.qb.r.arm, k).dur;
+    const aim = ahead(t);
     return { aim: { x: Math.min(aim.x, 119), y: clamp(aim.y, 1.5, FIELD_W - 1.5) }, kind: k };
   }
 
@@ -1247,7 +1289,10 @@ export class Play {
       d.findAt = Infinity;
       if (d.down) continue;
       const isMan = !!best && d.manTarget === best;
-      if (dist(d.pos, this.ballTarget) < 14 || isMan) {
+      // He breaks on any ball he can get to while it's in the air (a deep safety on the deep ball), not
+      // just one landing near him.
+      const reach = Math.max(BREAK_ON.near, maxSpeed(d) * dur + BREAK_ON.slack);
+      if (dist(d.pos, this.ballTarget) < reach || isMan) {
         const cov = d.assign?.kind === 'man' ? d.r.mcv : d.r.zcv;
         // Sitting on screens jumps a throw behind the line and is late to one downfield; leaning deep, the
         // reverse; not worried about the deep ball, he squats on the ones in between.
@@ -1452,7 +1497,7 @@ export class Play {
     const downfield = this.phase === 'run' && this.carrier?.side === 'off';
     for (const b of this.off) {
       // Pullers don't stop to block on the way, except on the man they're pulling for.
-      if (b.down || b.engaged || b.stun > 0 || b === this.carrier || b.role === 'QB' || (b.pull && !b.poa)) continue;
+      if (b.down || b.engaged || b.stun > 0 || b === this.carrier || b.role === 'QB' || (b.pull && !b.poa) || this.idle.has(b)) continue;
       if (!b.isBlocker && !downfield) continue;
       for (const d of this.def) {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
@@ -1465,9 +1510,24 @@ export class Play {
         // still close enough to matter.
         const man = b.mark ?? (b.poaJob ? b.poa : null);
         if (d.engagedBy.length === 1 && man !== d) continue;
-        if (b.isBlocker && man && !man.down && man !== d && (!downfield || dist(b.pos, man.pos) < 4)) continue;
+        // A lineman headed for a backer still takes a free down lineman who crosses his face (bodies: the
+        // backside tackle slanting across a climbing guard is picked up, not run through).
+        const pickup =
+          this.runBlocking() && b.role === 'OL' && d.role === 'DL' && !d.engagedBy.length && !!man && man.role !== 'DL' &&
+          dist(b.pos, d.pos) < RUN_PICKUP && (b.start.y - this.hole.y) * playSide(this) < 0;
+        if (b.isBlocker && man && !man.down && man !== d && !pickup && (!downfield || dist(b.pos, man.pos) < 4)) continue;
         const reach = man === d && this.runBlocking() ? RUN_ENGAGE : man === d && inPocket(this) ? PROT.engage : 1.0;
         if (dist(b.pos, d.pos) < reach) {
+          // Off the ball on a run: a one-gap lineman who beats his man slips into his gap (sim/runBlocking.ts).
+          if (!d.engagedBy.length && this.runBlocking() && d.role === 'DL' && !this.slipped.has(d)) {
+            this.slipped.add(d);
+            if (getOffWins(this, d, b)) {
+              d.noEngage = 0.7;
+              b.stun = 0.25;
+              this.gotOff.add(d);
+              continue;
+            }
+          }
           if (b.pull) b.pull = null;
           if (!b.mark && b.poaJob) b.mark = d;
           if (!d.engagedBy.length && inPocket(this)) startRep(this, d);
@@ -1479,6 +1539,7 @@ export class Play {
           }
           b.engaged = d;
           d.engagedBy.push(b);
+          this.wasBlocked.add(d);
           break;
         }
       }
@@ -1561,7 +1622,25 @@ export class Play {
     }
   }
 
+  /** The harness's ablation: the named blockers stand down (`PlaySetup.ablate`). */
+  private applyAblation(): void {
+    const a = this.ablate;
+    if (!a) return;
+    const side = playSide(this);
+    const line = this.off.filter((o) => o.role === 'OL' && !o.pull).sort((x, y) => (x.pos.y - y.pos.y) * side);
+    for (const o of line.slice(0, a.backside ?? 0)) this.idle.add(o);
+    for (const o of this.off) if (a.slots?.includes(o.slot as OffSlot)) this.idle.add(o);
+    for (const o of this.idle) {
+      o.mark = null;
+      o.climb = null;
+      o.hinge = null;
+      o.poa = null;
+      o.poaJob = null;
+    }
+  }
+
   private shed(d: Player): void {
+    this.gotOff.add(d);
     for (const b of d.engagedBy) b.stun = 0.35;
     this.release(d);
     d.noEngage = 1.3;
@@ -1593,12 +1672,17 @@ export class Play {
     for (const t of tacklers) {
       if (t.down || t.tackleCd > 0 || t.engaged || t.role === 'QB') continue;
       const arm = t.engagedBy.length > 0;
-      if (dist(t.pos, c.pos) > (!arm ? TACKLE_RANGE : this.runBlocking() ? RUN_CONTROL.armReach : TACKLE_RANGE * 0.8)) continue;
+      const d = dist(t.pos, c.pos);
+      if (!arm && d > TACKLE_RANGE && d <= DIVE_TACKLE.range && this.diveAt(t, c, d)) return;
+      if (d > (!arm ? TACKLE_RANGE : this.runBlocking() ? RUN_CONTROL.armReach : TACKLE_RANGE * 0.8)) continue;
       // A run-blocked defender's reach depends on how much of the block he's won (`armOdds`); pass pro's is flat.
       const armOdds = arm ? (this.runBlocking() ? runArmOdds(t) : ARM_TACKLE) * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
       // Caught mid-cut by a man in front of him (or level): he bit on it.
       const juked = !arm && c.juke > 0 && (t.pos.x - c.pos.x) * (c.side === 'off' ? 1 : -1) > -0.5;
-      if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * armOdds * (juked ? jukeTackleMul(c.r.elu) : 1)) {
+      // A receiver still turning out of his catch (`hips`) is the easiest man to wrap up: he misses less often.
+      const base = tackleChance(t.r.tkl, c.r.elu, c.r.str);
+      const odds = !arm && c.hips ? 1 - (1 - base) * AT_CATCH.miss : base;
+      if (this.rng() < odds * armOdds * (juked ? jukeTackleMul(c.r.elu) : 1)) {
         this.tackled(c, t);
         return;
       }
@@ -1619,6 +1703,27 @@ export class Play {
       c.vel = scale(c.vel, 0.55);
       this.popup('BROKEN TACKLE!', c.pos, '#ffd23f');
     }
+  }
+
+  /**
+   * A chase he isn't winning: a free defender just out of reach and not gaining on the carrier (closing
+   * slower than `DIVE_TACKLE.closing`) lays out for his legs, once. He brings him down at `odds` of a
+   * normal tackle; a miss leaves him on the ground. True when the carrier went down.
+   */
+  private diveAt(t: Player, c: Player, d: number): boolean {
+    // Only a chase in the open field: past the line, from behind or level. In the box it's a tackle or nothing.
+    if (c.side !== 'off' || this.phase !== 'run' || c.pos.x < this.los + DIVE_TACKLE.past || t.pos.x > c.pos.x + 0.3) return false;
+    const ux = (c.pos.x - t.pos.x) / d;
+    const uy = (c.pos.y - t.pos.y) / d;
+    const closing = (t.vel.x - c.vel.x) * ux + (t.vel.y - c.vel.y) * uy;
+    if (closing >= DIVE_TACKLE.closing) return false;
+    if (this.rng() < tackleChance(t.r.tkl, c.r.elu, c.r.str) * DIVE_TACKLE.odds) {
+      this.tackled(c, t);
+      return true;
+    }
+    knockDown(t, DIVE_TACKLE.down);
+    t.tackleCd = DIVE_TACKLE.down + 0.6;
+    return false;
   }
 
   private tackled(c: Player, t: Player): void {

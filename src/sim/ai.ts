@@ -2,6 +2,7 @@ import { FIELD_W, STEP } from '../engine/constants';
 import { add, clamp, dist, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Assign } from '../data/defenses';
 import type { Play } from '../game/playState';
+import { engagedGoal, fitSpot, runLeverage, runTechnique } from './runFits';
 import { accelOf, isEligible, LEAN_FX, maxSpeed, seek, seekTimed, setPose, startJuke, type Player } from './player';
 import { CATCH_REACH, PLACEMENT } from './catching';
 import { THROWS } from './ball';
@@ -26,6 +27,10 @@ const MAN_DEPTH = 3;
  * instead of chasing. Kick coverage keeps the shorter default lead.
  */
 const PURSUIT_LEAD = 2;
+/** Past this far beyond the LOS the carrier is in the open field, and pursuers take the intercept angle. */
+const OPEN_FIELD = 5;
+/** How far inside the sideline route waypoints stop (`buildRoute`), and a continuing route turns upfield. */
+export const ROUTE_SIDELINE = 2;
 
 /**
  * Underneath zones (`zoneCover`): each landmark's depth past the LOS, its distance out from the ball
@@ -70,11 +75,36 @@ const CONTAIN_CLOSE = 2.6;
 /** A defender sitting on a screen, not in man on someone else, comes for it from this close. */
 const SMELL_RANGE = 10;
 
-/** Chase a ball carrier, aiming at where they will be rather than where they are. */
-export function pursue(p: Player, c: Player, speedMul = 1, lead = 1.2): void {
+/**
+ * Chase a ball carrier, aiming at where they will be rather than where they are. In the open field
+ * (`intercept`), the intercept point: the first spot on his line he can reach in time (`interceptTime`), led
+ * at most `lead` s. In the box, and with no intercept (he's behind, or slower), the lead is a fraction of his
+ * distance: a runner there is still cutting, and a perfect angle on his last step would overplay him.
+ */
+export function pursue(p: Player, c: Player, speedMul = 1, lead = 1.2, intercept = false): void {
   const sp = maxSpeed(p) * speedMul;
-  const t = clamp(dist(p.pos, c.pos) / sp, 0, lead) * 0.85;
+  const hit = intercept ? interceptTime(p.pos, c.pos, c.vel, sp * PURSUIT_ANGLE) : null;
+  const t = hit !== null ? Math.min(hit, lead) : clamp(dist(p.pos, c.pos) / sp, 0, lead) * 0.85;
   p.want = seek(p, add(c.pos, scale(c.vel, t)), sp, 0.1);
+}
+/** The intercept is solved for this share of his top speed, so he takes an angle he can hold. */
+const PURSUIT_ANGLE = 0.92;
+
+/** Seconds until a chaser from `from` at `speed` can meet a target at `at` moving at `vel`; null if never. */
+export function interceptTime(from: Vec, at: Vec, vel: Vec, speed: number): number | null {
+  const rx = at.x - from.x;
+  const ry = at.y - from.y;
+  const a = vel.x * vel.x + vel.y * vel.y - speed * speed;
+  const b = 2 * (rx * vel.x + ry * vel.y);
+  const c = rx * rx + ry * ry;
+  if (Math.abs(a) < 1e-6) return b < 0 ? -c / b : null;
+  const disc = b * b - 4 * a * c;
+  if (disc < 0) return null;
+  const q = Math.sqrt(disc);
+  const t1 = (-b - q) / (2 * a);
+  const t2 = (-b + q) / (2 * a);
+  const ts = [t1, t2].filter((t) => t > 0);
+  return ts.length ? Math.min(...ts) : null;
 }
 
 // ---------------------------------------------------------------- offense
@@ -292,7 +322,9 @@ function runRoute(play: Play, p: Player): void {
     p.want = scale(norm(sub(p.route[p.routeIdx], p.pos)), sp);
   } else if (p.routeDir) {
     let d = p.routeDir;
-    if ((p.pos.y < 1.5 && d.y < 0) || (p.pos.y > FIELD_W - 1.5 && d.y > 0)) d = { x: 1, y: 0 };
+    // Near the sideline the route turns upfield, early enough that his momentum keeps him in bounds.
+    const edge = ROUTE_SIDELINE + 0.5;
+    if ((p.pos.y < edge && d.y < 0) || (p.pos.y > FIELD_W - edge && d.y > 0)) d = { x: 1, y: 0 };
     p.want = scale(d, sp);
   } else if (p.thenBlock) {
     // Play-action fake carried out: stay in and protect, starting with the man who was covering him.
@@ -386,7 +418,7 @@ export function thinkDefense(play: Play, d: Player): void {
   }
   const c = play.carrier;
   if (d.engagedBy.length) {
-    d.goal = c ? c.pos : play.ballTarget ?? play.qb.pos;
+    d.goal = c ? engagedGoal(play, d, c.pos) : play.ballTarget ?? play.qb.pos;
     return;
   }
   // Interception return: escort the returner.
@@ -395,13 +427,15 @@ export function thinkDefense(play: Play, d: Player): void {
     return;
   }
   if (play.phase === 'run' && c && play.time >= d.reactAt) {
+    if (runLeverage(play, d, c)) return;
     d.goal = c.pos;
     // Running through the line's bodies (blocked or not) costs speed: pursuit has to work through trash.
     // Linemen are the trash, and a defender closing on the carrier has already got through it.
+    // A chasing backside end flattening behind the line goes through the pullers and the back's path too.
     const trash =
-      c.side === 'off' && d.role !== 'DL' && d.pos.x < play.los + 3 && dist(d.pos, c.pos) > 2 &&
+      c.side === 'off' && (d.role !== 'DL' || d.runJob === 'chase') && d.pos.x < play.los + 3 && dist(d.pos, c.pos) > 2 &&
       play.off.some((o) => o.isBlocker && !o.down && o !== c && dist(o.pos, d.pos) < TRASH_RANGE);
-    pursue(d, c, trash ? TRASH_SPEED : 1, PURSUIT_LEAD);
+    pursue(d, c, trash ? TRASH_SPEED : 1, PURSUIT_LEAD, c.side === 'off' && c.pos.x > play.los + OPEN_FIELD);
     return;
   }
   if (play.phase === 'air' && play.ballTarget && play.time >= d.reactAt) {
@@ -444,7 +478,7 @@ export function thinkDefense(play: Play, d: Player): void {
  */
 function runFit(play: Play, d: Player): void {
   const depth = d.role === 'S' ? 4 : d.role === 'CB' ? 3 : LB_FIT_DEPTH;
-  const tgt = { x: play.los + depth, y: lerp(d.start.y, play.hole.y, 0.35) };
+  const tgt = fitSpot(play, d, depth);
   d.goal = tgt;
   d.want = seek(d, tgt, maxSpeed(d) * 0.95, 0.6);
 }
@@ -630,6 +664,8 @@ function rush(play: Play, d: Player): void {
     pursue(d, play.carrier, 0.9, PURSUIT_LEAD);
     return;
   }
+  // A designed run: the front plays its run technique, not the QB (sim/runFits.ts).
+  if (runTechnique(play, d)) return;
   if (d.role !== 'DL' && play.time - play.snapTime < 0.4) {
     d.want = ZERO; // blitzers time their run
     return;
