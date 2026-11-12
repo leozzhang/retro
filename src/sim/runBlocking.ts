@@ -85,14 +85,12 @@ const LEAD_PICKUP = 1.8;
  *   kick-out's only if he's at least this far outside the last blocker who stays in. On the line, `kickHeadUp`:
  *   head-up on that blocker is the kick-out's too (the end man on the line; the TE or tackle blocks down
  *   inside him). Further inside, the line has him.
- * - `leadInside`: a lead puller whose backer is filling inside the hole turns up this share of the way from
- *   the hole to him (1: right on him, inside-out; 0: at the hole, outside him).
  * - `meet`: he turns up early when his man comes to him this close.
  * - `attack`: a lead back leaves his path for his man this close to him.
  * - `lost`: he gives up on a man this far from the play and takes the most dangerous free defender.
  * - `lead`: cutting his man off, he aims for the carrier's spot up to this many seconds ahead (`cutOff`).
  */
-export const POA = { edge: 1.5, kickInside: 0.8, forceWidth: 10, forceDepth: 7, onLine: 1.8, kickOutside: 0.3, kickHeadUp: 0.5, leadInside: 0.5, meet: 2.2, attack: 3, lost: 10, lead: 1 };
+export const POA = { edge: 1.5, kickInside: 0.8, forceWidth: 10, forceDepth: 7, onLine: 1.8, kickOutside: 0.3, kickHeadUp: 0.5, meet: 2.2, attack: 3, lost: 10, lead: 1 };
 /** Back paths that attack the perimeter: the line's edge is the turn-up point and the runner reads wide. */
 const PERIMETER_PATHS = new Set<RouteName>(['sweep', 'toss', 'pitchPath', 'stretch', 'oz']);
 /** A hinging tackle holds his spot this long (seconds after the snap) before working up to the next threat. */
@@ -421,17 +419,12 @@ function pickRunTarget(play: Play, p: Player): Player | null {
   return best;
 }
 
-/**
- * Where a puller turns up: inside his man on a kick-out, at the edge on the perimeter, else the hole (or on
- * his backer, if the backer's filling inside it).
- */
+/** Where a puller turns up: inside his man on a kick-out, at the edge on the perimeter, else the hole. */
 export function pullTurnY(play: Play, p: Player, t: Player | null): number {
   const s = playSide(play);
   const at = p.turnY ?? play.hole.y;
   if (t && p.poaJob === 'kick') return t.pos.y - s * POA.kickInside;
   if (t && p.poaJob === 'force' && (t.pos.y - at) * s > POA.kickInside) return t.pos.y - s * POA.kickInside;
-  // A lead on a backer filling inside the hole turns up on him, inside-out, not outside him at the hole.
-  if (t && p.poaJob === 'lead' && (t.pos.y - at) * s < 0 && (t.pos.y - p.pos.y) * s > 0) return lerp(at, t.pos.y, POA.leadInside);
   return at;
 }
 

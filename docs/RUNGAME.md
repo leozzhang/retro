@@ -76,7 +76,6 @@ So backside blocks were worth little:
   - A sneak takes off `count`: the line fires on the count.
 - **Gap rules** (power, counter, duo, iso, trap): the line takes its men by best fit across the whole line (gap, on, down), not in playside order, so the man over a guard is the guard's. An uncovered lineman helps down (the man inside) and climbs from there; in zone he helps playside.
 - **The kick-out** takes the end man on the line, head-up on the last blocker included (`POA.kickHeadUp`): the tight end blocks down inside him. A man off the ball has to be outside the last blocker.
-- **A lead puller** whose backer is filling inside the hole turns up `POA.leadInside` of the way from the hole to him, inside-out, instead of outside him at the hole.
 - **Backside cutoffs** (`CUTOFF_FROM`): a lineman backside of the hole takes the angle across his man's path to the ball (`cutOff`), so a backside tackle slanting playside is walled off.
 - **Climbs on control** (`CLIMB`): the helper on a double comes off once the down man is being moved, after the combo's time, or when the backer declares. A down man who's still winning keeps him there up to `hold` s longer.
   - On the perimeter (stretch, pin, the toss) the climb stays on the clock.
@@ -91,6 +90,20 @@ So backside blocks were worth little:
   - The setting is a balance: at 0.4 the draw beat every call (70% success); at 0.8 it lost to the blitz it's built for. At 0.6 it beats light boxes and fire-zone pressure, and the bear and the goal line stop it.
   - Cover 0 still stops it: the extra blitzer meets the mesh.
   - Against two-high zones it's nearly automatic. The pass-side hook and curl defenders never fit a draw before the handoff (`passRead`), so the backers' "fooled" time (`DRAW_FOOLED`, `game/playState.ts`) doesn't bind. That's open.
+
+## Bodies (`BODY`, `game/playState.ts`)
+On a designed run a free defender can't run through the line. Within `r` yd (centre to centre) of a blocker, or of a lineman engaged on a block (the pile), he's pushed back out to `r`. He loses the speed going into the body and moves at no more than `keep` of his top speed while he's in contact, so he scrapes around it or finds a gap.
+- It applies within `band` yd of the line.
+- It doesn't apply to a lineman who's beaten his man off the ball (the get-off slip), to anyone on the ball carrier, or to a blocker standing down for an ablation.
+- `r` is 0.6: a lineman's half-width plus a defender's. The guards sit 1.5 yd from the center, so an interior gap is tight but open. At 0.7 every interior gap was closed.
+- It's off on passes, so the pass game is unchanged.
+
+**Why it matters:** before this, a backer reading a run ran straight through the linemen. That was worst on the slow plays, the counters, where the backers had time to get there. With bodies on and nothing else changed, Counter GT went from 4.0 to 7.3 yd a carry and Trey Counter from 6.0 to 9.2. Inside zone, which hits fast, didn't move.
+
+**What it exposed:**
+- **The blitzers on a run.** A backer rushing on a blitz call was handed a fill job on a run, so he stood and read like a normal backer, and walking through the line had hidden it. A rusher is now on the front whatever the play (`RUN_FIT.standUp`): he attacks his gap and the bodies decide whether he gets through. Counters against the blitz calls are now boom or bust: 32–56% stuffed.
+- **The inside-out lead turn-up** (`POA.leadInside`, last pass) had been making up for backers who came through the line. With bodies it made Power 7.1 and Counter 7.3 yd a carry, so it's gone.
+- **The gun's keep hold** (`RUN_FIT.gunHome`) is still needed. It holds the backside end, who isn't coming through the line.
 
 ## The runner
 - **Lanes count where a free defender is headed** (`LANE_LEAD` s ahead), so a closing backside chaser shuts the cutback.
@@ -156,4 +169,19 @@ The gap-scheme rules, the counter step, the gun's keep threat, the goal-line fit
 - Power's hinge and Duo's backside: about 0. With the line now blocking down correctly, the backside end rarely gets to Power's mesh. Worth a trace before the next gap-scheme book.
 
 **Open:** Heavy Power against Bear and Goal Line (85–93%), QB Power in short yardage (20–30%), the draw against two-high zones, and the defense-heavy talent slope. PROGRESS.md has the list.
+
+**With bodies (`BODY`) and blitzers attacking their gaps (same day, 150 snaps a call):**
+
+| Row | Before bodies | After | Target |
+| --- | --- | --- | --- |
+| RUN ALL | 5.0–5.2 ypc, 14–17% stuffs | 5.5–5.8 ypc, 15–18% stuffs | 4.5–5.5, 15–22% |
+| GAP −10 / even / +5 / +10 / +20 | 7.4 / 4.0 / 2.7 / 2.0 / 1.2 | 10.2 / 5.4 / 3.7 / 2.9 / 1.3 | 5.5–8 / 4.5–5.5 / 3–4 / 2.5–3.5 / 1.5–2.5 |
+| Counter GT / Trey Counter / Ace Wing Counter | 4.0 / 6.0 / 5.4 | 6.0 / 5.9 / 5.0 | about 4.5–5.5 |
+| Counter GT against Cover 0 (success) | 9% | 8% | low |
+| Goal Line, 3rd and 1: Power / Iso / sneak / QB Power | 89% / 62% / 76% / 21% | 79% / 76% / 68% / 38% | 65–70 / 65–70 / 75–80 / 65–70 |
+| Bear, 3rd and 1: Power / sneak | 76% / 82% | 77% / 89% | 65–70 / 83–87 |
+
+- **The talent gap mostly falls into place:** the defense-heavy side (+5, +10) is now in target, and even is 5.4.
+- **What's high:** the offense-heavy side (−10 at 10.2), and RUN ALL is at the top of its range.
+- **ABLATE:** Inside Zone's backside is still about −5 yd a carry and Counter's backside about −4. Power's hinge and Duo's backside are still about 0.
 

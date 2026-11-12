@@ -41,7 +41,7 @@ export type RunJob = 'gap' | 'twoGap' | 'edge' | 'chase' | 'fill' | 'cutback';
  * - `keyTime`: how long a fill backer takes to find the real hole after his read (× 1.6 − prc/100), flowing
  *   with the back's heading (`keyLead` s ahead) until then.
  * - `squeeze`: a lineman whose blocker leaves him (blocks down, pulls) closes this far toward the ball.
- * - `standUp`: a backer rushing from this close to the line is on the front (a stand-up end) and gets a line job.
+ * - `standUp`: a rusher who lined up this close to the line is on the front (a stand-up end, a blitzer) and gets a line job.
  */
 export const RUN_FIT = {
   read: { base: 0.12, slow: 0.3 },
@@ -59,7 +59,7 @@ export const RUN_FIT = {
   keyTime: 0.5,
   keyLead: 0.6,
   squeeze: 1.5,
-  standUp: 1.6,
+  standUp: 6,
 };
 
 /** The blockers' y at the snap (the line and attached ends), sorted across the field. */
@@ -70,9 +70,14 @@ function blockerYs(play: Play): number[] {
     .sort((a, b) => a - b);
 }
 
-/** On the front: a down lineman, or a backer rushing from the line (within `standUp` yd of it). */
+/**
+ * On the front: a down lineman, or anyone rushing: a stand-up end, the goal line's walked-up backer, a
+ * blitzer. A blitz is called before the snap, so on a run he still attacks his gap (and the bodies in front
+ * of him decide whether he gets through), instead of reading it like a backer. Within `standUp` yd of the
+ * line at the snap.
+ */
 function onFront(play: Play, d: Player): boolean {
-  return d.role === 'DL' || (d.role === 'LB' && d.assign?.kind === 'rush' && d.pos.x <= play.los + RUN_FIT.standUp);
+  return d.role === 'DL' || (d.assign?.kind === 'rush' && d.start.x <= play.los + RUN_FIT.standUp);
 }
 
 /** At the snap of a designed run: every front player's job, gap and read step. */

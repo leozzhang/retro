@@ -2,6 +2,18 @@
 
 _Last updated: 2026-11-12_
 
+## Done: bodies on the line, and blitzers who blitz a run (2026-11-12)
+Your report: on counters, backers locked onto the runner and sprinted through the line. That was right: players passed through each other, and the only cost was a 15% slowdown, after the handoff.
+- **`BODY`** (`game/playState.ts`, RUNGAME.md "Bodies"): on a designed run, a free defender is pushed back out of any blocker or blocked pair within 0.6 yd. He scrapes along it at up to 75% of his speed. It's off on passes.
+- **It exposed a bug:** blitzing backers were given fill jobs on runs, so a blitz never blitzed a run. Rushers are now on the front (`RUN_FIT.standUp`) and attack their gaps.
+- **Removed:** the inside-out lead turn-up from the previous pass (`POA.leadInside`). It was making up for the missing bodies.
+- **Measured:**
+  - Counters are 5.0–6.0 yd a carry, and boom or bust against the blitz.
+  - The defense-heavy talent gap is in target (+10 2.9, even 5.4).
+  - The offense-heavy side is now high (−10 10.2, target 5.5–8), and RUN ALL is 5.5–5.8 (top of 4.5–5.5).
+  - The pass rows are byte-identical.
+  - The auto-runner hits the hole at once. A patient runner in your hands should feel the change more than the harness shows. Play counters by hand next.
+
 ## Done: balancing by situation, and the run game's open items (2026-11-12)
 The aim: each play works against the looks it's built to beat and fails against the ones that stop it. PLAYBOOKS.md ("Balancing") has the method and the lessons for the next books.
 
@@ -18,7 +30,6 @@ The aim: each play works against the looks it's built to beat and fails against 
   - best fit across the line (gap, on, down)
   - an uncovered lineman helps down
   - the kick-out takes the end man on the line even when he's head-up on the TE (`POA.kickHeadUp`)
-  - a lead puller turns up inside-out on a backer filling inside the hole (`POA.leadInside`)
 - **The gun counter's back** takes a real counter step, so he no longer beats his pullers to the hole.
 - **Run fits** (`sim/runFits.ts`, `sim/ai.ts`):
   - From the gun, the backside end stays home longer for the keep (`RUN_FIT.gunHome`).

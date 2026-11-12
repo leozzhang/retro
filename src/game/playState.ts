@@ -96,6 +96,14 @@ export const BREAK_ON = { near: 14, slack: 3 };
 export const AT_CATCH = { miss: 0.4 };
 /** A backside lineman on his way to a backer picks up a free down lineman this close to him (playside climbers keep their man). */
 export const RUN_PICKUP = 1.1;
+/**
+ * Bodies on a designed run (docs/RUNGAME.md): a free defender can't run through the line. Within `r` yd
+ * (centre to centre) of a blocker, or of a lineman engaged on a block (the pile), he's pushed back out to
+ * `r`, loses the speed going into the body, and moves at no more than `keep` of his top speed along it: he scrapes around, or
+ * finds a gap, instead of sprinting through. Only within `band` yd of the line, and not for a lineman who's
+ * beaten his man off the ball (the get-off slip) or anyone on the ball carrier.
+ */
+export const BODY = { r: 0.6, keep: 0.75, band: 3 };
 export const DIVE_TACKLE = { range: 1.7, closing: 1.0, odds: 0.55, down: 1.0, past: 5 };
 /**
  * Seconds of full sprint from a full bar, from the least to the most enduring player, eased by
@@ -890,6 +898,7 @@ export class Play {
     this.updateEngagements(dt);
     this.blockCut();
     for (const p of this.players) stepPlayer(p, dt);
+    this.bodies();
     this.updateEyes();
     this.anchorBlockers();
     this.formEngagements();
@@ -1547,6 +1556,33 @@ export class Play {
           this.wasBlocked.add(d);
           break;
         }
+      }
+    }
+  }
+
+  /** Free defenders work around the line's bodies on a designed run, not through them (`BODY`). */
+  private bodies(): void {
+    if (this.playDef.block !== 'run' || this.thrown || this.phase === 'presnap' || this.phase === 'over') return;
+    const c = this.carrier;
+    const walls = [
+      // A blocker standing down for an ablation isn't there at all: the ablation measures his whole block.
+      ...this.off.filter((o) => o.isBlocker && o.role !== 'QB' && o !== c && !o.down && !this.idle.has(o)),
+      ...this.def.filter((d) => d.engagedBy.length && !d.down),
+    ];
+    for (const d of this.def) {
+      if (d.down || d.engagedBy.length || this.slipped.has(d) || Math.abs(d.pos.x - this.los) > BODY.band) continue;
+      if (c && c.side === 'off' && dist(d.pos, c.pos) < BODY.r + 0.4) continue; // he's on the ball
+      for (const w of walls) {
+        if (w === d) continue;
+        const gap = sub(d.pos, w.pos);
+        const g = len(gap);
+        if (g >= BODY.r || g < 1e-6) continue;
+        const n = scale(gap, 1 / g);
+        d.pos = add(w.pos, scale(n, BODY.r));
+        const into = d.vel.x * n.x + d.vel.y * n.y;
+        if (into < 0) d.vel = sub(d.vel, scale(n, into));
+        const cap = BODY.keep * maxSpeed(d);
+        if (len(d.vel) > cap) d.vel = scale(norm(d.vel), cap);
       }
     }
   }

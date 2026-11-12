@@ -5,6 +5,7 @@ import { Camera } from './engine/camera';
 import { STEP } from './engine/constants';
 import type { Input } from './engine/input';
 import { len, mulberry32 } from './engine/math';
+import { BODY } from './game/playState';
 import { cam, fakeInput, newPlay, referenceMatchup, runRep, type Matchup } from './harness';
 import { cutSpeed, maxSpeed } from './sim/player';
 import { armOdds, laneScores, PILE, pickLane, pileCap, RUN_CONTROL, RUN_GAP, runEngagement, runTalent } from './sim/runBlocking';
@@ -300,6 +301,30 @@ describe('run fits (sim/runFits.ts)', () => {
     };
     // At 0.6 s the gun's chase end is still home; under center he's already flattening down the line.
     expect(ends('counter')).toBeLessThan(ends('ace-counter'));
+  });
+
+  it('bodies: a free backer on a designed run never ends a step inside a blocker (BODY)', () => {
+    const play = snapRun('counter', 'c3');
+    let worst = Infinity;
+    for (let i = 0; i < 90 && play.phase !== 'over'; i++) {
+      play.update(STEP, fakeInput, cam);
+      for (const d of play.def) {
+        if (d.role !== 'LB' || d.engagedBy.length || Math.abs(d.pos.x - play.los) > BODY.band || d === play.tackler) continue;
+        if (play.carrier && Math.hypot(d.pos.x - play.carrier.pos.x, d.pos.y - play.carrier.pos.y) < BODY.r + 0.4) continue;
+        for (const o of play.off) {
+          if (!o.isBlocker || o.role === 'QB' || o === play.carrier || o.down) continue;
+          worst = Math.min(worst, Math.hypot(d.pos.x - o.pos.x, d.pos.y - o.pos.y));
+        }
+      }
+    }
+    expect(worst).toBeGreaterThan(BODY.r - 0.05);
+  });
+
+  it('a blitz still blitzes a run: the rushing backers attack gaps, they do not read and fill', () => {
+    const play = snapRun('counter', 'c0-blitz');
+    const blitzers = play.def.filter((d) => d.role === 'LB' && d.assign?.kind === 'rush');
+    expect(blitzers.length).toBeGreaterThan(0);
+    for (const d of blitzers) expect(['gap', 'edge', 'chase']).toContain(d.runJob);
   });
 
   it("a sneak reads only the A gaps", () => {
