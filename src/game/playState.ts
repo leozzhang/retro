@@ -1,3 +1,4 @@
+import { CONCEPTS } from '../data/concepts';
 import { taggedAssign, type DefCall, type DefPackage, type DefTags, type Disguise, type Front } from '../data/defenses';
 import { ROUTES, type PlayDef, type RunScheme } from '../data/plays';
 import { passBlockValue } from '../data/ratings';
@@ -12,7 +13,7 @@ import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS
 import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
 import {
-  accelOf, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
+  accelOf, breaksInside, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
   startCatch, startGather,
 } from '../sim/player';
 import { aimLag, aimTarget, MIN_DRAG_PX, MOVE_FULL, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
@@ -115,6 +116,13 @@ export const SCREEN_SET = 0.8;
 const FIT_EARLY = 0.15;
 /** A spy reacts to his QB taking off this fast. */
 const SPY_REACT = 0.05;
+/**
+ * RPO: the run key is a guess until the mesh. A second-level defender reads whether the back got it
+ * `base` + `slow` × (1 − prc/100) s after the snap, longer when he's sitting on the run (`leanMul` of
+ * −lean.run); if the QB still has it he stops fitting and plays his assignment. Deep defenders stay home
+ * on an RPO: they leave the run fit to the box until the handoff (docs/DEFENSE.md).
+ */
+export const MESH_READ = { base: 0.4, slow: 0.5 };
 /**
  * Disguises (data/defenses.ts `Disguise`). Show spots: `deep` yd for a deep safety, `down` and
  * `downWide` for the safety rolled down in a single-high look, `zero` and `zeroWide` for both safeties
@@ -464,13 +472,13 @@ export class Play {
         // A corner worried about the deep ball bails deeper.
         d.cushion = press ? 1 : (slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5) + LEAN_FX.bail * Math.max(0, d.lean.deep) + (this.prevent ? PREVENT.cushion : 0);
         d.turned = press;
-        pos = { x: los + d.cushion, y: t.pos.y + inside * 0.8 };
+        pos = { x: los + d.cushion, y: t.pos.y + inside * (0.8 + LEAN_FX.shade * d.lean.inside) };
       } else if (d.role === 'LB') {
         d.cushion = 1.5;
         pos = { x: pos.x, y: lerp(pos.y, t.pos.y, 0.4) };
       } else {
         d.cushion = 3;
-        pos = { x: los + 5.5, y: t.pos.y + inside };
+        pos = { x: los + 5.5, y: t.pos.y + inside * (1 + LEAN_FX.shade * d.lean.inside) };
       }
     } else if (a.kind === 'deep') {
       // Corners in a deep third or quarter line up over the outside receiver; a backer carrying the
@@ -696,17 +704,52 @@ export class Play {
     }
     // Run blocking is a run key: the second level reads it and comes downhill.
     if (this.playDef.block === 'run') {
+      // RPO pass-first (the DC's tag): the hook and curl defenders on the tagged route's side play pass.
+      const passSide = this.tags.rpo && this.playDef.read === 'rpo' ? this.rpoSide() : 0;
       for (const d of this.def) {
         if (d.role === 'DL') continue;
         const t = d.manTarget;
         if (t && !t.isBlocker) continue; // still has a receiver (or the back) to mirror
         const a = d.assign;
+        if (passSide && a?.kind === 'zone' && (a.spot === 'hook' || a.spot === 'curl') && Math.sign(zoneSpot(this, a).y - this.ballY) === passSide) {
+          d.fitAt = Infinity;
+          this.passRead.add(d);
+          continue;
+        }
         const read =
           0.35 + (1 - d.r.prc / 100) * 0.5 + (a?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0) -
           (a?.kind === 'zone' && a.fit ? FIT_EARLY : 0);
         d.fitAt = this.snapTime + read * leanMul(d.lean.run);
         d.fitUntil = Infinity;
+        if (this.playDef.read === 'rpo') {
+          if (a?.kind === 'deep') d.fitAt = Infinity;
+          else this.meshRead.set(d, this.snapTime + (MESH_READ.base + (1 - d.r.prc / 100) * MESH_READ.slow) * leanMul(-d.lean.run));
+        }
       }
+    }
+  }
+
+  /** RPO: the side of the ball (±1 across the field) of the tagged route (the play's concept routes), or 0. */
+  private rpoSide(): number {
+    const tag = new Set<string>();
+    for (const c of [this.playDef.strong, this.playDef.weak]) if (c) for (const r of Object.values(CONCEPTS[c].routes)) tag.add(r!);
+    const o = this.off.find((p) => p.routeName && tag.has(p.routeName));
+    return o ? Math.sign(o.start.y - this.ballY) || 1 : 0;
+  }
+
+  /** RPO: second-level defenders who read that the QB pulled it, by the time they read it. */
+  private readonly meshRead = new Map<Player, number>();
+  /** RPO: defenders who've read the pull and play the pass now (`zoneCover` stops its read step). */
+  readonly passRead = new Set<Player>();
+
+  /** RPO: each defender's mesh read comes due. The QB still has it: he stops fitting the run. */
+  private updateMeshReads(): void {
+    for (const [d, at] of this.meshRead) {
+      if (this.time < at) continue;
+      this.meshRead.delete(d);
+      if (this.handedOff || this.carrier !== this.qb) continue;
+      this.passRead.add(d);
+      d.fitUntil = Math.min(d.fitUntil, this.time);
     }
   }
 
@@ -767,6 +810,7 @@ export class Play {
         break;
       case 'live':
         this.updateLive(input, cam);
+        if (this.meshRead.size) this.updateMeshReads();
         break;
       case 'air':
         if (updateFlight(this.ball, dt)) this.resolveArrival();
@@ -1052,7 +1096,7 @@ export class Play {
     this.faked = true;
     this.popup('FAKE', this.rb.pos, '#9ad7ff');
     for (const d of this.def) {
-      if (d.role !== 'LB' && d.role !== 'S') continue;
+      if ((d.role !== 'LB' && d.role !== 'S') || this.passRead.has(d)) continue;
       const a = d.assign?.kind;
       const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.prc - 70) * 0.01 + LEAN_FX.paBite * d.lean.run;
       if (this.rng() >= chance) continue;
@@ -1211,7 +1255,7 @@ export class Play {
         const lean =
           air < LEAN_FX.shortAir ? leanMul(d.lean.screen)
           : air > LEAN_FX.deepAir ? leanMul(d.lean.deep) * (1 + LEAN_FX.late * Math.max(0, d.lean.screen, d.lean.run))
-          : leanMul(-d.lean.deep);
+          : leanMul(-d.lean.deep) * (best ? leanMul(breaksInside(best.start.y, this.ballY, this.ballTarget.y) ? d.lean.inside : -d.lean.inside) : 1);
         const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean;
         d.reactAt = this.time + lerp(Math.max(react, dur * FIND.trail, dur - FIND.trailLeft), react + 0.1, d.eyes);
         d.findAt = d.reactAt;

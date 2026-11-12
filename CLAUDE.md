@@ -82,7 +82,7 @@ Controls are listed in [README.md](README.md).
   - run blocks: `RUN_BLOCK_EDGE`, the squeezed talent edge `RUN_GAP`, the block-control gradient `RUN_CONTROL` (wear, the point-of-attack fight, arm tackles), the pile `PILE`, `REACH_PENALTY`, `BLOCK_ROLL_SD`, `WASH_RATE`, `COMBO_CLIMB`, `ARM_LEVERED`, `RUN_ENGAGE`, `DRAW_SET`, pullers' and lead backs' point-of-attack blocks `POA` (`sim/runBlocking.ts`)
   - defense vs. the run: `LB_FIT_DEPTH`, `MAN_DEPTH`, `TRASH_SPEED`, `PURSUIT_LEAD` (`sim/ai.ts`)
   - zones and tags: `ZONE`, `ZONE_HELP`, `ZONE_LEASH`, `ZONE_WIDEN`, `ZONE_OUTSIDE`, `ZONE_STICK`, `ZONE_UNDER`, `DEEP_OVER_NARROW`, `SPY_DEPTH`, `CONTAIN_WIDTH`, `SMELL_RANGE` (`sim/ai.ts`); `FIT_EARLY`, `SPY_REACT` (`game/playState.ts`)
-  - the learning defense: `DEF_BRAIN`, `ANTICIPATE` (`game/defBrain.ts`), `LEAN_FX` (`sim/player.ts`), ADJUST's `ADJUST_SPREAD` (`data/coaches.ts`)
+  - the learning defense: `DEF_BRAIN`, `ANTICIPATE`, the look and presnap check `CHECK`, team smarts `SMARTS` (`game/defBrain.ts`), `LEAN_FX` (`sim/player.ts`), ADJUST's `ADJUST_SPREAD` (`data/coaches.ts`); the RPO mesh read `MESH_READ` (`game/playState.ts`)
   - reading the coverage: `DISGUISE`, `MOTION`, `HARD_COUNT` (`game/playState.ts`); `IDENTITY.disguise` (`data/identity.ts`)
   - zone read and option: `KEY_CRASH`, `KEY_FOOLED`, `MESH_REACH`, `KEEP_WIDTH`, `KEEP_INSIDE`, `OPTION_CUT`; screens `SCREEN_SET` (`game/playState.ts`)
   - `pitchOdds`, `PITCH_REACH`, `HANDOFF_ODDS` (`sim/catching.ts`)

@@ -577,12 +577,15 @@ export function matchZones(play: Play): void {
  * instead of bailing, until the run fit or the throw takes over.
  */
 function zoneCover(play: Play, d: Player, a: Extract<Assign, { kind: 'zone' }>): void {
-  if (play.runBlocking() && play.phase !== 'air') {
+  if (play.runBlocking() && play.phase !== 'air' && !play.passRead.has(d)) {
     d.want = ZERO;
     return;
   }
   const z = ZONE[a.spot];
-  const spot = zoneSpot(play, a);
+  const base = zoneSpot(play, a);
+  // Leaning inside, a hook or curl defender sinks under the windows inside (the glance, the dig).
+  const sink = a.spot !== 'flat' ? LEAN_FX.sink * Math.max(0, d.lean.inside) : 0;
+  const spot = sink ? { x: base.x + sink, y: base.y } : base;
   const qb = play.qb.pos;
   const m = d.zoneMark;
   let tgt: Vec;
@@ -657,7 +660,8 @@ function cover(play: Play, d: Player): void {
   const lp = hist && hist.length ? hist[Math.max(0, hist.length - 1 - lagFrames)] : r.pos;
   const since = play.time - play.snapTime;
   const cushion = d.press ? 0.8 : Math.max(1.0, d.cushion - since * 2.2);
-  const inside = Math.sign(play.ballY - lp.y) * 0.6;
+  // Inside leverage, more (or outside) as he leans on the routes his man has been running.
+  const inside = Math.sign(play.ballY - lp.y) * (0.6 + LEAN_FX.shade * d.lean.inside);
   // A man still behind the line gets played from just past it: read him, don't chase him into the backfield.
   const tgt = { x: Math.max(lp.x + cushion, play.los + MAN_DEPTH), y: lp.y + inside };
   let sp = maxSpeed(d);

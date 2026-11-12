@@ -47,7 +47,7 @@ Each call has a front, a shell (the pre-snap tell), a coverage, a box count, and
   - a receiver breaking inside a curl defender counts double: the hook takes him
   - the receiver he's already on scores closer (`ZONE_STICK`), so he commits instead of flipping between two
 - **Defenders with nobody to cover** lean toward the nearest threat, up to `ZONE_LEASH` yards from the landmark.
-- **Against run blocking,** zone defenders take a read step instead of bailing.
+- **Against run blocking,** zone defenders take a read step instead of bailing. On an RPO the read step ends at the mesh read (below).
 - **Breaking on the ball:** zone defenders break on the throw by `zcv` (`Play.throwBall`). Until now, almost nothing exercised that rating.
 
 ### Balance by call
@@ -131,6 +131,22 @@ Three places call it: the CPU's live defense (`Game.toCall`, through `callFor`),
 
 It also records the success you had against calls with and without each trait: blitz, man, box. The DC's book keeps 0.85 of each older snap. The players' book (`flow`) keeps 0.6, so it's their recent read.
 
+### The RPO: reading the mesh (`MESH_READ`, `game/playState.ts`)
+Run blocking is a run key, so at the snap every second-level defender without a receiver to mirror sets a run fit. Before this, on an RPO that fit lasted until the throw, deep safeties included: on a pull, the glance window behind the backers was open every time (36–50 yards a throw against every zone call at a 1.3 s throw).
+- **The mesh read:** each of them reads whether the back got it `0.4 + 0.5 × (1 − prc/100)` s after the snap, × `leanMul(−lean.run)`: slower when he's sitting on the run, faster when he isn't. If the QB still has it, he stops fitting (`passRead`) and plays his assignment; his zone stops its read step.
+- **Deep defenders stay home** on an RPO: no run fit until the handoff, so they're a beat late to a give.
+- A defender who has read the pull doesn't bite on the fake (`sellFake`).
+- **Pass-first** (`DefTags.rpo`, the DC's tag): the hook and curl defenders to the tagged route's side ignore the run key altogether. That takes the glance, slant and smoke, and leaves the box a fitter short against the give.
+
+The give is always the counter: the harness's "glance ×8 then give" gains 5.2 a carry against a learning defense, against 4.1 against a static one.
+
+### Leverage (`Lean.inside`, `LEAN_FX.shade`, `LEAN_FX.sink`)
+The players' book keeps where the intermediate throws (4–20 yd) broke: inside or outside of where their receiver lined up (`laneOf`, on the players' short memory). The share past half is the `inside` lean (`ANTICIPATE.scale.inside`, by `prc` like the others):
+- A man defender shades up to `shade` yd more to the inside of his man, pre-snap too (a tell). Negative is outside leverage.
+- A hook or curl defender sinks up to `sink` yd under the windows inside.
+- On a throw between 3 and 15 yd, he breaks faster on a ball breaking his way and slower on one breaking the other way.
+- Nerve: beaten 8+ yards the other way (`laneGain`), he plays it straighter for a few snaps; right on an incomplete or short gain, bolder.
+
 ### The DC
 After each snap the DC builds a **target posture** and moves part of the way toward it:
 - **From tendencies,** measured against a normal offense (`DEF_BRAIN.norm`):
@@ -138,9 +154,12 @@ After each snap the DC builds a **target posture** and moves part of the way tow
   - deep throws → more two-high
   - quick game → more man, fewer blitzes
   - screens → fewer blitzes
+  - RPOs (`rpo` bucket) → more man and two-high, and the pass-first tag (`tag.rpo`)
+- **Buckets:** an RPO the QB gave is a run (and an RPO); one he pulled is a pass, play action and an RPO. A throw 7–14 yd out is `mid`.
 - **From results:** each trait gets more weight if it has given up less success than its opposite. He needs about 3 decayed snaps of each before he trusts it.
 - **Against a play you keep running:**
   - If one run is 50%+ of the book, or of your short-yardage snaps, he adds box against it on any down, and the Goal Line front opens on any down.
+  - If one pass is 50%+ of the book, the players sit on it: their screen, deep and leverage reads are up to `passSpam` × (share − 0.3) stronger ("THEY'RE SITTING ON THE ...").
   - QB runs raise his odds of tagging SPY and CONTAIN.
 
 **How much and how fast** comes from **ADJUST**, the DC's in-game rating (`dcAdjust`, `data/coaches.ts`):
@@ -156,8 +175,22 @@ After each snap the DC builds a **target posture** and moves part of the way tow
 - The identity's floor still holds, so a sold-out DC still mixes in every call.
 - Tags are capped at 60%.
 
+### The look and the presnap check (`CHECK`, `lookOf`, `checkFor`)
+The defense sees your **personnel and formation** once you break the huddle, never the play. Audibles are planned to keep personnel, so the look is the defense's key. The brain keeps a book per look (`lookOf`: "11 Gun Doubles").
+- **The players know the look:** their leans move toward what that look has shown (`CHECK.lean` × the team's smarts × confidence). A formation that has only run gets them sitting on the run, and play action from it is the counter.
+- **The check:** when a look's tendency differs from the whole book's by `from`+ on a dial, the DC may check to a call drawn with that look's tendency, from the same package. The odds are `odds` × his skill (`skillMin` for a weak DC) × the team's smarts × IQ, at most `max`. It happens once a snap, at the huddle break; an audible keeps the defense. A check is played straight (no disguise), and the presnap shows "THEY CHECKED: THEY'VE SEEN THIS LOOK".
+- **Measured:** the check alone is worth little (a redrawn call from shifted dials is often no better). It's the hook the film room (Hooks) will make sharp.
+
+### Smarts: a weak defense is a less smart one (`teamSmarts`, `SMARTS`)
+Every in-game adjustment is gated by the DC **and** the team. A defense's smarts is the mean `prc` of its eleven: 50 is `floor` (0.25), 90 is 1 (the reference defense is about 0.87, a 70 unit about 0.56). It scales:
+- how much of the DC's posture, tags and sell-outs the defense carries out (`execute`: from `dcMin` 0.5 to all of it)
+- the check's odds
+- how far the players' read moves toward the look
+
+The players' own reads still go through each one's `prc`. The ADAPT TIER rows check it: the same spammed RPO loses 44% against the reference defense and 27% against a 70 defense; the formation tell 16% and nothing.
+
 ### The players
-Each snap, each defender gets a **lean** (`Lean` in `sim/player.ts`), from −1 (wary) to 1 (sitting on it), on four things: the run, screens, the QB taking off, and the deep ball. A lean is made of:
+Each snap, each defender gets a **lean** (`Lean` in `sim/player.ts`), from −1 (wary) to 1 (sitting on it), on five things: the run, screens, the QB taking off, the deep ball, and leverage (`inside`, above). A lean is made of:
 - the players' recent read of your offense
 - × his play recognition (a 0 `prc` reader gets 30% of it)
 - × the DC's film (60% to 100% by skill)
@@ -207,11 +240,25 @@ Scripted offenses play 30 games of 40 snaps against the reference defense, start
 | Balanced | 34%, 0.17 TD | 33%, 0.20 | 31%, 0.17 | 31%, 0.14 |
 | IZ ×8 then PA: PA ypp | 6.5 | 9.1 | 9.2 | 11.7 |
 
+**RPO, pass spam and formation rows** (2026-11-11, after the mesh read; the RPO pull throws the tagged route at 1.3 s, `H.rpoRep`). Yards per play by snap window:
+
+| Offense | STATIC | NORMAL, DC 45 | NORMAL, DC 75 | SHARP, DC 75 |
+| --- | --- | --- | --- | --- |
+| RPO Glance, always the pull | 12.4 / 12.9 / 12.0 | 10.3 / 9.2 / 8.5 | 12.0 / 7.5 / 7.9 | 9.8 / 7.0 / 6.9 |
+| RPO Glance, 30% give | 10.2 / 10.9 / 10.1 | 10.3 / 8.4 / 9.1 | 10.5 / 7.5 / 8.8 | 10.6 / 8.9 / 8.7 |
+| RPO Slant only | 9.8 / 8.0 / 9.0 | 9.1 / 6.5 / 6.1 | 8.0 / 5.3 / 6.1 | 8.0 / 6.1 / 5.8 |
+| Glance ×8 then give: give ypc | 4.1 | 5.2 | 5.3 | 5.2 |
+| Glance ×8 then smoke: smoke ypp | 3.8 | 3.2 | 2.9 | 2.7 |
+| Pistol runs, Trips passes | 6.4 / 6.3 / 6.4 | 7.3 / 6.0 / 4.8 | 6.9 / 5.8 / 5.7 | 6.5 / 4.7 / 5.9 |
+
+Before the mesh read, the always-pull glance gained 20–22 yards a play (0.75 TDs a drive) **at every setting**: the defense learned nothing it could use. The smoke doesn't pay after the glance, because the pass-first defender sits right on it; the give is the counter. The PA counter after IZ ×8 now reads 7.4 / 12.4 / 14.4 / 15.2: that drift was already there at HEAD before this change.
+
 **Targets and where they stand:**
 - **Met:** a spammed run loses 40–60% of its yards by snaps 7–15.
 - **Met:** a balanced offense loses little at NORMAL (TDs per drive 0.17–0.20 against 0.17) and about 8–15% at SHARP.
 - **Met:** the counter after spamming the run gains more than its static baseline.
-- **Flag:** quick-game-only offenses are barely touched (the harness's quick throws are already about 4 yards a play).
+- **Met:** a spammed RPO or pass play loses 30–45% by snaps 7–15 (glance −40 to −44%, slant −33%); a mixed RPO (30% give) loses less.
+- **Flag:** quick-game-only offenses are barely touched. They're a random mix of quick plays, so there's no one play or lane to sit on.
 - The auto-runner doesn't "hold D and push" the sneak the way a user does, so a user's sneak starts higher than these 2.6 yards. It should fall by a similar share.
 
 ## Reading the coverage: disguise, motion and the hard count
@@ -292,6 +339,9 @@ The pass rows are noisy (a few hundred reps), so read the runs and the big moves
 - The harness never reads the look, so these rows show only what a disguise costs the defense, not what it gains against a user who misreads it.
 
 ## Hooks for later
+- **The film room (next):** `npm run film` plays every play against every call headlessly and writes a table of success by (play, call). In game, the DC models your play-calling per look and down-distance (Dirichlet counts, backoff to the whole book and a league prior) and picks the call that beats it (softmax over expected stop rate, Thompson-sampled from his own results), on top of the identity prior. The check becomes "the call that beats what this look runs". Every knob is gated by ADJUST × `teamSmarts` × IQ; a weak staff only sees a coarse table. At SHARP it blends toward an equilibrium mix (regret matching over the table), so it's hard to exploit when unsure. It would retire the hand-written `gain` dials.
+- **Deep safeties fitting pure runs:** on a designed run they still come down to 4 yd 0.5–1 s after the snap. Left as is, so the core run rows stay comparable.
+- **PA discipline:** a defense that keeps getting burned by play action could bite less (`paBite`) for a while; for now, only nerve does that.
 - **Film study** (phase 5): `TeamState.film` holds your bucket shares from your last few live games, so next week's DC starts with a prior, weighted by his SCOUT. The prep page would say what they've seen.
 - **The CPU's drives** could learn your defensive play in the same way, if user defense is ever played live.
 - **The `wide` front** has no call yet; a pass-rush package for third and long would use it.

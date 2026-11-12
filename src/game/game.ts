@@ -75,7 +75,7 @@ import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
-import { adjustments, callFor, halftime as brainHalftime, headline, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
+import { adjustments, callFor, checkFor, halftime as brainHalftime, headline, laneOf, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
 import { successful } from '../season/grades';
 import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog, lineupOf, simPart } from '../season/simGame';
@@ -329,6 +329,9 @@ export class Game {
   /** Hard counts the user has left this drive (`HARD_COUNT.perDrive`). */
   private hardCountsLeft = HARD_COUNT.perDrive;
   private dcNote: string | null = null;
+  /** The presnap check: whether this snap has had its chance (an audible keeps the defense), and the line if it checked. */
+  private checkDone = false;
+  private checkNote: string | null = null;
   private exhibitionIq: DefenseIq = 'NORMAL';
   private exhibitionAssist: RunAssist = 'FULL';
   private exhibitionAimSlow = false;
@@ -838,6 +841,7 @@ export class Game {
     this.brain = newBrain({
       iq: this.seasonGame && s ? s.config.defIq ?? 'NORMAL' : this.exhibitionIq,
       adjust: dcAdjust(dc), scout: dc.r.scout, qbMobility: Math.max(0, Math.min(1, (qbSpd - 70) / 20)), seed: (this.rng() * 2 ** 31) >>> 0,
+      smarts: teamSmarts(DEF_SLOTS.map((sl) => this.cpuRoster[sl]?.r.prc ?? 60)),
     });
     this.dcNote = null;
     if (from > 1 && this.seasonGame) this.simAhead(from);
@@ -2185,6 +2189,8 @@ export class Game {
     this.screen = 'call';
     this.callMode = mode;
     this.play = null;
+    this.checkDone = false;
+    this.checkNote = null;
     this.kick = null;
     this.applied = null;
     this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
@@ -2397,6 +2403,18 @@ export class Game {
   }
 
   private startPlay(def: PlayDef): void {
+    // The presnap check: the defense sees the personnel and formation (not the play), once a snap.
+    if (!this.checkDone && this.brain && this.callMode === 'normal' && !this.drive.try && this.defCall) {
+      this.checkDone = true;
+      const d = this.drive;
+      const c = checkFor(this.brain, defIdentity(this.cpu), def, this.defCall, d.down, d.firstDownX - d.los, OPP_GOAL - d.los, this.userSituation());
+      if (c) {
+        this.defCall = c;
+        this.disguise = null; // a late check is played straight
+        if (this.defTags.game && rushers(c) !== 4) this.defTags = { ...this.defTags, game: undefined };
+        this.checkNote = "THEY CHECKED: THEY'VE SEEN THIS LOOK";
+      }
+    }
     // Everyone plays this snap with his confidence at its leverage.
     this.snapLev = this.snapLeverage();
     this.snapAt = null;
@@ -2412,7 +2430,7 @@ export class Game {
       defCall: this.defCall!,
       press: this.press,
       tags: this.defTags,
-      reads: this.brain && !this.drive.try ? leansFor(this.brain, this.defPrc(), this.defCall!) : undefined,
+      reads: this.brain && !this.drive.try ? leansFor(this.brain, this.defPrc(), this.defCall!, def) : undefined,
       los: this.drive.los,
       ballY: this.drive.ballY,
       flip: this.flipCall,
@@ -2441,6 +2459,7 @@ export class Game {
     observe(this.brain, {
       play: play.playDef, call: play.defCall, down: d.down, toGo, yardsToGoal: OPP_GOAL - d.los, gain, success,
       scrambled: play.scramble, kept: play.kept, air: play.ballTarget && play.thrown ? play.ballTarget.x - d.los : 0,
+      handedOff: play.handedOff, lane: laneOf(play),
     });
   }
 
@@ -3353,6 +3372,7 @@ export class Game {
         drawHint(g, play.motion ? 'IN MOTION: WATCH WHO GOES WITH HIM   ESC: AUDIBLE' : `SPACE/CLICK: SNAP   M: MOTION   ${hc}ESC: AUDIBLE`);
         if (this.readHelp() !== 'OFF') this.drawShellRead(g);
         if (this.dcNote) this.drawDcNote(g, 34);
+        if (this.checkNote) this.drawNote(g, this.checkNote, this.dcNote ? 50 : 34);
         break;
       }
       case 'snap':
@@ -3386,7 +3406,10 @@ export class Game {
 
   /** The DC's newest adjustment, as a line over the field. */
   private drawDcNote(g: CanvasRenderingContext2D, y: number): void {
-    const s = `DEFENSE: ${this.dcNote}`;
+    this.drawNote(g, `DEFENSE: ${this.dcNote}`, y);
+  }
+
+  private drawNote(g: CanvasRenderingContext2D, s: string, y: number): void {
     const w = textWidth(g, s) + 16;
     g.fillStyle = 'rgba(40,28,6,0.85)';
     g.fillRect(Math.round(VIEW_W / 2 - w / 2), y - 3, Math.round(w), 14);

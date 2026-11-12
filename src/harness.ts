@@ -2,6 +2,7 @@
  * Headless auto-players shared by the balance report (`npm run balance`) and the ratings
  * sensitivity report (`npm run ratings`). No DOM: plays run on fixed steps with a fake input.
  */
+import { CONCEPTS } from './data/concepts';
 import type { DefCall } from './data/defenses';
 import type { PlayDef } from './data/plays';
 import type { KickDef } from './data/specialTeams';
@@ -18,7 +19,7 @@ import { Play, type PlaySetup } from './game/playState';
 import type { ThrowKind } from './sim/ball';
 import type { KickParams, Wind } from './sim/kicking';
 import { arcAngle } from './sim/passPro';
-import { isEligible } from './sim/player';
+import { isEligible, type Player } from './sim/player';
 import { DRAW_SET } from './sim/runBlocking';
 import { TACKLE_RANGE } from './sim/tackling';
 
@@ -81,7 +82,10 @@ export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, l
  * he caught it. `kind` is the throw type, or 'auto' for the CPU QB's pick (`cpuThrowKind`); the core rows
  * throw TOUCH, the old single arc.
  */
-export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng, x?: DefExtras, los = LOS, kind: ThrowKind | 'auto' = 'touch') {
+export function passRep(
+  m: Matchup, playDef: PlayDef, call: DefCall, holdTime: number, rng: Rng, x?: DefExtras, los = LOS, kind: ThrowKind | 'auto' = 'touch',
+  to?: (o: Player) => boolean,
+) {
   const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let thrown = false;
@@ -91,7 +95,7 @@ export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: n
       let best = null as null | { p: (typeof play.off)[number]; sep: number };
       for (const o of play.off) {
         // Not a back still selling pass before his route (screens, check-releases).
-        if (!isEligible(o) || o.isBlocker || play.time - play.snapTime < o.routeDelay) continue;
+        if (!isEligible(o) || o.isBlocker || play.time - play.snapTime < o.routeDelay || (to && !to(o))) continue;
         let sep = Infinity;
         for (const d of play.def) sep = Math.min(sep, dist(d.pos, o.pos));
         if (!best || sep > best.sep) best = { p: o, sep };
@@ -109,6 +113,24 @@ export function passRep(m: Matchup, playDef: PlayDef, call: DefCall, holdTime: n
     if (before === 'air' && play.phase !== 'air' && play.carrier?.side === 'off') catchX = play.carrier.pos.x;
   }
   return { play, o: play.outcome, catchX };
+}
+
+/** RPO: the auto-QB pulls it and throws the tagged route this long after the snap. */
+export const RPO_THROW = 1.3;
+
+/**
+ * One RPO rep: `give` hands it off at the mesh and the auto-runner carries it (`runRep`); a pull throws the
+ * play's tagged route (the receiver whose route is the play's `strong` or `weak` concept route) at `RPO_THROW`.
+ */
+export function rpoRep(m: Matchup, playDef: PlayDef, call: DefCall, give: boolean, rng: Rng, los = LOS, x?: DefExtras, hold = RPO_THROW) {
+  if (give) {
+    const r = runRep(m, playDef, call, rng, los, x);
+    return { play: r.play, o: r.o };
+  }
+  const tag = new Set<string>();
+  for (const c of [playDef.strong, playDef.weak]) if (c) for (const r of Object.values(CONCEPTS[c].routes)) tag.add(r!);
+  const r = passRep(m, playDef, call, hold, rng, x, los, 'auto', (o) => !!o.routeName && tag.has(o.routeName));
+  return { play: r.play, o: r.o };
 }
 
 /** Zone read: the auto-QB rides the back this long after the snap before reading the key. */

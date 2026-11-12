@@ -215,6 +215,8 @@ export interface DefTags {
   prevent?: boolean;
   /** A game up front (a stunt) on one side of the ball (`GAME`, sim/passPro.ts). */
   game?: { kind: GameKind; side: 1 | -1 };
+  /** RPO pass-first: on an RPO, the hook and curl defenders to the tagged route's side ignore the run key (`Play.snap`). */
+  rpo?: boolean;
 }
 
 /**

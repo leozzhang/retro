@@ -2,6 +2,28 @@
 
 _Last updated: 2026-11-11_
 
+## In progress: a smarter defense, part 1: the RPO, leverage, the look (2026-11-11)
+Playtest: RPO Glance could be called over and over and the receiver was never covered. Details and numbers are in DEFENSE.md.
+
+**The bug:** on any run-blocked play, every second-level defender without a receiver set a run fit at the snap that lasted until the throw, deep safeties included. On an RPO pull the glance window was always open (36–50 yards a throw against zones at a 1.3 s throw). The DC couldn't see it either: the `pa` bucket was never read, an RPO give counted as a pass, only runs were checked for spam, and nothing knew where the ball went.
+
+**Done:**
+- **The mesh read** (`MESH_READ`): on an RPO, backers read the pull by `prc` and their run lean, then play pass; deep defenders stay home until the handoff; the DC's pass-first tag (`DefTags.rpo`) takes the conflict backers off the run key.
+- **Leverage** (`Lean.inside`): the players' book of which way intermediate throws broke, feeding man shade (a pre-snap tell), zone sink and break speed, with nerve when beaten the other way.
+- **The DC:** `rpo` and `mid` buckets, the give counts as a run, RPO posture (more man and two-high), spam detection for any play, new headlines.
+- **The look** (`lookOf`, `CHECK`): personnel and formation, never the play. A book per look, players' leans pulled toward what a look has shown, and a presnap check within the package, once a snap; an audible keeps the defense.
+- **Smarts** (`teamSmarts`): every in-game adjustment is gated by the DC and the team's `prc`, so a weak defense is a less smart one. ADAPT TIER rows check it.
+- **Harness:** `H.rpoRep` (give, or pull and throw the tagged route), and new ADAPT scripts: RPO glance, the 30% give mix, slant only, glance ×8 then give or smoke, Pistol run / Trips pass, the TIER rows. `ADAPT_ONLY` limits the scripts.
+
+**Balance:** core PASS, PA and RUN rows are byte-identical. The RPO give rows moved slightly (deep safeties are a beat late to a give), and ROUTE rows moved (they include RPO pulls and share an RNG). The always-pull glance went from 20–22 ypp at every setting to 12.4 static and about 7 at SHARP; the give pays as the counter.
+
+**Next (part 2, the film room):** an offline table of every play against every call (`npm run film`), an in-game opponent model per look and down-distance, and the call that beats it, gated by DC × team smarts × IQ. The plan is in DEFENSE.md's Hooks.
+
+**Flags:**
+- Quick-game-only offenses are still barely touched.
+- The PA counter after IZ ×8 reads 12–15 ypp against a learning defense: that drift predates this work.
+- Deep safeties still fit pure runs at 4 yd.
+
 ## In progress: pass rush and protection (2026-11-11)
 Two rounds in `sim/passPro.ts`; design, constants and sources are in PROTECTION.md.
 

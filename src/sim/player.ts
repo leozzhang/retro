@@ -11,15 +11,18 @@ export type Side = 'off' | 'def';
 
 /**
  * Anticipation, from -1 (cautious) to 1 (sitting on it): the run, screens, the QB taking off, the
- * deep ball. Set per snap by the CPU defense's brain (game/defBrain.ts); `NO_LEAN` plays as before.
+ * deep ball, and `inside`: leverage, from -1 (sitting on outside breaks) to 1 (inside breaks: the
+ * glance, slant, dig). Set per snap by the CPU defense's brain (game/defBrain.ts); `NO_LEAN` plays as before.
  */
 export interface Lean {
   run: number;
   screen: number;
   qb: number;
   deep: number;
+  inside: number;
 }
-export const NO_LEAN: Lean = Object.freeze({ run: 0, screen: 0, qb: 0, deep: 0 });
+export const LEAN_KEYS = ['run', 'screen', 'qb', 'deep', 'inside'] as const;
+export const NO_LEAN: Lean = Object.freeze({ run: 0, screen: 0, qb: 0, deep: 0, inside: 0 });
 
 /**
  * What a defender's lean (`Player.lean`, game/defBrain.ts) does on the field. A lean speeds the read
@@ -32,11 +35,19 @@ export const NO_LEAN: Lean = Object.freeze({ run: 0, screen: 0, qb: 0, deep: 0 }
  * reversed: a defender who isn't worried about the deep ball squats on the short ones. A corner leaning
  * deep bails up to `bail` yards deeper pre-snap (a tell). Past `smell`, a defender
  * leaning screen comes for the screen as soon as the line lets its rushers go.
+ * Leaning inside, a man defender shades `shade` yd more to the inside of his man (pre-snap too: a
+ * tell) and an underneath zone defender sinks `sink` yd under the windows inside; on a throw between
+ * `shortAir` and `deepAir` he breaks faster on a ball breaking the way he leans and slower the other way.
  */
 export const LEAN_FX = {
   fast: 0.45, slow: 0.5, paBite: 0.25, biteLong: 0.6, eyes: 0.15, creep: 0.8, surge: 8, rushSoft: 0.15, shortAir: 3, deepAir: 15, late: 0.4,
-  smell: 0.3, bail: 2,
+  smell: 0.3, bail: 2, shade: 1.0, sink: 1.5,
 };
+
+/** A throw broke inside: the ball came down at least a yard closer to the ball's spot across the field than its receiver lined up. */
+export function breaksInside(startY: number, ballY: number, targetY: number): boolean {
+  return Math.abs(targetY - ballY) < Math.abs(startY - ballY) - 1;
+}
 
 /** Reaction-time factor for a lean: under 1 when he's sitting on it, over 1 when he's wary of it. */
 export function leanMul(l: number): number {

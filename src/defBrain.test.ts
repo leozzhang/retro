@@ -5,10 +5,12 @@ import { PLAYBOOK } from './data/plays';
 import { DEF_SLOTS, teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
 import {
-  adjustments, callFor, DEF_BRAIN, halftime, headline, leansFor, newBrain, newDrive, observe, type DefBrain, type SnapSeen,
+  adjustments, bucketsOf, callFor, DEF_BRAIN, halftime, headline, laneOf, leansFor, newBrain, newDrive, observe, type DefBrain, type SnapSeen,
 } from './game/defBrain';
 import { Play } from './game/playState';
 import * as H from './harness';
+import { STEP } from './engine/constants';
+import { NO_LEAN } from './sim/player';
 
 const book = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
 const ident = defIdentity(teamById('alabama'));
@@ -117,13 +119,51 @@ describe('defensive brain', () => {
   });
 });
 
+describe('the RPO and leverage', () => {
+  it('an RPO the QB gave is a run; one he pulled is a pass, play action and an RPO, and a glance is a mid throw', () => {
+    expect(bucketsOf(book('rpo-glance'), false, false, 0, true)).toEqual(['run', 'rpo']);
+    expect(bucketsOf(book('rpo-glance'), false, false, 11)).toEqual(['pass', 'mid', 'pa', 'rpo']);
+  });
+
+  it('a throw that comes down inside its receiver breaks in; outside, out; short and deep ones have no lane', () => {
+    const at = (startY: number, x: number, y: number) => laneOf({ thrown: true, intended: { start: { y: startY } }, ballTarget: { x, y }, ballY: 26.6, los: 35 });
+    expect(at(8, 46, 16)).toBe('in');
+    expect(at(8, 46, 4)).toBe('out');
+    expect(at(8, 37, 16)).toBeNull();
+    expect(at(8, 60, 16)).toBeNull();
+  });
+
+  it('on an RPO pull the second level stops fitting the run once it reads the mesh; deep safeties never fit', () => {
+    const m = H.referenceMatchup();
+    const call = DEF_CALLS.find((c) => c.id === 'c2')!;
+    const play = H.newPlay(m, book('rpo-glance'), call, mulberry32(4));
+    play.snap();
+    for (let t = 0; t < 1.3; t += STEP) play.update(STEP, H.fakeInput, H.cam);
+    const lbs = play.def.filter((d) => d.role === 'LB' && d.assign?.kind === 'zone');
+    expect(lbs.length).toBeGreaterThan(0);
+    for (const d of lbs) expect(play.passRead.has(d)).toBe(true);
+    for (const d of play.def.filter((d) => d.assign?.kind === 'deep')) expect(d.pos.x).toBeGreaterThan(play.los + 8);
+  });
+
+  it('the inside routes they keep seeing turn into inside leverage, and a pass spammed draws its headline', () => {
+    const b = brain('SHARP');
+    feed(b, 'rpo-glance', 6, 12, 11);
+    for (let i = 0; i < 6; i++) {
+      observe(b, { play: book('rpo-glance'), call: DEF_CALLS[0], down: 1, toGo: 10, yardsToGoal: 60, gain: 12, success: true, scrambled: false, kept: false, air: 11, lane: 'in' });
+    }
+    const leans = leansFor(b, prc, DEF_CALLS[0]);
+    expect(leans.CB1!.inside).toBeGreaterThan(0.3);
+    expect(headline(b, (id) => id)).toMatch(/SITTING ON|RPO PASS FIRST|INSIDE/);
+  });
+});
+
 describe('defensive playbook', () => {
   it('the original three calls line up exactly as before, and neutral leans change nothing', () => {
     const m = H.referenceMatchup();
     const p = book('smash');
     for (const call of DEF_CALLS.slice(0, 3)) {
       const a = H.newPlay(m, p, call, mulberry32(2));
-      const reads = Object.fromEntries(DEF_SLOTS.map((s) => [s, { run: 0, screen: 0, qb: 0, deep: 0 }]));
+      const reads = Object.fromEntries(DEF_SLOTS.map((s) => [s, { ...NO_LEAN }]));
       const b = H.newPlay(m, p, call, mulberry32(2), H.LOS, { reads, tags: {} });
       expect(b.def.map((d) => d.pos)).toEqual(a.def.map((d) => d.pos));
     }
