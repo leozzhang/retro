@@ -81,14 +81,18 @@ const LEAD_PICKUP = 1.8;
  *   force blocks turn up there.
  * - `kickInside`: a kick-out turns up this far inside his man, to hit his inside shoulder and wash him out.
  * - `forceWidth`, `forceDepth`: the force player is a defender up to this far outside the edge and this deep.
- * - `onLine`: an end man on the line is no deeper than this; `kickOutside`: he's the kick-out's only if
- *   he's at least this far outside the last blocker who stays in (head-up or inside, the line has him).
+ * - `onLine`: an end man on the line is no deeper than this; `kickOutside`: a man off the ball is the
+ *   kick-out's only if he's at least this far outside the last blocker who stays in. On the line, `kickHeadUp`:
+ *   head-up on that blocker is the kick-out's too (the end man on the line; the TE or tackle blocks down
+ *   inside him). Further inside, the line has him.
+ * - `leadInside`: a lead puller whose backer is filling inside the hole turns up this share of the way from
+ *   the hole to him (1: right on him, inside-out; 0: at the hole, outside him).
  * - `meet`: he turns up early when his man comes to him this close.
  * - `attack`: a lead back leaves his path for his man this close to him.
  * - `lost`: he gives up on a man this far from the play and takes the most dangerous free defender.
  * - `lead`: cutting his man off, he aims for the carrier's spot up to this many seconds ahead (`cutOff`).
  */
-export const POA = { edge: 1.5, kickInside: 0.8, forceWidth: 10, forceDepth: 7, onLine: 1.8, kickOutside: 0.3, meet: 2.2, attack: 3, lost: 10, lead: 1 };
+export const POA = { edge: 1.5, kickInside: 0.8, forceWidth: 10, forceDepth: 7, onLine: 1.8, kickOutside: 0.3, kickHeadUp: 0.5, leadInside: 0.5, meet: 2.2, attack: 3, lost: 10, lead: 1 };
 /** Back paths that attack the perimeter: the line's edge is the turn-up point and the runner reads wide. */
 const PERIMETER_PATHS = new Set<RouteName>(['sweep', 'toss', 'pitchPath', 'stretch', 'oz']);
 /** A hinging tackle holds his spot this long (seconds after the snap) before working up to the next threat. */
@@ -216,8 +220,9 @@ export function assignRunBlocks(play: Play): void {
     const s = o.routeName && ROUTES[o.routeName].away ? -side : side;
     const out = (d: Player) => (d.pos.y - play.ballY) * s;
     const last = Math.max(...line.map(out));
-    const outside = play.def.filter((d) => !reserved.has(d) && d !== play.readKey && out(d) > last + POA.kickOutside);
-    const onLine = outside.filter((d) => (d.role === 'DL' || d.role === 'LB') && d.pos.x <= play.los + POA.onLine);
+    const free = play.def.filter((d) => !reserved.has(d) && d !== play.readKey);
+    const outside = free.filter((d) => out(d) > last + POA.kickOutside);
+    const onLine = free.filter((d) => (d.role === 'DL' || d.role === 'LB') && d.pos.x <= play.los + POA.onLine && out(d) > last - POA.kickHeadUp);
     const off = outside.filter((d) => d.role !== 'DL' && d.pos.x <= play.los + POA.forceDepth && out(d) < last + POA.forceWidth);
     const near = (a: Player, b: Player) => out(a) - out(b) || a.pos.x - b.pos.x;
     const end = onLine.sort(near)[0] ?? off.sort((a, b) => dist(a.pos, { x: play.los, y: play.ballY + s * last }) - dist(b.pos, { x: play.los, y: play.ballY + s * last }))[0];
@@ -281,18 +286,33 @@ export function assignRunBlocks(play: Play): void {
   const [lo, hi, pref] = down ? [-2.2, 0.7, -0.6] : [-0.7, 2.1, 0.4]; // zone, stretch and pin: man over or playside
   const covered = new Map<Player, Player>();
   const taken = new Set<Player>();
-  for (const b of line) {
-    let best: Player | null = null;
-    for (const d of dl) {
-      if (taken.has(d)) continue;
-      const o = along(d) - along(b);
-      if (o < lo || o > hi) continue;
-      if (!best || Math.abs(o - pref) < Math.abs(along(best) - along(b) - pref)) best = d;
+  const cover = (b: Player, d: Player) => {
+    b.mark = d;
+    covered.set(b, d);
+    taken.add(d);
+  };
+  if (down) {
+    // Gap rules (gap, on, down): the best fits across the whole line first, so the man over a guard is
+    // the guard's, not the tackle's two yards away who can't reach him down the line.
+    const pairs: { b: Player; d: Player; fit: number }[] = [];
+    for (const b of line) {
+      for (const d of dl) {
+        const o = along(d) - along(b);
+        if (o >= lo && o <= hi) pairs.push({ b, d, fit: Math.abs(o - pref) });
+      }
     }
-    if (best) {
-      b.mark = best;
-      covered.set(b, best);
-      taken.add(best);
+    pairs.sort((x, y) => x.fit - y.fit);
+    for (const { b, d } of pairs) if (!covered.has(b) && !taken.has(d)) cover(b, d);
+  } else {
+    for (const b of line) {
+      let best: Player | null = null;
+      for (const d of dl) {
+        if (taken.has(d)) continue;
+        const o = along(d) - along(b);
+        if (o < lo || o > hi) continue;
+        if (!best || Math.abs(o - pref) < Math.abs(along(best) - along(b) - pref)) best = d;
+      }
+      if (best) cover(b, best);
     }
   }
 
@@ -327,8 +347,10 @@ export function assignRunBlocks(play: Play): void {
   const helped = new Set<Player>();
   line.forEach((b, i) => {
     if (b.mark) return;
-    // Help a neighbour (playside first) who has his man; each covered blocker takes one helper.
-    const partner = [line[i - 1], line[i + 1]].find((n) => n && covered.has(n) && !helped.has(n));
+    // Help a neighbour who has his man; each covered blocker takes one helper. Zone helps playside first;
+    // a gap scheme blocks down, so it helps the man inside first.
+    const order = down ? [line[i + 1], line[i - 1]] : [line[i - 1], line[i + 1]];
+    const partner = order.find((n) => n && covered.has(n) && !helped.has(n));
     const climb = nearestBacker(b);
     if (partner) {
       helped.add(partner);
@@ -399,12 +421,17 @@ function pickRunTarget(play: Play, p: Player): Player | null {
   return best;
 }
 
-/** Where a puller turns up: inside his man on a kick-out, at the edge on the perimeter, else the hole. */
+/**
+ * Where a puller turns up: inside his man on a kick-out, at the edge on the perimeter, else the hole (or on
+ * his backer, if the backer's filling inside it).
+ */
 export function pullTurnY(play: Play, p: Player, t: Player | null): number {
   const s = playSide(play);
   const at = p.turnY ?? play.hole.y;
   if (t && p.poaJob === 'kick') return t.pos.y - s * POA.kickInside;
   if (t && p.poaJob === 'force' && (t.pos.y - at) * s > POA.kickInside) return t.pos.y - s * POA.kickInside;
+  // A lead on a backer filling inside the hole turns up on him, inside-out, not outside him at the hole.
+  if (t && p.poaJob === 'lead' && (t.pos.y - at) * s < 0 && (t.pos.y - p.pos.y) * s > 0) return lerp(at, t.pos.y, POA.leadInside);
   return at;
 }
 
@@ -600,7 +627,7 @@ const defPower = (r: Ratings) => r.bsh * 0.7 + r.spd * 0.3;
  * on the count; a two-gap player never slips, he's there to control his man). The pass rush
  * (`passPro.ts`) is untouched.
  */
-export const RUN_GETOFF = { window: 0.6, sd: 9, perTalent: 0.2, win: 11, edge: 0, short: 7, count: 12 };
+export const RUN_GETOFF = { window: 0.6, sd: 9, perTalent: 0.1, win: 11, edge: 0, short: 7, count: 12 };
 
 export function getOffWins(play: Play, d: Player, b: Player): boolean {
   if (play.time - play.snapTime > RUN_GETOFF.window || (d.runJob !== 'gap' && d.runJob !== 'edge')) return false;

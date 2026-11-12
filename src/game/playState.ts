@@ -136,6 +136,11 @@ export const STALK_SPLIT = 6.5;
 export const SCREEN_SET = 0.8;
 /** A box defender with a run-first (`fit`) zone reads the run this much sooner. */
 const FIT_EARLY = 0.15;
+/**
+ * On a draw the backers read pass through the line's set (`DRAW_SET`) and this much longer before they
+ * see the run: they've opened to their drops.
+ */
+const DRAW_FOOLED = 0.25;
 /** A spy reacts to his QB taking off this fast. */
 const SPY_REACT = 0.05;
 /**
@@ -748,7 +753,7 @@ export class Play {
           continue;
         }
         const read =
-          0.35 + (1 - d.r.prc / 100) * 0.5 + (a?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + 0.25 : 0) -
+          0.35 + (1 - d.r.prc / 100) * 0.5 + (a?.kind === 'deep' ? 0.15 : 0) + (this.runScheme === 'draw' ? DRAW_SET + DRAW_FOOLED : 0) -
           (a?.kind === 'zone' && a.fit ? FIT_EARLY : 0);
         d.fitAt = this.snapTime + read * leanMul(d.lean.run);
         d.fitUntil = Infinity;

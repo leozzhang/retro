@@ -71,6 +71,8 @@ Every play has hand tags (`PlayDef.tags`, `src/data/playTags.ts`). Next to them 
 
 `callCovers` maps each defensive call to these. The film room checks every `beats` tag (`TAG MISS`, FILM.md).
 
+**`stops`** is the other half: the looks that should stop the concept (`STOPS` in `playTags.ts`, by concept, so Smash is beaten by quarters from every formation). `tags()` fills it in; a look can't be in both. The film room checks it the same way (`STOP MISS`), and its SITUATIONS section shows each play's spread between the two (below).
+
 **Features (`playFeatures`):** personnel, formation, backfield (gun, pistol, under center, empty), read, run scheme and direction, pulls, the pass routes and the deepest, quick and deep, screen, PA, RPO, QB run, boot, drop, and the extra blockers.
 - `featureVector` is the numeric form, and `FEATURE_KEYS` names its entries, in an order that stays stable.
 - Scouting's `playTraits` is now a view over the features, with the same output as before.
@@ -119,10 +121,39 @@ FBS-wide charting of formations and concepts isn't public. So a style is defined
 - Route shapes for fade, whip, arrow, out-and-up, slip and leak come from coaching texts. The NFL tracking sample in `analysis/` has none of them.
 - There's no crack block or option route yet. A crack toss and Y-option wait on those mechanics.
 
+## Balancing: where a play should work, and where it shouldn't
+A play is balanced when it works against the looks it's built to beat and fails against the ones that stop it. Its average says little. A play that's good against everything is a cheat, and the learning defense will have nothing to read. A play that's mediocre against everything is filler. The tools, in the order to use them:
+
+1. **SITUATIONS** (`npm run film`): each play's success and yards a play against its `beats` looks, less against its `stops` looks. FLAT means under 10 points and 3 yd a play: it doesn't care what the defense shows, so look at it first. A negative spread (better against the look that should stop it) is a mechanic bug or a wrong tag.
+2. **STOP MISS / TAG MISS:** the same, one look at a time, against the play's peers.
+3. **`FILM_EXPLAIN=id`:** which receiver and route win each column, with the separation and the catch rate.
+4. **`npm run runfit`** for runs: who makes the tackle (by job and by slot), the cutback share, the SHORT section (3rd and 1 against Bear and Goal Line), and the ablations (what each block is worth).
+5. **`npm run trace`** (`TRACE_PLAY`, `TRACE_CALL`): one snap step by step. The JOBS line shows every blocker's assignment at the snap. Most run-game bugs this pass showed up there in one look: the wrong man kicked out, a lineman skipping the man over him, a lead turning up outside his backer.
+
+**Lessons from the first two books (2026-11-12), for the next ones:**
+- **Fix the mechanic, not the play.** The weak gun counters weren't a counter problem. They were three blocking rules, a timing problem and a missing threat:
+  - the kick-out skipped an end head-up on the tight end
+  - the gap scheme assigned the man over a guard to the tackle two yards away
+  - an uncovered lineman helped playside instead of down
+  - the back reached the hole before his pullers
+  - nothing held the backside end home for the gun QB's keep
+
+  Each fix moved a family: Power O, Trey Counter, Ace Wing Counter and Duo all moved with them.
+- **Read success and yards together.** A shot's checkdown against the coverage that takes the shot away still counts as a 1st-down success. Four Verts against Cover 4 is 63% at 6.6 yd a play; against Cover 3 it's 74% at 44.7. Success alone called that flat.
+- **Compare like with like.** Short-yardage plays (3rd and 1) are judged against each other, not against 1st-and-10 runs. A stop look is judged on its plain form: "loses to man" is 2 Man and Cover 1, not Cover 0, where nobody's deep and every route is open.
+- **Mind the noise.** A film cell is about ±6 points at 80 snaps. The run ablations need 150+ snaps a call: at 60, Power's hinge read −1.3 yd a carry; at 150 the same code read −0.4.
+- **Runs need their timing.** A puller takes about 1.1–1.3 s to reach the hole. A back's path has to arrive after him (the counter step), or the back outruns his blocks and the backer he was meant to meet makes the tackle.
+- **The tags can be wrong too.** Play action wasn't stopped by the blitz in our film, and the literature agrees: PA is beaten by two-high safeties who don't bite. Check the source before tuning the sim to match a tag.
+- **Known biases to read through** (open, PROGRESS.md):
+  - The film QB's deep ball is too good (go and seam caught 55–66% against an NFL 33%). Shots and dropbacks flag at 45–50% "against every call" because of it.
+  - Cover 2's underneath loses to the quick game and the screens.
+  - Boots fail against Cover 3.
+  - Heavy power beats the Bear front.
+
 ## Adding a batch
 1. Add formations, routes and concepts as data (`plays.ts`, `concepts.ts`). Keep personnel fixed per formation.
 2. Add plays to `BATCH_*` in `plays.ts` with tags. Each play's id is its own and stays stable.
 3. Put each play in at least one style book (`offStyles.ts`), and flip a style's `book` from `null` when it's built.
 4. Run `npm test`: the validation test holds the tags and the book rules.
-5. Run `npm run film` and read FLAGS, `TAG MISS`, BOOKS and ROUTES, with `FILM_EXPLAIN` on anything flagged. Save a baseline (`cp film.json film.base.json`) and diff later runs with `FILM_BASE=film.base.json`.
+5. Run `npm run film` and read SITUATIONS first, then FLAGS, `TAG MISS`/`STOP MISS`, BOOKS and ROUTES, with `FILM_EXPLAIN` on anything flagged (and `npm run runfit` / `npm run trace` for runs). A new concept gets its `STOPS` entry. Save a baseline (`cp film.json film.base.json`) and diff later runs with `FILM_BASE=film.base.json`.
 6. Run `npm run balance`. The aggregate rows run over `LEGACY` and must not move. New plays get their own per-play rows, and each built book gets BOOK rows.

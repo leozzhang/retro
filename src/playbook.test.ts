@@ -3,7 +3,7 @@ import { buildStaff } from './data/coaches';
 import { DEF_CALLS, rushers } from './data/defenses';
 import { OFF_STYLES, ocBook, ocIdentity, ocStyle, signatures, STYLES, styleBook, styleOfProfile } from './data/offStyles';
 import { LEGACY, PLAYBOOK, ROUTES, type PlayDef, type RouteName } from './data/plays';
-import { callCovers, COVER_TAGS, FAMILIES, PLAY_CONCEPTS, type Family } from './data/playTags';
+import { callCovers, COVER_TAGS, FAMILIES, PLAY_CONCEPTS, STOPS, type Family } from './data/playTags';
 import { TEAMS } from './data/teams';
 import { featureVector, FEATURE_KEYS, playFeatures } from './game/playFeatures';
 import { personnelOf } from './game/resolvePlay';
@@ -51,7 +51,14 @@ describe('playbook tags', () => {
       expect(PLAY_CONCEPTS, p.id).toContain(p.tags.concept);
       for (const b of p.tags.beats) expect(COVER_TAGS, p.id).toContain(b);
       expect(new Set(p.tags.beats).size, p.id).toBe(p.tags.beats.length);
+      // What stops it: known looks, and never one it's also tagged to beat.
+      for (const s of p.tags.stops) expect(COVER_TAGS, p.id).toContain(s);
+      expect(p.tags.stops.filter((s) => p.tags.beats.includes(s)), p.id).toEqual([]);
     }
+  });
+
+  it('every concept says what stops it (STOPS), except the sneak', () => {
+    for (const c of PLAY_CONCEPTS) if (c !== 'sneak') expect(STOPS[c].length, c).toBeGreaterThan(0);
   });
 
   it("every play's family agrees with its data", () => {

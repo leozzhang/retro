@@ -17,7 +17,8 @@
     "film": "vitest run src/film.test.ts",
     "app": "node scripts/app-dev.mjs",
     "app:build": "tsc --noEmit && vite build && electron-builder --win portable && electron-builder --win nsis",
-    "runfit": "vitest run src/runfit.test.ts"
+    "runfit": "vitest run src/runfit.test.ts",
+    "trace": "vitest run src/trace.test.ts --reporter=verbose"
   },
   "build": {
     "appId": "com.leo.saturdaygridiron",

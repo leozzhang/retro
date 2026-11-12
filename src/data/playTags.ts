@@ -69,10 +69,50 @@ export interface PlayTags {
   family: Family;
   concept: PlayConcept;
   beats: CoverTag[];
+  /** The looks that should stop it (`STOPS`, by concept): the other half of where it works. */
+  stops: CoverTag[];
 }
 
-/** Shorthand for the playbook's entries. */
-export const tags = (family: Family, concept: PlayConcept, ...beats: CoverTag[]): PlayTags => ({ family, concept, beats });
+/**
+ * What stops each concept: the looks it should do worse against than its peers do (the film room's
+ * `STOP MISS`, and the SITUATIONS spread between its `beats` and its `stops`; docs/PLAYBOOKS.md). A
+ * concept with no answer in coaching literature has none here (the sneak). Kept apart from `beats` because
+ * the answer is a property of the concept: Smash is beaten by quarters from every formation it's run from.
+ */
+export const STOPS: Record<PlayConcept, CoverTag[]> = {
+  // Quick game: a hard (cover 2) corner sits on the flat and the hitch, the hooks wall the slants.
+  'slant-flat': ['cover2'], 'double-slant': ['cover2'], 'double-hitch': ['cover2', 'man'], stick: ['cover2'],
+  outs: ['cover2'], spacing: ['man'], 'fade-out': ['cover2'], whip: ['cover2'],
+  // Dropback: the zone beaters lose to man, the man beaters to zone; Smash to quarters' corner carrying the
+  // corner route, the dig and the crossers to the Tampa middle, the post off the single-high safety.
+  smash: ['quarters'], mesh: ['cover2'], dagger: ['cover2'], 'curl-flat': ['man'], drive: ['cover2'],
+  'y-cross': ['cover2'], mills: ['cover3', 'cover1'], flood: ['man'], 'dig-cross': ['cover2'],
+  'corner-out': ['quarters'], snag: ['man'], 'go-out': ['cover2'], texas: ['cover2'],
+  // Shots: four deep defenders match the verticals.
+  'four-verts': ['quarters'], 'go-post': ['quarters'], 'post-wheel': ['quarters'], 'max-shot': ['quarters'],
+  'out-and-up': ['cover3'],
+  // Screens: the hard corner and the rolled-up flat defender are on top of the throw.
+  smoke: ['cover2'], tunnel: ['cover2'], 'rb-screen': ['cover2'], 'slip-screen': ['cover2'], bubble: ['cover2'],
+  // Play action wants a single-high, run-fitting defense: two deep safeties who don't bite take the shot
+  // away (quarters' safeties read the run, Cover 2's stay deep). The boot's flood is a Cover 2 problem:
+  // the cloud corner sits on the flat and the half safety is over the corner route.
+  'pa-post': ['quarters'], 'pa-crossers': ['quarters'], 'pa-seams': ['quarters'], 'deep-cross': ['quarters'],
+  'pa-dig': ['cover2'], 'y-leak': ['quarters'], 'boot-flood': ['cover2'], 'counter-boot': ['cover2'], keeper: ['cover2'],
+  // RPOs: the pull answers the box, so the look that stops one is the coverage its throw can't beat.
+  'rpo-slant': ['cover2'], 'rpo-bubble': ['cover2'], 'rpo-glance': ['quarters'], 'rpo-stick': ['cover2'],
+  'rpo-pop': ['quarters'], 'rpo-smoke': ['cover2'], 'rpo-arrow': ['cover2'], 'rpo-fade': ['cover2'],
+  // Runs: a loaded box, and for the slow-developing and perimeter runs, penetration (the blitz).
+  'inside-zone': ['heavyBox'], 'split-zone': ['heavyBox'], 'outside-zone': ['blitz'], power: ['heavyBox'],
+  counter: ['blitz', 'heavyBox'], duo: ['heavyBox'], iso: ['heavyBox'], trap: ['heavyBox'], toss: ['blitz'],
+  'pin-pull': ['blitz'], draw: ['heavyBox'], 'zone-read': ['heavyBox'], 'power-read': ['heavyBox'],
+  'speed-option': ['heavyBox'], 'qb-draw': ['heavyBox'], 'qb-power': ['heavyBox'], 'qb-counter': ['blitz', 'heavyBox'],
+  sneak: [],
+};
+
+/** Shorthand for the playbook's entries; what stops it comes from its concept (`STOPS`). */
+export const tags = (family: Family, concept: PlayConcept, ...beats: CoverTag[]): PlayTags => ({
+  family, concept, beats, stops: STOPS[concept].filter((t) => !beats.includes(t)),
+});
 
 /** The coverage family of each zone call, by id; man calls and the shell come from the call itself. */
 const ZONE_COVER: Record<string, CoverTag> = {

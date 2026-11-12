@@ -14,8 +14,13 @@ const ZERO: Vec = { x: 0, y: 0 };
 /** Yards a scorer carries on into the end zone after crossing the goal line, before pulling up. Only for show. */
 /** A back selling pass before a delayed route steps up to block no more than this far from his spot. */
 const DELAY_SET_RANGE = 1.2;
+/** The draw's back sets this close to his spot: he sells pass beside the QB and takes the ball there. */
+const DRAW_SET_RANGE = 0.6;
 /** Backers fit a run this far past the LOS (they read, then fill; they don't meet the back at the line). */
 const LB_FIT_DEPTH = 2.8;
+/** A backer's fit is this much shallower than his alignment (`runFit`), and no shallower than `LB_FIT_MIN`. */
+const LB_FIT_STEP = 0.8;
+const LB_FIT_MIN = 1.0;
 /** A backer or DB in the box this close to a blocker is working through traffic and runs at `TRASH_SPEED`. */
 const TRASH_RANGE = 1.6;
 const TRASH_SPEED = 0.85;
@@ -375,7 +380,8 @@ function passBlock(play: Play, p: Player): void {
     const r = p.mark;
     let tgt = add(r.pos, scale(norm(sub(qb.pos, r.pos)), 0.9));
     // A back who's only selling pass before his route (screen, draw, check-release) stays near his spot.
-    if (!p.isBlocker) tgt = add(p.start, limit(sub(tgt, p.start), DELAY_SET_RANGE));
+    // On a draw he sells it from beside the QB, so the mesh is there when the delay's up (`DRAW_SET_RANGE`).
+    if (!p.isBlocker) tgt = add(p.start, limit(sub(tgt, p.start), play.runScheme === 'draw' ? DRAW_SET_RANGE : DELAY_SET_RANGE));
     // Linemen take their pass sets (sim/passPro.ts): the tackles vertical on the edge, the interior short.
     p.want = passSet(play, p, r) ?? seek(p, tgt, maxSpeed(p) * 0.95, 0.4);
   } else {
@@ -477,7 +483,11 @@ export function thinkDefense(play: Play, d: Player): void {
  * linebacker clairvoyant; the back has to find the crease.
  */
 function runFit(play: Play, d: Player): void {
-  const depth = d.role === 'S' ? 4 : d.role === 'CB' ? 3 : LB_FIT_DEPTH;
+  // On a designed run a backer fits a step in front of where he lined up, no deeper than `LB_FIT_DEPTH`: a
+  // goal-line or bear backer walked up to 2–3 yd plays downhill from there, not back to the regular fit.
+  // (Play action's bite keeps the regular fit.)
+  const lbDepth = play.playDef.kind === 'run' ? clamp(d.start.x - play.los - LB_FIT_STEP, LB_FIT_MIN, LB_FIT_DEPTH) : LB_FIT_DEPTH;
+  const depth = d.role === 'S' ? 4 : d.role === 'CB' ? 3 : lbDepth;
   const tgt = fitSpot(play, d, depth);
   d.goal = tgt;
   d.want = seek(d, tgt, maxSpeed(d) * 0.95, 0.6);
@@ -707,7 +717,10 @@ function cover(play: Play, d: Player): void {
   // Inside leverage, more (or outside) as he leans on the routes his man has been running.
   const inside = Math.sign(play.ballY - lp.y) * (0.6 + LEAN_FX.shade * d.lean.inside);
   // A man still behind the line gets played from just past it: read him, don't chase him into the backfield.
-  const tgt = { x: Math.max(lp.x + cushion, play.los + MAN_DEPTH), y: lp.y + inside };
+  // On a designed run, a backer walked up closer than that (the goal line) holds his depth instead of
+  // backing out of the box.
+  const floor = d.role === 'LB' && play.playDef.kind === 'run' ? Math.min(MAN_DEPTH, d.start.x - play.los) : MAN_DEPTH;
+  const tgt = { x: Math.max(lp.x + cushion, play.los + floor), y: lp.y + inside };
   let sp = maxSpeed(d);
   if (!d.turned) {
     if (r.pos.x > d.pos.x - 2.5 || since > 1.2) d.turned = true;

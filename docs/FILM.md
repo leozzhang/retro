@@ -39,6 +39,11 @@ It has two jobs:
   - `TAG MISS`: the play does at least `beatsSlack` (3 points) worse than its peers there. The bar widens by 2 standard errors of the cells it rests on, so a look shown by one call (Cover 4, Cover 0) isn't flagged on noise.
   - `TAG EXTRA`: it does 12+ points better against a look it isn't tagged for.
   - RPO gives aren't checked, and `press` can't be (it's the identity's, not a call's).
+  - `STOP MISS`: the mirror, on the play's `stops` looks (`STOPS`, by concept): it does `beatsSlack` better than its peers against a look that should stop it. A stop look is judged on its plain form: a coverage without the blitz calls showing it.
+  - Peers are passes against passes and runs against runs, and short yardage (3rd and 1) against its own.
+- **SITUATIONS** (`situations`): each play's mean success and yards a play against the calls showing a look it beats, less against the calls showing a look that stops it (a call showing both counts for neither).
+  - `FLAT`: under `spreadFrom` (10 points) and `spreadYpp` (3 yd a play). It doesn't care what the defense shows: a cheat, filler, or a mechanic bug. Read these first.
+  - The yards matter for shots. A checkdown against the look that takes the shot away is still a 1st-down success.
 - **ROUTES:** every throw by route against the NFL's catch rate and yards a target. The film QB throws only to an open man, so deep routes run high there. The balance report's ROUTE rows throw every route and are the fair comparison.
 - **BOOKS:** each built style book against each call, and its families.
   - `BOOK HOLE`: a call nothing in the book reaches 50% against.
@@ -58,7 +63,12 @@ It has two jobs:
 
   Then it totals each target over the regular calls against the NFL route rate. That shows *why* a play wins: which receiver, which route, and whether it's the catch or the run after it.
 - **`FILM_BASE=film.base.json`** diffs against a saved table (`cp film.json film.base.json`). It lists cells that moved 10+ points and rows whose mean moved 3+, a before and after for each fix or batch.
-- To dig further, trace one rep headless: `H.newPlay`, `play.snap()`, step it and print positions (see PROGRESS.md for the Cover 2 corner found that way).
+- **Tracing a snap:** `TRACE_PLAY=counter TRACE_CALL=c3 npm run trace` (`src/trace.test.ts`; `TRACE_N` snaps, `TRACE_T=0.3,0.7,1.1` the times, `TRACE_SEED`). It prints:
+  - every blocker's assignment at the snap: `mark`, `^climb`, `@poa`, `(job)`
+  - at each time, every player's spot (yd past the LOS, yd from the ball), who's engaged with whom, and each defender's run job
+  - how the snap ended, and who made the tackle
+
+  For runs it's the fastest way from a RUNFIT row to the cause. Passes aren't thrown there; use `FILM_EXPLAIN`.
 
 **Options:**
 - `FILM_ONLY=id,kind` limits the plays (for example `FILM_ONLY=pass` or `FILM_ONLY=rpo-glance,smash`)

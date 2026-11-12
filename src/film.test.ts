@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEF_CALLS } from './data/defenses';
 import { PLAYBOOK } from './data/plays';
-import { beatsChecks, explainReport, FILM, filmDiff, filmReport, filmRows, filmTable, type FilmTable } from './film';
+import { beatsChecks, explainReport, FILM, filmDiff, filmReport, filmRows, filmTable, situations, type FilmTable } from './film';
 
 describe('film room', () => {
   it('an RPO is two rows, the give and the pull; short-yardage plays are measured on 3rd and 1', () => {
@@ -35,7 +35,10 @@ describe('film room', () => {
     const smash = PLAYBOOK.find((p) => p.id === 'smash')!;
     const verts = PLAYBOOK.find((p) => p.id === 'four-verts')!;
     const t = filmTable([smash, verts], 4);
-    for (const c of beatsChecks(t)) expect(['ok', 'miss', 'extra']).toContain(c.kind);
+    for (const c of beatsChecks(t)) expect(['ok', 'miss', 'extra', 'stopOk', 'stopMiss']).toContain(c.kind);
+    // Smash is stopped by quarters: that's checked as a stop, not a beat.
+    expect(beatsChecks(t).some((c) => c.row.play === 'smash' && c.tag === 'quarters' && c.kind.startsWith('stop'))).toBe(true);
+    expect(situations(t).every((s) => s.spread === s.works - s.fails)).toBe(true);
     expect(beatsChecks(t).some((c) => c.row.play === 'smash' && c.tag === 'cover2')).toBe(true);
   });
 });

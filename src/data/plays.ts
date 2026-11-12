@@ -131,8 +131,9 @@ export const ROUTES: Record<RouteName, RouteDef> = {
   izDeep: { pts: [[2.5, 0.8], [5.6, 2.6], [9, 3]], cont: true, run: true },
   // Under-center stretch: aim at the tight end's outside hip, then bend it up.
   stretch: { pts: [[3, 1.8], [5.5, 6], [8.5, 8.5]], cont: true, run: true },
-  // Gun counter: jab away, then come back across behind the pullers to the off-tackle hole.
-  counter: { pts: [[0.2, -0.4], [0.8, 2], [4, 5], [8, 5.8]], cont: true, run: true },
+  // Gun counter: a real counter step away (a yard), then back across behind the pullers to the off-tackle
+  // hole. The step is the timing: the pullers need 1.1–1.3 s to get there, and the back mustn't beat them.
+  counter: { pts: [[-0.2, -1.1], [0.4, 1.2], [4, 5], [8, 5.8]], cont: true, run: true },
   // Trap: a quick hitter just inside the trapped lineman.
   trap: { pts: [[3, 0.8], [6.5, 1], [9, 1.2]], cont: true, run: true },
   // Draw: sell pass, then step up beside the QB and hit the A gap.

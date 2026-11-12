@@ -18,6 +18,7 @@ describe('runfit', () => {
 // `npm run runfit`: the RUNFIT section on its own, to runfit.txt (RUNFIT_ONLY=id,..., RUNFIT_REPS=n).
 it.runIf(process.env.npm_lifecycle_event === 'runfit')('runfit report', () => {
   const only = process.env.RUNFIT_ONLY?.split(',').map((x) => x.trim()).filter(Boolean);
-  const lines = runfitReport(Number(process.env.RUNFIT_REPS ?? 60), undefined, only);
+  const calls = process.env.RUNFIT_CALLS?.split(',').map((x) => x.trim()).filter(Boolean);
+  const lines = runfitReport(Number(process.env.RUNFIT_REPS ?? 60), undefined, only, calls);
   writeFileSync(process.env.RUNFIT_OUT ?? 'runfit.txt', lines.join('\n'));
 }, 3_600_000);

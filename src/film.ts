@@ -12,7 +12,7 @@ import { holdFor } from './adaptive';
 import { DEF_CALLS, rushers, type DefCall, type DefTags } from './data/defenses';
 import { OFF_STYLES, STYLES } from './data/offStyles';
 import { LEGACY, PLAYBOOK, type PlayDef } from './data/plays';
-import { callCovers, COVER_TAGS, type CoverTag, type Family, type PlayConcept } from './data/playTags';
+import { BOX_TAGS, callCovers, COVER_TAGS, type CoverTag, type Family, type PlayConcept } from './data/playTags';
 import { OPP_GOAL } from './engine/constants';
 import { mulberry32 } from './engine/math';
 import { lookOf } from './game/defBrain';
@@ -35,7 +35,11 @@ import { playTraits, type Trait } from './season/scouting';
  *   - `tagFrom`: a tag that moves a cell's success this much is worth a line.
  * - The beats check (`beatsChecks`): `beatsSlack` worse than the peers against a tagged look is a miss,
  *   `extraFrom` better against an untagged one is an extra, each widened by `sigmas` standard errors of
- *   the cells it rests on. `diffFrom`: a cell that moved this much since `FILM_BASE` gets a line.
+ *   the cells it rests on. A look that should stop it (`stops`) is the mirror: `beatsSlack` better than
+ *   the peers there is a stop miss.
+ * - SITUATIONS (`situations`): a play's success against the looks it beats less its success against the
+ *   looks that stop it. Under `spreadFrom` and `spreadYpp` yd a play it doesn't care what the defense shows: a flat play, either a
+ *   cheat or filler, and the ML defense has nothing to learn from it. `diffFrom`: a cell that moved this much since `FILM_BASE` gets a line.
  * - `nfl`: the NFL route table the ROUTES section compares against.
  */
 export const FILM = {
@@ -52,6 +56,8 @@ export const FILM = {
   beatsSlack: 0.03,
   extraFrom: 0.12,
   sigmas: 2,
+  spreadFrom: 0.1,
+  spreadYpp: 3,
   diffFrom: 0.1,
   /**
    * NFL catch rate and yards a target by route (docs/TARGETS.md, "Pass results by route"), and which
@@ -115,6 +121,8 @@ export interface FilmRow {
   family: Family;
   concept: PlayConcept;
   beats: CoverTag[];
+  /** The looks that should stop it (`PlayTags.stops`; missing in an old FILM_BASE). */
+  stops?: CoverTag[];
   /** The style books it's in (`data/offStyles.ts`); `legacy` for the original 62. */
   books: string[];
   /** `featureVector` (`game/playFeatures.ts`), in `FEATURE_KEYS` order. */
@@ -156,7 +164,7 @@ export function filmRows(plays: PlayDef[] = PLAYBOOK): Omit<FilmRow, 'cells'>[] 
   const out: Omit<FilmRow, 'cells'>[] = [];
   for (const p of plays) {
     const base = {
-      play: p.id, traits: [...playTraits(p)], family: p.tags.family, concept: p.tags.concept, beats: p.tags.beats,
+      play: p.id, traits: [...playTraits(p)], family: p.tags.family, concept: p.tags.concept, beats: p.tags.beats, stops: p.tags.stops,
       books: booksOf(p), features: featureVector(p), look: lookOf(p), down: p.short ? 3 : 1, toGo: p.short ? 1 : 10,
     };
     if (p.read === 'rpo') {
@@ -325,7 +333,7 @@ export function filmReport(t: FilmTable): string[] {
   }
   if (!tagged) out.push('TAG  none');
 
-  out.push('', ...beatsReport(t), '', ...routesReport(t), '', ...booksReport(t));
+  out.push('', ...beatsReport(t), '', ...situationsReport(t), '', ...routesReport(t), '', ...booksReport(t));
 
   // Flags: not tuned here, for a person to look at.
   out.push('', 'FLAGS (regular calls only)');
@@ -358,11 +366,16 @@ const callName = (id: string) => DEF_CALLS.find((c) => c.id === id)?.name ?? id;
 const regular = (t: FilmTable) => t.calls.filter((c) => !t.situational.includes(c));
 const passy = (r: FilmRow) => r.mode === 'pass' || r.mode === 'pull';
 
-/** The regular calls that answer to a tag (`callCovers`). */
-function callsFor(t: FilmTable, tag: CoverTag): string[] {
+/**
+ * The regular calls that answer to a tag (`callCovers`). `clean`: for a coverage tag, only the calls
+ * showing it with a normal rush. A look that should stop a play is judged on its plain form: a zone
+ * beater "losing to man" shouldn't be measured on Cover 0, where nobody's deep and everything is open.
+ */
+function callsFor(t: FilmTable, tag: CoverTag, clean = false): string[] {
   return regular(t).filter((id) => {
     const c = DEF_CALLS.find((x) => x.id === id)!;
-    return callCovers(c, rushers(c)).has(tag);
+    const covers = callCovers(c, rushers(c));
+    return covers.has(tag) && !(clean && !BOX_TAGS.includes(tag) && covers.has('blitz'));
   });
 }
 
@@ -371,7 +384,7 @@ export interface BeatsCheck {
   tag: CoverTag;
   /** How much better (+) or worse the row does against the tag's calls than its peers do, success points. */
   rel: number;
-  kind: 'ok' | 'miss' | 'extra';
+  kind: 'ok' | 'miss' | 'extra' | 'stopOk' | 'stopMiss';
 }
 
 /**
@@ -386,18 +399,25 @@ export function beatsChecks(t: FilmTable): BeatsCheck[] {
   const edge = (r: FilmRow, calls: string[]) => mean(calls.map((c) => r.cells[c].succ)) - means.get(r)!;
   const n = regular(t).length;
   for (const tag of COVER_TAGS) {
-    const calls = callsFor(t, tag);
-    if (!calls.length || calls.length === n) continue;
-    for (const kind of [true, false]) {
-      const peers = t.rows.filter((r) => r.mode !== 'give' && passy(r) === kind);
-      if (!peers.length) continue;
-      const peer = mean(peers.map((r) => edge(r, calls)));
-      // A tag shown by one call rests on one cell: the bar widens by the noise (`sigmas` standard errors).
-      const noise = FILM.sigmas * Math.sqrt(0.25 / (t.reps * calls.length));
-      for (const row of peers) {
-        const rel = edge(row, calls) - peer;
-        if (row.beats.includes(tag)) out.push({ row, tag, rel, kind: rel < -(FILM.beatsSlack + noise) ? 'miss' : 'ok' });
-        else if (rel >= FILM.extraFrom + noise) out.push({ row, tag, rel, kind: 'extra' });
+    for (const clean of [false, true]) {
+      const calls = callsFor(t, tag, clean);
+      if (!calls.length || calls.length === n) continue;
+      // Peers: passes against passes, runs against runs, and short yardage (3rd and 1) against its own.
+      for (const kind of [true, false]) {
+        for (const down of [1, 3]) {
+          const peers = t.rows.filter((r) => r.mode !== 'give' && passy(r) === kind && r.down === down);
+          if (!peers.length) continue;
+          const peer = mean(peers.map((r) => edge(r, calls)));
+          // A tag shown by one call rests on one cell: the bar widens by the noise (`sigmas` standard errors).
+          const noise = FILM.sigmas * Math.sqrt(0.25 / (t.reps * calls.length));
+          for (const row of peers) {
+            const rel = edge(row, calls) - peer;
+            if (clean) {
+              if (row.stops?.includes(tag)) out.push({ row, tag, rel, kind: rel > FILM.beatsSlack + noise ? 'stopMiss' : 'stopOk' });
+            } else if (row.beats.includes(tag)) out.push({ row, tag, rel, kind: rel < -(FILM.beatsSlack + noise) ? 'miss' : 'ok' });
+            else if (!row.stops?.includes(tag) && rel >= FILM.extraFrom + noise) out.push({ row, tag, rel, kind: 'extra' });
+          }
+        }
       }
     }
   }
@@ -408,7 +428,8 @@ const signedPts = (x: number) => `${x >= 0 ? '+' : '-'}${String(Math.abs(Math.ro
 
 function beatsReport(t: FilmTable): string[] {
   const checks = beatsChecks(t);
-  const tagged = checks.filter((c) => c.kind !== 'extra');
+  const tagged = checks.filter((c) => c.kind === 'ok' || c.kind === 'miss');
+  const stops = checks.filter((c) => c.kind === 'stopOk' || c.kind === 'stopMiss');
   const out = [
     `BEATS: each play against the looks its tags say it attacks (data/playTags.ts), relative to its peers; + is better than the peers do.`,
     `${tagged.length} tags checked: ${tagged.filter((c) => c.kind === 'ok').length} hold, ${tagged.filter((c) => c.kind === 'miss').length} miss (worse than the peers by ${Math.round(FILM.beatsSlack * 100)}+ points). EXTRA: ${Math.round(FILM.extraFrom * 100)}+ points better against a look it isn't tagged for.`,
@@ -416,11 +437,67 @@ function beatsReport(t: FilmTable): string[] {
   for (const c of checks.filter((x) => x.kind === 'miss').sort((a, b) => a.rel - b.rel)) {
     out.push(`TAG MISS   ${c.row.name.slice(0, 30).padEnd(30)} ${c.tag.padEnd(9)} ${signedPts(c.rel)} (${callsFor(t, c.tag).map(head).join(' ').replace(/ +/g, ' ').trim()})`);
   }
+  out.push(`${stops.length} stops checked (the looks that should stop it, STOPS): ${stops.filter((c) => c.kind === 'stopOk').length} hold, ${stops.filter((c) => c.kind === 'stopMiss').length} miss (better than the peers by ${Math.round(FILM.beatsSlack * 100)}+ points).`);
+  for (const c of checks.filter((x) => x.kind === 'stopMiss').sort((a, b) => b.rel - a.rel)) {
+    out.push(`STOP MISS  ${c.row.name.slice(0, 30).padEnd(30)} ${c.tag.padEnd(9)} ${signedPts(c.rel)} (${callsFor(t, c.tag, true).map(head).join(' ').replace(/ +/g, ' ').trim()})`);
+  }
   for (const c of checks.filter((x) => x.kind === 'extra').sort((a, b) => b.rel - a.rel)) {
     out.push(`TAG EXTRA  ${c.row.name.slice(0, 30).padEnd(30)} ${c.tag.padEnd(9)} ${signedPts(c.rel)}`);
   }
   return out;
 }
+
+export interface Situation {
+  row: FilmRow;
+  /** Mean success against the calls showing a look it beats, and against those showing a look that stops it. */
+  works: number;
+  fails: number;
+  spread: number;
+  /** The same in yards a play: a shot's checkdown against the look that takes it away is a 1st-down success. */
+  worksYpp: number;
+  failsYpp: number;
+}
+
+/**
+ * Where each play works and where it doesn't: its success against the regular calls showing a look it
+ * beats, and against those showing a look that should stop it (a call showing both counts for neither).
+ * Rows without both sides (the sneak, an RPO give) are left out.
+ */
+export function situations(t: FilmTable): Situation[] {
+  const out: Situation[] = [];
+  for (const row of t.rows) {
+    if (row.mode === 'give' || !row.stops?.length || !row.beats.length) continue;
+    const good = new Set(row.beats.flatMap((g) => callsFor(t, g)));
+    const bad = new Set(row.stops.flatMap((g) => callsFor(t, g, true)));
+    const works = [...good].filter((c) => !bad.has(c));
+    const fails = [...bad].filter((c) => !good.has(c));
+    if (!works.length || !fails.length) continue;
+    const w = mean(works.map((c) => row.cells[c].succ));
+    const f = mean(fails.map((c) => row.cells[c].succ));
+    const wy = mean(works.map((c) => row.cells[c].ypp));
+    const fy = mean(fails.map((c) => row.cells[c].ypp));
+    out.push({ row, works: w, fails: f, spread: w - f, worksYpp: wy, failsYpp: fy });
+  }
+  return out;
+}
+
+function situationsReport(t: FilmTable): string[] {
+  const all = situations(t);
+  const flat = all.filter((s) => s.spread < FILM.spreadFrom && s.worksYpp - s.failsYpp < FILM.spreadYpp).sort((a, b) => a.spread - b.spread);
+  const out = [
+    `SITUATIONS: success against the looks each play beats (its tags) less against the looks that should stop it (STOPS, data/playTags.ts).`,
+    `${all.length} plays: median spread ${signedPts(median(all.map((s) => s.spread)))} points; ${flat.length} FLAT (under ${Math.round(FILM.spreadFrom * 100)} points and ${FILM.spreadYpp} yd a play: it doesn't care what the defense shows).`,
+  ];
+  for (const s of flat) {
+    out.push(`FLAT  ${s.row.name.slice(0, 30).padEnd(30)} works ${pct(s.works)}% ${s.worksYpp.toFixed(1)} ypp (${s.row.beats.join(' ')}) | fails ${pct(s.fails)}% ${s.failsYpp.toFixed(1)} ypp (${s.row.stops!.join(' ')}) | spread ${signedPts(s.spread)}`);
+  }
+  return out;
+}
+
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length ? s[s.length >> 1] : 0;
+};
 
 interface RouteAgg {
   n: number;

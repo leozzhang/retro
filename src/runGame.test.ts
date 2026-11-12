@@ -275,6 +275,33 @@ describe('run fits (sim/runFits.ts)', () => {
     expect(run({ backside: 2 })).toBeLessThan(run() - 1.5);
   });
 
+  it('gap rules: the man over a guard is the guard\'s, and the uncovered tackle helps down on him (counter)', () => {
+    const play = snapRun('counter', 'c3');
+    play.update(STEP, fakeInput, cam);
+    const g = play.off.find((o) => o.slot === 'RG')!;
+    const t = play.off.find((o) => o.slot === 'RT')!;
+    const dt = g.mark!;
+    expect(dt.role).toBe('DL');
+    expect(Math.abs(dt.pos.y - g.pos.y)).toBeLessThan(1);
+    expect(t.mark).toBe(dt); // the double, down
+    // The kick-out takes the end man on the line, head-up on the tight end; the TE climbs.
+    const kick = play.off.find((o) => o.poaJob === 'kick')!;
+    expect(kick.poa?.role).toBe('DL');
+    expect(play.off.find((o) => o.slot === 'TE')!.mark?.role).toBe('LB');
+  });
+
+  it('a gun QB holds the backside end home longer (the keep), from under center he chases sooner', () => {
+    const ends = (id: string) => {
+      const play = snapRun(id, 'c3');
+      const chase = play.def.find((d) => d.runJob === 'chase')!;
+      const start = { ...chase.pos };
+      for (let i = 0; i < 36; i++) play.update(STEP, fakeInput, cam); // 0.6 s
+      return Math.abs(chase.pos.y - start.y);
+    };
+    // At 0.6 s the gun's chase end is still home; under center he's already flattening down the line.
+    expect(ends('counter')).toBeLessThan(ends('ace-counter'));
+  });
+
   it("a sneak reads only the A gaps", () => {
     const play = snapRun('qb-sneak', 'goal');
     for (let i = 0; i < 12 && play.phase !== 'run'; i++) play.update(STEP, fakeInput, cam);

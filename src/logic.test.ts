@@ -40,7 +40,7 @@ import { flightPos, passParams } from './sim/ball';
 import { cutKeep, facingQB } from './sim/ai';
 import { catchOdds, HANDOFF_ODDS, PITCH_REACH, pitchOdds } from './sim/catching';
 import { endurance, maxSpeed, type Player } from './sim/player';
-import { playSide, runEngagement } from './sim/runBlocking';
+import { playSide, POA, runEngagement } from './sim/runBlocking';
 import { fallForward, returnTackleChance, tackleChance } from './sim/tackling';
 import { referenceRoster } from './harness';
 
@@ -983,7 +983,7 @@ describe('run blocking', () => {
     expect(lg.mark).toBe(dt);
   });
 
-  it('Power O: the FB kicks out the first man outside the TE, and the pulling guard leads on a backer', () => {
+  it('Power O: the FB kicks out the end man on the line (head-up on the TE or outside him), and the pulling guard leads on a backer', () => {
     for (const call of DEF_CALLS.slice(0, 3)) {
       const p = snapAt(book('power-o'), call);
       const fb = at(p, 'FB');
@@ -991,9 +991,10 @@ describe('run blocking', () => {
       const te = at(p, 'TE');
       const side = Math.sign(p.hole.y - p.ballY);
       const end = fb.poa;
-      // Outside the last blocker who stays in; with nobody there, he turns up as a lead and finds work.
+      // Head-up on the last blocker who stays in or outside him (the TE blocks down); with nobody there,
+      // he turns up as a lead and finds work.
       if (fb.poaJob === 'kick') {
-        expect((end!.pos.y - te.pos.y) * side).toBeGreaterThan(0.3);
+        expect((end!.pos.y - te.pos.y) * side).toBeGreaterThan(-POA.kickHeadUp);
         expect(p.off.some((o) => o !== fb && o.mark === end)).toBe(false);
       } else expect(fb.poaJob).toBe('lead');
       expect(lg.poaJob).toBe('lead');
@@ -1029,11 +1030,11 @@ describe('run blocking', () => {
     expect(blocked).toBeGreaterThan(24); // more than one a snap on average
   });
 
-  it('Counter: the pulling guard kicks out the first man outside the TE, or leads with nobody there', () => {
+  it('Counter: the pulling guard kicks out the end man on the line (head-up on the TE or outside), or leads with nobody there', () => {
     const p = snapAt(book('counter'), DEF_CALLS[0]);
     const kick = p.off.find((o) => o.pull === 'kick')!;
     const side = Math.sign(p.hole.y - p.ballY);
-    if (kick.poaJob === 'kick') expect((kick.poa!.pos.y - at(p, 'TE').pos.y) * side).toBeGreaterThan(0.3);
+    if (kick.poaJob === 'kick') expect((kick.poa!.pos.y - at(p, 'TE').pos.y) * side).toBeGreaterThan(-POA.kickHeadUp);
     else expect(kick.poaJob).toBe('lead');
   });
 

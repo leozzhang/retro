@@ -2,6 +2,60 @@
 
 _Last updated: 2026-11-12_
 
+## Done: balancing by situation, and the run game's open items (2026-11-12)
+The aim: each play works against the looks it's built to beat and fails against the ones that stop it. PLAYBOOKS.md ("Balancing") has the method and the lessons for the next books.
+
+**The tools:**
+- **What stops each concept:** `STOPS` in `data/playTags.ts`, filled into every play's `tags.stops`. The film room checks it like `beats` (`STOP MISS`).
+- **SITUATIONS** (film room): each play's success and yards against its beats looks minus its stops looks. FLAT rows don't care what the defense shows.
+  - Peers are now by down: short yardage is judged against short yardage.
+  - A stop look is judged on its plain form (no blitz calls in "man").
+- **`npm run trace`** (`src/trace.test.ts`): one snap step by step, with every blocker's assignment at the snap.
+- **runfit:** tacklers by slot, a SHORT section (3rd and 1 against 2 Man, Bear and Goal Line), and `RUNFIT_CALLS`.
+
+**Run-game fixes (mechanics, each moved a family):**
+- **Gap blocking** (`sim/runBlocking.ts`):
+  - best fit across the line (gap, on, down)
+  - an uncovered lineman helps down
+  - the kick-out takes the end man on the line even when he's head-up on the TE (`POA.kickHeadUp`)
+  - a lead puller turns up inside-out on a backer filling inside the hole (`POA.leadInside`)
+- **The gun counter's back** takes a real counter step, so he no longer beats his pullers to the hole.
+- **Run fits** (`sim/runFits.ts`, `sim/ai.ts`):
+  - From the gun, the backside end stays home longer for the keep (`RUN_FIT.gunHome`).
+  - A stand-up rusher on the line is on the front (the edge).
+  - Goal-line backers fit downhill from where they line up (`LB_FIT_STEP`), and in man they hold their depth on runs.
+- **The draw's back** sells pass beside the QB (`DRAW_SET_RANGE`). The mesh used to come 6 yd deep at 1.3 s.
+- **The get-off's talent term** halved (`RUN_GETOFF.perTalent` 0.1): the defense-heavy slope was too steep.
+- **The tags:** play action's and the boot's stops are two-high shells, not the blitz (the literature, and the film agree).
+
+**Measured** (`npm run balance`, `npm run film`, `npm run runfit` at 150 snaps a call):
+- **Unchanged:** PASS, PA (pass-protected), POCKET and STUNT are byte-identical. The THROW, ROUTE, DISGUISE and DEF pass rows move only through play action with run-action blocking, which uses the new run rules.
+- **RUN ALL:** 5.0–5.2 ypc, 14–17% stuffs (target 4.5–5.5, 15–22%).
+- **The talent gap:** even 4.0 (was 3.7), +10 2.0 (1.8), +20 1.2 (1.0), −10 7.4 (8.2, now in target).
+- **The gun counters,** in yards a carry (runfit):
+
+  | Play | Was | Now |
+  | --- | --- | --- |
+  | Counter GT | 3.6 | 4.0 |
+  | Trey Counter | 3.4 | 6.0 |
+  | Ace Wing Counter | 4.1 | 5.4 |
+
+  Counter GT now works where it should: 81–88% success against 2 Man, Cover 2 and Tampa 2, 4–24% against Cover 0, Bear and Goal Line.
+- **Goal Line, 3rd and 1:** Iso 79% → 62–65%, Power 87% → 84–89%, the sneak 62% → 62–76%. Bear: Power 74–76%, the sneak 82–87%.
+- **The draw:** 26% → 56% success, Cover 0 still stops it (10%). It no longer gets stuffed 97% of the time.
+- **ADAPT:** spamming IZ still loses most of its success, and the counter after it pays 14–16 ypp.
+- **SITUATIONS:** a median spread of +10 points across 94 plays, with 39 FLAT. That's the work list.
+
+**Open** (the SITUATIONS and FLAGS sections list them):
+- **Cover 2's underneath** loses to the quick game and screens: Slant Flat, Smoke, Tunnel, RPO Slant and the bubbles all do better against it than their peers (STOP MISS). The curl defenders sit 9 yd deep, over the slant.
+- **Boots against Cover 3** gain 1–2 yd a play (and 18 against Cover 2): almost certainly a mechanic bug, worth a trace.
+- **The film QB's deep ball** is caught 55–66% (NFL 33%), so Four Verts, Drive and Curl Flat flag "beats every call" at 45–50%. That's the deep-ball model, not the plays. It touches the core pass rows, so it's its own task.
+- **Short yardage:** Heavy Power converts 85–93% against Bear and Goal Line (target 65–70%). Both calls put a backer in man on the TE, so nobody sets the edge outside him. Aligning him on the line was tried and made it worse (the MLB left the box), so it's a design question about those calls. QB Power from the gun is about 20–30% there.
+- **The draw against two-high zones** is 96–100%: the pass-side hook and curl defenders never fit before the handoff.
+- **Backside blocks on gap runs:** with the gap rules fixed, Power's hinge and Duo's backside block are worth about 0 yd a carry (Power's was −0.4 at 150 snaps before; the −1.3 recorded earlier was 60-snap noise). Inside Zone's backside (−5.0), Outside Zone's (−3.2), Split Zone's slice (−2.5) and Counter's backside (−4.9) are worth a lot.
+- **The defense-heavy talent gap** is still steep (+10 2.0 against 2.5–3.5). The rest is in the tackle odds.
+- Not played by hand yet.
+
 ## Done: the run game rework, the line, fits and the edge (2026-11-12)
 RUNGAME.md has the model and the numbers.
 

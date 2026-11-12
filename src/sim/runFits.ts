@@ -31,7 +31,8 @@ export type RunJob = 'gap' | 'twoGap' | 'edge' | 'chase' | 'fill' | 'cutback';
  *   how far off his blocker's shoulder.
  * - `headUp`: within this of a blocker's nose, he's head-up: a two-gap player.
  * - `edgeOut`: the edge sets this far outside the end blocker.
- * - `chaseHome`: the backside end stays home this long after the snap (the QB's keep, the boot);
+ * - `chaseHome`: the backside end stays home this long after the snap (the QB's keep, the boot); from the
+ *   gun `gunHome` longer: the QB's keep is a real threat there (the read game), and he carries the fake out;
  *   `chaseDepth`: then he flattens down the line this deep in the backfield, at `chaseSpeed` of his top speed
  *   (squeezing through the bodies behind the line).
  * - `spill`: the league's share of calls that spill the kick-out (the rest box).
@@ -40,6 +41,7 @@ export type RunJob = 'gap' | 'twoGap' | 'edge' | 'chase' | 'fill' | 'cutback';
  * - `keyTime`: how long a fill backer takes to find the real hole after his read (× 1.6 − prc/100), flowing
  *   with the back's heading (`keyLead` s ahead) until then.
  * - `squeeze`: a lineman whose blocker leaves him (blocks down, pulls) closes this far toward the ball.
+ * - `standUp`: a backer rushing from this close to the line is on the front (a stand-up end) and gets a line job.
  */
 export const RUN_FIT = {
   read: { base: 0.12, slow: 0.3 },
@@ -48,6 +50,7 @@ export const RUN_FIT = {
   headUp: 0.45,
   edgeOut: 1.2,
   chaseHome: 0.45,
+  gunHome: 0.3,
   chaseSpeed: 0.85,
   chaseDepth: 0.4,
   spill: 0.4,
@@ -56,6 +59,7 @@ export const RUN_FIT = {
   keyTime: 0.5,
   keyLead: 0.6,
   squeeze: 1.5,
+  standUp: 1.6,
 };
 
 /** The blockers' y at the snap (the line and attached ends), sorted across the field. */
@@ -66,6 +70,11 @@ function blockerYs(play: Play): number[] {
     .sort((a, b) => a - b);
 }
 
+/** On the front: a down lineman, or a backer rushing from the line (within `standUp` yd of it). */
+function onFront(play: Play, d: Player): boolean {
+  return d.role === 'DL' || (d.role === 'LB' && d.assign?.kind === 'rush' && d.pos.x <= play.los + RUN_FIT.standUp);
+}
+
 /** At the snap of a designed run: every front player's job, gap and read step. */
 export function assignRunFits(play: Play): void {
   const side = playSide(play);
@@ -73,7 +82,9 @@ export function assignRunFits(play: Play): void {
   const ys = blockerYs(play);
   if (!ys.length) return;
   const spill = !!play.defCall.runFit ? play.defCall.runFit === 'spill' : play.rng() < RUN_FIT.spill;
-  const dl = play.def.filter((d) => d.role === 'DL' && d !== play.readKey);
+  // The front: the down linemen, and a backer standing on the line as a rusher (a stand-up end, the goal
+  // line's walked-up backer). The end man on the line has the edge whether he's down or standing.
+  const dl = play.def.filter((d) => d !== play.readKey && onFront(play, d));
   // The end man on the line each side: the widest down lineman (in a bear or a wide 9, an end).
   const play1 = dl.reduce<Player | null>((a, d) => (!a || along(d) > along(a) ? d : a), null);
   const back1 = dl.reduce<Player | null>((a, d) => (!a || along(d) < along(a) ? d : a), null);
@@ -103,7 +114,7 @@ export function assignRunFits(play: Play): void {
     }
   }
   // Backers: the backside-most one has the cutback lane, the rest fill.
-  const lbs = play.def.filter((d) => d.role === 'LB' && (!d.manTarget || d.manTarget.isBlocker || d.manTarget === play.rb));
+  const lbs = play.def.filter((d) => d.role === 'LB' && !dl.includes(d) && (!d.manTarget || d.manTarget.isBlocker || d.manTarget === play.rb));
   const back = lbs.reduce<Player | null>((a, d) => (!a || along(d) < along(a) ? d : a), null);
   // A fill is a gap in the box, not the perimeter: on a toss or a sweep the alley is the force player's.
   const boxY = clamp(play.hole.y, ys[0] - 1, ys[ys.length - 1] + 1);
@@ -126,7 +137,8 @@ function lineGoal(play: Play, d: Player): Vec {
       return { x: los - RUN_FIT.gapDepth * 0.5, y: read && d.spill ? lerp(d.gapY, play.hole.y, 0.4) : d.gapY };
     case 'chase': {
       // Home for the keep or the boot, then flat down the line behind the ball.
-      if (play.time - play.snapTime < RUN_FIT.chaseHome) return { x: los - RUN_FIT.chaseDepth, y: d.pos.y };
+      const home = RUN_FIT.chaseHome + (play.qb.start.x < los - 3 ? RUN_FIT.gunHome : 0);
+      if (play.time - play.snapTime < home) return { x: los - RUN_FIT.chaseDepth, y: d.pos.y };
       const ball = play.carrier ?? play.rb;
       return { x: Math.min(ball.pos.x, los - RUN_FIT.chaseDepth), y: ball.pos.y };
     }
@@ -147,7 +159,7 @@ function lineGoal(play: Play, d: Player): Vec {
  * the QB. False for anyone without a job (blitzers keep their rush) or once it's a pass.
  */
 export function runTechnique(play: Play, d: Player): boolean {
-  if (!d.runJob || d.role !== 'DL' || !play.runBlocking()) return false;
+  if (!d.runJob || !onFront(play, d) || !play.runBlocking()) return false;
   const tgt = lineGoal(play, d);
   // Free and through his gap with the mesh in front of him: he's in the backfield, go get the ball.
   const ball = play.playDef.qbRun || !play.rb ? play.qb : play.rb;
