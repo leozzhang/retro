@@ -18,7 +18,8 @@
     "app": "node scripts/app-dev.mjs",
     "app:build": "tsc --noEmit && vite build && electron-builder --win portable && electron-builder --win nsis",
     "runfit": "vitest run src/runfit.test.ts",
-    "trace": "vitest run src/trace.test.ts --reporter=verbose"
+    "trace": "vitest run src/trace.test.ts --reporter=verbose",
+    "audit": "vitest run src/runAudit.test.ts"
   },
   "build": {
     "appId": "com.leo.saturdaygridiron",

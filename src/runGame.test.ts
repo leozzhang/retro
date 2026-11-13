@@ -285,10 +285,12 @@ describe('run fits (sim/runFits.ts)', () => {
     expect(dt.role).toBe('DL');
     expect(Math.abs(dt.pos.y - g.pos.y)).toBeLessThan(1);
     expect(t.mark).toBe(dt); // the double, down
-    // The kick-out takes the end man on the line, head-up on the tight end; the TE climbs.
+    // The kick-out takes the end man on the line, head-up on the tight end. The TE takes the playside force
+    // (the nickel), not the backside WLB across the formation; the double climbs to the WLB.
     const kick = play.off.find((o) => o.poaJob === 'kick')!;
     expect(kick.poa?.role).toBe('DL');
-    expect(play.off.find((o) => o.slot === 'TE')!.mark?.role).toBe('LB');
+    expect(play.off.find((o) => o.slot === 'TE')!.mark?.slot).toBe('NB');
+    expect(t.climb?.slot).toBe('WLB');
   });
 
   it('a gun QB holds the backside end home longer (the keep), from under center he chases sooner', () => {

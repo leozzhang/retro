@@ -22,7 +22,6 @@ import type { ThrowKind } from './sim/ball';
 import type { KickParams, Wind } from './sim/kicking';
 import { arcAngle } from './sim/passPro';
 import { isEligible, type Player } from './sim/player';
-import { DRAW_SET } from './sim/runBlocking';
 import { TACKLE_RANGE } from './sim/tackling';
 
 /** No keys, except that the harness user holds sprint (a receiver after the catch runs on the sprint bar). */
@@ -151,34 +150,22 @@ export function rpoRep(m: Matchup, playDef: PlayDef, call: DefCall, give: boolea
   return { play: r.play, o: r.o, catchX: r.catchX, target: r.target };
 }
 
-/** Zone read: the auto-QB rides the back this long after the snap before reading the key. */
-export const READ_AT = 0.55;
-
 /**
- * One auto-run rep. The auto-QB hands off (or pitches on the toss) as soon as it's on; `autoRun`
- * carries the ball. On a zone read it rides the mesh, then gives unless the key is crashing (then
- * the QB keeps). On a draw it waits out the fake pass set. On the option it pitches once the key
- * commits to the QB, and otherwise keeps. Designed QB runs carry it themselves.
+ * One auto-run rep. The auto-QB gives by the scripted rule (`Play.giveDue`, the same one the user's
+ * called runs use); `autoRun` carries the ball. Designed QB runs carry it themselves.
+ * `observe` sees the play after every step and must not change it.
  * `contact` = yards past the LOS when the first defender (blocked or not) gets a hand on him.
  */
-export function runRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras) {
+export function runRep(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras, observe?: (play: Play) => void) {
   const play = newPlay(m, playDef, call, rng, los, x);
   play.snap();
   let contact: number | null = null;
   let cutback: boolean | null = null;
   for (let t = 0; t < 15 && play.phase !== 'over'; t += STEP) {
-    const opt = play.handoffOption();
-    const since = play.time - play.snapTime;
-    if (playDef.read === 'option') {
-      const k = play.readKey!;
-      if (opt === 'pitch' && dist(k.pos, play.qb.pos) < 3 && !play.keyCrashing()) play.handoff(); // he's on the QB: pitch
-    } else {
-      const zr = playDef.read === 'zoneRead';
-      const ready = (!zr || (since >= READ_AT && !play.keyCrashing())) && (play.runScheme !== 'draw' || since >= DRAW_SET);
-      if ((opt === 'handoff' && ready) || (opt === 'pitch' && playDef.read === 'pitch')) play.handoff();
-    }
+    if (play.giveDue()) play.handoff();
     if (play.handedOff || play.kept || (playDef.qbRun && play.phase === 'run')) play.controlled = null;
     play.update(STEP, fakeInput, cam);
+    observe?.(play); // read-only (the INTENT report, src/runIntent.ts)
     const c = play.carrier;
     // A cutback: he crosses the line on the far side of the center from the play.
     if (cutback === null && c && c.side === 'off' && c.pos.x >= los + 1) cutback = (c.pos.y - play.ballY) * playSide(play) < -1;

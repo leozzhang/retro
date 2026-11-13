@@ -21,7 +21,7 @@ import {
   ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, getOffWins, pileCap, playSide, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
 import { assignRunFits } from '../sim/runFits';
-import { fallForward, jukeTackleMul, TACKLE_RANGE, tackleChance } from '../sim/tackling';
+import { breakChance, CONTACT, dragSpeed, fallForward, jukeTackleMul, TACKLE_GAP, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { assignRushRoles, callProtection, inPocket, passEngagement, pocketSpot, PROT, protectStep, protecting, startRep } from '../sim/passPro';
 import { matchDefense } from './matchups';
 import { alignY, BACKFIELD_DX, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
@@ -60,6 +60,8 @@ export interface PlaySetup {
   disguise?: Disguise | null;
   /** Extra aim lag (s) from a shaken QB on this snap (data/confidence.ts `shakenAimLag`). */
   aimNerves?: number;
+  /** The user's snap: a called give (`read: 'handoff'` or `'pitch'`) hands off on its own at the mesh (`giveDue`). Reads stay his. */
+  autoGive?: boolean;
   /**
    * The harness's ablations (`npm run balance`, RUNFIT): blockers who stand down on a run, to measure what a
    * block is worth. `backside`: that many of the backside-most linemen who stay in; `slots`: by on-field
@@ -70,6 +72,12 @@ export interface PlaySetup {
 }
 
 const HISTORY_LEN = 60;
+/** A lead back's path runs this far (yd) playside of the carrier's track (`aimLeads`): he takes the backer's inside-out angle. */
+export const LEAD_TRACK = 0.4;
+/** A blocker leaves a defender to the puller or lead back closing on him as his point-of-attack man inside this (yd). */
+const POA_CLAIM = 4;
+/** The scripted zone read rides the mesh this long (s) before it gives (`giveDue`). */
+export const READ_AT = 0.55;
 /** Handoff reach; farther than this (up to PITCH_RANGE) the QB pitches it. */
 export const HANDOFF_RANGE = 1.8;
 export const PITCH_RANGE = 8;
@@ -247,6 +255,7 @@ export class Play {
   readonly qb: Player;
   /** Extra aim lag (s) from the QB's nerves this snap. */
   readonly aimNerves: number;
+  readonly autoGive: boolean;
   readonly center: Player;
   readonly rb: Player;
   /** Where the run is designed to hit (end of the RB's run path); run fits and blocks key on it. Moves on a QB keep. */
@@ -353,6 +362,7 @@ export class Play {
     this.defCall = s.defCall;
     this.rng = s.rng;
     this.aimNerves = s.aimNerves ?? 0;
+    this.autoGive = s.autoGive ?? false;
 
     const offHome = s.homeId === undefined || s.homeId === s.offTeam.id;
     const offU = teamUniform(s.offTeam, offHome);
@@ -389,6 +399,8 @@ export class Play {
         : qbPath
           ? { x: this.los + qbPath[0], y: clamp(this.ballY + qbPath[1] * rp.strongSign, 2, FIELD_W - 2) }
           : { x: this.los + 1.5, y: this.ballY };
+
+    this.aimLeads();
 
     this.prevent = !!s.tags?.prevent;
     this.tags = s.tags ?? {};
@@ -432,6 +444,30 @@ export class Play {
 
     this.players = [...this.off, ...this.def];
     this.ball = makeBall(this.los, this.ballY);
+  }
+
+  /**
+   * A lead back leads the carrier, wherever he lines up: each step of his `lead` path is put on the
+   * back's own track at that depth (`LEAD_TRACK` playside of it), so he's in the hole ahead of him. Drawn as an
+   * offset from his alignment, an H offset beside the QB led the C gap while the back hit the A or B.
+   */
+  private aimLeads(): void {
+    const rb = this.rb;
+    if (this.playDef.qbRun || !rb.routeName || !ROUTES[rb.routeName].run || !rb.route.length) return;
+    const track = [rb.pos, ...rb.route];
+    const yAt = (x: number) => {
+      for (let i = 1; i < track.length; i++) {
+        const a = track[i - 1];
+        const b = track[i];
+        if (x <= b.x || i === track.length - 1) return a.y + (b.y - a.y) * clamp((x - a.x) / (b.x - a.x || 1), 0, 1);
+      }
+      return track[track.length - 1].y;
+    };
+    const side = Math.sign(this.hole.y - this.ballY) || this.resolved.strongSign;
+    for (const p of this.off) {
+      if (p.routeName !== 'lead' || p === rb || p.pos.x - this.los > BACKFIELD_DX) continue;
+      p.route = p.route.map((pt) => ({ x: pt.x, y: clamp(yAt(pt.x) + side * LEAD_TRACK, 2, FIELD_W - 2) }));
+    }
   }
 
   private buildRoute(p: Player, rn: keyof typeof ROUTES): void {
@@ -886,6 +922,7 @@ export class Play {
     if (this.phase === 'presnap') this.presnapMoves();
     if (this.controlled) this.userControl(input, dt);
     this.pile();
+    this.drag(dt);
 
     if (this.runBlocking()) releaseClimbers(this);
     if (this.playDef.screen && !this.screenReleased && this.phase !== 'presnap' && this.time - this.snapTime >= SCREEN_SET) {
@@ -963,6 +1000,10 @@ export class Play {
       for (const d of this.def) d.reactAt = this.time + (d.assign?.kind === 'spy' ? SPY_REACT : (0.2 + (1 - d.r.prc / 100) * 0.4) * leanMul(d.lean.qb));
       this.popup('SCRAMBLE', qb.pos, '#9ad7ff');
     }
+    if (this.autoGive && this.calledGive() && this.giveDue()) {
+      this.handoff();
+      return;
+    }
     if ((input.mouse.rpressed || input.hit('KeyF')) && this.handoffOption()) {
       this.handoff();
       return;
@@ -1017,6 +1058,28 @@ export class Play {
     if (this.phase !== 'live' || this.carrier !== qb || this.scramble || this.thrown || qb.down) return null;
     if (this.playDef.qbRun || rb.isBlocker || rb.down || rb.engaged || rb.stun > 0) return null;
     return handoffKind(qb.pos, rb.pos, this.los, this.readKey ? MESH_REACH : HANDOFF_RANGE);
+  }
+
+  /** A called give, not a read: the QB hands it off (or tosses it) whatever the defense does. */
+  calledGive(): boolean {
+    return this.playDef.read === 'handoff' || this.playDef.read === 'pitch';
+  }
+
+  /**
+   * The scripted give, the same for the user's called runs (`autoGive`), the harness and the CPU's autopilot:
+   * a handoff as soon as the back is in reach (after the line's pass set on a draw); on a zone read, after
+   * riding the mesh `READ_AT` s unless the key crashes; a toss pitches at once; the option pitches once the
+   * key is on the QB.
+   */
+  giveDue(): boolean {
+    const opt = this.handoffOption();
+    if (!opt) return false;
+    const read = this.playDef.read;
+    if (read === 'option') return opt === 'pitch' && dist(this.readKey!.pos, this.qb.pos) < 3 && !this.keyCrashing();
+    if (opt === 'pitch') return read === 'pitch';
+    const since = this.time - this.snapTime;
+    const ready = read !== 'zoneRead' || (since >= READ_AT && !this.keyCrashing());
+    return ready && (this.runScheme !== 'draw' || since >= DRAW_SET);
   }
 
   handoff(): void {
@@ -1530,6 +1593,9 @@ export class Play {
           this.runBlocking() && b.role === 'OL' && d.role === 'DL' && !d.engagedBy.length && !!man && man.role !== 'DL' &&
           dist(b.pos, d.pos) < RUN_PICKUP && (b.start.y - this.hole.y) * playSide(this) < 0;
         if (b.isBlocker && man && !man.down && man !== d && !pickup && (!downfield || dist(b.pos, man.pos) < 4)) continue;
+        // Someone else's point-of-attack man, with that blocker closing on him (a kick-out, a lead): leave him to
+        // him. A slot crossing for his backer grabbed the end the guard was pulling to kick, then lost him.
+        if (man !== d && this.runBlocking() && this.off.some((o) => o !== b && o.poaJob && o.poa === d && !o.down && !o.engaged && dist(o.pos, d.pos) < POA_CLAIM)) continue;
         const reach = man === d && this.runBlocking() ? RUN_ENGAGE : man === d && inPocket(this) ? PROT.engage : 1.0;
         if (dist(b.pos, d.pos) < reach) {
           // Off the ball on a run: a one-gap lineman who beats his man slips into his gap (sim/runBlocking.ts).
@@ -1593,6 +1659,39 @@ export class Play {
     if (!c || c.side !== 'off' || this.phase !== 'run' || !this.runBlocking() || c.juke > 0) return;
     const cap = pileCap(this, c);
     if (cap !== null && c.want.x > cap) c.want = { x: cap, y: c.want.y };
+  }
+
+  /** Contact (`CONTACT`) applies to the carrier of a designed run: the handoff, the keep, a designed QB run. */
+  private contactRun(c: Player): boolean {
+    return c.side === 'off' && c === this.carrier && this.phase === 'run' && !this.thrown && (this.handedOff || this.kept || !!this.playDef.qbRun);
+  }
+
+  /** A wrapped carrier drags his tackler forward at `dragSpeed`; at the end of it he goes down or spins out (`CONTACT`). */
+  private drag(dt: number): void {
+    const c = this.carrier;
+    if (!c || c.wrap <= 0) return;
+    const t = c.wrapBy;
+    if (c.down || !t || t.down) {
+      c.wrap = 0;
+      c.wrapBy = null;
+      return;
+    }
+    const v = dragSpeed(c.r.str, t.r.str);
+    c.want = { x: Math.min(c.want.x, v), y: clamp(c.want.y, -0.5 * v, 0.5 * v) };
+    if (c.vel.x > v) c.vel = { x: v, y: c.vel.y * 0.5 };
+    t.want = c.vel;
+    t.pos = { x: lerp(t.pos.x, c.pos.x + 0.45, 0.3), y: lerp(t.pos.y, c.pos.y, 0.3) };
+    c.wrap -= dt;
+    if (c.wrap > 0) return;
+    c.wrapBy = null;
+    if (this.rng() < (CONTACT.hold * tackleChance(t.r.tkl, c.r.elu, c.r.str)) / TACKLE_GAP.base) {
+      this.tackled(c, t);
+      return;
+    }
+    knockDown(t, 0.9);
+    t.tackleCd = 1.6;
+    c.vel = scale(c.vel, CONTACT.out);
+    this.popup('SPUN OUT!', c.pos, '#ffd23f');
   }
 
   /** Only a back carrying on a called run can cut. */
@@ -1723,6 +1822,14 @@ export class Play {
       // A receiver still turning out of his catch (`hips`) is the easiest man to wrap up: he misses less often.
       const base = tackleChance(t.r.tkl, c.r.elu, c.r.str);
       const odds = !arm && c.hips ? 1 - (1 - base) * AT_CATCH.miss : base;
+      // Wrapped up: anyone else who gets to him finishes it (`CONTACT.finish`).
+      if (c.wrap > 0 && t !== c.wrapBy) {
+        if (this.rng() < CONTACT.finish * armOdds) {
+          this.tackled(c, t);
+          return;
+        }
+        continue;
+      }
       if (this.rng() < odds * armOdds * (juked ? jukeTackleMul(c.r.elu) : 1)) {
         this.tackled(c, t);
         return;
@@ -1737,6 +1844,13 @@ export class Play {
         t.tackleCd = 1.6;
         c.juke = 0;
         this.popup('MADE HIM MISS!', c.pos, '#7dff7d');
+        continue;
+      }
+      // On a designed run most misses are a piece of him, not a clean escape: he's wrapped and dragging (`CONTACT`).
+      if (this.contactRun(c) && c.wrap <= 0 && this.rng() >= breakChance(t.r.tkl, c.r.elu, c.r.str)) {
+        c.wrap = CONTACT.time;
+        c.wrapBy = t;
+        t.tackleCd = CONTACT.time + 0.3;
         continue;
       }
       knockDown(t, 0.9);
@@ -1768,6 +1882,8 @@ export class Play {
   }
 
   private tackled(c: Player, t: Player): void {
+    c.wrap = 0;
+    c.wrapBy = null;
     // Carriers going forward fall forward (yards after contact); returners and sacks don't.
     if (c.side === 'off') c.pos = { x: Math.min(c.pos.x + fallForward(c.vel.x, c.r.str, t.r.str), OPP_GOAL - 0.01), y: c.pos.y };
     knockDown(c);

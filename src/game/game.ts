@@ -2489,6 +2489,7 @@ export class Game {
       offRoster: clutchRoster(this.userRoster, this.snapLev, true),
       defRoster: clutchRoster(this.cpuRoster, this.snapLev),
       aimNerves: shakenAimLag(this.userRoster.QB?.conf ?? 0, this.snapLev),
+      autoGive: true,
       play: def,
       defCall: this.defCall!,
       press: this.press,
@@ -3440,7 +3441,8 @@ export class Game {
       }
       case 'snap':
       case 'live': {
-        const ho = play.handoffOption();
+        // A called give hands off on its own (`Play.autoGive`); only reads offer the choice.
+        const ho = play.autoGive && play.calledGive() ? null : play.handoffOption();
         const give = ho === 'pitch' ? 'R-CLICK PITCH  ' : ho ? 'R-CLICK HAND OFF  ' : '';
         drawHint(g, play.scramble ? 'WASD RUN  SHIFT SPRINT' : play.aim ? 'RELEASE TO THROW  WHEEL/1: BULLET-TOUCH-LOB  SPACE: CANCEL' : `${give}DRAG + RELEASE TO THROW  WASD MOVE QB`);
         break;

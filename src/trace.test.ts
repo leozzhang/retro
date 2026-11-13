@@ -28,8 +28,7 @@ it.runIf(!!process.env.TRACE_PLAY)('trace', () => {
     let ti = 0;
     let jobs = false;
     for (let t = 0; t < 10 && play.phase !== 'over'; t += STEP) {
-      const opt = play.handoffOption();
-      if (opt === 'handoff' || (opt === 'pitch' && p.read === 'pitch')) play.handoff();
+      if (play.giveDue()) play.handoff();
       if (play.handedOff || play.kept || (p.qbRun && play.phase === 'run')) play.controlled = null;
       play.update(STEP, H.fakeInput, H.cam);
       if (!jobs) {

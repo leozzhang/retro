@@ -1,7 +1,6 @@
 import type { Input } from '../engine/input';
 import { dist } from '../engine/math';
 import { isEligible, type Player } from '../sim/player';
-import { DRAW_SET } from '../sim/runBlocking';
 import type { Play } from './playState';
 
 /**
@@ -28,9 +27,6 @@ export interface AutoPlan {
   /** Throw to this slot ('tight': the most closely covered receiver, 'open': the most open). */
   target: string;
 }
-
-/** Zone read: ride the back this long before reading the key (as the harness does). */
-const READ_AT = 0.55;
 
 function separation(play: Play, o: Player): number {
   let sep = Infinity;
@@ -67,15 +63,7 @@ export function autoStep(play: Play, plan: AutoPlan): void {
       }
     }
   } else {
-    const opt = play.handoffOption();
-    if (def.read === 'option') {
-      const k = play.readKey!;
-      if (opt === 'pitch' && dist(k.pos, play.qb.pos) < 3 && !play.keyCrashing()) play.handoff();
-    } else {
-      const zr = def.read === 'zoneRead';
-      const ready = (!zr || (since >= READ_AT && !play.keyCrashing())) && (play.runScheme !== 'draw' || since >= DRAW_SET);
-      if ((opt === 'handoff' && ready) || (opt === 'pitch' && def.read === 'pitch')) play.handoff();
-    }
+    if (play.giveDue()) play.handoff();
   }
   // Whoever has it after a catch, handoff or keep runs on the AI.
   if (play.phase === 'run' && play.carrier?.side === 'off') play.controlled = null;

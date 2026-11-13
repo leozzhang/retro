@@ -79,6 +79,9 @@ export interface Player {
   down: boolean;
   downTimer: number;
   tackleCd: number;
+  /** A ball carrier wrapped up and dragging a tackler (`CONTACT`, sim/tackling.ts): seconds left, and who has him. */
+  wrap: number;
+  wrapBy: Player | null;
   stamina: number;
   reactAt: number;
 
@@ -224,6 +227,8 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     down: false,
     downTimer: 0,
     tackleCd: 0,
+    wrap: 0,
+    wrapBy: null,
     stamina: 1,
     reactAt: Infinity,
     start: { ...pos },

@@ -2,7 +2,8 @@ import { writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEF_CALLS } from './data/defenses';
 import { PLAYBOOK } from './data/plays';
-import { runfitReport, runStats } from './runfit';
+import { intentReport } from './runIntent';
+import { RUNFIT, runfitReport, runStats } from './runfit';
 
 describe('runfit', () => {
   it('classifies every run, and an ablation stands blockers down', () => {
@@ -19,6 +20,9 @@ describe('runfit', () => {
 it.runIf(process.env.npm_lifecycle_event === 'runfit')('runfit report', () => {
   const only = process.env.RUNFIT_ONLY?.split(',').map((x) => x.trim()).filter(Boolean);
   const calls = process.env.RUNFIT_CALLS?.split(',').map((x) => x.trim()).filter(Boolean);
-  const lines = runfitReport(Number(process.env.RUNFIT_REPS ?? 60), undefined, only, calls);
+  const reps = Number(process.env.RUNFIT_REPS ?? 60);
+  const lines = runfitReport(reps, undefined, only, calls);
+  // INTENT (src/runIntent.ts): every designed run, or RUNFIT_ONLY's; RUNFIT_INTENT=0 skips it. Not in the balance report.
+  if (process.env.RUNFIT_INTENT !== '0') lines.push('', ...intentReport(reps, 71, only, calls ?? RUNFIT.calls));
   writeFileSync(process.env.RUNFIT_OUT ?? 'runfit.txt', lines.join('\n'));
 }, 3_600_000);

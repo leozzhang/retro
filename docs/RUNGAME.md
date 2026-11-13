@@ -124,6 +124,24 @@ On a designed run a free defender can't run through the line. Within `r` yd (cen
 - `RUNFIT_ONLY=id,...`, `RUNFIT_REPS` and `RUNFIT_CALLS=id,...` work like the film room's options. It takes about 10 s at 60 reps. Read the ablations at 150+ (`RUNFIT_REPS=150`, about 30 s): at 60 they're inside the noise.
 - To see why a row is what it is, trace a snap: `TRACE_PLAY=id TRACE_CALL=id npm run trace` (FILM.md).
 
+## Intent (`npm run runfit`, the INTENT section; `src/runIntent.ts`)
+A run should win where it's built to and lose where it isn't, for a reason you can see. INTENT checks that each designed run does what it's drawn to do, before any yardage gets tuned. It's tooling only: it reads the play through `runRep`'s `observe` hook, and the balance report doesn't include it.
+- **AIM:** the gap the carrier's path crosses the line in. Gaps come from the blockers at the snap: playside A–D, then OUT past the last blocker by 2+ yd; backside gaps are lower case.
+- **HIT:** where he actually crossed (BEHIND: down before the line), and ON AIM, the share on the aim gap or next to it. **INTENT MISS** under 50%.
+- **SHAPE:** gains <0, 0–2, 3–4, 5–9, 10+, and yards before and after the first contact by a defender off any block.
+- **BLOCKS:** per blocker, `held` (still on a man when the ball crossed) and `his man` (the share of tackles made by the man he had at the snap). `free` is tackles by a man nobody had.
+- **CARD:** each blocker's job against Cover 3, the most common over the reps. Compare it with what the play is drawn to do.
+- `RUNFIT_ONLY` limits it, `RUNFIT_INTENT=0` skips it. All 42 runs at 60 reps take about 30 s.
+
+**First read (2026-11-12, work list for the scheme audit):**
+- **Lead backs don't lead.** In Split Zone Lead and Split Zone Read the H's man (MLB) makes 28–29% of the tackles, and the H is on him 1–4% of the time. In the trace, the H runs up the strong C gap (y +4) while the back hits the A gap (y +0.5), and he reaches the MLB at 1.4 s, after the back has passed. The lead path is drawn from his alignment, not to the back's aim point.
+- **Ace Wing Counter's wrapping tackle** (LT, lead on the MLB) holds 1% and his man makes 46% of the tackles. The pull from the far side gets there late.
+- **The backside double on Duo and Iso** goes outward: the LG helps the LT on the backside end (`LG:DE1`), not the center on the 1-technique up to the backer. It shows in Duo, Iso, Heavy Iso, Weak I Duo, Wing Duo and Trey Duo. Duo's backside block was worth about 0 in ABLATE; this is likely why.
+- **Wing Zone Read's TE** has a kick job with no man (`TE:-(kick)`).
+- **The toss family's reach:** the TE and RT both have the playside end (DE2), and he still makes 32–38% of tackles.
+- **INTENT MISS:** Split Counter (26% on aim, 34% BEHIND), QB Power (40% BEHIND), Empty QB Draw (86% crosses backside). The outside zones (OZ, Stretch, Ace Wide Zone, Pistol Ace Zone) aim OUT and mostly cut up into B. That's the zone read (bang, bend, bounce), but each is also 23–35% BEHIND.
+- **The shape is bimodal:** few runs end at 3–4 yd (5–36%), and 5–9 is often the biggest bucket. Yards after contact are 3.3–6.3 a carry for the backs (NFL about 3), because one tackle roll ends the run or nothing does (the contact model, next).
+
 ## Measured (2026-11-12, `npm run balance`)
 | Row | Before | After | Target |
 | --- | --- | --- | --- |
@@ -185,3 +203,62 @@ The gap-scheme rules, the counter step, the gun's keep threat, the goal-line fit
 - **What's high:** the offense-heavy side (−10 at 10.2), and RUN ALL is at the top of its range.
 - **ABLATE:** Inside Zone's backside is still about −5 yd a carry and Counter's backside about −4. Power's hinge and Duo's backside are still about 0.
 
+
+## Pressing the design, contact, and the first rule fixes (2026-11-12)
+**Rule fixes found by INTENT:**
+- **Leads lead the carrier** (`aimLeads`, `LEAD_TRACK`, game/playState.ts). A `lead` path is set on the back's own track at each depth, 0.4 yd playside of it. Drawn as an offset from the lead back's alignment, Gun Split's H led the C gap while the back hit the A or B gap. The H now holds his man 66–91% of the time (was 1–4%), and that man's share of the tackles fell from 28% to 2–3%.
+- **Gap schemes help toward the center on both sides** (`assignRunBlocks`). The backside guard doubled outward on the end. Duo's backside double is now the guard with the center on the nose, up to the WLB.
+- **The cutback backer folds** (`RUN_FIT.fold`, `foldDepth`, `runLeverage`). After the handoff he shuffles inside-out on the ball instead of sitting on his lane until it crosses.
+
+**Pressing** (`PRESS`, sim/ai.ts): the auto-runner follows his drawn path until he's 1.2 yd from the line, then reads it. Before, he read lanes from the mesh, cut up the first crease before the blocks formed, and outran his pullers. With pressing, the designs work: the runs went up 1–2 yd a carry before the contact model.
+
+**Contact** (`CONTACT`, `breakChance`, `dragSpeed`, sim/tackling.ts; `Play.drag`). On a designed run's carrier only, so the pass rows are byte-identical:
+- A missed tackle is a clean break only with odds `breakChance` (0.3 at even, ±0.004 a point).
+- Otherwise the carrier is wrapped for 0.5 s, dragging the tackler at `dragSpeed` (by strength), and any other defender who reaches him finishes it (0.92).
+- If nobody comes, the tackler brings him down with odds `hold`; otherwise he spins out at half speed.
+- Before: 0.3 broken tackles a carry, and 60–75% of 10+ runs had one.
+
+**Measured** (`npm run balance`, `npm run runfit`; pass, POCKET, STUNT, THROW and ROUTE rows unchanged):
+
+| Row | Before | After | Target |
+| --- | --- | --- | --- |
+| RUN ALL (legacy) | 5.8 ypc, med 2.9, 10+ 14% | 5.2, 2.8, 12% | 4.5–5.5, 10–14% |
+| GAP −10 / 0 / +5 / +10 / +20 | 10.2 / 5.4 / 3.7 / 2.9 / 1.3 | 8.5 / 5.3 / 4.3 / 3.4 / 1.7 | 5.5–8 / 4.5–5.5 / 3–4 / 2.5–3.5 / 1.5–2.5 |
+| GAP −20 / UGA 88 v Kent 65 | 16.8 / 20.3 | 16.5 / 17.3 | — (should be far less) |
+| 3rd and 1, Bear / Goal: Power | 68% / 80% | 67% / 68% | 65–70% |
+| Heavy Power | 86% / 85% | 63% / 58% | 65–70% |
+| Sneak | 87% / 64% | 83% / 77% | 83–87% / 75–80% |
+| Split Zone Lead (film success) | 43% | 65% (IZ 59%) | stopped by the heavy boxes: Cat 16%, Bear 36%, Goal 36% |
+
+**Open:**
+- **The offense-heavy talent gap.** At −20, lifting one defensive channel to the offense's level gives (ypc, from 15.4): speed 9.9, block shedding 12.2, tackling 12.7, recognition 15.8, all of them 6.8. The channels compound in pursuit. Squeezing speed would touch the pass game too, so it's a design decision.
+- **Inside Zone against light boxes:** 7–8 ypc with medians of 7–10 (4.8 against Cover 3 Sky, 3.3 against Bear, 1.1 against Cover 0). The shape is right, the level is high.
+- **Power's hinge is worth −1.0 yd** (Power is better without it), Power O's −0.7. The hinge is getting in the way.
+- **Duo** fell to 34% film success (16–18% against 2 Man and Cover 1 Robber).
+- Split Counter (39%), QB Power in short yardage (27–35%), Empty QB Draw (crosses backside), Speed Option (52% BEHIND).
+
+## Second pass: doubles, kick-outs, the option (2026-11-12)
+- **The helper joins a double** (`runBlock`): a backside lineman whose man is already on a teammate's block goes to him, not to a cutoff spot. Cutting off a man who was already blocked, Duo's center ran to a spot in front of the ball and stood there, so Duo had one double team, not two. Duo went from 5.2 to 5.7 ypc, and its backside block is worth 1.1 yd a carry at 100 snaps (was about 0).
+- **A kick-out from the backfield attacks his man from the snap** (`leadBlock`): on a man on the line he goes straight for the inside shoulder, not the drawn path (an offset from his alignment). Gun Split's H ran to y +6 while the end squeezed to y +2; the pulling guard picked the end up and the MIKE came free.
+  - Split Counter: on aim 28% → 59%, behind the line 63% → 33%.
+  - Power O: 6.3 → 4.8 ypc.
+- **No pressing after an option pitch** (`PRESS`): the pitch path is the relationship, not a track to the line. Speed Option behind the line went from 52% back to 30%.
+- **Power's hinge** is worth about 0 at 150 snaps a call (±0.4; without it, stuffs rise 2–5 points). The −1.0 at 60 snaps was the long-run tail.
+
+**Measured** (`npm run balance`):
+- Legacy RUN ALL: 4.6 ypc, med 2.7, 10+ 10% (target 4.5–5.5, 10–14%).
+- GAP −10 / 0 / +5 / +10 / +20: 9.2 / 5.6 / 3.8 / 3.0 / 1.7. The defense side is in target; the offense side is high, accepted for now.
+- 3rd and 1, Bear / Goal Line: Power 68% / 64%, Iso 51% / 62%, sneak 89% / 64% (goal line low), QB Power 28% / 28%.
+- ADAPT: spamming IZ falls from 53% to 17–22% success; PA after IZ ×8 pays 12.8–16.6 ypp.
+- Unchanged: the PASS, PA, POCKET and STUNT rows. THROW and ROUTE moved through the RPOs and run-action play action (run-blocking rules on a shared stream).
+
+**Open:**
+- **Counters against the blitz** (film STOP MISS): Counter GT +20, Ace Wing Counter +17, QB Counter +12. They do better against the blitz calls than their peers, when the blitz should stop them.
+- **Split Counter** is 26% in the film (2.5 ypp).
+- **QB Power** in short yardage (28%). Against Bear the end wins his get-off, the back picks him up, and the MIKE is free. The data has the back leading; real QB Power usually has him kick out the end. That's a play-data question.
+- **Wing Zone Read's TE** has no man by design (the end is the read key): he could take the backside alley defender for the keep.
+- The goal-line sneak is 64% (target 75–80%).
+- Empty QB Draw's "backside" crossing is a label artifact (its aim is at the center).
+
+## The audit
+Every run checked against its design, every front and three defense levels: [RUNAUDIT.md](RUNAUDIT.md) (`npm run audit`).

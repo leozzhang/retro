@@ -36,7 +36,8 @@ export type RunJob = 'gap' | 'twoGap' | 'edge' | 'chase' | 'fill' | 'cutback';
  *   `chaseDepth`: then he flattens down the line this deep in the backfield, at `chaseSpeed` of his top speed
  *   (squeezing through the bodies behind the line).
  * - `spill`: the league's share of calls that spill the kick-out (the rest box).
- * - `cutbackOff`: the backside backer's lane, this far backside of the ball; `fillFlow`: how far a fill
+ * - `cutbackOff`: the backside backer's lane, this far backside of the ball; after the handoff he shuffles
+ *   `fold` of the way from it toward the back, `foldDepth` past the line (`runLeverage`); `fillFlow`: how far a fill
  *   backer flows from his alignment to the hole once he's read it.
  * - `keyTime`: how long a fill backer takes to find the real hole after his read (× 1.6 − prc/100), flowing
  *   with the back's heading (`keyLead` s ahead) until then.
@@ -55,6 +56,8 @@ export const RUN_FIT = {
   chaseDepth: 0.4,
   spill: 0.4,
   cutbackOff: 1.5,
+  fold: 0.5,
+  foldDepth: 1.8,
   fillFlow: 0.5,
   keyTime: 0.5,
   keyLead: 0.6,
@@ -65,7 +68,7 @@ export const RUN_FIT = {
 /** The blockers' y at the snap (the line and attached ends), sorted across the field. */
 function blockerYs(play: Play): number[] {
   return play.off
-    .filter((o) => o.role === 'OL' || (o.isBlocker && o.role !== 'QB' && o.pos.x > play.los - 1.6 && Math.abs(o.pos.y - play.ballY) < 6.5))
+    .filter((o) => o.role === 'OL' || (o.isBlocker && o.role !== 'QB' && o.role !== 'WR' && o.pos.x > play.los - 1.6 && Math.abs(o.pos.y - play.ballY) < 6.5))
     .map((o) => o.pos.y)
     .sort((a, b) => a - b);
 }
@@ -76,7 +79,7 @@ function blockerYs(play: Play): number[] {
  * of him decide whether he gets through), instead of reading it like a backer. Within `standUp` yd of the
  * line at the snap.
  */
-function onFront(play: Play, d: Player): boolean {
+export function onFront(play: Play, d: Player): boolean {
   return d.role === 'DL' || (d.assign?.kind === 'rush' && d.start.x <= play.los + RUN_FIT.standUp);
 }
 
@@ -212,7 +215,10 @@ export function runLeverage(play: Play, d: Player, c: Player): boolean {
     return true;
   }
   if (d.runJob === 'cutback' && (c.pos.y - play.hole.y) * side > -1) {
-    const tgt = { x: play.los + 2.5, y: d.gapY };
+    // He shuffles with the ball, inside-out on it (`fold` of the way from his lane to the back): still on the
+    // cutback, and close enough to fit the frontside when the back hits it. Sitting on the lane, he let an
+    // inside zone run past him 3 yd away.
+    const tgt = { x: play.los + RUN_FIT.foldDepth, y: lerp(d.gapY, c.pos.y, RUN_FIT.fold) };
     d.goal = tgt;
     d.want = seek(d, tgt, maxSpeed(d) * 0.9, 0.5);
     return true;

@@ -2,6 +2,72 @@
 
 _Last updated: 2026-11-12_
 
+## In progress: balancing the run game by intent (2026-11-12)
+The plan: measure what each run is drawn to do before tuning it, fix mechanics rather than plays, and build the ML defense after the run game is stable (it would learn the bugs). Each run should win in its `beats` situations and lose in its `stops` ones. What's missing is precision: who blocks whom, which gap the ball hits, what the back reads.
+
+**Done:**
+- **Auto-handoff on called runs.** `read: 'handoff'` and `'pitch'` give on their own at the mesh, after the pass set on a draw. Reads (zone read, RPO, option) and passes stay manual (F or right click).
+  - `Play.giveDue()` is the one scripted give, shared by the user's snaps (`PlaySetup.autoGive`), the harness, the CPU autopilot and the trace. The trace used to hand a draw off at once.
+  - Balance, film (txt and json) and runfit are byte-identical to before.
+  - The R-CLICK HAND OFF hint is gone on called runs.
+- **INTENT** (`src/runIntent.ts`, in `npm run runfit`; RUNGAME.md "Intent"): for every designed run, the aim gap against where it crossed, the gain shape and yards before and after contact, each blocker's hold rate and his man's tackle share, and the blocking card.
+
+**Found (RUNGAME.md "Intent" has the list):**
+- the H's lead in Gun Split goes up the wrong gap and arrives late
+- Duo and Iso's backside double goes outward
+- Ace Wing Counter's wrapping tackle never gets there
+- Wing Zone Read's TE has no man
+- the toss family's reach
+- runs are bimodal, with high yards after contact
+
+**Also done** (RUNGAME.md, "Pressing the design, contact, and the first rule fixes"):
+- leads on the carrier's track (`aimLeads`)
+- gap help toward the center on both sides
+- the cutback backer folds
+- the auto-runner presses his path (`PRESS`)
+- the contact model (`CONTACT`: wrap, drag, the second man finishes, clean breaks by `breakChance`)
+
+**Measured:**
+- Legacy RUN ALL 5.2 ypc, 10+ 12% (was 5.8, 14%). GAP +10 3.4, in target.
+- Short yardage is in target, Heavy Power included (63/58%, was 85–93%).
+- Split Zone Lead 65% (was 43%).
+- Pass, POCKET, STUNT, THROW and ROUTE rows are byte-identical. `npm test` passes.
+
+**Second pass** (RUNGAME.md, "Second pass"):
+- Duo's double team forms (the helper joins).
+- Kick-outs from the backfield attack their man.
+- No pressing after an option pitch.
+- Power's hinge checked: about 0, not a bug.
+- The talent gap's offense side (−20: 16 ypc) is accepted for now.
+- Legacy RUN ALL 4.6 ypc. The defense-side GAP rows and short-yardage Power are in target. `npm test` passes.
+
+**Run audit** (`npm run audit`; RUNAUDIT.md has the design by family and every play's row):
+- **The tool:** every designed run against ten calls × three defense levels, checked against its scheme's rules (idle blockers, wasted doubles, wrong-side leads, free playside men, failing assignments, point-of-attack holds).
+- **Rule fixes:**
+  - blitzers are blocked as down men
+  - leads and their pickups stay playside (a backer in man on the carrier excepted)
+  - receivers aren't line blockers
+  - a point-of-attack man is left to his puller (`POA_CLAIM`)
+  - climbing linemen cut off a filling backer
+  - trap's uncovered linemen climb straight to the backers
+  - a wide zone presses to the edge
+- **Level retune** (the blocks connect now): `RUN_GETOFF.perTalent` 0.2, `CONTACT.breakBase` 0.2, `RUN_CONTROL.base` 0.95.
+- **Measured:**
+  - RUN ALL 5.2 ypc (med 2.8).
+  - GAP −10 / 0 / +5 / +10 / +20: 7.5 / 5.3 / 3.9 / 3.4 / 2.4, all in target.
+  - 3rd and 1, Power: 71% / 77%.
+  - ADAPT holds.
+  - Pass, PA, POCKET and STUNT rows are unchanged. `npm test` passes.
+
+**Next:**
+1. The perimeter: the toss's aiming point (its hole is the drawn spot 12.5 yd out) and the reach on the end (Outside Zone, the tosses, QB Counter).
+2. Split Counter, Power Read against man, Duo variants against 2 Man.
+3. QB Power in short yardage (lead or kick: play data); the goal-line sneak.
+4. Re-baseline PROGRESS's balance section.
+5. The ML defense.
+
+Not played by hand yet: the auto-handoff, pressing and contact (the user's runner gets the drag too).
+
 ## Done: the Air Raid, Spread Option and Power books (batch 7, 2026-11-12)
 All five OC styles now have their own book; none runs the legacy 62. PLAYBOOKS.md ("What each batch 2 book is") has each book, and FILM.md the film numbers.
 

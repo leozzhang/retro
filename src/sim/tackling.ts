@@ -17,6 +17,28 @@ export function tackleChance(tkl: number, carrierElu: number, carrierStr: number
 }
 
 /**
+ * Contact on a designed run (docs/RUNGAME.md "Contact"). A missed tackle is mostly not a clean escape: the
+ * tackler gets a piece of him and hangs on. With odds `breakChance` the carrier breaks it clean (the old
+ * broken tackle); otherwise he's wrapped for `time` s, dragging the tackler forward at `drag` yd/s (more for
+ * a strong back, `dragStr`), and any other defender who gets to him finishes it (`finish`). If nobody comes,
+ * the tackler brings him down at the end with odds `hold`, else he spins out at `out` of his speed.
+ * - `breakBase` at even, `breakPerPt` a point of the carrier's edge (elusiveness and strength against the
+ *   tackle rating), within `breakMin`–`breakMax`.
+ */
+export const CONTACT = { breakBase: 0.2, breakPerPt: 0.004, breakMin: 0.1, breakMax: 0.45, time: 0.5, drag: 1.2, dragStr: 1.0, finish: 0.92, hold: 0.55, out: 0.5 };
+
+/** A carrier who beat the tackle roll breaks it clean with these odds; otherwise he's wrapped (`CONTACT`). */
+export function breakChance(tkl: number, carrierElu: number, carrierStr: number): number {
+  const edge = carrierElu * 0.6 + carrierStr * 0.4 - tkl;
+  return clamp(CONTACT.breakBase + CONTACT.breakPerPt * edge, CONTACT.breakMin, CONTACT.breakMax);
+}
+
+/** How fast a wrapped carrier drags his tackler forward (yd/s), by his strength against the tackler's. */
+export function dragSpeed(carrierStr: number, tacklerStr: number): number {
+  return Math.max(0.3, CONTACT.drag + CONTACT.dragStr * (carrierStr - tacklerStr) / 50 + 0.4 * (carrierStr / 100));
+}
+
+/**
  * A tackler who closes during the carrier's juke (sim/player.ts `JUKE`) and isn't coming from behind:
  * his odds are cut by up to `JUKE_WHIFF`, more by a more elusive carrier.
  */
