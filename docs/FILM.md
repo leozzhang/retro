@@ -63,7 +63,7 @@ It has two jobs:
 
   Then it totals each target over the regular calls against the NFL route rate. That shows *why* a play wins: which receiver, which route, and whether it's the catch or the run after it.
 - **`FILM_BASE=film.base.json`** diffs against a saved table (`cp film.json film.base.json`). It lists cells that moved 10+ points and rows whose mean moved 3+, a before and after for each fix or batch.
-- **Tracing a snap:** `TRACE_PLAY=counter TRACE_CALL=c3 npm run trace` (`src/trace.test.ts`; `TRACE_N` snaps, `TRACE_T=0.3,0.7,1.1` the times, `TRACE_SEED`). It prints:
+- **Tracing a snap:** `TRACE_PLAY=counter TRACE_CALL=c3 npm run trace` (`src/trace.test.ts`; `TRACE_N` snaps, `TRACE_T=0.3,0.7,1.1` the times, `TRACE_SEED`, `TRACE_LVL=n` a 70 offense against a 70+n defense, the audit's matchups, instead of the reference teams). It prints:
   - every blocker's assignment at the snap: `mark`, `^climb`, `@poa`, `(job)`
   - at each time, every player's spot (yd past the LOS, yd from the ball), who's engaged with whom, and each defender's run job
   - how the snap ended, and who made the tackle

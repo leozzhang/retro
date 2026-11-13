@@ -10,7 +10,8 @@ import * as H from './harness';
  * RUNFIT or film row needs a why. It prints each blocker's assignment at the snap (`mark`, `^climb`,
  * `@poa`, `(job)`), then at each time in TRACE_T every player's spot (yd past the LOS, yd from the ball)
  * with who he's engaged with (`>` blocking, `<` blocked by) and each defender's run job, and how it ended.
- * TRACE_PLAY=id TRACE_CALL=id [TRACE_N=snaps] [TRACE_T=0.3,0.7,1.1] [TRACE_SEED=n]. The harness's
+ * TRACE_PLAY=id TRACE_CALL=id [TRACE_N=snaps] [TRACE_T=0.3,0.7,1.1] [TRACE_SEED=n] [TRACE_LVL=n: a 70 offense against a 70+n defense,
+ * the audit's matchups; else the reference teams]. The harness's
  * auto-runner hands off at the first chance; passes aren't thrown (use the film room's FILM_EXPLAIN).
  */
 it.runIf(!!process.env.TRACE_PLAY)('trace', () => {
@@ -20,7 +21,8 @@ it.runIf(!!process.env.TRACE_PLAY)('trace', () => {
   const times = (process.env.TRACE_T ?? '0.3,0.7,1.1').split(',').map(Number);
   const out: string[] = [];
   for (let n = 1; n <= Number(process.env.TRACE_N ?? 2); n++) {
-    const play = H.newPlay(H.referenceMatchup(), p, c, mulberry32(n * 977 + Number(process.env.TRACE_SEED ?? 0)));
+    const m = process.env.TRACE_LVL ? H.referenceMatchup(70, 70 + Number(process.env.TRACE_LVL)) : H.referenceMatchup();
+    const play = H.newPlay(m, p, c, mulberry32(n * 977 + Number(process.env.TRACE_SEED ?? 0)));
     play.snap();
     const los = H.LOS;
     const at = (q: { slot: string; pos: { x: number; y: number } }) => `${q.slot}(${(q.pos.x - los).toFixed(1)},${(q.pos.y - play.ballY).toFixed(1)})`;

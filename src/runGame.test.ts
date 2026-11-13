@@ -8,7 +8,7 @@ import { len, mulberry32 } from './engine/math';
 import { BODY } from './game/playState';
 import { cam, fakeInput, newPlay, referenceMatchup, runRep, type Matchup } from './harness';
 import { cutSpeed, maxSpeed } from './sim/player';
-import { armOdds, laneScores, PILE, pickLane, pileCap, RUN_CONTROL, RUN_GAP, runEngagement, runTalent } from './sim/runBlocking';
+import { armOdds, laneScores, lineHole, PILE, pickLane, pileCap, playSide, POA, RUN_CONTROL, RUN_GAP, runEngagement, runTalent } from './sim/runBlocking';
 import { jukeTackleMul, tackleChance } from './sim/tackling';
 
 /** The harness input with a held direction and one-step key presses. */
@@ -205,7 +205,9 @@ describe('run blocks and the talent gap', () => {
     const stronger = run(referenceMatchup(70, 80));
     expect(weaker.ypc).toBeGreaterThan(even.ypc);
     expect(even.ypc).toBeGreaterThan(stronger.ypc);
-    expect(stronger.stuff).toBeLessThan(0.35);
+    // Under 40%: the sample includes Cover 0 against the toss and outside zone, whose stop look is the blitz (balance's GAP +10
+    // row, all runs and fronts: about a third).
+    expect(stronger.stuff).toBeLessThan(0.4);
     expect(stronger.ypc).toBeGreaterThan(1.5);
   });
 });
@@ -286,11 +288,13 @@ describe('run fits (sim/runFits.ts)', () => {
     expect(Math.abs(dt.pos.y - g.pos.y)).toBeLessThan(1);
     expect(t.mark).toBe(dt); // the double, down
     // The kick-out takes the end man on the line, head-up on the tight end. The TE takes the playside force
-    // (the nickel), not the backside WLB across the formation; the double climbs to the WLB.
+    // (the nickel), not the backside WLB across the formation; the double climbs to the WLB, its nearer man (the guard)
+    // coming off (`COMBO_SWAP`).
     const kick = play.off.find((o) => o.poaJob === 'kick')!;
     expect(kick.poa?.role).toBe('DL');
     expect(play.off.find((o) => o.slot === 'TE')!.mark?.slot).toBe('NB');
-    expect(t.climb?.slot).toBe('WLB');
+    expect(g.climb?.slot).toBe('WLB');
+    expect(t.climb).toBeNull();
   });
 
   it('a gun QB holds the backside end home longer (the keep), from under center he chases sooner', () => {
@@ -334,5 +338,50 @@ describe('run fits (sim/runFits.ts)', () => {
     for (let i = 0; i < 12 && play.phase !== 'run'; i++) play.update(STEP, fakeInput, cam);
     const lanes = laneScores(play, play.qb);
     expect(Math.max(...lanes.map((l) => Math.abs(l.y - play.hole.y)))).toBeLessThanOrEqual(1.3);
+  });
+
+  it('a sneak is a wedge: its double stays on the down man, and nobody climbs to a goal-line backer', () => {
+    const play = snapRun('qb-sneak', 'goal');
+    for (let i = 0; i < 18; i++) play.update(STEP, fakeInput, cam);
+    expect(play.off.filter((o) => o.climb)).toEqual([]);
+    expect(play.def.some((d) => d.role === 'DL' && d.engagedBy.filter((b) => b.role === 'OL').length === 2)).toBe(true);
+  });
+
+  it("power read: the key widening with the sweep is the keep, the line blocks the keep's C gap, and the puller never takes the key", () => {
+    const play = snapRun('power-read', 'c3');
+    play.update(STEP, fakeInput, cam);
+    const k = play.readKey!;
+    const s = playSide(play);
+    expect(lineHole(play).y).toBeCloseTo(k.start.y - s * POA.keepInside);
+    k.pos = { ...k.start };
+    k.vel = { x: 0, y: s * 3 }; // widening along the line
+    expect(play.keyCrashing()).toBe(true);
+    k.vel = { x: 0.3, y: -s * 2 }; // squeezing
+    expect(play.keyCrashing()).toBe(false);
+    for (let seed = 1; seed <= 12; seed++) {
+      const p = snapRun('power-read', 'c3', seed);
+      const lg = p.off.find((o) => o.slot === 'LG')!;
+      for (let i = 0; i < 120 && p.phase !== 'over'; i++) {
+        if (p.giveDue()) p.handoff();
+        if (p.handedOff || p.kept) p.controlled = null;
+        p.update(STEP, fakeInput, cam);
+        expect(lg.engaged === p.readKey && !!p.readKey, `seed ${seed}`).toBe(false);
+      }
+    }
+  });
+
+  it("a receiver's stalk is a mirror: even a corner winning it big takes a beat to get off", () => {
+    const play = snapRun('counter', '2-man');
+    let d = null as null | (typeof play.def)[number];
+    for (let i = 0; i < 90 && !d; i++) {
+      play.update(STEP, fakeInput, cam);
+      d = play.def.find((x) => x.role === 'CB' && x.engagedBy.length === 1 && x.engagedBy[0].role === 'WR') ?? null;
+    }
+    expect(d).not.toBeNull();
+    d!.blockRoll = 30;
+    d!.blockControl = 1;
+    let steps = 0;
+    while (runEngagement(play, d!) === 0 && steps < 600) steps++;
+    expect(steps * STEP).toBeGreaterThan(0.95 / RUN_CONTROL.stalkWear);
   });
 });

@@ -25,7 +25,7 @@ export function tackleChance(tkl: number, carrierElu: number, carrierStr: number
  * - `breakBase` at even, `breakPerPt` a point of the carrier's edge (elusiveness and strength against the
  *   tackle rating), within `breakMin`–`breakMax`.
  */
-export const CONTACT = { breakBase: 0.2, breakPerPt: 0.004, breakMin: 0.1, breakMax: 0.45, time: 0.5, drag: 1.2, dragStr: 1.0, finish: 0.92, hold: 0.55, out: 0.5 };
+export const CONTACT = { breakBase: 0.06, breakPerPt: 0.004, breakMin: 0.03, breakMax: 0.45, time: 0.5, drag: 1.0, dragStr: 1.0, finish: 0.92, hold: 0.85, out: 0.5 };
 
 /** A carrier who beat the tackle roll breaks it clean with these odds; otherwise he's wrapped (`CONTACT`). */
 export function breakChance(tkl: number, carrierElu: number, carrierStr: number): number {

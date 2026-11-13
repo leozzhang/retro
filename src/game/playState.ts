@@ -18,9 +18,9 @@ import {
 } from '../sim/player';
 import { aimLag, aimTarget, MIN_DRAG_PX, MOVE_FULL, stepAimCursor, throwErrorSd, type Aim } from '../sim/passing';
 import {
-  ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, getOffWins, pileCap, playSide, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
+  ARM_LEVERED, armOdds as runArmOdds, assignRunBlocks, CLIMB, POA, getOffWins, pileCap, playSide, pressEdge, RUN_CONTROL, BLOCK_ROLL_SD, DRAW_SET, levered, releaseClimbers, RUN_ENGAGE, runEngagement,
 } from '../sim/runBlocking';
-import { assignRunFits } from '../sim/runFits';
+import { assignRunFits, onFront } from '../sim/runFits';
 import { breakChance, CONTACT, dragSpeed, fallForward, jukeTackleMul, TACKLE_GAP, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { assignRushRoles, callProtection, inPocket, passEngagement, pocketSpot, PROT, protectStep, protecting, startRep } from '../sim/passPro';
 import { matchDefense } from './matchups';
@@ -74,8 +74,18 @@ export interface PlaySetup {
 const HISTORY_LEN = 60;
 /** A lead back's path runs this far (yd) playside of the carrier's track (`aimLeads`): he takes the backer's inside-out angle. */
 export const LEAD_TRACK = 0.4;
+/**
+ * The toss and the sweep aim at the edge, not their drawn spot (`aimPerimeter`): the back gets his width on the
+ * drawn first step (up to `step` yd wide), then goes for a spot `out` yd outside the edge (`pressEdge`: the last man on the line plus
+ * `POA.edge`), reaching it `bend` yd behind the line, and turns up. The gun sweep bends deeper: it runs flat from the
+ * mesh, outside an unblocked key (power read) and the pullers (pin-pull). Drawn 12.5 yd out, he ran to the numbers
+ * behind the line and the pursuit got there first.
+ */
+export const PERIMETER_AIM = { out: 1.5, bend: { toss: 1.2, sweep: 2.5 }, step: 3.5 };
 /** A blocker leaves a defender to the puller or lead back closing on him as his point-of-attack man inside this (yd). */
 const POA_CLAIM = 4;
+/** The defense reads a handoff no sooner than this long after the snap (s), an under-center handoff's time (`reactToRun`). */
+const RUN_TELL = 0.55;
 /** The scripted zone read rides the mesh this long (s) before it gives (`giveDue`). */
 export const READ_AT = 0.55;
 /** Handoff reach; farther than this (up to PITCH_RANGE) the QB pitches it. */
@@ -132,6 +142,11 @@ const RUN_CTRL = { zone: 2, patience: 0.5, slideX: 0.25 };
 const FAKE_RANGE = 2;
 /** Chance the zone-read key crashes on the back; otherwise he stays home on the QB. */
 const KEY_CRASH = 0.5;
+/**
+ * Power read's playside key has taken the sweep (`keyCrashing`) once he's `depth` yd into the backfield and still coming upfield
+ * at `speed` yd/s, or he's widening with it along the line at `widen` yd/s: either way he's run himself out of the keep's C gap.
+ */
+const KEY_UPFIELD = { depth: 0.3, speed: 1.5, widen: 2 };
 /** Extra reaction time for a read key who guessed wrong (crashed on a keep, stayed home on a give). */
 const KEY_FOOLED = 0.35;
 /** Zone read: the QB rides the back this far, so the give stays a handoff longer than on a called run. */
@@ -140,8 +155,6 @@ const MESH_REACH = 3.2;
 const KEEP_WIDTH = 3.5;
 /** Zone read: the QB pulls it if the back never reaches the mesh this long after the snap. */
 const MESH_TIME = 1.2;
-/** Power read: on a keep the QB cuts this far inside the read key, behind the pulling guard. */
-const KEEP_INSIDE = 3;
 /** Speed option: on a keep (the key took the pitch man) the QB turns up this far inside him. */
 const OPTION_CUT = 2.5;
 /** Designed QB runs wait this long after the snap for the blocking to form, by scheme (QB power lets the guard get there). */
@@ -400,6 +413,7 @@ export class Play {
           ? { x: this.los + qbPath[0], y: clamp(this.ballY + qbPath[1] * rp.strongSign, 2, FIELD_W - 2) }
           : { x: this.los + 1.5, y: this.ballY };
 
+    this.aimPerimeter();
     this.aimLeads();
 
     this.prevent = !!s.tags?.prevent;
@@ -464,10 +478,37 @@ export class Play {
       return track[track.length - 1].y;
     };
     const side = Math.sign(this.hole.y - this.ballY) || this.resolved.strongSign;
+    // The toss's lead (`leadWide`) leads the back's new track to the edge too, not his drawn spot 11 yd out.
+    const toss = rb.routeName === 'toss' || rb.routeName === 'sweep';
     for (const p of this.off) {
-      if (p.routeName !== 'lead' || p === rb || p.pos.x - this.los > BACKFIELD_DX) continue;
+      if (!(p.routeName === 'lead' || (toss && p.routeName === 'leadWide')) || p === rb || p.pos.x - this.los > BACKFIELD_DX) continue;
       p.route = p.route.map((pt) => ({ x: pt.x, y: clamp(yAt(pt.x) + side * LEAD_TRACK, 2, FIELD_W - 2) }));
     }
+  }
+
+  /**
+   * The toss and the sweep (`PERIMETER_AIM`): the drawn first step for width, then a spot just outside the edge
+   * `bend` yd behind the line, then up. That spot is the play's hole, which the lanes, the edge's spill and the
+   * leads key on.
+   */
+  private aimPerimeter(): void {
+    const rb = this.rb;
+    if (this.playDef.qbRun || (rb.routeName !== 'toss' && rb.routeName !== 'sweep') || !rb.route.length) return;
+    const edge = pressEdge(this);
+    if (edge === null) return;
+    const side = Math.sign(this.hole.y - this.ballY) || this.resolved.strongSign;
+    const y = clamp(this.ballY + side * (edge + PERIMETER_AIM.out), 2, FIELD_W - 2);
+    const first = rb.route[0];
+    const bend = PERIMETER_AIM.bend[rb.routeName];
+    rb.route = [
+      // A short first step (the gun sweep's) stays; the toss's 6 yd flat one is cut: he angles from the pitch.
+      ...(Math.abs(first.y - rb.pos.y) <= PERIMETER_AIM.step && first.x < this.los - bend ? [first] : []),
+      { x: this.los - bend, y },
+      { x: this.los + 4, y: clamp(y + side, 2, FIELD_W - 2) },
+    ];
+    rb.routeDir = norm(sub(rb.route[rb.route.length - 1], rb.route[rb.route.length - 2]));
+    rb.cutKeep = rb.route.map(() => 1);
+    this.hole = { x: this.los + 1, y };
   }
 
   private buildRoute(p: Player, rn: keyof typeof ROUTES): void {
@@ -1089,7 +1130,7 @@ export class Play {
     const rb = this.rb;
     this.aim = null;
     this.handedOff = true;
-    this.reactToRun(this.readKey && !this.keyCrash && this.playDef.read === 'zoneRead' ? this.readKey : null);
+    this.reactToRun(this.readKey && !this.keyCrash && this.playDef.read === 'zoneRead' ? this.readKey : null, kind === 'handoff');
     if (kind === 'pitch') {
       // Lead the back to where he'll be at full tilt when it gets there: along his heading if he's
       // moving, along his path if he's just starting off, accelerating from his current speed.
@@ -1155,6 +1196,13 @@ export class Play {
   keyCrashing(): boolean {
     const k = this.readKey;
     if (!k || len(k.vel) < 1.5) return false;
+    // A playside key (power read) is read by depth: the sweep crosses the QB's face toward him, so chasing the back
+    // and squeezing the QB point the same way. Taking the sweep, he flies upfield into the backfield; at home he
+    // sits on the line. Read by direction, the QB gave it every time. Widening along the line with the sweep (a blitzing end
+    // slow-playing it) takes him out of the keep's gap too: read by depth alone, the QB gave it into him.
+    if (this.playDef.key === 'play') {
+      return (k.pos.x < this.los - KEY_UPFIELD.depth && k.vel.x < -KEY_UPFIELD.speed) || k.vel.y * playSide(this) > KEY_UPFIELD.widen;
+    }
     const v = norm(k.vel);
     const at = (p: Player) => {
       const d = norm(sub(p.pos, k.pos));
@@ -1172,7 +1220,7 @@ export class Play {
     const out = Math.sign(key.start.y - this.ballY) || -this.resolved.strongSign;
     this.kept = true;
     this.aim = null;
-    const y = this.playDef.keep === 'inside' ? key.start.y - out * KEEP_INSIDE : key.pos.y + out * KEEP_WIDTH;
+    const y = this.playDef.keep === 'inside' ? key.start.y - out * POA.keepInside : key.pos.y + out * KEEP_WIDTH;
     this.hole = { x: this.los + 1, y: clamp(y, 2, FIELD_W - 2) };
     // He's been riding the mesh, so he pulls it already moving.
     this.qb.vel = scale(norm(sub(this.hole, this.qb.pos)), maxSpeed(this.qb) * 0.5);
@@ -1194,16 +1242,24 @@ export class Play {
   }
 
   /** Defenders key the handoff: front seven fast, defenders turned on receivers slower. A fooled read key is slower still. */
-  private reactToRun(fooled: Player | null = null): void {
+  private reactToRun(fooled: Player | null = null, handoff = false): void {
+    // A handoff tells the defense no sooner than an under-center one would (`RUN_TELL` s after the snap): backers read the
+    // line's blocks, not the exchange. Timed from the exchange, the pistol's early mesh (0.3 s) had them pursuing 0.3 s
+    // sooner on the same run, and every pistol run trailed its under-center twin. A pitch shows at once.
+    const from = handoff ? Math.max(this.time, this.snapTime + RUN_TELL) : this.time;
     for (const d of this.def) {
       const slow = 1 - d.r.prc / 100;
       const t = d.manTarget;
       let react: number;
-      if (this.time >= d.fitAt) react = 0.05;
+      // Already on the run: a backer fitting it, or a front player past his read step (he's been playing the ball since).
+      // A front player chasing the ball pursues from now, not from `RUN_TELL` (held to it, a free backside end chasing the
+      // mesh coasted past the back); a backer fitting his gap still waits for the handoff's tell to leave it.
+      const onIt = !!d.runJob && onFront(this, d) && this.time >= d.readAt;
+      if (onIt || this.time >= d.fitAt) react = 0.05;
       else if (d.role === 'DL' || d.role === 'LB' || t === this.rb || d.assign?.kind === 'spy') react = 0.1 + slow * 0.25;
       else if (t && !t.isBlocker) react = 0.4 + slow * 0.4;
       else react = 0.3 + slow * 0.3;
-      d.reactAt = this.time + react * leanMul(d.lean.run) + (d === fooled ? KEY_FOOLED : 0);
+      d.reactAt = (onIt ? this.time : from) + react * leanMul(d.lean.run) + (d === fooled ? KEY_FOOLED : 0);
     }
   }
 
@@ -1580,7 +1636,8 @@ export class Play {
         if (d.down || d === this.carrier || d.noEngage > 0 || d.engagedBy.length >= 2) continue;
         // Away from the ball only a blocker's own run-block assignment is worth locking onto (a WR on his DB).
         if (downfield && dist(d.pos, this.carrier!.pos) > 10 && !(b.mark === d && this.runBlocking())) continue;
-        if (!downfield && d === this.readKey) continue; // left unblocked on purpose
+        // Left unblocked on purpose; after the mesh too for a puller or lead, who goes on to his man (the scrape on a give).
+        if (d === this.readKey && (!downfield || b.poaJob)) continue;
         if (b.pull && d !== b.poa) continue;
         // Blockers with an assignment (a puller or lead back on his way: his point-of-attack man) work to
         // their man rather than grabbing whoever they bump into. On runs too, as long as their man is
@@ -1620,6 +1677,8 @@ export class Play {
           b.engaged = d;
           d.engagedBy.push(b);
           this.wasBlocked.add(d);
+          // A double team's helper gets a hand on him before he climbs (`CLIMB.touch`).
+          if (b.climb && this.runBlocking()) b.comboUntil = Math.max(b.comboUntil, this.time + CLIMB.touch);
           break;
         }
       }

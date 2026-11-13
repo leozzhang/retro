@@ -4,7 +4,8 @@
  *
  * At the snap (each rep, once the line has its run men; on a draw, after the pass set):
  * - IDLE: a blocker with no job (no man, no climb, no point-of-attack man, no hinge) who isn't running a route.
- * - DEAD DOUBLE: two blockers on one man and neither climbs, while a playside box defender is free (a wasted hat).
+ * - DEAD DOUBLE: two blockers on one man and neither climbs, while a playside box defender is free (a wasted hat). Not the
+ *   sneak's wedge, whose doubles stay on by design.
  * - WRONG SIDE: a lead, kick or force block (not a slice) whose man is backside of the ball.
  * - FREE PLAYSIDE: a box defender playside of the center whom no blocker has (not the read key). Expected when
  *   the box outnumbers the hats; the report shows both.
@@ -64,7 +65,8 @@ function snapCheck(play: Play): Snap {
   const inBox = play.def.filter((d) => d.pos.x < play.los + 6 && Math.abs(d.pos.y - play.ballY) < 7.5 && d.role !== 'CB');
   const free = inBox.filter((d) => !had.has(d) && d !== play.readKey && along(d) > -0.5).map((d) => d.slot);
   // A double with nobody to climb to is only a wasted hat while someone in the box is free.
-  if (!free.length) dead.length = 0;
+  // A sneak's doubles are the wedge (`assignRunBlocks`): nobody climbs by design.
+  if (!free.length || play.playDef.tags.concept === 'sneak') dead.length = 0;
   const card = blockers
     .map((o) => `${o.slot}:${o.mark?.slot ?? '-'}${o.climb ? '^' + o.climb.slot : ''}${o.poa && o.poa !== o.mark ? '@' + o.poa.slot : ''}${o.poaJob ? '(' + o.poaJob + ')' : ''}${o.hinge ? '(hinge)' : ''}`)
     .join(' ');

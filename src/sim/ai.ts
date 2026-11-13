@@ -671,6 +671,12 @@ function rush(play: Play, d: Player): void {
     return;
   }
   if (play.phase === 'run' && play.carrier) {
+    // On a designed run he hasn't reacted to the ball yet (`reactAt`): he carries on with what he was doing. Chasing
+    // the carrier here, a lineman's reaction never counted, nor a read key's for guessing wrong (`KEY_FOOLED`).
+    if (play.runBlocking() && play.time < d.reactAt) {
+      d.want = d.vel;
+      return;
+    }
     pursue(d, play.carrier, 0.9, PURSUIT_LEAD);
     return;
   }
@@ -778,7 +784,7 @@ function robber(play: Play, d: Player): void {
 export const AUTO_JUKE = { range: 2, chance: 0.5, retry: 0.5 };
 
 /**
- * Pressing the design: a back on a called run follows his drawn path (the aiming point: the B gap on inside
+ * Pressing the design: a back on a called run (or a QB carrying: his hole) follows his drawn path (the aiming point: the B gap on inside
  * zone, the pullers' hips on a counter, the edge on a toss) until he's `until` yd from the line (or, on a
  * perimeter run, outside the edge: `pressEdge`), then reads
  * it (`pickLane`). Reading lanes from the mesh, he cut up the first crease before the blocks formed and
@@ -788,6 +794,11 @@ export const PRESS = { until: 1.2, reach: 0.8 };
 
 /** The next point on his path while he's pressing it, or null once he's reading the line. */
 function pressPoint(play: Play, c: Player): Vec | null {
+  // A QB carrying on a designed run (QB power, the QB draw, a read's keep) presses his hole the same way: reading
+  // lanes from 5 yd deep, power read's keep took the A gap into the filling MIKE instead of the C gap behind the guard.
+  if (c === play.qb && (play.playDef.qbRun || play.kept) && play.playDef.read !== 'option') {
+    return c.pos.x < play.los - PRESS.until ? play.hole : null;
+  }
   // Not after an option pitch: his path is the pitch relationship, not a track to the line.
   if (c !== play.rb || play.playDef.kind !== 'run' || play.playDef.read === 'option' || !c.route.length || c.pos.x >= play.los - PRESS.until) return null;
   // A wide zone presses to the edge, then reads (one cut, downhill). The toss and the sweep keep their path:

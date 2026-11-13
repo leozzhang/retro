@@ -19,7 +19,7 @@ import { onFront } from './runFits';
 /** Drive-block advantage for the OL on designed runs (subtracted from the defender's power). */
 export const RUN_BLOCK_EDGE = 3;
 /** Stretch (reach) blocks are the hardest in football: the blocker gives up this much of his edge. */
-export const REACH_PENALTY = 4;
+export const REACH_PENALTY = 2;
 /** Spread of each run block's outcome, in rating points, rolled when the block is made. */
 export const BLOCK_ROLL_SD = 8;
 /** A double team's advantage over a one-on-one, in rating points. */
@@ -30,8 +30,14 @@ const DOUBLE_TEAM = 15;
  * positions would give (so a WR stalking a corner still plays as before). Real lines' run-block
  * win rates span only about ±6 points from the best to the worst (ESPN, TARGETS.md); a linear edge
  * let a 5-point better DL win half his blocks and a 10-point one stuff 43% of runs.
+ * `pos`: a defender's edge from position alone over a TE or back (his template's run-block value against the
+ * defender's, at the same level) counts at this share; over a receiver's stalk, `posWr`; over a lineman, whole. At full value
+ * a TE won 22% of his blocks on an end at equal talent, against ESPN's run-block win rates of about 60% for TEs and 70% for
+ * linemen. The talent edge is measured from the full position edge (`runEngagement`), so the shares are what's left of it:
+ * measured from the reduced edge, most of the removed edge came back through the tanh (a corner on a receiver at 15.8 for
+ * 14), and a bad blocker was barely worse than an average one, the tanh already flat.
  */
-export const RUN_GAP = { k: 0.5, soft: 10 };
+export const RUN_GAP = { k: 0.4, soft: 10, pos: 0.5, posWr: 0.85 };
 /**
  * How much of a defender his run blocker still has (`Player.blockControl`): 1 at contact, worn down each
  * second while the defender is winning (`base` plus `perPower` a point of power; losing, he still wears it
@@ -43,9 +49,13 @@ export const RUN_GAP = { k: 0.5, soft: 10 };
  * control he's won back (`armOdds`).
  * A block is a gradient, not a switch: a worse line gets beaten more often and sooner, but a beaten
  * blocker still on his man still slows him and spoils his tackle.
+ * A receiver's stalk is a mirror, not a drive block: he only has to stay between his man and the ball, so a defender
+ * winning it wears it at most `stalkWear` a second (the near-the-ball fight still applies). At `maxWear` every stalk was gone
+ * 0.4 s after contact whatever the matchup, and a slot on the nickel decided every counter to his side (Trey, Split). Slower
+ * still (1.2) and the perimeter gained 0.4 yd a carry at every talent gap.
  */
 export const RUN_CONTROL = {
-  base: 0.95, perPower: 0.06, losing: 0.1, regain: 0.04,
+  base: 0.5, perPower: 0.25, maxWear: 3.5, stalkWear: 1.6, losing: 0.1, regain: 0.04,
   nearDist: 2.5, near: 2.5, nearLevered: 0.6, nearFloor: 1.2, nearFloorLevered: 0.3,
   arm: 0.5, armFloor: 0.06, armReach: 1.2,
 };
@@ -57,10 +67,21 @@ export const WASH_RATE = 1.2;
 const WORK_RATE = 0.05;
 /** Combos: the second blocker comes off the double team for the backer this long after the snap, by scheme. */
 export const COMBO_CLIMB: Record<'zone' | 'stretch' | 'gap', number> = { zone: 0.55, stretch: 0.3, gap: 0.5 };
+/** Yards a climb target counts as farther per yard he is backside of the climber (`assignRunBlocks`): inside runs, perimeter runs. */
+const CLIMB_BACKSIDE = { inside: 0.6, perimeter: 2 };
+/** A helper doubles a neighbour no farther than this along the line (yd). */
+const COMBO_REACH = 2.5;
+/** The partner climbs instead of the helper when he's this much nearer the backer (yd). */
+const COMBO_SWAP = 0.5;
 /** He also comes off early once the backer declares: this close to him, or this close to the line. */
 const CLIMB_TRIGGER = 3;
-/** Climbs on control (`releaseClimbers`): the double has him when his power is under −`margin`; else it holds up to `hold` s more. */
-export const CLIMB = { margin: 2, hold: 0.5 };
+/**
+ * Climbs on control (`releaseClimbers`): the double has him when his power is under −`margin`; else it holds up to `hold` s more.
+ * The helper gets a hand on the down man first: he's on the double at least `touch` s (the clock runs from his contact, set in
+ * `Play.formEngagements`), and one still closing on him (within `closing` yd) at the combo's time keeps going for `late` s more.
+ * Off the snap's clock, the stretch's tackle (0.3 s) climbed before he ever reached the end, and the TE reached him alone.
+ */
+export const CLIMB = { margin: 2, hold: 0.5, touch: 0.2, closing: 2.5, late: 0.25 };
 /**
  * Backside linemen cut off (`runBlock`): a lineman this far backside of the hole takes the angle across his
  * man's path to the ball (`cutOff`), so a backside tackle slanting playside is walled off, not run past.
@@ -90,12 +111,16 @@ const LEAD_PICKUP = 1.8;
  * - `attack`: a lead back leaves his path for his man this close to him.
  * - `lost`: he gives up on a man this far from the play and takes the most dangerous free defender.
  * - `lead`: cutting his man off, he aims for the carrier's spot up to this many seconds ahead (`cutOff`).
+ * - `keepInside`: power read's keep hits this far inside the read key (the C gap), and the pulling guard leads
+ *   there, not at the sweep's edge: led at the edge, he left the keep to a filling MIKE.
  */
-export const POA = { edge: 1.5, kickInside: 0.8, forceWidth: 10, forceDepth: 7, onLine: 1.8, kickOutside: 0.3, kickHeadUp: 0.5, meet: 2.2, attack: 3, lost: 10, lead: 1 };
+export const POA = { keepInside: 1.5, edge: 1.5, kickInside: 0.8, forceWidth: 10, forceDepth: 7, onLine: 1.8, kickOutside: 0.3, kickHeadUp: 0.5, meet: 2.2, attack: 3, lost: 10, lead: 1 };
 /** Back paths that attack the perimeter: the line's edge is the turn-up point and the runner reads wide. */
 const PERIMETER_PATHS = new Set<RouteName>(['sweep', 'toss', 'pitchPath', 'stretch', 'oz']);
 /** A hinging tackle holds his spot this long (seconds after the snap) before working up to the next threat. */
 const HINGE_HOLD = 1;
+/** He takes the backside end from this long after the snap (s), if nobody's come through the gap first. */
+const HINGE_CHASE = 0.3;
 /** A puller turns up into the hole this far (sideways) before he gets to it. */
 const PULL_TURN = 1;
 /** Draw: the line shows pass for this long, then turns its men away from the back. */
@@ -115,10 +140,6 @@ const LANE_LEAD = 0.35;
 
 const dot = (a: Vec, b: Vec) => a.x * b.x + a.y * b.y;
 
-/** Defenders some blocker already has, is climbing to, or is assigned at the point of attack. */
-function claimed(play: Play): Set<Player | null> {
-  return new Set(play.off.flatMap((o) => [o.mark, o.climb, o.poa]));
-}
 
 /** A perimeter run: an outside scheme, or the back's path goes for the edge. */
 export function perimeter(play: Play): boolean {
@@ -138,6 +159,17 @@ export function pressEdge(play: Play): number | null {
     .filter((o) => o.role === 'OL' || (o.role === 'TE' && o.start.x > play.los - 1.5 && Math.abs(o.start.y - play.ballY) < 6.5))
     .map((o) => (o.start.y - play.ballY) * side);
   return Math.max(...along) + POA.edge;
+}
+
+/**
+ * Where the line blocks to: the hole, except on a read that keeps inside (power read), where the line blocks power for the
+ * keep's C gap (`POA.keepInside` inside the key) while the sweep is the read's other half. Blocked to the sweep's spot 9 yd
+ * out, the center's back block on the 1-technique cut off a spot 3 yd playside of him and never touched him.
+ */
+export function lineHole(play: Play): Vec {
+  const k = play.readKey;
+  if (play.playDef.keep !== 'inside' || !k || play.kept) return play.hole;
+  return { x: play.hole.x, y: k.start.y - playSide(play) * POA.keepInside };
 }
 
 /** Where the play is going: the ball carrier once it's a run, else the hole. */
@@ -289,10 +321,13 @@ export function assignRunBlocks(play: Play): void {
 
   // Leads get the playside backer nearest where they turn up (the hole, or the edge on the perimeter),
   // before the line's combos pick who they climb to.
-  const turnAt = wide ? { x: play.los + 2, y: edgeY } : play.hole;
+  // Power read's guard leads the keep inside the key (`POA.keepInside`), whatever the sweep does outside.
+  const keepY = play.playDef.keep === 'inside' && play.readKey ? play.readKey.pos.y - side * POA.keepInside : null;
+  const turnAt = keepY !== null ? { x: play.los + 2, y: keepY } : wide ? { x: play.los + 2, y: edgeY } : play.hole;
   for (const o of play.off) {
     if (o.poaJob !== 'lead') continue;
-    if (wide) o.turnY = edgeY;
+    if (keepY !== null) o.turnY = keepY;
+    else if (wide) o.turnY = edgeY;
     if (noKick.has(o)) continue;
     let best: Player | null = null;
     let bestScore = Infinity;
@@ -326,8 +361,11 @@ export function assignRunBlocks(play: Play): void {
     // the guard's, not the tackle's two yards away who can't reach him down the line.
     const pairs: { b: Player; d: Player; fit: number }[] = [];
     for (const b of line) {
+      // Inside is toward the play on the backside: there the range mirrors (Duo's backside tackle took the end outside him,
+      // over the TE, and the TE had to climb to the SAM from outside).
+      const back = along(b) < -0.3 ? -1 : 1;
       for (const d of dl) {
-        const o = along(d) - along(b);
+        const o = (along(d) - along(b)) * back;
         if (o >= lo && o <= hi) pairs.push({ b, d, fit: Math.abs(o - pref) });
       }
     }
@@ -362,46 +400,77 @@ export function assignRunBlocks(play: Play): void {
     }
   }
 
-  const backers = boxDefenders(play).filter((d) => !reserved.has(d));
+  // A corner isn't a backer to climb to, even pressed on a wing inside the box: he's the wing's (Wing Duo's tackle climbed
+  // to him past the MIKE).
+  const backers = boxDefenders(play).filter((d) => !reserved.has(d) && d.role !== 'CB');
   const climbTaken = new Set<Player>(reserved);
+  // Prefer playside backers: a yard backside of the blocker costs `CLIMB_BACKSIDE` yd, more on the perimeter, where
+  // the whole line works playside and the backside backer is left to chase (against a Bear, the center climbed to
+  // the WILL and left the MIKE free over the toss).
+  const backCost = wide && !down ? CLIMB_BACKSIDE.perimeter : CLIMB_BACKSIDE.inside;
+  let climber: Player;
+  const climbScore = (d: Player) => dist(d.pos, climber.pos) + Math.max(0, -(along(d) - along(climber))) * backCost;
   const nearestBacker = (b: Player) => {
+    climber = b;
     let best: Player | null = null;
     for (const d of backers) {
       if (climbTaken.has(d) || d.pos.x < b.pos.x) continue;
       // A playside end or back doesn't climb across the formation to a backside backer (linemen do: the double to the backside backer).
       if (b.role !== 'OL' && along(b) > 1 && along(d) < -1 && !flows(play, d)) continue;
-      const score = dist(d.pos, b.pos) + Math.max(0, -(along(d) - along(b))) * 0.6; // prefer playside backers
-      if (!best || score < dist(best.pos, b.pos) + Math.max(0, -(along(best) - along(b))) * 0.6) best = d;
+      if (!best || climbScore(d) < climbScore(best)) best = d;
     }
     if (best) climbTaken.add(best);
     return best;
   };
   const helped = new Set<Player>();
+  const wedge = play.playDef.tags.concept === 'sneak';
+  // On the perimeter (stretch, pin, the toss) the outermost man on the line, uncovered, arcs for the force: the
+  // first man outside who isn't a down lineman (`forceMan`). Helping inside and climbing to the MIKE, the TE left
+  // the walked-up safety to set the edge alone against a Bear.
+  const arc = !down && wide && line[0] && !line[0].mark && line[0].role !== 'OL' ? line[0] : null;
+  if (arc) {
+    const f = forceMan(play, along, edgeAlong, new Set([...reserved, ...climbTaken]));
+    if (f) {
+      arc.mark = f;
+      climbTaken.add(f);
+    }
+  }
   line.forEach((b, i) => {
     if (b.mark) return;
     // Help a neighbour who has his man; each covered blocker takes one helper. Zone helps playside first;
     // a gap scheme blocks down, so it helps toward the center first: inside on the playside (the line runs
     // playside to backside), but playside on the backside (Duo's backside double is the guard with the
     // center on the nose, up to the backer, not the guard with the tackle on the end).
-    const toCenter = along(b) > -0.3 ? [line[i + 1], line[i - 1]] : [line[i - 1], line[i + 1]];
+    // A gap scheme only doubles toward the center: with nobody free inside him he climbs straight to his backer (Duo's
+    // backside tackle doubled out on the end with the TE, then climbed from 5 yd outside the SAM).
+    const toCenter = along(b) > -0.3 ? [line[i + 1]] : [line[i - 1]];
     const order = down ? toCenter : [line[i - 1], line[i + 1]];
     // On a trap the uncovered linemen release straight to the backers (the man they'd help on is let in for
     // the trapper, and the center blocks back alone): joining a double first, the playside guard was released
     // at its clock as he arrived, with his momentum going the wrong way.
-    const partner = scheme === 'trap' ? undefined : order.find((n) => n && covered.has(n) && !helped.has(n));
-    const climb = nearestBacker(b);
+    // A double is two neighbours: across the gap a puller or a hinge left (Heavy Power's backside TE and the center, 4 yd
+    // apart) the helper never got there, and the climb left the down man free.
+    const partner = scheme === 'trap' ? undefined : order.find((n) => n && covered.has(n) && !helped.has(n) && Math.abs(along(n) - along(b)) < COMBO_REACH);
+    // A sneak is a wedge (it fires on the count, `RUN_GETOFF.count`): its doubles drive the down men and nobody climbs; the
+    // backers are what the QB's yard head start has to beat. Climbing at the snap to a goal-line backer 2 yd off the ball, the
+    // center left the guard alone on the nose, and the stalled pile held the QB behind the line 18% of the time.
+    const climb = wedge && partner ? null : nearestBacker(b);
     if (partner) {
       helped.add(partner);
       b.mark = covered.get(partner)!;
-      b.climb = climb;
-      b.comboUntil = play.snapTime + COMBO_CLIMB[down ? 'gap' : scheme === 'stretch' || scheme === 'pin' ? 'stretch' : 'zone'];
+      // Whichever of the two is nearer the backer comes off for him; the other keeps the down man. The helper climbing
+      // from outside, Pistol Duo's backside TE started 3 yd behind a SAM flowing away from him.
+      const up = climb && dist(partner.pos, climb.pos) < dist(b.pos, climb.pos) - COMBO_SWAP ? partner : b;
+      up.climb = climb;
+      up.comboUntil = play.snapTime + COMBO_CLIMB[down ? 'gap' : scheme === 'stretch' || scheme === 'pin' ? 'stretch' : 'zone'];
     } else {
       b.mark = climb;
     }
   });
 
   // Receivers and backs stalk the nearest defender in front of them; uncovered linemen with nobody left take a backer.
-  const marked = () => new Set(play.off.flatMap((o) => [o.mark, o.poa]).filter(Boolean));
+  // A lineman's climb counts: a back doesn't take the backer the double is coming off to (Wing Duo's FB and LG both had the WILL).
+  const marked = () => new Set(play.off.flatMap((o) => [o.mark, o.poa, o.climb]).filter(Boolean));
   for (const b of play.off) {
     if (b.mark || !b.isBlocker || b.pull || b.hinge || b.route.length || b.role === 'QB') continue;
     const tk = marked();
@@ -419,18 +488,11 @@ export function assignRunBlocks(play: Play): void {
   }
 
   // Force blocks get the playside force or alley defender nobody has: outside the edge, near the alley.
-  const alley = { x: play.los + 1, y: play.ballY + side * (edgeAlong + 2) };
   for (const o of play.off) {
     if (o.poaJob !== 'force') continue;
     o.turnY = edgeY;
     const tk = marked();
-    let best: Player | null = null;
-    for (const d of play.def) {
-      if (tk.has(d) || d === play.readKey || d.role === 'DL' || d.pos.x > play.los + POA.forceDepth) continue;
-      const a = along(d);
-      if (a < edgeAlong - 2.5 || a > edgeAlong + POA.forceWidth) continue;
-      if (!best || dist(d.pos, alley) < dist(best.pos, alley)) best = d;
-    }
+    const best = forceMan(play, along, edgeAlong, tk);
     o.poa = best;
     // Nobody in the alley for him: he leads on the playside backer nearest the edge instead.
     if (!best) {
@@ -443,6 +505,22 @@ export function assignRunBlocks(play: Play): void {
       }
     }
   }
+}
+
+/**
+ * The playside force or alley defender nobody has (`taken`): not a down lineman, within `POA.forceDepth` of the
+ * line, from 2.5 yd inside the edge to `POA.forceWidth` outside it, nearest the alley.
+ */
+function forceMan(play: Play, along: (p: Player) => number, edgeAlong: number, taken: Set<Player | null>): Player | null {
+  const alley = { x: play.los + 1, y: play.ballY + playSide(play) * (edgeAlong + 2) };
+  let best: Player | null = null;
+  for (const d of play.def) {
+    if (taken.has(d) || d === play.readKey || d.role === 'DL' || onFront(play, d) || d.pos.x > play.los + POA.forceDepth) continue;
+    const a = along(d);
+    if (a < edgeAlong - 2.5 || a > edgeAlong + POA.forceWidth) continue;
+    if (!best || dist(d.pos, alley) < dist(best.pos, alley)) best = d;
+  }
+  return best;
 }
 
 /** Nearest unblocked defender in front of a run blocker, preferring ones nobody has yet. The zone-read key is left alone. */
@@ -516,22 +594,28 @@ function pullBlock(play: Play, p: Player): boolean {
   return turnUp(p, t);
 }
 
-/** Hinge: hold the spot inside and take the first defender who comes through it. */
+/** Hinge: hold the spot inside and take the first defender who comes through it; with nobody by `HINGE_HOLD`, work out to the end. */
 function hingeBlock(play: Play, p: Player): boolean {
   const spot = p.hinge!;
-  const taken = claimed(play);
-  let best: Player | null = null;
-  for (const d of play.def) {
-    if (d.down || taken.has(d) || d.pos.x > play.los + 2.5) continue;
-    const dd = dist(d.pos, spot);
-    if (dd < 3 && (!best || dd < dist(best.pos, spot))) best = d;
-  }
-  if (best || play.time - play.snapTime > HINGE_HOLD) {
+  if (play.time - play.snapTime > HINGE_HOLD) {
     // Nobody came: work up to the nearest threat like any run blocker.
-    p.mark = best;
     p.hinge = null;
     return false;
   }
+  const taken = new Set(play.off.filter((o) => o !== p).flatMap((o) => [o.mark, o.climb, o.poa]));
+  let best: Player | null = null;
+  // The gap first, then the end: the backside end (the chase) is his from `HINGE_CHASE` s, and anyone coming through the
+  // gap comes before him. He keeps reading until he has his hands on someone, so a blitzer who shows late still takes him
+  // off the end. Taking the first body near the spot at the snap, he trailed the end upfield and a blitzing WILL came
+  // through the gap untouched (Trap vs Cover 0); ignoring the end until `HINGE_HOLD`, the end ran down short-yardage runs.
+  const score = (q: Player) => dist(q.pos, spot) + (q.runJob === 'chase' ? 3 : 0);
+  for (const d of play.def) {
+    const chase = d.runJob === 'chase';
+    if (d.down || taken.has(d) || d.pos.x > play.los + 2.5 || (chase && play.time - play.snapTime < HINGE_CHASE)) continue;
+    if (dist(d.pos, spot) < 3 && (!best || score(d) < score(best))) best = d;
+  }
+  p.mark = best;
+  if (best) return false;
   p.want = seek(p, spot, maxSpeed(p) * 0.8, 0.4);
   return true;
 }
@@ -571,11 +655,14 @@ export function runBlock(play: Play, p: Player): void {
     p.want = ZERO; // standing down for the harness's ablation
     return;
   }
-  const hole = play.hole;
+  const hole = lineHole(play);
   if (!p.mark && p.route.length && leadBlock(play, p)) return;
   if (p.pull && !p.mark && pullBlock(play, p)) return;
-  if (p.hinge && !p.mark && hingeBlock(play, p)) return;
-  if (p.climb && (play.time >= p.comboUntil || p.climb.down)) {
+  if (p.hinge && hingeBlock(play, p)) return;
+  // Still closing on a man he can get his hands on (not slipping a block, not already doubled).
+  const m = p.mark;
+  const closing = !!m && !m.down && m.noEngage <= 0 && m.engagedBy.length < 2 && dist(p.pos, m.pos) < CLIMB.closing;
+  if (p.climb && (play.time >= p.comboUntil + (closing ? CLIMB.late : 0) || p.climb.down)) {
     // Never got onto the double team: go straight to the backer.
     p.mark = p.climb.down ? null : p.climb;
     p.climb = null;
@@ -603,10 +690,16 @@ export function runBlock(play: Play, p: Player): void {
     // cutoff, the scoop); everyone else leads his man's movement.
     // A man already on a teammate's block is a double team to join, not a path to cut off: cutting him off,
     // the helper ran to a spot in front of the ball and stood there (Duo's backside double never formed).
-    const backside = (p.start.y - hole.y) * playSide(play) < -CUTOFF_FROM && p.role === 'OL' && !r.engagedBy.some((b) => b !== p);
+    // A TE cuts off only on the far side of the ball (Pistol Duo's backside TE): measured from an outside zone's hole 8 yd out,
+    // the playside TE played his reach as a cutoff and never got his hands on the end.
+    const side = playSide(play);
+    const backside =
+      (p.start.y - hole.y) * side < -CUTOFF_FROM && (p.role === 'OL' || (p.role === 'TE' && (p.start.y - play.ballY) * side < -CUTOFF_FROM)) &&
+      !r.engagedBy.some((b) => b !== p);
     // A lineman climbing to a backer steps into the backer's path to the ball too: leading where a filling
     // backer will be, his target swung behind him and he stood still while the backer made the tackle.
-    const climbing = p.role === 'OL' && r.role === 'LB' && !r.engagedBy.length;
+    // An inline TE climbing off a double does the same (Pistol Duo's backside TE trailed the SAM across the formation).
+    const climbing = (p.role === 'OL' || p.role === 'TE') && r.role === 'LB' && !r.engagedBy.length;
     const at = p.poaJob || backside || climbing ? cutOff(p, r, c && ref === c.pos ? c : null, ref, sp) : add(r.pos, scale(r.vel, clamp(dist(p.pos, r.pos) / sp, 0, 0.6)));
     const tgt = { x: at.x - 0.25, y: at.y + Math.sign(ref.y - at.y) * 0.75 };
     p.want = seek(p, tgt, sp, 0.3);
@@ -700,6 +793,13 @@ function evenEdge(d: Player, b: Player): number {
   return v;
 }
 
+/** The position part of a run block's edge (`RUN_GAP`): a share of a defender's edge over a TE or a back (`pos`) or a receiver's stalk (`posWr`); whole over a lineman. */
+function posEdge(d: Player, b: Player): number {
+  const e = evenEdge(d, b);
+  if (e <= 0 || b.role === 'OL') return e;
+  return e * (b.role === 'WR' ? RUN_GAP.posWr : RUN_GAP.pos);
+}
+
 /** The squeezed talent part of a run block: the raw rating edge, pulled toward the equal-talent edge (`RUN_GAP`). */
 export function runTalent(raw: number, even: number): number {
   return even + RUN_GAP.k * RUN_GAP.soft * Math.tanh((raw - even) / RUN_GAP.soft);
@@ -716,8 +816,12 @@ export function runEngagement(play: Play, d: Player): number {
   const goal = d.goal ?? play.qb.pos;
   const toGoal = norm(sub(goal, d.pos));
   const blk = d.engagedBy.reduce((s, b) => s + runBlockValue(b.r), 0) / n;
-  const even = d.engagedBy.reduce((s, b) => s + evenEdge(d, b), 0) / n;
-  const talent = runTalent(defPower(d.r) - blk, even);
+  // The edge a defender has over a non-lineman just from position counts at `RUN_GAP.pos` (`posEdge`).
+  const even = d.engagedBy.reduce((s, b) => s + posEdge(d, b), 0) / n;
+  // The talent edge is his rating edge past what equal-talent players at those positions would give (`full`), laid on the share
+  // of the position edge that counts (`even`).
+  const full = d.engagedBy.reduce((s, b) => s + evenEdge(d, b), 0) / n;
+  const talent = runTalent(defPower(d.r) - blk - full + even, even);
   const edge = RUN_BLOCK_EDGE - (play.runScheme === 'stretch' ? REACH_PENALTY : 0);
   // A lineman sitting on the run gets off the ball into it (`LEAN_FX.surge`).
   const surge = d.role === 'DL' ? Math.max(0, d.lean.run) * LEAN_FX.surge : 0;
@@ -736,7 +840,9 @@ export function runEngagement(play: Play, d: Player): number {
 
   // A defender who's winning wears the block down; one who's losing mostly stays on it (`RUN_CONTROL`).
   const k = RUN_CONTROL;
-  let wear = (power > 0 ? k.base + power * k.perPower : k.losing + power * k.regain) / Math.pow(n, 1.5);
+  // Winning, he wears it by his margin (`perPower`), at most `maxWear` a second: even a rout takes a beat to get off.
+  const cap = d.engagedBy.every((b) => b.role === 'WR') ? k.stalkWear : k.maxWear;
+  let wear = (power > 0 ? Math.min(cap, k.base + power * k.perPower) : k.losing + power * k.regain) / Math.pow(n, 1.5);
   const c = play.carrier;
   if (c && c.side === 'off' && play.phase === 'run') {
     const dc = dist(d.pos, c.pos);

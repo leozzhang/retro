@@ -261,4 +261,7 @@ The gap-scheme rules, the counter step, the gun's keep threat, the goal-line fit
 - Empty QB Draw's "backside" crossing is a label artifact (its aim is at the center).
 
 ## The audit
-Every run checked against its design, every front and three defense levels: [RUNAUDIT.md](RUNAUDIT.md) (`npm run audit`).
+Every run checked against its design, every front and three defense levels: [RUNAUDIT.md](RUNAUDIT.md) (`npm run audit`). Its passes:
+- **Second:** the perimeter's aiming point, doubles that touch before they climb, the force arc, power read's key and keep, reaction on runs, the edge against a kick-out, and the hinge.
+- **Third:** what decides a run (shed by the margin, the level from contact), the position edge for TEs and backs, and the pistol's handoff read.
+- **Fourth:** a receiver's stalk as a mirror (`RUN_CONTROL.stalkWear`), talent measured from the full position edge, power read's widening key and its line blocking the keep, and the sneak's wedge (goal-line sneak 80%, up from 64%).

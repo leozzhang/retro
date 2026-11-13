@@ -106,7 +106,7 @@ export const STOPS: Record<PlayConcept, CoverTag[]> = {
   // Runs: a loaded box, and for the slow-developing and perimeter runs, penetration (the blitz).
   'inside-zone': ['heavyBox'], 'split-zone': ['heavyBox'], 'outside-zone': ['blitz'], power: ['heavyBox'],
   counter: ['blitz', 'heavyBox'], duo: ['heavyBox'], iso: ['heavyBox'], trap: ['heavyBox'], toss: ['blitz'],
-  'pin-pull': ['blitz'], draw: ['heavyBox'], 'zone-read': ['heavyBox'], 'power-read': ['heavyBox'],
+  'pin-pull': ['blitz'], draw: ['heavyBox'], 'zone-read': ['heavyBox'], 'power-read': ['blitz', 'heavyBox'],
   'speed-option': ['heavyBox'], 'qb-draw': ['heavyBox'], 'qb-power': ['heavyBox'], 'qb-counter': ['blitz', 'heavyBox'],
   sneak: [],
 };

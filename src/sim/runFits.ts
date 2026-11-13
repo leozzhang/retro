@@ -30,7 +30,7 @@ export type RunJob = 'gap' | 'twoGap' | 'edge' | 'chase' | 'fill' | 'cutback';
  * - `gapDepth`: a one-gap lineman's landmark in the backfield (behind the LOS, the offense's side); `gapWidth`
  *   how far off his blocker's shoulder.
  * - `headUp`: within this of a blocker's nose, he's head-up: a two-gap player.
- * - `edgeOut`: the edge sets this far outside the end blocker.
+ * - `edgeOut`: the edge sets this far outside the end blocker, braking over the last `edgeSet` yd to get there.
  * - `chaseHome`: the backside end stays home this long after the snap (the QB's keep, the boot); from the
  *   gun `gunHome` longer: the QB's keep is a real threat there (the read game), and he carries the fake out;
  *   `chaseDepth`: then he flattens down the line this deep in the backfield, at `chaseSpeed` of his top speed
@@ -63,6 +63,7 @@ export const RUN_FIT = {
   keyLead: 0.6,
   squeeze: 1.5,
   standUp: 6,
+  edgeSet: 1.2,
 };
 
 /** The blockers' y at the snap (the line and attached ends), sorted across the field. */
@@ -173,7 +174,11 @@ export function runTechnique(play: Play, d: Player): boolean {
   const ball = play.playDef.qbRun || !play.rb ? play.qb : play.rb;
   // Free after his read (nobody on him, nobody about to be): he's a free man, and goes and gets the ball.
   // Through his gap with the ball near, the same. This is what an unblocked backside man does to a run.
-  const blocker = play.off.some((o) => o.isBlocker && o.role !== 'QB' && !o.down && !play.idle.has(o) && (o.mark === d || o.poa === d) && dist(o.pos, d.pos) < 3);
+  // A puller or lead back assigned to him (the kick-out) counts from anywhere: the down block inside him is his cue to
+  // squeeze and play the kicker. Counting himself free, Split Counter's end ran after the jab and met the H 2 yd deep, in the hole.
+  const blocker = play.off.some(
+    (o) => o.isBlocker && o.role !== 'QB' && !o.down && !play.idle.has(o) && (o.mark === d || o.poa === d) && (dist(o.pos, d.pos) < 3 || (!!o.poaJob && o.poa === d)),
+  );
   const through = d.pos.x <= play.los + 0.2 && dist(d.pos, ball.pos) < 3.5;
   if (d.runJob !== 'chase' && ((play.time >= d.readAt && !blocker) || through)) {
     d.goal = ball.pos;
@@ -181,7 +186,9 @@ export function runTechnique(play: Play, d: Player): boolean {
     return true;
   }
   d.goal = tgt;
-  d.want = seek(d, tgt, maxSpeed(d) * (d.runJob === 'chase' ? RUN_FIT.chaseSpeed : 0.9), 0.3);
+  // The edge sets at his landmark (`edgeSet`: he brakes over that last stretch). Braking only in the last 0.3 yd he ran a yard
+  // past it into the backfield, and a kick-out from the backfield (Split Counter's H) met him from behind, not inside.
+  d.want = seek(d, tgt, maxSpeed(d) * (d.runJob === 'chase' ? RUN_FIT.chaseSpeed : 0.9), d.runJob === 'edge' ? RUN_FIT.edgeSet : 0.3);
   return true;
 }
 
@@ -195,7 +202,15 @@ export function engagedGoal(play: Play, d: Player, carrier: Vec): Vec {
   // Before the handoff the ball is going to the back, not staying with the QB.
   const ball = play.phase !== 'run' && !play.playDef.qbRun ? play.rb.pos : carrier;
   const side = playSide(play);
-  if (d.runJob === 'edge') return { x: ball.x, y: ball.y + side * (d.spill ? -1.5 : 1.5) };
+  if (d.runJob === 'edge') {
+    // He plays the block at the line, not the ball 5 yd deep: before the handoff that's the back's jab on a counter, and
+    // the end drove the kick-out 2 yd into the backfield and into the hole. Box keeps his outside arm free, squeezing no
+    // more than `squeeze` inside his landmark; spill wrong-arms it, under the block toward the ball.
+    const x = Math.max(ball.x, play.los - RUN_FIT.gapDepth * 0.5);
+    if (d.spill) return { x, y: ball.y - side * 1.5 };
+    const y = side > 0 ? Math.max(ball.y + 1.5, d.gapY - RUN_FIT.squeeze) : Math.min(ball.y - 1.5, d.gapY + RUN_FIT.squeeze);
+    return { x, y };
+  }
   if (d.runJob === 'twoGap' && play.phase !== 'run') return { x: play.los - 0.5, y: d.gapY };
   return ball;
 }

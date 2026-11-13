@@ -1,6 +1,6 @@
 # Progress
 
-_Last updated: 2026-11-12_
+_Last updated: 2026-11-13_
 
 ## In progress: balancing the run game by intent (2026-11-12)
 The plan: measure what each run is drawn to do before tuning it, fix mechanics rather than plays, and build the ML defense after the run game is stable (it would learn the bugs). Each run should win in its `beats` situations and lose in its `stops` ones. What's missing is precision: who blocks whom, which gap the ball hits, what the back reads.
@@ -59,12 +59,84 @@ The plan: measure what each run is drawn to do before tuning it, fix mechanics r
   - ADAPT holds.
   - Pass, PA, POCKET and STUNT rows are unchanged. `npm test` passes.
 
+**Run audit, second pass** (2026-11-13; RUNAUDIT.md "Second pass" has each fix and why):
+- **The perimeter:**
+  - the toss and sweep aim at the edge (`PERIMETER_AIM`)
+  - a double's helper gets a hand on his man before climbing (`CLIMB.touch`)
+  - the uncovered outermost blocker arcs for the force
+  - perimeter climbs work playside (`CLIMB_BACKSIDE`)
+- **Reads:**
+  - power read's key is read by depth (`KEY_UPFIELD`)
+  - its guard leads the keep through the C gap (`POA.keepInside`)
+  - a QB carrier presses his hole
+- **Reaction:** on a designed run, an unreacted defender holds his course (the rush used to chase the ball, so linemen's reaction and `KEY_FOOLED` never counted). A front player past his read is already on the ball.
+- **The edge:**
+  - he plays a kick-out at the line: a kicker counts from anywhere, he works no deeper than his landmark, and he brakes into it (`RUN_FIT.edgeSet`)
+  - the hinge takes the gap first, then the end (`HINGE_CHASE`)
+- **Assignments:** corners aren't climb targets, and backs don't double a climb target.
+- **Play data:** QB Power's back kicks out the end.
+- **Moved:**
+  - Toss 50–67% vs light boxes and Sky (was 13–37); Lead Toss and Strong I Toss alike.
+  - Outside Zone light 23–47% (was 27–43).
+  - Counters up (Counter GT 73–77% vs light boxes).
+  - Trap vs Cover 0 7.1 ypc (was 1.1).
+  - Wing Duo vs 2 Man 8.4 ypc (was 2.7).
+  - Power Read's keep now happens (it never did).
+- **Measured:**
+  - RUN ALL 5.2 (med 2.9).
+  - GAP −10 / 0 / +5 / +10 / +20: 7.0 / 5.9 / 3.7 / 2.7 / 1.7 (even is 0.4 over target; −20 11.2, was 16.3).
+  - 3rd and 1, Power 82 / 72.
+  - Stuffs 8–20% (OZ 32%).
+  - Pass, PA, POCKET and STUNT rows are byte-identical. ADAPT holds. `npm test` passes.
+
+**Run audit, third pass** (2026-11-13; RUNAUDIT.md "Third pass"): Outside Zone, Pistol Duo, QB Power, and what decides a run.
+- **Timing no longer decides a run.**
+  - A losing block used to be shed in about 1 s (the level dial), so every run reaching the line after 1.1 s lost (OZ, the counters, gun QB runs, the pistol).
+  - Now the shed is by the margin (`RUN_CONTROL` base 0.5, perPower 0.25, maxWear 3.5), and the level comes from contact (`CONTACT` breakBase 0.06, hold 0.85, drag 1.0), with `RUN_GAP.k` 0.4.
+- **TEs and backs** carry a quarter of a defender's position edge (`RUN_GAP.pos`), receivers' stalks three quarters (`posWr`), linemen all of it (ESPN run-block win rates). The reach penalty is 2.
+- **The pistol:** the defense reads a handoff no sooner than an under-center one (`RUN_TELL`).
+- **Gap rules:**
+  - backside down blocks mirror
+  - doubles go toward the center with an adjacent neighbour (`COMBO_REACH`), and the nearer man climbs (`COMBO_SWAP`)
+  - inline TEs cut off
+- **QB Power:** its hole is outside the down block. It stays a short-yardage play against a normal box, which is how it's used (Bear and goal-line loads stop it).
+- **Moved:**
+  - Outside Zone: 48% vs light boxes, 28% heavy, 21% blitz; stuffs 22%; backside block worth 1.4 yd.
+  - Pistol Duo: 35 / 29 / 21%, a few points under Duo's 44.
+  - The pistol plays are on par with their under-center twins.
+  - Every ablation is worth something.
+- **Measured:**
+  - RUN ALL 5.3.
+  - GAP −10 to +20 all in target (7.7 / 7.2 / 4.7 / 3.2 / 2.7 / 1.6).
+  - Pass, PA, POCKET and STUNT rows are byte-identical. ADAPT holds. `npm test` passes.
+
+**Run audit, fourth pass** (2026-11-13; RUNAUDIT.md "Fourth pass"): the counters, Power Read, the sneak.
+- **A receiver's stalk is a mirror** (`RUN_CONTROL.stalkWear` 1.6). Before, a corner's speed counted as shed power, so every stalk was gone 0.4 s after contact. A slot on the nickel decided every counter to his side.
+- **Run-block talent is measured from the full position edge.** The share that counts is now `RUN_GAP.pos` 0.5 and `posWr` 0.85, the same edges at template ratings. Before, most of the removed edge came back through the tanh, and a bad TE or receiver blocker was barely worse than an average one.
+- **Power Read:**
+  - The key widening with the sweep is the keep (`KEY_UPFIELD.widen`).
+  - A puller never blocks the read key (`formEngagements`).
+  - The line blocks the keep's C gap, not the sweep's spot 9 yd out (`lineHole`). Before, the center's back block missed against weaker defenses, and the play did worse against a 10-point worse defense than at even.
+  - Retagged: beats lightBox; stopped by heavyBox and blitz.
+- **The sneak is a wedge** (`assignRunBlocks`): its doubles stay on, nobody climbs.
+- **Moved** (light / heavy / blitz success):
+  - Trey Counter: 34 → 40%.
+  - Split Counter: 16 → 29%. Still the weakest counter, by structure: the H kicks, the tackle is alone on the 3-technique, and the nickel is to its side.
+  - Power Read: 40 / 33 / 7 (was 21 / 24 / 34, inverted).
+  - QB Power: 35 / 13 / 9.
+  - Empty QB Draw: 59 / 36 / 75.
+  - Goal-line sneak, 3rd and 1: 80% (was 60); Bear 85%.
+- **Measured:**
+  - RUN ALL 5.4 / 5.4.
+  - GAP −10 8.6 (over 8; the full-edge fix), +5 4.0, +10 2.7, +20 1.6.
+  - Stuffs 11–25%. ABLATE: IZ −6.5, Counter −2.5, Duo −2.1, OZ −0.7.
+  - PASS, PA, POCKET and STUNT rows are byte-identical. THROW rows reroll (blocks after the catch are stalks) with no shift.
+  - `npm test` passes.
+
 **Next:**
-1. The perimeter: the toss's aiming point (its hole is the drawn spot 12.5 yd out) and the reach on the end (Outside Zone, the tosses, QB Counter).
-2. Split Counter, Power Read against man, Duo variants against 2 Man.
-3. QB Power in short yardage (lead or kick: play data); the goal-line sneak.
-4. Re-baseline PROGRESS's balance section.
-5. The ML defense.
+1. Split Counter's design (H crossing to the one-receiver side?), the zone reads tagged "man", the −10 GAP row, OZ's backside cutoff.
+2. Re-baseline PROGRESS's balance section.
+3. The ML defense.
 
 Not played by hand yet: the auto-handoff, pressing and contact (the user's runner gets the drag too).
 

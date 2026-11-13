@@ -886,7 +886,9 @@ const LEGACY_PLAYS: PlayDef[] = [
     id: 'power-read', name: 'Power Read', kind: 'run', formation: GUN_DOUBLES,
     strong: 'arc', backs: { RB: 'sweep' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
     read: 'zoneRead', key: 'play', keep: 'inside', flip: 'field', drop: 0.5,
-    tags: tags('read', 'power-read', 'man'),
+    // A numbers play: the end is left unblocked to gain a hat in a light box. The extra unblocked rusher of a blitz, or a
+    // loaded box, beats it (the man looks it once claimed include Cover 0 and Bear).
+    tags: tags('read', 'power-read', 'lightBox'),
     tip: 'Read the playside end. He widens with the sweep? Keep it inside.',
   },
   {
@@ -898,10 +900,13 @@ const LEGACY_PLAYS: PlayDef[] = [
   },
   {
     id: 'qb-power', name: 'QB Power', kind: 'run', formation: GUN_TRIPS,
-    backs: { RB: 'qbLead' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
-    read: 'none', qbRun: true, qbPath: [1, 3.2], short: true, flip: 'field', drop: 0.3,
+    // Gun QB power: the back kicks out the end man, the backside guard wraps up on the playside backer, and the QB hits
+    // the C gap outside the down block. The QB carrying makes the back an extra hat: short yardage against a normal box.
+    // A Bear (the guards and center covered, nobody pulls clean) or a 9-man goal-line front with three wideouts out stops it.
+    backs: { RB: 'kickOut' }, block: 'run', scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'none', qbRun: true, qbPath: [1, 4], short: true, flip: 'field', drop: 0.3,
     tags: tags('qbRun', 'qb-power', 'man'),
-    tip: 'QB keeps it behind the back and the pulling guard. Goal-line hammer.',
+    tip: 'Back kicks the end, guard wraps. QB follows. Short-yardage hammer.',
   },
   {
     id: 'qb-sneak', name: 'QB Sneak', kind: 'run', formation: SINGLEBACK,
