@@ -73,6 +73,8 @@ export const CONCEPTS = {
   arrow: { name: 'Arrow', routes: { 2: 'arrow' } },
   // Screen: the #2 (TE) slips out behind the line
   slip: { name: 'Slip', routes: { 2: 'slip' } },
+  // Batch 7: the Air Raid's Y-Corner from trips: #1 clears, #2 arrows to the flat, #3 (Y) runs the corner over it.
+  'y-corner': { name: 'Y-Corner', routes: { 1: 'go', 2: 'arrow', 3: 'corner' } },
   // Backside solo tags
   fade: { name: 'Fade', routes: { 1: 'fade' } },
   go: { name: 'Go', routes: { 1: 'go' } },

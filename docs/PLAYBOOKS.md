@@ -14,14 +14,14 @@ How plays are built (formations, concepts, reads, blocking) is in [PLAYBOOK.md](
 | Air Raid | 13 |
 | Power | 1 |
 
-Batch 1 builds the Spread RPO and Pro books (72 programs), and the rest run the legacy book until batch 2. The Spread RPO book has 66 plays and the Pro book 57.
+Every style has its own book. Batch 1 (batch 6 in `plays.ts`) built the Spread RPO (66 plays) and Pro (57) books; batch 2 (`BATCH_7`) built the Air Raid (56), Spread Option (59) and Power (55) books.
 
 ## The library and the books
-**The library (`PLAYBOOK`, `src/data/plays.ts`)** holds every play. `LEGACY` is the original 62; batch 6 adds 36 for the Spread RPO and Pro books.
+**The library (`PLAYBOOK`, `src/data/plays.ts`)** holds every play, 121 in all. `LEGACY` is the original 62; batch 6 adds 36 for the Spread RPO and Pro books, and batch 7 adds 23 for the Air Raid, Spread Option and Power books.
 
-**Style books (`STYLES` in `src/data/offStyles.ts`):** each built style lists its play ids, so a whole book reads in one place.
-- A style without a built book (`book: null`) runs `LEGACY` until its batch is built. In batch 1 that's Air Raid, Spread Option and Power.
+**Style books (`STYLES` in `src/data/offStyles.ts`):** each style lists its play ids, so a whole book reads in one place.
 - `styleBook(style)` returns a style's book.
+- Every play in the library, legacy included, is in at least one book (tested), so nothing is dead weight.
 
 **An OC's book, `ocBook(coach)`:** his style's book plus 2–3 signature plays from a nearby style's book (`near`, `OC_STYLE.sigMin`/`sigMax`).
 - The signature plays are drawn from his id, so no two OCs of a style have quite the same book.
@@ -103,11 +103,11 @@ FBS-wide charting of formations and concepts isn't public. So a style is defined
 
 | Style | Pass share | Personnel (book share) | Core | Built |
 | --- | --- | --- | --- | --- |
-| Air Raid | 0.62 | 10/11 | Mesh, Four Verts, Double Hitch, Shallow, Y-Stick, Y-Cross, Y-Corner, screens, IZ and the draw | batch 2 |
+| Air Raid | 0.62 | 11 ~77%, 10 ~23% | Mesh, Four Verts, Double Hitch, Shallow, Y-Stick, Y-Cross, Y-Corner, screens, IZ and the draw | **batch 2** |
 | Spread RPO | 0.54 | 11 ~90%, 10 and 12 ~5% each | IZ, Duo and Counter with RPO tags (bubble, arrow, glance, stick, slant, pop, fade) from Doubles, Trips, Trey and Wing; quick game; Smash, Dagger, Snag from a Bunch | **batch 1** |
-| Spread Option | 0.54 (0.30 for `option` programs) | 11, 20 | zone read, power read, QB counter and power, speed option, RPOs, play action off the read | batch 2 |
+| Spread Option | 0.54 (0.30 for `option` programs) | 11 ~88%, 20 ~8%, 10 ~3% | zone read, power read, QB counter and power, speed option, RPOs, play action off the read | **batch 2** |
 | Pro Style | 0.50 | 11 ~53%, 12 ~26%, 21 ~16%, 22 ~5% | wide zone and stretch under center, boots and the naked keeper, the Y-leak, PA dig and deep over, Duo, Counter and Power from the I, toss, quick game under center | **batch 1** |
-| Power | 0.40 | 21, 12, 22 heavy | Iso, Power O, Counter, Lead Toss, play action from the I, max protection, the goal line | batch 2 |
+| Power | 0.40 | 11 ~51%, 21 ~22%, 12 ~18%, 22 ~9% | Iso, Power O, Counter, Duo, Lead Toss, play action from the I, max protection, the goal line | **batch 2** |
 
 **Sources:**
 - The Air Raid core: Mumme and Leach. The ~7-concept core is widely described, and the book is small and repped a lot ([Queer Football Breakdowns](https://queerfootballbreakdowns.substack.com/p/what-is-the-air-raid-in-honor-of), [FootballScoop](https://footballscoop.com/news/for-every-play-mike-leach-adds-to-his-playbook-he-takes-one-away)).
@@ -119,7 +119,13 @@ FBS-wide charting of formations and concepts isn't public. So a style is defined
 **What's approximate:**
 - Personnel shares are shares of the book, not of snaps. The `calls` weights set how often a family gets called in replays.
 - Route shapes for fade, whip, arrow, out-and-up, slip and leak come from coaching texts. The NFL tracking sample in `analysis/` has none of them.
-- There's no crack block or option route yet. A crack toss and Y-option wait on those mechanics.
+- There's no crack block or option route yet. A crack toss and Y-option wait on those mechanics, and so do the midline read and the triple option.
+- The speed option runs only from the pistol. From the gun the back starts level with the QB on the far side, crosses his face and takes the ball at the mesh, with no pitch relationship (7–8% success in the film). A gun speed option needs the back aligned to the option side.
+
+## What each batch 2 book is
+- **Air Raid:** a small dropback book from 2x2 and 3x1. It's the spread book's 25 passes plus its own four-wide sets: Gun Spread (10, 2x2) and Gun Trips 4-Wide (10, 3x1). It has few runs (IZ, Zone Read, Split Zone, Counter, the draw, QB runs), a light RPO menu, and no TE or under-center sets except the sneak. Its own plays are Spread Mesh, Y-Cross, Smash, Mills, Texas, Quick Outs and Bubble, plus Trips Y-Corner (the one new concept), Y-Stick and Sail.
+- **Spread Option:** the read game. Zone read from the gun, the pistol, the trey and the wing; Power Read, the speed option, QB Counter, QB Power and the QB draw; and the RPOs. Its dropback menu is thinner than the Spread RPO's (no Mills, Y-Cross, Texas, Snag, Go Out), and it has no 12 personnel. Its own plays come from Gun Split (20: the RB weak, the H strong): Split Zone Read and Split Zone Lead (the H leads), Split Counter (the H kicks out, the guard leads), Split Bubble and Split Post Wheel (the H wheels). Also Pistol, Trey and Wing Zone Read (the wing's slice skips the key and blocks the next man out, the bluff).
+- **Power:** downhill from the I. The pro book's gap runs, play action from the I and max protection, without its wide zone, boots and naked game. Plus Counter GT, Trey Duo and Trey Counter from the gun. Its own plays come from Weak I (21) and I-Form Wing (22): Weak I Duo, Weak I PA Cross, I-Form Smash, Wing Duo and Wing PA Cross.
 
 ## Balancing: where a play should work, and where it shouldn't
 A play is balanced when it works against the looks it's built to beat and fails against the ones that stop it. Its average says little. A play that's good against everything is a cheat, and the learning defense will have nothing to read. A play that's mediocre against everything is filler. The tools, in the order to use them:
@@ -143,6 +149,12 @@ A play is balanced when it works against the looks it's built to beat and fails 
 - **Compare like with like.** Short-yardage plays (3rd and 1) are judged against each other, not against 1st-and-10 runs. A stop look is judged on its plain form: "loses to man" is 2 Man and Cover 1, not Cover 0, where nobody's deep and every route is open.
 - **Mind the noise.** A film cell is about ±6 points at 80 snaps. The run ablations need 150+ snaps a call: at 60, Power's hinge read −1.3 yd a carry; at 150 the same code read −0.4.
 - **Runs need their timing.** A puller takes about 1.1–1.3 s to reach the hole. A back's path has to arrive after him (the counter step), or the back outruns his blocks and the backer he was meant to meet makes the tackle.
+- **Reuse, don't multiply** (batch 2). A play on a mechanic with an open bias goes into a new book as its existing copy, not as a new variant, so the fix lands on one row. The biased mechanics: the deep ball, PA and boots against two-high, the draw, Iso/Power/Heavy Power, Trap, Power Read and QB Power. New plays are known concepts in new formations, so each new row has a sibling to read against.
+- **A new formation can expose a mechanic the old ones hid.** Batch 2 pulled six plays before shipping (see PROGRESS.md):
+  - two gun speed options, which have no pitch relationship
+  - Weak I Stick: the under-center quick game's sacks, the same disease as Ace Y-Stick
+  - three runs over 9 ypc: Spread IZ against the dime's five-man box, Weak I Counter off the offset FB's kick angle, and Wing Counter's extra hats in 22
+- **Under center, the back's path has to reach the mesh.** `izDeep` from I-Form depth (−7) passes the QB 2 yd wide and never hands off. The I's downhill runs use `iso`. Trace every new back alignment once.
 - **The tags can be wrong too.** Play action wasn't stopped by the blitz in our film, and the literature agrees: PA is beaten by two-high safeties who don't bite. Check the source before tuning the sim to match a tag.
 - **Known biases to read through** (open, PROGRESS.md):
   - The film QB's deep ball is too good (go and seam caught 55–66% against an NFL 33%). Shots and dropbacks flag at 45–50% "against every call" because of it.
@@ -153,7 +165,8 @@ A play is balanced when it works against the looks it's built to beat and fails 
 ## Adding a batch
 1. Add formations, routes and concepts as data (`plays.ts`, `concepts.ts`). Keep personnel fixed per formation.
 2. Add plays to `BATCH_*` in `plays.ts` with tags. Each play's id is its own and stays stable.
-3. Put each play in at least one style book (`offStyles.ts`), and flip a style's `book` from `null` when it's built.
+3. Put each play in at least one style book (`offStyles.ts`). The test fails on a play no book calls.
 4. Run `npm test`: the validation test holds the tags and the book rules.
-5. Run `npm run film` and read SITUATIONS first, then FLAGS, `TAG MISS`/`STOP MISS`, BOOKS and ROUTES, with `FILM_EXPLAIN` on anything flagged (and `npm run runfit` / `npm run trace` for runs). A new concept gets its `STOPS` entry. Save a baseline (`cp film.json film.base.json`) and diff later runs with `FILM_BASE=film.base.json`.
-6. Run `npm run balance`. The aggregate rows run over `LEGACY` and must not move. New plays get their own per-play rows, and each built book gets BOOK rows.
+5. Trace each new formation's runs once (`npm run trace`): a missed handoff or a kick on the wrong man shows up on the JOBS line or as a `none` ending. Runfit takes new runs by name (`RUNFIT_ONLY=id,...`).
+6. Run `npm run film` and read SITUATIONS first, then FLAGS, `TAG MISS`/`STOP MISS`, BOOKS and ROUTES, with `FILM_EXPLAIN` on anything flagged (and `npm run runfit` / `npm run trace` for runs). A new concept gets its `STOPS` entry. Save a baseline (`cp film.json film.base.json`) and diff later runs with `FILM_BASE=film.base.json`.
+7. Run `npm run balance`. The aggregate rows run over `LEGACY` and must not move. New plays get their own per-play rows, and each built book gets BOOK rows.

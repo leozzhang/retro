@@ -257,6 +257,7 @@ type Chip = string;
 const PACKAGES: { pers: string; label: string }[] = [
   { pers: '10', label: '10 4-WIDE' },
   { pers: '11', label: '11 3-WIDE' },
+  { pers: '20', label: '20 SPLIT' },
   { pers: '12', label: '12 2-TE' },
   { pers: '21', label: '21 2-BACK' },
   { pers: '22', label: '22 HEAVY' },

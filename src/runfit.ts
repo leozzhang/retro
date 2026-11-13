@@ -109,7 +109,9 @@ export function runfitReport(reps = RUNFIT.reps, seed = RUNFIT.seed, only?: stri
     `RUNFIT: who stops each run, ${reps} snaps a call against ${callIds.join(', ')} (the reference matchup, 1st and 10).`,
     'Tackled by: FREE nobody ever blocked him; SHED he got off a block; BLOCKED still on one (an arm tackle); BACK he lined up on the far side of the play (the chase); DOWN past 5 yd. Targets in RUNGAME.md.',
   ];
-  for (const id of RUNFIT.plays) {
+  // RUNFIT_ONLY can also name a run outside the fixed list (a new play being balanced); the default report is unchanged.
+  const extra = only?.filter((id) => !RUNFIT.plays.includes(id) && PLAYBOOK.find((p) => p.id === id)?.kind === 'run') ?? [];
+  for (const id of [...RUNFIT.plays, ...extra]) {
     if (only && !only.includes(id)) continue;
     const s = runStats(book(id), calls, reps, seed);
     out.push(`RUNFIT ${book(id).name.padEnd(17)}| ${line(s)} | free ${pct(s.how.free)} shed ${pct(s.how.shed)} blocked ${pct(s.how.blocked)} back ${pct(s.how.backside)} down ${pct(s.how.downfield)} | ${topTacklers(s)}`);

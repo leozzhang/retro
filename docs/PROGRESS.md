@@ -2,6 +2,59 @@
 
 _Last updated: 2026-11-12_
 
+## Done: the Air Raid, Spread Option and Power books (batch 7, 2026-11-12)
+All five OC styles now have their own book; none runs the legacy 62. PLAYBOOKS.md ("What each batch 2 book is") has each book, and FILM.md the film numbers.
+
+**Built data only, on mechanics the film room already measures.**
+- **New formations:**
+  - Gun Spread (10, 2x2)
+  - Gun Trips 4-Wide (10, 3x1)
+  - Gun Split (20: the RB weak, the H strong)
+  - Weak I (21)
+  - I-Form Wing (22)
+- **One new concept:** `y-corner`, with `STOPS: ['quarters']`.
+- **23 new plays,** 121 in the library.
+- **Reuse, don't multiply:** plays on a biased mechanic (the deep ball, PA against two-high, the draw, Iso/Power, Trap, Power Read, QB Power) go in as their existing copies, not new variants.
+
+| Book | Plays | Personnel | What it is |
+| --- | --- | --- | --- |
+| Air Raid | 56 | 11 43, 10 13 | 22 dropbacks, 10 quick, 9 runs: the spread passes plus the four-wide sets |
+| Spread Option | 59 | 11 52, 20 5, 10 2 | 7 reads, 10 RPOs, 4 QB runs, a thin dropback menu; split backs |
+| Power | 55 | 11 28, 21 12, 12 10, 22 5 | 15 gap runs, 8 PA, max protection; no wide zone or boots |
+
+**Also:**
+- the call screen's `20 SPLIT` chip
+- `RUNFIT_ONLY` takes runs outside runfit's fixed list
+- each BOOK block in the balance report has its own RNG stream (from the style's id), so adding a book never moves another's rows
+- the playbook test now requires every play, legacy included, to be in some book. It found the legacy Speed Option in no book; it's in Spread Option's now.
+
+**Measured:**
+- **Film:** 23 new rows, no existing cell moved, and the FLAGS list is unchanged. Book means: Air Raid 56%, Spread Option 53%, Power 54% (Spread RPO and Pro 54%). No BOOK HOLE.
+- **Balance:** every old row is byte-identical except the BOOK rows (which moved once, to the new per-book streams) and the added-plays block's RUN ALL, which now includes the new runs.
+- **New BOOK rows:** Air Raid, Spread Option and Power runs at 7.0–7.3 ypc against 2 Man and 5.0–5.5 against Cover 0, beside Spread RPO's 7.4 and 5.7.
+- **Season report:** identical apart from timing.
+
+**Pulled before shipping (flags, not tuned; each is a mechanic question):**
+- **The gun speed option** (Split and Trey: 7–8% success). From the gun the back starts level with the QB on the far side, crosses his face and takes the ball at the mesh: there's no pitch relationship. It needs the back aligned to the option side. The pistol's Speed Option is unaffected.
+- **Weak I Stick** (19%): the under-center quick game gives 22–82% sacks on a 1.2 s throw, and the FB's flat is caught 43% at 4.4 yd of separation. Ace Y-Stick (32%) and Singleback Quick (28%) have the same disease.
+- **Spread Inside Zone:** 9.5 ypc and 31% 10+ against the dime's five-man box (IZ 5.7). Does the dime need a run answer, or a lighter call box against 10 personnel?
+- **Weak I Counter:** 9.3 ypc. It has the same JOBS and defensive alignment as Strong I Power (6.1); the only difference is the FB's kick from the weak offset. The kick angle or its timing is worth a trace.
+- **Wing Counter:** 9.7 ypc (Ace Wing Counter 5.0). It gets the extra hats of 22 personnel against a 7-man box, the same bias as Heavy Power's 89%.
+
+**Fixed while building:** under center from I-Form depth, `izDeep` never reaches the mesh, so Weak I Duo and Wing Duo use `iso`.
+
+**Inherited in the film (read through):**
+- the new zone reads are FLAT like legacy Zone Read (better against a heavy box than against man)
+- Weak I PA Cross is FLAT against quarters like the other PA plays
+- I-Form Smash's STOP MISS quarters matches Trey Smash's
+- the bubbles' Cover 2 STOP MISS
+- the Cover 3 out/hitch TAG MISS cluster (Spread Quick Outs, Trips Y-Corner)
+
+**Next:**
+- the deferred mechanics: the option route (Y-Option/Choice), the midline read and triple option (the 4 `option` programs), the crack toss, and the gun speed option's alignment
+- the five pulled plays, once their mechanics are answered
+- Not played by hand or checked in a browser yet: the Air Raid's 10 4-WIDE chip, Spread Option's 20 SPLIT, and the Power book's call screen.
+
 ## Done: bodies on the line, and blitzers who blitz a run (2026-11-12)
 Your report: on counters, backers locked onto the runner and sprinted through the line. That was right: players passed through each other, and the only cost was a 15% slowdown, after the handoff.
 - **`BODY`** (`game/playState.ts`, RUNGAME.md "Bodies"): on a designed run, a free defender is pushed back out of any blocker or blocked pair within 0.6 yd. He scrapes along it at up to 75% of his speed. It's off on passes.

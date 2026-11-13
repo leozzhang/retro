@@ -75,7 +75,7 @@ It has two jobs:
 - `FILM_REPS` sets the snaps a cell
 - `FILM_OUT` and `FILM_JSON` set the output paths
 
-The whole library (98 plays, 111 rows) takes about 2 minutes.
+The whole library (121 plays, 134 rows) takes about 3 minutes.
 
 ## Batch 6, with the reading QB (2026-11-11)
 **Book means:** Spread RPO 54%, Pro Style 58%, Legacy 56%.
@@ -109,3 +109,37 @@ The whole library (98 plays, 111 rows) takes about 2 minutes.
 - **Weak plays:** Strong I Toss (14%) and Counter GT (18%).
 
 The first run's numbers (2026-11-11, the most-open QB) are kept in git history.
+
+## Batch 7: the Air Raid, Spread Option and Power books (2026-11-12)
+**The method:** known concepts in new formations, so each new row reads against a sibling (Spread Smash against Smash, Pistol Zone Read against Zone Read). Plays on a mechanic with an open bias were reused, not copied (PLAYBOOKS.md, "Balancing").
+
+**Against the base table:** 23 new rows, and no existing cell moved. The FLAGS list is the same seven plays as before; no new play beats every call or none.
+
+**Book means:**
+
+| Book | Mean |
+| --- | --- |
+| Air Raid | 56% |
+| Spread Option | 53% |
+| Power | 54% |
+| Spread RPO | 54% |
+| Pro Style | 54% |
+| Legacy | 54% |
+
+There's no BOOK HOLE. The only BOOK FAMILY flag is the quick game, the one the legacy and Spread RPO books already had.
+
+**Pulled before shipping** (a new formation exposed a mechanic; PROGRESS.md has the numbers):
+- the two gun speed options: no pitch relationship
+- Weak I Stick: the under-center quick game's sacks
+- Spread Inside Zone, Weak I Counter and Wing Counter: over 9 ypc in runfit
+
+**Fixed while building:** under center from I-Form depth, `izDeep` passes the QB 2 yd wide and never hands off. The trace showed `none` endings. Weak I Duo and Wing Duo use `iso`.
+
+**Read through, inherited from a sibling:**
+- **The zone reads are FLAT:** better against a heavy box than against man. Legacy Zone Read is FLAT the same way.
+- **Weak I PA Cross:** PA against quarters.
+- **I-Form Smash STOP MISS quarters:** Trey Smash has the same miss, a Smash where #2 is the TE.
+- **Spread Bubble:** the Cover 2 underneath STOP MISS shared by every screen.
+- **Spread Quick Outs and Trips Y-Corner TAG MISS cover3:** the out-and-hitch-against-Cover-3 cluster.
+- **Split Post Wheel** (70%, 27.5 ypp) rides the film QB's deep ball, like Post Wheel (67%).
+

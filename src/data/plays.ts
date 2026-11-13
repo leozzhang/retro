@@ -404,9 +404,96 @@ export const HEAVY_I: Formation = {
   },
 };
 
+// Batch 7 formations (docs/PLAYBOOKS.md): the Air Raid's four-wide sets, the Spread Option's split backs,
+// and the Power book's Weak I and wing.
+
+/** 10, 2x2 four wide: WR4 in the TE slot as the right slot, the back beside the QB. */
+export const GUN_SPREAD: Formation = {
+  name: 'Gun Spread',
+  strong: 'right',
+  sub: { TE: 'WR4' },
+  align: {
+    ...OL_ALIGN,
+    QB: { dx: -5, y: 0, mode: 'rel' },
+    RB: { dx: -5, y: -1.6, mode: 'rel' },
+    X: { dx: -0.6, y: -WIDE, mode: 'split' },
+    SL: { dx: -1.5, y: -SLOT, mode: 'split' },
+    TE: { dx: -1.5, y: SLOT, mode: 'split' },
+    Z: { dx: -0.6, y: WIDE, mode: 'split' },
+  },
+};
+
+/** 10, 3x1 four wide: Z outside, the slot, and WR4 (the TE slot) innermost as #3. */
+export const GUN_TRIPS_4W: Formation = {
+  name: 'Gun Trips 4-Wide',
+  strong: 'right',
+  sub: { TE: 'WR4' },
+  align: {
+    ...OL_ALIGN,
+    QB: { dx: -5, y: 0, mode: 'rel' },
+    RB: { dx: -5, y: -1.6, mode: 'rel' },
+    X: { dx: -0.6, y: -WIDE, mode: 'split' },
+    TE: { dx: -1.5, y: 6, mode: 'split' },
+    SL: { dx: -1.5, y: 10.5, mode: 'split' },
+    Z: { dx: -0.6, y: WIDE, mode: 'split' },
+  },
+};
+
+/**
+ * 20, split backs in the gun: the RB on the weak side, the H (FB) on the strong side, so his lead, kick
+ * and pitch-lead paths (drawn to the strong side) go with the back's. Three receivers, WR4 in the slot.
+ */
+export const GUN_SPLIT: Formation = {
+  name: 'Gun Split',
+  strong: 'right',
+  sub: { SL: 'FB', TE: 'WR4' },
+  align: {
+    ...OL_ALIGN,
+    QB: { dx: -5, y: 0, mode: 'rel' },
+    RB: { dx: -5, y: -1.6, mode: 'rel' },
+    SL: { dx: -5, y: 1.6, mode: 'rel' },
+    X: { dx: -0.6, y: -WIDE, mode: 'split' },
+    TE: { dx: -1.5, y: SLOT, mode: 'split' },
+    Z: { dx: -0.6, y: WIDE, mode: 'split' },
+  },
+};
+
+/** 21, the fullback offset away from the TE. */
+export const WEAK_I: Formation = {
+  name: 'Weak I',
+  strong: 'right',
+  sub: { SL: 'FB' },
+  align: {
+    ...OL_ALIGN,
+    QB: { dx: -1.1, y: 0, mode: 'rel' },
+    SL: { dx: -4.2, y: -1.8, mode: 'rel' },
+    RB: { dx: -7, y: 0, mode: 'rel' },
+    X: { dx: -0.6, y: -WIDE, mode: 'split' },
+    TE: { dx: -0.8, y: 4.8, mode: 'rel' },
+    Z: { dx: -1.5, y: WIDE, mode: 'split' },
+  },
+};
+
+/** 22, the I with the TE inline and TE2 as a wing outside him; X is the one receiver. */
+export const HEAVY_WING: Formation = {
+  name: 'I-Form Wing',
+  strong: 'right',
+  sub: { SL: 'FB', Z: 'TE2' },
+  align: {
+    ...OL_ALIGN,
+    QB: { dx: -1.1, y: 0, mode: 'rel' },
+    SL: { dx: -4.2, y: 0, mode: 'rel' },
+    RB: { dx: -7, y: 0, mode: 'rel' },
+    X: { dx: -0.6, y: -WIDE, mode: 'split' },
+    TE: { dx: -0.8, y: 4.8, mode: 'rel' },
+    Z: { dx: -1.5, y: 6.5, mode: 'rel' },
+  },
+};
+
 export const FORMATIONS: Formation[] = [
   GUN_DOUBLES, GUN_TRIPS, PISTOL, SINGLEBACK, I_FORM, ACE, EMPTY,
   GUN_TREY, GUN_BUNCH, GUN_WING, PISTOL_ACE, ACE_WING, STRONG_I, HEAVY_I,
+  GUN_SPREAD, GUN_TRIPS_4W, GUN_SPLIT, WEAK_I, HEAVY_WING,
 ];
 
 /** Playbook tab. 'st' (special teams) holds kick calls from `data/specialTeams.ts` rather than plays. */
@@ -1193,9 +1280,178 @@ const BATCH_6: PlayDef[] = [
   },
 ];
 
+/**
+ * Batch 7 (docs/PLAYBOOKS.md): the Air Raid, Spread Option and Power books' own plays. Each is a concept
+ * the film room already measures, in a new formation or personnel group, so its row has a sibling to read
+ * against. Plays on a mechanic with a known bias (the deep ball, PA against two-high, the draw, Iso/Power,
+ * Trap, Power Read, QB Power) aren't copied here: the books reuse the existing ones.
+ */
+const BATCH_7: PlayDef[] = [
+  // ---------------------------------------------------------------- Air Raid
+  {
+    id: 'spread-mesh', name: 'Spread Mesh', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'mesh', weak: 'mesh', backs: { RB: 'swing' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 1.5,
+    tags: tags('dropback', 'mesh', 'man', 'cover1'),
+    tip: 'The slots drag under each other, corners over the top. Rubs man coverage.',
+  },
+  {
+    id: 'spread-y-cross', name: 'Spread Y-Cross', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'cross-go', weak: 'curl-flat', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tags: tags('dropback', 'y-cross', 'cover3', 'cover1'),
+    tip: 'Four wide: Y crosses at 12 under the Z go. Read it high to low.',
+  },
+  {
+    id: 'spread-smash', name: 'Spread Smash', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'smash', weak: 'smash', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2,
+    tags: tags('dropback', 'smash', 'cover2'),
+    tip: 'Hitch and corner both sides. Corner squats on the hitch? Throw over him.',
+  },
+  {
+    id: 'spread-mills', name: 'Spread Mills', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'mills', weak: 'double-slant', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tags: tags('dropback', 'mills', 'quarters', 'cover2'),
+    tip: 'Post over the dig. The safety jumps the dig? The post is behind him.',
+  },
+  {
+    id: 'spread-texas', name: 'Spread Texas', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'post-curl', weak: 'double-slant', backs: { RB: 'angle' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2,
+    tags: tags('dropback', 'texas', 'man', 'cover1'),
+    tip: 'The RB angles out, then back inside. The dime backer on him loses.',
+  },
+  {
+    id: 'spread-outs', name: 'Spread Quick Outs', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'double-out', weak: 'double-out', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 1,
+    tags: tags('quick', 'outs', 'cover3'),
+    tip: 'Four quick outs. Off coverage gives them; get out of bounds late.',
+  },
+  {
+    id: 'spread-bubble', name: 'Spread Bubble', kind: 'pass', formation: GUN_SPREAD,
+    strong: 'bubble', weak: 'go', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 0.5,
+    tags: tags('screen', 'bubble', 'heavyBox', 'cover3'),
+    tip: 'The slot bubbles behind Z. Throw it now if they are short outside.',
+  },
+  {
+    id: 'trips4-y-corner', name: 'Trips Y-Corner', kind: 'pass', formation: GUN_TRIPS_4W,
+    strong: 'y-corner', weak: 'hitch', backs: { RB: 'checkFlat' },
+    block: 'pass', read: 'none', flip: 'field', drop: 2,
+    tags: tags('dropback', 'y-corner', 'cover3', 'cover2'),
+    tip: 'Z clears, the slot arrows to the flat, Y runs the corner over it.',
+  },
+  {
+    id: 'trips4-stick', name: 'Trips Y-Stick', kind: 'pass', formation: GUN_TRIPS_4W,
+    strong: 'stick', weak: 'slant', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 1,
+    tags: tags('quick', 'stick', 'cover3', 'quarters'),
+    tip: 'Four wide stick: the flat defender takes the flat? Throw the stick.',
+  },
+  {
+    id: 'trips4-sail', name: 'Trips Sail', kind: 'pass', formation: GUN_TRIPS_4W,
+    strong: 'flood', weak: 'curl', backs: { RB: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 2.5,
+    tags: tags('dropback', 'flood', 'cover3'),
+    tip: 'Three levels to the field from four wide: go, sail, flat. Read the corner.',
+  },
+
+  // ---------------------------------------------------------------- Spread Option
+  {
+    id: 'split-zone-read', name: 'Split Zone Read', kind: 'run', formation: GUN_SPLIT,
+    backs: { RB: 'iz', SL: 'lead' }, block: 'run', read: 'zoneRead', flip: 'fixed', drop: 0.5,
+    tags: tags('read', 'zone-read', 'man'),
+    tip: 'The H leads the give. The end crashes? Keep it the other way.',
+  },
+  {
+    id: 'split-iz', name: 'Split Zone Lead', kind: 'run', formation: GUN_SPLIT,
+    backs: { RB: 'iz', SL: 'lead' }, block: 'run', read: 'handoff', flip: 'fixed', drop: 0.5,
+    tags: tags('insideZone', 'inside-zone', 'lightBox'),
+    tip: 'Inside zone with the H leading on the backer. Follow him into the B gap.',
+  },
+  {
+    id: 'split-counter', name: 'Split Counter', kind: 'run', formation: GUN_SPLIT,
+    backs: { RB: 'counter', SL: 'kickOut' }, block: 'run',
+    scheme: { run: 'gap', pulls: [{ who: 'LG', job: 'lead' }] },
+    read: 'handoff', flip: 'boundary', drop: 0.5,
+    tags: tags('gap', 'counter', 'lightBox'),
+    tip: 'Jab away; the H kicks out the end, the guard leads. Follow them.',
+  },
+  {
+    id: 'split-bubble', name: 'Split Bubble', kind: 'pass', formation: GUN_SPLIT,
+    strong: 'bubble', weak: 'go', backs: { RB: 'block', SL: 'block' },
+    block: 'pass', read: 'none', flip: 'field', drop: 0.5,
+    tags: tags('screen', 'bubble', 'heavyBox', 'cover3'),
+    tip: 'Two backs pull the box in; the slot bubbles outside. Throw it now.',
+  },
+  {
+    id: 'split-post-wheel', name: 'Split Post Wheel', kind: 'pass', formation: GUN_SPLIT,
+    strong: 'go-post', weak: 'go', backs: { RB: 'block', SL: 'wheel' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tags: tags('shot', 'post-wheel', 'man'),
+    tip: 'The H wheels up the sideline under the go and post. A backer loses.',
+  },
+  {
+    id: 'pistol-zone-read', name: 'Pistol Zone Read', kind: 'run', formation: PISTOL,
+    backs: { RB: 'izDeep' }, block: 'run', read: 'zoneRead', flip: 'fixed', drop: 0.8,
+    tags: tags('read', 'zone-read', 'man'),
+    tip: 'Downhill mesh from the pistol. R-click to give, or keep it off the end.',
+  },
+  {
+    id: 'trey-zone-read', name: 'Trey Zone Read', kind: 'run', formation: GUN_TREY,
+    backs: { RB: 'iz' }, block: 'run', read: 'zoneRead', flip: 'field', drop: 0.5,
+    tags: tags('read', 'zone-read', 'man'),
+    tip: 'Zone to the trey side, read the backside end. R-click to give.',
+  },
+  {
+    id: 'wing-zone-read', name: 'Wing Zone Read', kind: 'run', formation: GUN_WING,
+    strong: 'slice', backs: { RB: 'iz' }, block: 'run', read: 'zoneRead', flip: 'fixed', drop: 0.5,
+    tags: tags('read', 'zone-read', 'man'),
+    tip: 'The wing bluffs the end and blocks the next man. Keep it behind him.',
+  },
+
+  // ---------------------------------------------------------------- Power
+  {
+    id: 'weak-i-duo', name: 'Weak I Duo', kind: 'run', formation: WEAK_I,
+    backs: { RB: 'iso' }, block: 'run', scheme: { run: 'gap' }, read: 'handoff', flip: 'boundary', drop: 1.2,
+    tags: tags('gap', 'duo', 'lightBox'),
+    tip: 'Two double teams, the FB stays home on the backside. Read the MIKE.',
+  },
+  {
+    id: 'weak-i-pa-cross', name: 'Weak I PA Cross', kind: 'pa', formation: WEAK_I,
+    strong: 'post-cross', weak: 'go', backs: { SL: 'flat', RB: 'paFake' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 3,
+    tags: tags('pa', 'deep-cross', 'cover3', 'cover1'),
+    tip: 'Sell the power; the TE crosses deep under the Z post. FB in the flat.',
+  },
+  {
+    id: 'i-smash', name: 'I-Form Smash', kind: 'pass', formation: I_FORM,
+    strong: 'smash', weak: 'go', backs: { SL: 'flat', RB: 'block' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 2.5,
+    tags: tags('dropback', 'smash', 'cover2'),
+    tip: 'Base D, two backs: Z hitch, the TE corner over it, the FB in the flat.',
+  },
+  {
+    id: 'wing-duo', name: 'Wing Duo', kind: 'run', formation: HEAVY_WING,
+    backs: { RB: 'iso' }, block: 'run', scheme: { run: 'gap' }, read: 'handoff', flip: 'boundary', drop: 1.2,
+    tags: tags('gap', 'duo', 'lightBox'),
+    tip: 'Doubles at the point with the wing and the TE. Hit it downhill.',
+  },
+  {
+    id: 'wing-pa-cross', name: 'Wing PA Cross', kind: 'pa', formation: HEAVY_WING,
+    strong: 'cross-corner', weak: 'go', backs: { SL: 'flat', RB: 'paFake' },
+    block: 'pass', read: 'none', flip: 'fixed', drop: 3,
+    tags: tags('pa', 'deep-cross', 'cover3', 'cover1'),
+    tip: 'Heavy run look: the wing crosses deep, the TE runs the corner.',
+  },
+];
+
 export const LEGACY: readonly PlayDef[] = LEGACY_PLAYS;
 /** Every play: the library the style books draw from (`data/offStyles.ts`). */
-export const PLAYBOOK: PlayDef[] = [...LEGACY_PLAYS, ...BATCH_6];
+export const PLAYBOOK: PlayDef[] = [...LEGACY_PLAYS, ...BATCH_6, ...BATCH_7];
 
 export function playsOfKind(kind: PlayKind, book: readonly PlayDef[] = PLAYBOOK): PlayDef[] {
   return book.filter((p) => p.kind === kind);

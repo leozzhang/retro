@@ -96,14 +96,15 @@ describe('playbook tags', () => {
 });
 
 describe('style books', () => {
-  const built = OFF_STYLES.filter((s) => STYLES[s].book);
+  const built = OFF_STYLES;
 
-  it('every new play is in a style book, and every book id is a play', () => {
+  it('every play is in a style book, and every book id is a play', () => {
     const ids = new Set(PLAYBOOK.map((p) => p.id));
-    const inBook = new Set(built.flatMap((s) => STYLES[s].book!));
-    for (const s of built) for (const id of STYLES[s].book!) expect(ids.has(id), `${s}: ${id}`).toBe(true);
-    for (const p of PLAYBOOK.slice(LEGACY.length)) expect(inBook.has(p.id), p.id).toBe(true);
-    for (const s of built) expect(new Set(STYLES[s].book).size, s).toBe(STYLES[s].book!.length);
+    const inBook = new Set(built.flatMap((s) => STYLES[s].book));
+    for (const s of built) for (const id of STYLES[s].book) expect(ids.has(id), `${s}: ${id}`).toBe(true);
+    // The legacy plays too: nothing in the library is dead weight that no OC can call.
+    expect(PLAYBOOK.filter((p) => !inBook.has(p.id)).map((p) => p.id)).toEqual([]);
+    for (const s of built) expect(new Set(STYLES[s].book).size, s).toBe(STYLES[s].book.length);
   });
 
   for (const s of OFF_STYLES) {

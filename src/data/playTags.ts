@@ -38,7 +38,7 @@ export const PLAY_CONCEPTS = [
   'slant-flat', 'double-slant', 'double-hitch', 'stick', 'outs', 'spacing', 'fade-out', 'whip',
   // dropback
   'smash', 'mesh', 'dagger', 'curl-flat', 'drive', 'y-cross', 'mills', 'flood', 'dig-cross', 'corner-out',
-  'snag', 'go-out', 'texas',
+  'snag', 'go-out', 'texas', 'y-corner',
   // shots
   'four-verts', 'go-post', 'post-wheel', 'max-shot', 'out-and-up',
   // screens
@@ -88,6 +88,8 @@ export const STOPS: Record<PlayConcept, CoverTag[]> = {
   smash: ['quarters'], mesh: ['cover2'], dagger: ['cover2'], 'curl-flat': ['man'], drive: ['cover2'],
   'y-cross': ['cover2'], mills: ['cover3', 'cover1'], flood: ['man'], 'dig-cross': ['cover2'],
   'corner-out': ['quarters'], snag: ['man'], 'go-out': ['cover2'], texas: ['cover2'],
+  // Y-Corner high-lows the flat defender; the quarters safety on #3 carries the corner.
+  'y-corner': ['quarters'],
   // Shots: four deep defenders match the verticals.
   'four-verts': ['quarters'], 'go-post': ['quarters'], 'post-wheel': ['quarters'], 'max-shot': ['quarters'],
   'out-and-up': ['cover3'],

@@ -142,6 +142,13 @@ A play is **formation + a concept on each side + backfield jobs + read + blockin
 | Ace Wing | 12 | TE2 as a wing off the left tackle |
 | Strong I | 21 | the FB offset to the TE side |
 | Heavy I | 22 | FB in SL, TE2 in Z: one receiver |
+| Gun Spread | 10 | 2x2 four wide: WR4 in the TE slot as the right slot |
+| Gun Trips 4-Wide | 10 | 3x1 four wide, WR4 innermost as #3 |
+| Gun Split | 20 | split backs: the RB weak, the H (FB) strong, so his lead, kick and wheel go with the back; WR4 in the slot |
+| Weak I | 21 | the FB offset away from the TE |
+| I-Form Wing | 22 | the I with TE2 as a wing outside the TE: one receiver |
+
+Batch 7 adds formations and one concept (`y-corner`: #1 go, #2 arrow, #3 corner), no routes. A lead back's path (lead, kick-out, lead-wide) is drawn to the strong side wherever he lines up, which is why Gun Split puts the H on the strong side.
 
 New routes in batch 6: `fade`, `whip`, `arrow`, `outUp`, `slip` (a delayed slip screen; it's a screen route, so `screenTarget`), and `leak` (the boot's delayed Y-leak).
 

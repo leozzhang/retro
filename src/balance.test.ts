@@ -9,7 +9,7 @@ import { buildSquad, rosterFor, teamRatings } from './data/depth';
 import { kickDef, type KickDef } from './data/specialTeams';
 import { teamById } from './data/teams';
 import { FIELD_W, STEP } from './engine/constants';
-import { add, clamp, dist, len, mulberry32, norm, scale, sub, type Rng } from './engine/math';
+import { add, clamp, dist, hashString, len, mulberry32, norm, scale, sub, type Rng } from './engine/math';
 import type { KickPlay } from './game/kickPlay';
 import type { Play } from './game/playState';
 import { resolvePlay } from './game/resolvePlay';
@@ -360,10 +360,14 @@ function shortRows(plays: PlayDef[], rng: Rng): string[] {
   return rows;
 }
 
-/** Each built style book as a whole: its passes at a normal hold and its runs, against the core calls. */
-function bookRows(rng: Rng): string[] {
+/**
+ * Each style book as a whole: its passes at a normal hold and its runs, against the core calls. Each book
+ * has its own stream (from its style's id), so adding or changing one book never moves another's rows.
+ */
+function bookRows(): string[] {
   const rows: string[] = [];
-  for (const st of OFF_STYLES.filter((x) => STYLES[x].book)) {
+  for (const st of OFF_STYLES) {
+    const rng = mulberry32(hashString(`book:${st}`));
     const book = styleBook(st);
     const pass = book.filter((p) => p.kind === 'pass' || (p.kind === 'pa' && p.block === 'pass'));
     const runs = book.filter((p) => p.kind === 'run' && !p.short);
@@ -648,7 +652,7 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   if (addedPass.length) rows.push('', ...perPlayRows(addedPass, mulberry32(53)));
   if (addedRuns.length) rows.push('', ...runRows(addedRuns, mulberry32(59)));
   if (added.some((p) => p.short && picked(p))) rows.push('', ...shortRows(added.filter((p) => p.short && picked(p)), mulberry32(61)));
-  if (!only || only.includes('book')) rows.push('', ...bookRows(mulberry32(67)));
+  if (!only || only.includes('book')) rows.push('', ...bookRows());
   if (!only || only.includes('runfit')) rows.push('', ...runfitReport());
   if (!only || only.includes('gap')) rows.push('', ...gapRows(mulberry32(23)));
   if (!only || only.includes('route')) rows.push('', ...routeRows(mulberry32(17)));

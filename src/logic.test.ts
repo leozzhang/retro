@@ -723,7 +723,7 @@ describe('playbook', () => {
     }
     expect(offR.FB.role).toBe('RB');
     expect(offR.FB.r.rbk).toBeGreaterThan(offR.RB.r.rbk);
-    expect(FORMATIONS.map(personnelOf)).toEqual(['11', '11', '11', '11', '21', '12', '10', '11', '11', '11', '12', '12', '21', '22']);
+    expect(FORMATIONS.map(personnelOf)).toEqual(['11', '11', '11', '11', '21', '12', '10', '11', '11', '11', '12', '12', '21', '22', '10', '10', '20', '21', '22']);
     // In Empty the split-out back counts as the weak side's #2 receiver.
     expect(resolvePlay({ ...play('mesh'), formation: EMPTY, weak: 'slant-drag', backs: {} }, MID, false).routes.RB).toBe('drag');
     expect(GUN_TRIPS.sub).toBeUndefined();

@@ -2,7 +2,7 @@ import { clamp, hashString, mulberry32 } from '../engine/math';
 import { parseCoachId, type Coach } from './coaches';
 import type { OffScheme, QbStyle } from './fbs/profile';
 import { PROFILES } from './fbs/profiles';
-import { LEGACY, PLAYBOOK, type PlayDef } from './plays';
+import { PLAYBOOK, type PlayDef } from './plays';
 import type { Family } from './playTags';
 
 /**
@@ -15,8 +15,8 @@ export const OFF_STYLES: OffStyle[] = ['airRaid', 'spreadRpo', 'spreadOption', '
 
 export interface StyleDef {
   name: string;
-  /** The style book's play ids; `null` until its batch is built, and the style runs the legacy book. */
-  book: string[] | null;
+  /** The style book's play ids. */
+  book: string[];
   /** Share of the book's plays in each personnel group, [min, max] (tested; docs/PLAYBOOKS.md). */
   personnel: Record<string, [number, number]>;
   /** Base weight of each family when the CPU calls from this book (key-play replays, and the defense's prior later). */
@@ -49,10 +49,60 @@ const PRO_LEGACY = [
   'pa-post', 'pa-boot', 'pa-cross', 'pa-seams', 'i-boot', 'i-deep-cross', 'ace-boot', 'ace-max', 'counter-boot', 'rpo-pop',
 ];
 
+/**
+ * The Air Raid (batch 7): a small dropback book from 2x2 and 3x1, four wide or with the Y. The spread book's
+ * passes, a few runs (IZ, the draw, QB runs), a light RPO menu, and its own four-wide sets.
+ */
+const AIR_RAID = [
+  // the spread book's passes
+  'four-verts', 'slant-flat', 'smash', 'mesh', 'dagger', 'curl-flat', 'double-slant', 'double-hitch', 'stick',
+  'trips-outs', 'empty-spacing', 'smoke', 'tunnel-screen', 'rb-screen', 'drive', 'y-cross', 'mills', 'go-post',
+  'flood', 'empty-dig-cross', 'corner-out', 'post-wheel', 'snag', 'go-out', 'texas',
+  // runs
+  'inside-zone', 'zone-read', 'split-zone', 'counter', 'draw', 'qb-draw', 'qb-power', 'qb-sneak',
+  // RPOs and play action
+  'rpo-slant', 'rpo-glance', 'rpo-stick', 'rpo-smoke', 'pa-post', 'pa-cross',
+  // batch 6
+  'bunch-snag', 'bunch-whip', 'fade-out', 'out-up', 'trips-bubble', 'trey-smash', 'rpo-fade',
+  // its own: four wide
+  'spread-mesh', 'spread-y-cross', 'spread-smash', 'spread-mills', 'spread-texas', 'spread-outs',
+  'spread-bubble', 'trips4-y-corner', 'trips4-stick', 'trips4-sail',
+];
+
+/**
+ * The Spread Option (batch 7): the read game. Zone read from four looks, the speed option, the QB runs and
+ * the RPOs, with a thinner dropback menu than the Spread RPO's; split backs (20) for its own.
+ */
+const SPREAD_OPTION = [
+  ...SPREAD_LEGACY.filter((id) => !['mills', 'y-cross', 'empty-dig-cross', 'texas', 'go-out', 'snag', 'duo', 'rpo-pop'].includes(id)),
+  'speed-option',
+  // batch 6
+  'trey-iz', 'trey-counter', 'wing-split-zone', 'qb-counter', 'counter-glance', 'trey-glance', 'wing-pop',
+  'rpo-arrow', 'trips-bubble', 'trey-pa-dig', 'fade-out',
+  // its own
+  'split-zone-read', 'split-iz', 'split-counter', 'split-bubble', 'split-post-wheel', 'pistol-zone-read',
+  'trey-zone-read', 'wing-zone-read',
+];
+
+/**
+ * Power (batch 7): downhill from the I. The pro book's gap runs, play action from the I and max
+ * protection, without its wide zone and boots; the Weak I and the wing for its own.
+ */
+const POWER = [
+  ...PRO_LEGACY.filter((id) => !['outside-zone', 'split-zone', 'pa-boot', 'ace-boot', 'counter-boot', 'rpo-pop'].includes(id)),
+  'counter', 'trey-duo', 'trey-counter', 'y-leak',
+  // the pro book's batch 6
+  'pistol-duo', 'ace-counter', 'strong-i-power', 'strong-i-toss', 'heavy-iso', 'heavy-power', 'heavy-max',
+  'strong-i-cross', 'slip-screen', 'ace-pa-dig', 'ace-out-up', 'sb-quick', 'ace-hitches',
+  // its own
+  'weak-i-duo', 'weak-i-pa-cross', 'i-smash', 'wing-duo',
+  'wing-pa-cross',
+];
+
 export const STYLES: Record<OffStyle, StyleDef> = {
   airRaid: {
     name: 'Air Raid',
-    book: null,
+    book: AIR_RAID,
     personnel: { 10: [0.1, 0.5], 11: [0.5, 0.9] },
     calls: { quick: 3, dropback: 3, shot: 1.2, screen: 1.5, insideZone: 1.5, draw: 1, rpo: 0.8, pa: 0.4 },
     near: ['spreadRpo'],
@@ -71,8 +121,8 @@ export const STYLES: Record<OffStyle, StyleDef> = {
   },
   spreadOption: {
     name: 'Spread Option',
-    book: null,
-    personnel: { 11: [0.6, 0.95], 20: [0, 0.2] },
+    book: SPREAD_OPTION,
+    personnel: { 10: [0, 0.1], 11: [0.6, 0.95], 20: [0.03, 0.2] },
     calls: { read: 3, qbRun: 1.5, insideZone: 1.5, rpo: 2, gap: 1.2, quick: 1, dropback: 0.8, pa: 0.8, screen: 0.6, shot: 0.5 },
     near: ['spreadRpo'],
   },
@@ -90,7 +140,7 @@ export const STYLES: Record<OffStyle, StyleDef> = {
   },
   power: {
     name: 'Power',
-    book: null,
+    book: POWER,
     personnel: { 11: [0.25, 0.55], 12: [0.15, 0.4], 21: [0.15, 0.4], 22: [0.02, 0.15] },
     calls: { gap: 3, insideZone: 1, outsideZone: 1, perimeter: 1, pa: 2, boot: 1, shot: 1, quick: 0.8, dropback: 0.8, screen: 0.4 },
     near: ['pro'],
@@ -146,10 +196,20 @@ export const ocStyle = (c: Pick<Coach, 'id'>): OffStyle => ocIdentity(c).style;
 const byId = new Map(PLAYBOOK.map((p) => [p.id, p]));
 export const playById = (id: string): PlayDef | undefined => byId.get(id);
 
-/** A style's book: its own plays, or the legacy book until its batch is built. */
+const styleCache = new Map<OffStyle, readonly PlayDef[]>();
+
+/** A style's book, in its listed order. */
 export function styleBook(s: OffStyle): readonly PlayDef[] {
-  const ids = STYLES[s].book;
-  return ids ? ids.map((id) => byId.get(id)!) : LEGACY;
+  let out = styleCache.get(s);
+  if (!out) {
+    out = STYLES[s].book.map((id) => {
+      const p = byId.get(id);
+      if (!p) throw new Error(`styleBook: ${s} lists unknown play ${id}`);
+      return p;
+    });
+    styleCache.set(s, out);
+  }
+  return out;
 }
 
 /** Plays in a nearby style's book that his own book doesn't have: where his signature plays come from. */
