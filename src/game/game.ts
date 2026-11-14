@@ -843,7 +843,7 @@ export class Game {
     this.homeId = homeId;
     const userHome = this.homeId === user.id;
     this.showCtx = {
-      user, cpu, userSide: { team: user, roster: this.userRoster, home: userHome }, cpuSide: { team: cpu, roster: this.cpuRoster, home: !userHome },
+      user, cpu, userSide: { team: user, roster: this.userRoster, home: userHome, dc: this.dcOf(user) }, cpuSide: { team: cpu, roster: this.cpuRoster, home: !userHome, dc: this.dcOf(cpu) },
       userPass: (own ?? autoGamePlan(this.userSquad, this.cpuSquad, this.ocOf(this.user))).passShare, cpuPass: autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)).passShare,
       userOc: { book: ocBook(this.ocOf(user)), style: ocStyle(this.ocOf(user)) }, cpuOc: { book: ocBook(this.ocOf(cpu)), style: ocStyle(this.ocOf(cpu)) },
     };
@@ -878,7 +878,7 @@ export class Game {
     const s = this.season;
     this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
     this.book = ocBook(this.ocOf(user));
-    const dc = (this.seasonGame && s ? staffFor(s, cpu.id) : buildStaff(cpu)).DC;
+    const dc = this.dcOf(cpu);
     const qbSpd = this.userRoster.QB?.r.spd ?? 70;
     this.brain = newBrain({
       iq: this.seasonGame && s ? s.config.defIq ?? 'NORMAL' : this.exhibitionIq,
@@ -1650,6 +1650,12 @@ export class Game {
     return (this.seasonGame && s ? staffFor(s, t.id) : buildStaff(t)).OC;
   }
 
+  /** The DC in the chair: the season's staff in a season game, else the generated one. */
+  private dcOf(t: Team): Coach {
+    const s = this.season;
+    return (this.seasonGame && s ? staffFor(s, t.id) : buildStaff(t)).DC;
+  }
+
   /** The dynasty's book: the user's OC, his style, and the plays he brings. */
   private userBook(): BookOwner {
     const s = this.season!;
@@ -2259,7 +2265,7 @@ export class Game {
     this.applied = null;
     this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
     // The CPU defense's identity: its own call mix (more zero blitz on third and long if that's who it is) and press rates.
-    const ident = defIdentity(this.cpu);
+    const ident = defIdentity(this.cpu, this.dcOf(this.cpu));
     const toGo = this.drive.firstDownX - this.drive.los;
     // The clock and score too: prevent against a late score, a sell-out against the clock running out.
     const sit = this.userSituation();
@@ -2479,7 +2485,7 @@ export class Game {
     if (!this.checkDone && this.brain && this.callMode === 'normal' && !this.drive.try && this.defCall) {
       this.checkDone = true;
       const d = this.drive;
-      const c = checkFor(this.brain, defIdentity(this.cpu), def, this.defCall, d.down, d.firstDownX - d.los, OPP_GOAL - d.los, this.userSituation());
+      const c = checkFor(this.brain, defIdentity(this.cpu, this.dcOf(this.cpu)), def, this.defCall, d.down, d.firstDownX - d.los, OPP_GOAL - d.los, this.userSituation());
       if (c) {
         this.defCall = c;
         this.disguise = null; // a late check is played straight

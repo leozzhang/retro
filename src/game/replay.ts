@@ -1,3 +1,4 @@
+import type { Coach } from '../data/coaches';
 import { DEF_CALLS, pickDefCall, type DefCall, type DefTags } from '../data/defenses';
 import { defIdentity, preventLevel, situationMix, type DefIdentity } from '../data/identity';
 import { callWeight, type OffStyle } from '../data/offStyles';
@@ -42,6 +43,8 @@ export const REPLAY = {
 
 export interface ReplaySide {
   team: Team;
+  /** The DC in the chair (the season's staff), for the defense's identity; the generated one if missing. */
+  dc?: Coach;
   roster: Record<string, RosterPlayer>;
   /** The home team, which wears the home kit. */
   home?: boolean;
@@ -185,7 +188,7 @@ export function targetFor(k: KeyPlay, off: ReplaySide, def: ReplaySide, passShar
     finalHalf: d.half >= 1, lead, ...(d.half >= 2 ? { ot: 'first' as const } : {}),
   };
   return {
-    off, def, defIdent: defIdentity(def.team), yard: p.yard, down: p.down, toGo: p.toGo, gain: shownGain(p), want,
+    off, def, defIdent: defIdentity(def.team, def.dc), yard: p.yard, down: p.down, toGo: p.toGo, gain: shownGain(p), want,
     pass: cr?.pass, slot: cr?.who?.slot, by: want === 'int' ? cr?.by?.slot : undefined, sit, passShare, ...(oc ? { oc } : {}),
   };
 }

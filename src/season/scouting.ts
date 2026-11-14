@@ -500,7 +500,7 @@ export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<strin
   const oppId = game.home === u ? game.away : game.home;
   const user = squadFor(s, u);
   const opp = squadFor(s, oppId);
-  const id = defIdentity(teamById(oppId));
+  const id = defIdentity(teamById(oppId), staffFor(s, oppId).DC);
   const m = matchups(user, opp);
   const prof = opp.team.profile.offense;
   const oppOc = staffFor(s, oppId).OC;

@@ -28,6 +28,9 @@ DEFENSE.md, "The DC", "Keying a receiver", "Film study" and the measured section
 
 **Next:** play a dynasty game by hand (headlines, F1, the prep line after a week), then the open flags.
 
+**Fixed: the identity followed the generated DC** (`defIdentity`, data/identity.ts). It was built from `buildStaff(team).DC` and cached by team, so a DC brought in by the carousel or a hire never changed the defense's style or its disguise rate (his ADJUST). It now takes the DC in the chair (`staffFor(state, id).DC`; the generated one outside a season), cached by team, style and ADJUST. The callers: the live CPU defense and its check, every replay's defense (`ReplaySide.dc`), and the prep page. An outside hire still runs the program's style (COACHES.md); a DC who moves brings his own. Test: `scouting.test.ts`, "follows the DC in the chair".
+- **Open:** your own DC's ratings still do nothing on the field. CPU drives use `DRIVE_SIM`, and season sims read no coaches. It's decided separately.
+
 ## In progress: balancing the run game by intent (2026-11-12)
 The plan: measure what each run is drawn to do before tuning it, fix mechanics rather than plays, and build the ML defense after the run game is stable (it would learn the bugs). Each run should win in its `beats` situations and lose in its `stops` ones. What's missing is precision: who blocks whom, which gap the ball hits, what the back reads.
 

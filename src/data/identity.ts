@@ -1,6 +1,6 @@
 import { clamp, hashString } from '../engine/math';
 import { desperate, tempo, type Situation } from '../game/situation';
-import { buildStaff, dcAdjust } from './coaches';
+import { buildStaff, dcAdjust, type Coach } from './coaches';
 import { DEF_CALLS, rushers, type DefCall, type GameKind } from './defenses';
 import type { Team } from './teams';
 
@@ -158,12 +158,16 @@ function normalize(mix: Record<string, number>): Record<string, number> {
 
 const cache = new Map<string, DefIdentity>();
 
-export function defIdentity(team: Team): DefIdentity {
-  const hit = cache.get(team.id);
-  if (hit) return hit;
-  // The DC owns the style.
-  const dc = buildStaff(team).DC;
+/**
+ * The program's defense with `dc` in the chair: the DC in the season's staff (`staffFor(state, id).DC`), or
+ * the generated one. His style and his ADJUST (the disguise rate) are the identity's, so a new DC changes it.
+ */
+export function defIdentity(team: Team, dc: Coach = buildStaff(team).DC): DefIdentity {
   const style = dc.style ?? defStyle(team.id);
+  const adjust = dcAdjust(dc);
+  const key = `${team.id}|${style}|${adjust}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
   const S = IDENTITY.styles[style];
   const dl = team.profile.units.DL ?? 0;
   const cb = team.profile.units.CB ?? 0;
@@ -172,10 +176,10 @@ export function defIdentity(team: Team): DefIdentity {
   for (const [slot, p] of Object.entries(IDENTITY.basePress)) press[slot] = clamp(p * S.press + IDENTITY.cbPress * cb, 0.05, 0.7);
   const D = IDENTITY.disguise;
   const secondary = ((team.profile.units.CB ?? 0) + (team.profile.units.S ?? 0)) / 2;
-  const disguise = clamp(D.base + D.perAdjust * (dcAdjust(dc) - D.adjustMid) + D.perUnit * secondary, D.min, D.max);
+  const disguise = clamp(D.base + D.perAdjust * (adjust - D.adjustMid) + D.perUnit * secondary, D.min, D.max);
   const games = IDENTITY.games.rate * IDENTITY.games.style[style];
   const id: DefIdentity = { style, dials, mix: mixFor(dials), press, longBlitz: S.longBlitz, disguise, games };
-  cache.set(team.id, id);
+  cache.set(key, id);
   return id;
 }
 

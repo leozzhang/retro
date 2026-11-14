@@ -8,12 +8,28 @@ import { mulberry32 } from './engine/math';
 import { playTraits, scoutReport } from './season/scouting';
 import { advanceWeek, defaultConfig, newSeason, userGameThisWeek } from './season/season';
 import type { SeasonState } from './season/types';
-import { squadFor } from './season/world';
+import { squadFor, staffFor } from './season/world';
+import { buildStaff, dcAdjust } from './data/coaches';
 
 const book = (id: string) => PLAYBOOK.find((p) => p.id === id)!;
 const allText = (r: ReturnType<typeof scoutReport>) => r.sections.flatMap((s) => s.items.map((i) => i.text)).join('\n');
 
 describe('defensive identity', () => {
+  it('follows the DC in the chair: a DC hired from another program brings his style and his disguises', () => {
+    const s = newSeason(defaultConfig('georgia'), 5);
+    const home = teamById('alabama');
+    const own = buildStaff(home).DC;
+    // A DC from a program whose style differs (and so whose ADJUST does too).
+    const from = TEAMS.find((t) => buildStaff(t).DC.style !== own.style)!;
+    const hired = buildStaff(from).DC;
+    expect(defIdentity(home, staffFor(s, home.id).DC)).toEqual(defIdentity(home));
+    (s.teamState[home.id] ??= {}).staff = { DC: hired.id };
+    const now = defIdentity(home, staffFor(s, home.id).DC);
+    expect(now.style).toBe(hired.style);
+    expect(now.style).not.toBe(defIdentity(home).style);
+    if (dcAdjust(hired) !== dcAdjust(own)) expect(now.disguise).not.toBe(defIdentity(home).disguise);
+  });
+
   it('is deterministic, sums to 1 and keeps every call at or above its floor', () => {
     for (const t of TEAMS) {
       const id = defIdentity(t);
@@ -40,7 +56,7 @@ describe('defensive identity', () => {
   });
 
   it('aggressive defenses bring more pressure than soft ones, and more still on third and long', () => {
-    const of = (style: string) => TEAMS.map(defIdentity).filter((d) => d.style === style);
+    const of = (style: string) => TEAMS.map((t) => defIdentity(t)).filter((d) => d.style === style);
     const p = (ds: ReturnType<typeof of>) => ds.reduce((s, d) => s + pressureShare(d.mix), 0) / ds.length;
     expect(p(of('aggressive'))).toBeGreaterThan(p(of('balanced')));
     expect(p(of('balanced'))).toBeGreaterThan(p(of('soft')));
