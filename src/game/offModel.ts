@@ -6,6 +6,7 @@ import { FAMILIES, type Family } from '../data/playTags';
 import type { Ratings } from '../data/ratings';
 import { clamp, lerp } from '../engine/math';
 import { personnelOf } from './resolvePlay';
+import type { ThrowSeen } from './habits';
 
 /**
  * The learning defense's model of your offense (docs/DEFENSE.md, "The ML DC"): what you'll call and who
@@ -145,6 +146,12 @@ export interface OffModel {
   n: number;
   /** This game's snaps, undecayed: the film it leaves for next week's DC. */
   raw: FilmBook;
+  /** How you throw (`sigOf`): decayed counts overall and by look, and success over film by `sig|call` and `sig|cls`. */
+  sig: Counts;
+  sigLook: Record<string, Counts>;
+  sres: Record<string, Resid>;
+  /** The DC's knobs, for the residual of a residual (`learn`). */
+  prm: ModelParams;
 }
 
 /**
@@ -167,10 +174,16 @@ export interface FilmBook {
   /** How it went against film, by `fam|call` and `fam|cls`, and by target slot: which calls they beat. */
   res: Record<string, Resid>;
   tres: Record<string, Resid>;
+  /** How you throw (`sigOf`) and how it went by call; the latest throws, for the players (game/habits.ts). */
+  sig?: Counts;
+  sigLook?: Record<string, Counts>;
+  sres?: Record<string, Resid>;
+  throws?: ThrowSeen[];
 }
 
 export const emptyFilm = (): FilmBook => ({
   g: 0, fam: {}, exp: {}, sit: {}, look: {}, plays: {}, tgtAll: {}, tgtExp: {}, give: { n: 0, g: 0 }, who: {}, res: {}, tres: {},
+  sig: {}, sigLook: {}, sres: {}, throws: [],
 });
 
 /** The binned situation. */
@@ -251,6 +264,7 @@ export function newModel(o: { book: readonly PlayDef[]; style?: OffStyle; roster
   return {
     book: book.map((p) => p.id), prior, tgtPrior, fam: {}, exp: {}, sit: {}, look: {}, plays: {}, tgt: {}, tgtAll: {}, tgtExp: {},
     give: { n: 0, g: 0 }, res: {}, tres: {}, n: 0, raw: { ...emptyFilm(), g: 1, who: { ...(o.roster?.who ?? {}) } },
+    sig: {}, sigLook: {}, sres: {}, prm: o.prm,
   };
 }
 
@@ -266,7 +280,9 @@ function decayAll(m: OffModel, d: number): void {
   for (const c of Object.values(m.tgt)) dc(c);
   dc(m.tgtAll);
   dc(m.tgtExp);
-  for (const r of [...Object.values(m.res), ...Object.values(m.tres)]) {
+  dc(m.sig);
+  for (const c of Object.values(m.sigLook)) dc(c);
+  for (const r of [...Object.values(m.res), ...Object.values(m.tres), ...Object.values(m.sres)]) {
     r.n *= d;
     r.d *= d;
   }
@@ -293,6 +309,8 @@ export interface ModelSnap {
   yardsToGoal: number;
   handedOff?: boolean;
   target?: string | null;
+  /** The throw, as the players remember it (game/habits.ts): its signature (`sigOf`) is how you throw. */
+  throw?: Omit<ThrowSeen, 'w'> | null;
   /** Weight of this snap (1 a live snap; less for film). */
   w?: number;
   /** Decay before it (false for a film snap laid in at the start). */
@@ -330,6 +348,88 @@ export function learn(m: OffModel, s: ModelSnap): void {
     bump(m.tres, s.target, w);
     bump(m.raw.tres, s.target, 1);
   }
+  // How you threw it: the signature's count, and what's left of the result once the family's residual has
+  // had its share (so the same snap isn't counted twice).
+  if (s.throw) {
+    const g = sigOf(s.throw);
+    const look = lookKey(p);
+    for (const [to, x] of [[m, w], [m.raw, 1]] as const) {
+      to.sig![g] = (to.sig![g] ?? 0) + x;
+      const sl = (to.sigLook![look] ??= {});
+      sl[g] = (sl[g] ?? 0) + x;
+    }
+    const d2 = d - resid(m, m.prm, f, s.call);
+    for (const k of [`${g}|${s.call.id}`, `${g}|${clsOf(s.call)}`]) {
+      for (const [to, x] of [[m.sres, w], [m.raw.sres!, 1]] as const) {
+        const r = (to[k] ??= { n: 0, d: 0 });
+        r.n += x;
+        r.d += x * d2;
+      }
+    }
+  }
+}
+
+/**
+ * A throw's signature, how the DC buckets the way you throw: where the QB threw from (the pocket, or rolled
+ * to the formation's strong or weak side), how deep it came down (behind the line, under 8, under 15, deeper),
+ * inside or outside (12+ yd across from the ball), and the throw type: "RW|M|out|bullet".
+ */
+export function sigOf(t: Pick<ThrowSeen, 'roll' | 'dx' | 'dy' | 'kind'>): string {
+  const where = t.roll === 0 ? 'P' : t.roll > 0 ? 'RS' : 'RW';
+  const band = t.dx < 0 ? 'B' : t.dx < 8 ? 'S' : t.dx < 15 ? 'M' : 'D';
+  return `${where}|${band}|${Math.abs(t.dy) >= 12 ? 'out' : 'in'}|${t.kind}`;
+}
+
+/**
+ * The coaching prior on a throw signature against a call (success over film), before he's seen it work or
+ * fail: a rolling QB beats man and Cover 3 and is walled by a hard flat (Cover 2, Tampa 2, Sky's strong
+ * side); the quick out is the Cover 2 corner's; the deep ball wants two high (`HABIT_PRIOR`).
+ */
+export const HABIT_PRIOR = {
+  roll: { c2: -0.06, tampa2: -0.06, 'c3-sky': -0.03, c3: 0.03, man: 0.04 } as Record<string, number>,
+  quickOut: { c2: -0.06, tampa2: -0.04, man: 0.03 } as Record<string, number>,
+  deep: { twoHigh: -0.05, oneHigh: 0.05 },
+};
+function priorResid(sig: string, call: DefCall): number {
+  const [where, band, side] = sig.split('|');
+  const H = HABIT_PRIOR;
+  const man = call.coverage === 'man' ? 'man' : '';
+  let v = 0;
+  if (where !== 'P' && band !== 'D') v += H.roll[call.id] ?? H.roll[man] ?? 0;
+  if (band === 'S' && side === 'out') v += H.quickOut[call.id] ?? H.quickOut[man] ?? 0;
+  if (band === 'D') v += call.shell === 'two-high' ? H.deep.twoHigh : H.deep.oneHigh;
+  return v;
+}
+
+/** The share of each throw signature he expects (from that look, when he has it); empty with no throws seen. */
+export function sigDist(m: OffModel, prm: ModelParams, look?: string): Counts {
+  const all = norm({ ...m.sig });
+  if (!look || !m.sigLook[look]) return all;
+  const lc = m.sigLook[look];
+  const n = total(lc);
+  const A = at(OFF_MODEL.look, prm.skill);
+  const out: Counts = {};
+  for (const k of new Set([...Object.keys(all), ...Object.keys(lc)])) out[k] = ((lc[k] ?? 0) + A * (all[k] ?? 0)) / (n + A);
+  return out;
+}
+
+/** What he believes a throw signature does against a call over film (and the family's residual): `z` draws from its spread. */
+export function residSig(m: OffModel, prm: ModelParams, sig: string, call: DefCall, z = 0): number {
+  const R = OFF_MODEL.res;
+  const kc = at(R.cls, prm.skill);
+  const kk = at(R.call, prm.skill);
+  const pr = priorResid(sig, call);
+  const cl = m.sres[`${sig}|${clsOf(call)}`];
+  const rc = ((cl?.d ?? 0) + kc * pr) / ((cl?.n ?? 0) + kc);
+  const cc = m.sres[`${sig}|${call.id}`];
+  const n = cc?.n ?? 0;
+  return ((cc?.d ?? 0) + kk * rc) / (n + kk) + (z * R.sd * R.explore) / Math.sqrt(n + (cl?.n ?? 0) + kk);
+}
+
+/** The share of the throws he's seen thrown on the move (out of the pocket). */
+export function rollShare(m: OffModel): number {
+  const n = total(m.sig);
+  return n ? Object.entries(m.sig).reduce((a, [k, v]) => a + (k.startsWith('R') ? v : 0), 0) / n : 0;
 }
 
 /**
@@ -409,6 +509,10 @@ export function mergeFilm(old: FilmBook | undefined, game: FilmBook): FilmBook {
     give: { n: Math.round((o.give.n * k + game.give.n) * 100) / 100, g: Math.round((o.give.g * k + game.give.g) * 100) / 100 },
     who: { ...o.who, ...game.who },
     res: mergeRes(o.res ?? {}, game.res, k),
+    sig: addCounts(scaleCounts(o.sig ?? {}, k), scaleCounts(game.sig ?? {}, 1)),
+    sigLook: mapCounts(o.sigLook ?? {}, game.sigLook ?? {}, k),
+    sres: mergeRes(o.sres ?? {}, game.sres ?? {}, k),
+    throws: [...(game.throws ?? []), ...(o.throws ?? []).map((r) => ({ ...r, w: Math.round(r.w * k * 100) / 100 }))].filter((r) => r.w >= OFF_MODEL.film.min).slice(0, 12),
     tres: mergeRes(Object.fromEntries(Object.entries(o.tres ?? {}).filter(([sl]) => !changed.includes(sl))), game.tres, k),
   };
 }
@@ -453,6 +557,9 @@ export function layFilm(m: OffModel, film: FilmBook, prm: ModelParams): void {
   };
   layRes(m.res, film.res);
   layRes(m.tres, film.tres, same);
+  layRes(m.sres, film.sres);
+  lay(m.sig, film.sig ?? {});
+  for (const [k, c] of Object.entries(film.sigLook ?? {})) lay((m.sigLook[k] ??= {}), c);
   m.n += Object.values(film.fam).reduce((a, b) => a + b, 0) * w;
 }
 

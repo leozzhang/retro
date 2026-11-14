@@ -8,7 +8,7 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, STEP } from '../engine/constant
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { cutKeep, eyesOf, facingQB, FIND, isRusher, KEY, matchZones, PREVENT, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
+import { ANTIC, cutKeep, eyesOf, facingQB, FIND, isRusher, KEY, matchZones, PREVENT, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
@@ -24,7 +24,8 @@ import { assignRunFits, onFront } from '../sim/runFits';
 import { breakChance, CONTACT, dragSpeed, fallForward, jukeTackleMul, TACKLE_GAP, TACKLE_RANGE, tackleChance } from '../sim/tackling';
 import { assignRushRoles, callProtection, inPocket, passEngagement, pocketSpot, PROT, protectStep, protecting, startRep } from '../sim/passPro';
 import { matchDefense } from './matchups';
-import { alignY, BACKFIELD_DX, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
+import { alignY, BACKFIELD_DX, personnelOf, resolvePlay, type CoverClass, type ResolvedPlay } from './resolvePlay';
+import { anticRoles, expectThrow, rollOf, type AnticRole, type Expect, type ThrowSeen } from './habits';
 import { fieldLabel, yardsText, type PlayOutcome } from './rules';
 
 export type Phase = 'presnap' | 'snap' | 'live' | 'air' | 'run' | 'over';
@@ -52,6 +53,9 @@ export interface PlaySetup {
   tags?: DefTags;
   /** Each defender's anticipation this snap (game/defBrain.ts); missing is neutral. */
   reads?: Partial<Record<DefSlot, Lean>>;
+  /** The user's throws so far (game/habits.ts) and each defender's anticipation of them, 0..1; missing is none. */
+  habits?: ThrowSeen[];
+  antic?: Partial<Record<DefSlot, number>>;
   los: number;
   ballY: number;
   /** The user mirrored the play at the call. */
@@ -286,6 +290,21 @@ export class Play {
   readonly tags: DefTags;
   /** The receiver the DC keyed (`DefTags.key`, `KEY` in sim/ai.ts), or null. */
   readonly keyed: Player | null;
+  /** The user's throws the defense remembers (game/habits.ts), the look, and the throw it expects now. */
+  readonly habits: ThrowSeen[];
+  readonly look: string;
+  expect: Expect | null = null;
+  /** When the QB first got out of the pocket, and the DC's trap side in field terms (+1 larger y; 0 none). */
+  rolledAt: number | null = null;
+  trapSide = 0;
+  /** Who's answering the expected throw this step (`anticRoles`), and the strongest role each played this snap. */
+  antic = new Map<Player, { role: AnticRole; s: number }>();
+  readonly anticLog = new Map<Player, AnticRole>();
+  /** The end playing contain on a rollout he's chasing, or null. */
+  rollContain: Player | null = null;
+  /** The release: seconds after the snap, and the QB's roll then; the defender nearest the catch. */
+  private releasedAt: { t: number; roll: -1 | 0 | 1 } | null = null;
+  private nearCatch: Player | null = null;
   /** Defensive personnel for this snap, matched to the offense's. */
   readonly defPackage: DefPackage;
   readonly qbDrop: Vec;
@@ -421,6 +440,9 @@ export class Play {
     this.prevent = !!s.tags?.prevent;
     this.tags = s.tags ?? {};
     this.keyed = s.tags?.key ? bySlot.get(s.tags.key) ?? null : null;
+    this.habits = s.habits ?? [];
+    this.trapSide = s.tags?.trap ? (s.tags.trap === 'strong' ? 1 : -1) * rp.strongSign : 0;
+    this.look = `${personnelOf(s.play.formation)} ${s.play.formation.name}`;
     this.disguise = s.disguise ?? null;
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
@@ -431,6 +453,7 @@ export class Play {
       d.assign = a;
       const lean = s.reads?.[slot];
       if (lean) d.lean = lean;
+      d.antic = s.antic?.[slot] ?? 0;
       d.pos = this.defAlignment(slot, d, bySlot, s.press[slot] ?? false);
       d.start = { ...d.pos };
       this.def.push(d);
@@ -592,7 +615,8 @@ export class Play {
         // A corner worried about the deep ball bails deeper.
         d.cushion = press ? 1 : (slot === 'CB1' || slot === 'CB2' ? 6.5 : 4.5) + LEAN_FX.bail * Math.max(0, d.lean.deep) + (this.prevent ? PREVENT.cushion : 0);
         d.turned = press;
-        pos = { x: los + d.cushion, y: t.pos.y + inside * (0.8 + LEAN_FX.shade * d.lean.inside) };
+        // Sitting on a throw he's seen, he lines up shallower: a tell (`ANTIC.tell`).
+        pos = { x: los + d.cushion - (d.antic >= ANTIC.tellFrom && !press ? ANTIC.tell : 0), y: t.pos.y + inside * (0.8 + LEAN_FX.shade * d.lean.inside) };
       } else if (d.role === 'LB') {
         d.cushion = 1.5;
         pos = { x: pos.x, y: lerp(pos.y, t.pos.y, 0.4) };
@@ -959,6 +983,7 @@ export class Play {
 
     for (const p of this.off) if (p !== this.controlled) thinkOffense(this, p);
     if (this.phase === 'live') matchZones(this);
+    if (this.phase === 'live' && this.habits.length) this.readThrow();
     for (const d of this.def) {
       if (d === this.carrier) returnerAI(this, d);
       else thinkDefense(this, d);
@@ -1383,9 +1408,58 @@ export class Play {
   }
 
   /** Throw to `target` (the user's aim, or the CPU's on a replay) with the given throw type; `aimed` for the user's (`passContext`). */
+  /**
+   * The defense reads the throw it expects (game/habits.ts): the look, the clock, and the QB out of the
+   * pocket to a side. Then who answers it this step, and the end who plays contain on a rollout being chased.
+   */
+  private readThrow(): void {
+    const strong = (this.resolved.strongSign >= 0 ? 1 : -1) as 1 | -1;
+    const roll = rollOf(this.qb.pos.y, this.ballY, strong);
+    if (roll !== 0 && this.rolledAt === null) this.rolledAt = this.time;
+    const holding = this.carrier === this.qb && !this.thrown && !this.scramble;
+    this.expect = holding ? expectThrow(this.habits, { look: this.look, t: this.time - this.snapTime, roll, los: this.los, ballY: this.ballY, strong }) : null;
+    this.antic = anticRoles(this, ANTIC);
+    const rank = { lane: 1, plus: 2, jump: 3 } as const;
+    for (const [d, a] of this.antic) {
+      const was = this.anticLog.get(d);
+      if (!was || rank[a.role] > rank[was]) this.anticLog.set(d, a.role);
+    }
+    this.rollContain = null;
+    if ([...this.antic.values()].some((a) => a.role === 'plus')) {
+      const side = Math.sign(this.qb.pos.y - this.ballY);
+      let w = -1;
+      for (const d of this.def) {
+        const off = (d.start.y - this.ballY) * side;
+        if (d.role === 'DL' && d.assign?.kind === 'rush' && !d.down && off > w) {
+          w = off;
+          this.rollContain = d;
+        }
+      }
+    }
+  }
+
+  /**
+   * This snap's throw as the defense remembers it (game/habits.ts), once the play is over: null with no
+   * throw. `gain` is the play's yards.
+   */
+  throwRecord(gain: number): Omit<ThrowSeen, 'w'> | null {
+    if (!this.thrown || !this.releasedAt || !this.ballTarget || this.pitch) return null;
+    const strong = this.resolved.strongSign >= 0 ? 1 : -1;
+    const o = this.outcome;
+    const caught = !!o && o.type !== 'incomplete' && o.type !== 'int' && o.type !== 'pick6';
+    const tgt = this.intended;
+    return {
+      look: this.look, roll: this.releasedAt.roll, t: this.releasedAt.t, kind: this.thrownKind, slot: tgt?.slot ?? '?',
+      ...(tgt?.routeName ? { route: tgt.routeName } : {}),
+      dx: Math.round((this.ballTarget.x - this.los) * 10) / 10, dy: Math.round((this.ballTarget.y - this.ballY) * strong * 10) / 10,
+      gain, caught, ...(this.nearCatch ? { beaten: this.nearCatch.slot as DefSlot } : {}),
+    };
+  }
+
   throwBall(target: Vec, kind: ThrowKind = this.throwKind, aimed = false): void {
     const qb = this.qb;
     const rng = this.rng;
+    this.releasedAt = { t: this.time - this.snapTime, roll: rollOf(qb.pos.y, this.ballY, (this.resolved.strongSign >= 0 ? 1 : -1) as 1 | -1) };
     const { pressure, moving } = this.passContext(aimed);
     const sd = throwErrorSd(dist(qb.pos, target), qb.r, pressure, moving, kind);
     const to = { x: target.x + gauss(rng) * sd, y: target.y + gauss(rng) * sd * 0.8, z: 1.2 };
@@ -1440,7 +1514,12 @@ export class Play {
         // The keyed receiver: everyone's on a ball to him (but his tight man is beaten deep); a beat slow to the rest.
         const k = this.keyed;
         const key = !k ? 1 : best !== k ? 1 + KEY.others : air > LEAN_FX.deepAir && d.manTarget === k ? 1 + KEY.deep : 1 - KEY.react;
-        const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean * key;
+        // Sitting on the throw he expected: on it if that's the throw, a step wrong if it isn't.
+        const an = this.antic.get(d);
+        const e = this.expect;
+        const on = an && an.role !== 'plus' && e && best?.slot === e.slot && dist(this.ballTarget, e.spot) < ANTIC.near;
+        const guess = !an || an.role === 'plus' ? 1 : on ? 1 - ANTIC.react * an.s : 1 + ANTIC.wrong * an.s;
+        const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean * key * guess;
         d.reactAt = this.time + lerp(Math.max(react, dur * FIND.trail, dur - FIND.trailLeft), react + 0.1, d.eyes);
         d.findAt = d.reactAt;
       }
@@ -1485,6 +1564,14 @@ export class Play {
 
   private resolveArrival(): void {
     const land = this.ballTarget!;
+    let nd = Infinity;
+    for (const d of this.def) {
+      const dd = dist(d.pos, land);
+      if (!d.down && dd < nd) {
+        nd = dd;
+        this.nearCatch = d;
+      }
+    }
     if (this.pitch) {
       const rb = this.rb;
       if (!rb.down && this.rng() < pitchOdds(Math.max(0, 1 - dist(rb.pos, land) / PITCH_REACH), rb.r.cth)) {

@@ -8,11 +8,12 @@ import { clamp, gauss, lerp, mulberry32, type Rng } from '../engine/math';
 import { playTraits } from '../season/scouting';
 import { breaksInside, LEAN_KEYS, NO_LEAN, type Lean } from '../sim/player';
 import {
-  damage, famDist, giveRate, layFilm, learn, leagueDist, leagueShares, lookKey, newModel, playDist, resid, sitBin, targetDist, type ModelParams, type OffModel, type RosterRead,
+  damage, famDist, giveRate, layFilm, learn, residSig, rollShare, sigDist, leagueDist, leagueShares, lookKey, newModel, playDist, resid, sitBin, targetDist, type ModelParams, type OffModel, type RosterRead,
   type SitBin, OFF_MODEL, type FilmBook,
 } from './offModel';
 import { personnelOf } from './resolvePlay';
 import type { Situation } from './situation';
+import { addThrow, type AnticRole, type ThrowSeen } from './habits';
 
 /**
  * The CPU defense learns your offense during a live game (docs/DEFENSE.md). Two layers:
@@ -39,7 +40,8 @@ const BUCKETS: Bucket[] = ['run', 'qbRun', 'screen', 'quick', 'mid', 'deep', 'pa
  * - `norm`: a normal offense's share of each bucket (runs include QB runs and scrambles), the baseline
  *   a tendency is measured from.
  * - `trust`: decayed plays before the DC half-believes a tendency, at skill 0 (a sharp DC needs `trustSharp`).
- * - `tag`: spy, contain and RPO pass-first odds per point of a share above normal; `tagMax`.
+ * - `tag`: spy, contain and RPO pass-first odds per point of a share above normal; `tagMax`. Contain and
+ *   spy also come from throws on the move (`roll`, `rollSpy` per point of the rollout share past `rollNorm`).
  * - `shortFrom`, `spamAt`, `passSpam`: against a pass play that's `spamAt` or more of the book, the
  *   players' read is `passSpam` stronger per point of share past `shortFrom` (they sit on it).
  * - `rate`: share of the way to his tag odds he closes each snap, from skill 0 to 1 (all of it at halftime).
@@ -51,7 +53,8 @@ export const DEF_BRAIN = {
   norm: { run: 0.45, qbRun: 0.08, screen: 0.07, quick: 0.2, mid: 0.2, deep: 0.12, pa: 0.12, rpo: 0.06 } as Record<string, number>,
   trust: 7,
   trustSharp: 3,
-  tag: { spy: 3, contain: 2.5, rpo: 3 },
+  tag: { spy: 3, contain: 2.5, rpo: 3, roll: 1.5, rollSpy: 0.5 },
+  rollNorm: 0.15,
   tagMax: 0.6,
   shortFrom: 0.3,
   spamAt: 0.5,
@@ -74,6 +77,7 @@ export const DEF_BRAIN = {
  * - `key`: keying a receiver (`DefTags.key`). Of the throws he expects, the top receiver's share past `from`
  *   (a normal offense's top target gets about a third), plus `res` × how far that receiver has beaten the
  *   film's expectation, × `odds`, × his lean budget's share of the most, at most `max`.
+ * - `trap`: the trap (`trapRead`): the top habit's concentration past `from`, × `odds`, × his lean budget's share, at most `max`.
  * - `leans`: how far the players' read moves toward the DC's model of this situation and look (`modelRead`),
  *   × the team's smarts: they know this offense throws on 3rd and long from trips.
  */
@@ -85,6 +89,7 @@ export const ML_DC = {
   heavy: 0.35,
   say: 3,
   key: { from: 0.4, odds: 3, res: 1.5, max: 0.7 },
+  trap: { from: 0.35, odds: 2, max: 0.6 },
   leans: 0.5,
 };
 
@@ -180,6 +185,13 @@ export interface DefBrain {
   keyRead: { slot: OffSlot; odds: number } | null;
   /** Who plays each of the offense's slots ("name #num"), for the headlines. */
   who: Record<string, string>;
+  /** The user's throws (game/habits.ts), each defender's experience of being beaten on them, and his nerve for jumping them. */
+  habits: ThrowSeen[];
+  exp: Partial<Record<DefSlot, number>>;
+  jumpNerve: Partial<Record<DefSlot, number>>;
+  /** The habit answers on the last snap (who sat in the lane, jumped, chased), for the headlines; the trap's odds. */
+  answered: Partial<Record<AnticRole, number>>;
+  trapOdds: number;
   /** Intermediate throws breaking inside or outside (`laneOf`), on the players' short memory. */
   lanes: { in: number; out: number };
   /** The players' team read on the last snap (for the headlines). */
@@ -217,7 +229,7 @@ export function newBrain(o: {
     iq, skill, scout, smarts: o.smarts ?? 1, half: false,
     model: newModel({ book: o.book ?? [], style: o.style, roster: o.roster, prm: { skill, scout } }),
     looks: {}, book: tally(), flow: tally(), short: tally(),
-    shift: { ...ZERO_DIALS }, tags: { spy: 0, contain: 0, rpo: 0 }, heavy: null, keyed: null, keyRead: null, who: o.roster?.who ?? {},
+    shift: { ...ZERO_DIALS }, tags: { spy: 0, contain: 0, rpo: 0 }, heavy: null, keyed: null, keyRead: null, who: o.roster?.who ?? {}, habits: [], exp: {}, jumpNerve: {}, answered: {}, trapOdds: 0,
     lanes: { in: 0, out: 0 }, read: { ...NO_LEAN },
     nerve: {}, last: null, said: [], saidThisDrive: false, runIds: [], seed: o.seed >>> 0, draws: 0,
   };
@@ -228,7 +240,12 @@ export function newBrain(o: {
     b.book.total += prior;
   }
   // The film of your past games, as much as his scouting got out of it.
-  if (o.film) layFilm(b.model, o.film, { skill, scout });
+  if (o.film) {
+    layFilm(b.model, o.film, { skill, scout });
+    // The players watched it too: last week's throws, as much as the staff got out of it.
+    const w = lerp(OFF_MODEL.film.w[0], OFF_MODEL.film.w[1], scout);
+    b.habits = (o.film.throws ?? []).map((t) => ({ ...t, w: t.w * w }));
+  }
   target(b, true);
   return b;
 }
@@ -322,6 +339,9 @@ export interface SnapSeen {
   target?: string | null;
   /** A sack or a turnover. */
   lost?: boolean;
+  /** The throw as the defense remembers it (`Play.throwRecord`), and who answered it how (`Play.anticLog`). */
+  throw?: Omit<ThrowSeen, 'w'> | null;
+  antic?: Partial<Record<DefSlot, AnticRole>>;
 }
 
 /** Learn from a snap: the model, the players' books, each defender's nerve, then the tag odds. */
@@ -338,9 +358,58 @@ export function observe(b: DefBrain, s: SnapSeen): void {
   if (sit === 'short') add(b.short, DEF_BRAIN.decay, bk, s.play.id);
   learn(b.model, {
     play: s.play, call: s.call, tags: s.tags, sit, gain: s.gain, lost: s.lost, yardsToGoal: s.yardsToGoal, handedOff: s.handedOff, target: s.target,
+    throw: s.throw,
   });
   nerve(b, s, bk);
+  learnThrow(b, s);
   target(b, false);
+}
+
+/**
+ * Habit tuning for the players (`anticFor`, `learnThrow`).
+ * - `team`: the team's read at full smarts; × each defender's play recognition (`prc.min` of it for a 0
+ *   reader, all of it at 100), the DC's film and the team's smarts (`teamSmarts`): a weak defense learns less.
+ * - `exp`: anticipation per point of a defender's own experience (beaten on a throw `beatenGain`+ yd), × his
+ *   play recognition the same way,
+ *   which keeps `expDecay` a pass.
+ * - `bold`/`burned`: nerve for jumping, from a ball he got to, or a gain of `burnedGain`+ while he
+ *   sat in the lane or jumped; keeps `nerveDecay` a pass, within ±`nerveMax`.
+ */
+export const HABIT_PLAYERS = { team: 0.75, prc: { min: 0.3 }, exp: 0.2, beatenGain: 6, expDecay: 0.85, bold: 0.1, burned: 0.35, burnedGain: 15, nerveDecay: 0.7, nerveMax: 0.5 };
+
+/** Remember the throw; the beaten defender learns from it, and those who jumped it win or lose nerve. */
+function learnThrow(b: DefBrain, s: SnapSeen): void {
+  const H = HABIT_PLAYERS;
+  const t = s.throw;
+  if (!t) return;
+  b.habits = addThrow(b.habits, t);
+  for (const k of Object.keys(b.exp) as DefSlot[]) b.exp[k]! *= H.expDecay;
+  for (const k of Object.keys(b.jumpNerve) as DefSlot[]) b.jumpNerve[k]! *= H.nerveDecay;
+  if (t.caught && t.gain >= H.beatenGain && t.beaten) b.exp[t.beaten] = (b.exp[t.beaten] ?? 0) + 1;
+  b.answered = {};
+  for (const [slot, role] of Object.entries(s.antic ?? {}) as [DefSlot, AnticRole][]) {
+    b.answered[role] = (b.answered[role] ?? 0) + 1;
+    if (role === 'plus') continue;
+    const bump = (v: number) => (b.jumpNerve[slot] = clamp((b.jumpNerve[slot] ?? 0) + v, -H.nerveMax, H.nerveMax));
+    if (s.gain >= H.burnedGain) bump(-H.burned);
+    else if (!t.caught || s.lost) bump(H.bold);
+  }
+}
+
+/**
+ * Each defender's anticipation of the user's throws this snap (0..1): the team's read by his play
+ * recognition, the DC's film and the team's smarts, plus his own experience and nerve. Zero with no throws seen.
+ */
+export function anticFor(b: DefBrain, prc: Partial<Record<DefSlot, number>>): Partial<Record<DefSlot, number>> {
+  if (!b.habits.length) return {};
+  const H = HABIT_PLAYERS;
+  const film = H.team * b.iq * lerp(0.6, 1, b.skill) * b.smarts;
+  const out: Partial<Record<DefSlot, number>> = {};
+  for (const [slot, p] of Object.entries(prc) as [DefSlot, number][]) {
+    const read = lerp(H.prc.min, 1, p / 100);
+    out[slot] = clamp(read * film + H.exp * read * (b.exp[slot] ?? 0) + (b.jumpNerve[slot] ?? 0), 0, 1);
+  }
+  return out;
 }
 
 /** Nerve: right guesses embolden, getting beaten on a guess makes a defender careful for a few snaps. */
@@ -382,11 +451,13 @@ function target(b: DefBrain, snap: boolean): void {
   const conf = t.total / (t.total + trust);
   const qb = share(t, 'qbRun') - N.qbRun;
   const rpo = share(t, 'rpo') - N.rpo;
+  // A QB who throws on the move: contain the edge he rolls to, and a little more spy.
+  const roll = Math.max(0, rollShare(b.model) - B.rollNorm) * Math.min(1, share(t, 'pass') * 2);
   const k = conf * b.iq * execute(b);
   const tag = (v: number) => clamp(v * k, 0, B.tagMax);
   const step = snap ? 1 : lerp(B.rate.min, B.rate.max, b.skill);
-  b.tags.spy = lerp(b.tags.spy, tag(B.tag.spy * qb), step);
-  b.tags.contain = lerp(b.tags.contain, tag(B.tag.contain * qb), step);
+  b.tags.spy = lerp(b.tags.spy, tag(B.tag.spy * qb + B.tag.rollSpy * roll), step);
+  b.tags.contain = lerp(b.tags.contain, tag(B.tag.contain * qb + B.tag.roll * roll), step);
   b.tags.rpo = lerp(b.tags.rpo, tag(B.tag.rpo * rpo), step);
 }
 
@@ -420,6 +491,8 @@ export interface DcRead {
   gain: Record<string, number>;
   /** The plays he expects, most likely first. */
   expect: { id: string; w: number }[];
+  /** His lean budget this snap (`ML_DC.lam`, executed). */
+  lam: number;
   /** The receiver he'd key, the odds he does, and that receiver's share of the throws he expects. */
   key: { slot: OffSlot; odds: number; share: number } | null;
 }
@@ -448,9 +521,14 @@ export function dcMix(
   const at = (k: number[]) => lerp(k[0], k[1], prm.skill);
   const misread = at(ML_DC.misread);
   const gain: Record<string, number> = {};
+  // How you throw (the habit signatures), on the share of the plays he expects that are throws.
+  const sd = sigDist(b.model, prm, look);
+  const passShare = expect.reduce((a, x) => a + x.w * (x.p.kind === 'run' ? (x.p.read === 'rpo' ? 1 - give : 0) : 1), 0);
   for (const cid of ids) {
     const c = DEF_CALLS_BY_ID[cid];
     const z = gauss(r);
+    let habit = 0;
+    for (const [g, w] of Object.entries(sd)) habit += w * residSig(b.model, prm, g, c, z);
     const res = new Map<string, number>();
     let mine = 0;
     for (const x of expect) {
@@ -459,7 +537,7 @@ export function dcMix(
       if (rf === undefined) res.set(f, (rf = resid(b.model, prm, f, c, z)));
       mine += x.w * (damage(x.p, c, give) + rf);
     }
-    gain[cid] = leagueDamage(sit, c) - mine + gauss(r) * misread;
+    gain[cid] = leagueDamage(sit, c) - mine - passShare * habit + gauss(r) * misread;
   }
   const beta = at(ML_DC.beta) * b.iq;
   const lam = at(ML_DC.lam) * execute(b) * Math.min(1, b.iq);
@@ -490,7 +568,7 @@ export function dcMix(
     const odds = clamp(K.odds * (Math.max(0, share - K.from) + K.res * beat) * Math.min(1, passes * 2) * (lam / ML_DC.lam[1]), 0, K.max);
     if (odds > 0) key = { slot: top[0] as OffSlot, odds, share };
   }
-  return { mix, base, gain, expect: expect.sort((x, y) => y.w - x.w).slice(0, 8).map((x) => ({ id: x.p.id, w: x.w })), key };
+  return { mix, base, gain, lam, expect: expect.sort((x, y) => y.w - x.w).slice(0, 8).map((x) => ({ id: x.p.id, w: x.w })), key };
 }
 
 const leagueCache = new Map<string, number>();
@@ -504,6 +582,31 @@ function leagueDamage(sit: SitBin, c: DefCall): number {
     leagueCache.set(k, v);
   }
   return v;
+}
+
+/**
+ * The trap (`DefTags.trap`): when the user's throws pile up on one receiver from one side (the habit
+ * records, game/habits.ts), the DC calls the corner and flat defender to that side to sit on it. Odds by
+ * how concentrated the habit is past `ML_DC.trap.from`, × `odds` × his lean budget's share, at most `max`.
+ */
+function trapRead(b: DefBrain, read: DcRead): { side: 'strong' | 'weak'; odds: number } | null {
+  if (!b.habits.length) return null;
+  const T = ML_DC.trap;
+  const by = new Map<string, { w: number; dy: number }>();
+  let tot = 0;
+  for (const h of b.habits) {
+    tot += h.w;
+    const k = `${h.slot}|${h.roll}`;
+    const e = by.get(k) ?? { w: 0, dy: 0 };
+    e.w += h.w;
+    e.dy += h.w * (h.roll !== 0 ? h.roll : Math.sign(h.dy));
+    by.set(k, e);
+  }
+  const top = [...by.values()].sort((x, y) => y.w - x.w)[0];
+  const conc = (top.w / tot) * (tot / (tot + 2));
+  const lam = read.lam;
+  const odds = clamp(T.odds * (conc - T.from) * (lam / ML_DC.lam[1]), 0, T.max);
+  return odds > 0 && top.dy !== 0 ? { side: top.dy > 0 ? 'strong' : 'weak', odds } : null;
 }
 
 /** How far a mix leans from another, as the identity's dials (scaled by `ML_DC.say`), for the headlines. */
@@ -538,6 +641,10 @@ export function callFor(
   if (r() < b.tags.contain) tags.contain = true;
   if (r() < b.tags.rpo) tags.rpo = true;
   if (preventLevel(late)) tags.prevent = true;
+  // A trap to the side the user's habit throws to: the corner and flat defender there sit on it.
+  const trap = trapRead(b, read);
+  b.trapOdds = trap?.odds ?? 0;
+  if (trap && !tags.prevent && r() < trap.odds) tags.trap = trap.side;
   // Keying the receiver he expects the ball to go to (never in prevent: everyone's deep).
   b.keyed = null;
   b.keyRead = read.key ? { slot: read.key.slot, odds: read.key.odds } : null;
@@ -659,6 +766,8 @@ const SAY: { key: string; on: (b: DefBrain) => number; text: (b: DefBrain, name:
   { key: 'short', on: (b) => (b.heavy ? 1 : 0), text: (b, name) => `THEY'RE SELLING OUT FOR THE ${name(b.heavy!)}` },
   { key: 'passSpam', on: (b) => (passSpam(b) ? passSpam(b)!.share + 0.2 : 0), text: (b, name) => `THEY'RE SITTING ON THE ${name(passSpam(b)!.id)}` },
   { key: 'rpo', on: (b) => b.tags.rpo * 1.6, text: () => "THEY'RE PLAYING THE RPO PASS FIRST" },
+  { key: 'jump', on: (b) => ((b.answered.jump ?? 0) + (b.answered.lane ?? 0) * 0.5 + b.trapOdds) * 0.6, text: (b) => `THEY'RE SITTING ON YOUR THROW TO ${habitName(b)}` },
+  { key: 'plus', on: (b) => (b.answered.plus ?? 0) * 0.7, text: () => 'THEIR BACKERS ARE CHASING THE ROLLOUT' },
   { key: 'key', on: (b) => (b.keyRead?.odds ?? 0) * 1.4, text: (b) => `THEY'RE KEYING ${keyName(b)}: HELP OVER THE TOP` },
   { key: 'inside', on: (b) => b.read.inside, text: () => "THEY'RE SITTING ON YOUR INSIDE ROUTES" },
   { key: 'outside', on: (b) => -b.read.inside, text: () => "THEY'RE TAKING AWAY THE OUTSIDE" },
@@ -673,6 +782,14 @@ const SAY: { key: string; on: (b: DefBrain) => number; text: (b: DefBrain, name:
   { key: 'man-', on: (b) => -b.shift.man, text: () => 'THEY\'RE DROPPING INTO ZONES' },
 ];
 const SLOT_WORD: Record<string, string> = { X: 'YOUR X', Z: 'YOUR Z', SL: 'YOUR SLOT', TE: 'YOUR TIGHT END', RB: 'YOUR BACK' };
+/** The receiver the user's throw habit goes to, by name, or his slot. */
+function habitName(b: DefBrain): string {
+  const by = new Map<string, number>();
+  for (const h of b.habits) by.set(h.slot, (by.get(h.slot) ?? 0) + h.w);
+  const s = [...by.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? '';
+  return (b.who[s]?.toUpperCase() ?? SLOT_WORD[s] ?? s).replace(/ #\d+$/, '');
+}
+
 /** The keyed receiver by name, or his slot. */
 function keyName(b: DefBrain): string {
   const s = b.keyRead?.slot ?? '';

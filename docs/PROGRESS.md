@@ -2,6 +2,36 @@
 
 _Last updated: 2026-11-13_
 
+## Done: the players learn your throws (2026-11-14)
+DEFENSE.md, "The players learn your throws", has the design and numbers.
+
+**Why:** a hand-played game of PA Boot Flood, booting and bulleting to the same out, gained about 11 yd every snap, even keyed. A rollout behind the line wasn't a cue, the players learned buckets rather than throws, and a turned man defender couldn't tip a bullet.
+
+**Built:**
+- **`game/habits.ts`:** each throw is a record (look, rolled or not, the time, the throw type, the receiver, the catch spot, who got beaten). The live read (`expectThrow`) weighs the records against the look, the QB's roll side and the clock. `anticRoles` assigns who answers:
+  - **lane:** the defender responsible sits between the QB and the spot, eyes on the QB, so `TIP` tips and picks bullets
+  - **jump:** he drives to the spot before the throw
+  - **chase:** a backer to the roll side pursues the QB, and the end there plays contain
+- **Each defender's anticipation** (`anticFor`): the team's read × his `prc` × film × smarts, plus his own experience of being beaten, plus his nerve.
+- **The cost of each answer:** a lost trail, out of position on another throw, a vacated zone. A man corner sitting on it lines up a yard shallower (the tell).
+- **The DC:**
+  - throw signatures and residuals by signature in the model, with a coaching prior (`HABIT_PRIOR`)
+  - contain and spy from the rollout share
+  - the `trap` tag (the corner and flat defender to the habit's side sit on it)
+  - all of it on film, the throws too
+- **Headlines,** F1 (the expected throw and who's on it), and the ADAPT boot rows (`boot bullet`, the lob and drag counters, the pocket version, and the TIER and FILM rows).
+
+**Measured:**
+- Boot bullet late ypp 11.0/11.7 → 6.7/6.7 at DC 75 (it was 8.7/7.8), interceptions 1% → 7–9%.
+- The weak defense takes 28% off, the strong 45%.
+- The counters pay. Balanced and quick-only are unchanged. Every row outside ADAPT is byte-identical.
+- `npm test` passes (`src/habits.test.ts` is new).
+
+**Flags:**
+- A pure pass spam now loses 45–60%, past the old band (harness throws into a sitting defender).
+- The DC's habit features add little over the players.
+- Not played by hand yet.
+
 ## Done: the ML defense (2026-11-13)
 DEFENSE.md, "The DC", "Keying a receiver", "Film study" and the measured section have the design and numbers.
 

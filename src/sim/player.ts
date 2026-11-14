@@ -170,6 +170,8 @@ export interface Player {
   zoneMark: Player | null;
   /** A defender's anticipation this snap, from the game so far (game/defBrain.ts); zero is neutral. */
   lean: Lean;
+  /** How hard he plays the throw he expects (game/habits.ts, `ANTIC` in sim/ai.ts), 0..1; zero is neutral. */
+  antic: number;
   press: boolean;
   cushion: number;
   turned: boolean;
@@ -275,6 +277,7 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
     manTarget: null,
     zoneMark: null,
     lean: NO_LEAN,
+    antic: 0,
     press: false,
     cushion: 0,
     turned: true,

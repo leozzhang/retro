@@ -200,7 +200,70 @@ The cost: his tight man is 35% slower on a ball thrown 15+ yd to him, the deep h
 
 **Measured, forced to a 99 X** (quick and dropback passes, 150 a call): 9.7 → 8.2 yards a throw. Man calls lose the most (Cover 1 Robber 15.0 → 10.7); zones move little.
 
-### The look and the presnap check (`CHECK`, `lookOf`, `checkFor`)
+### The players learn your throws (`game/habits.ts`, `ANTIC` in `sim/ai.ts`)
+Added after a hand-played game of PA Boot Flood: the QB booted out every snap and fired a bullet to the same out, for about 11 yd every time, keyed or not. A rollout behind the line was no cue (the defense only read a scramble past the line), the players learned buckets rather than throws, and a turned man defender has his back to the QB (`eyes` 0), so he could never tip or pick a bullet.
+
+**The records.** Every pass the user throws is a `ThrowSeen`:
+- the look
+- where the QB threw from (the pocket, or rolled 4.5+ yd to the formation's strong or weak side, `rollOf`)
+- the release time and the throw type
+- the receiver and his route, and the catch spot (mirrored to the formation's strength)
+- the gain, and the defender nearest the catch
+
+They decay 0.85 a pass (`HABIT`), 24 at most. The DC's brain keeps them for the game, and film carries the latest 12 to next week.
+
+**The live read** (`expectThrow`, each step while the QB holds the ball). Each record is weighed against the cues now:
+- the same look (1) or another (0.3)
+- the QB rolled the same way (1), still in the pocket (0.5), or rolled the other way (0.1)
+
+The read is the receiver most of that weight went to, his catch spot, the release time, the bullet share, and a confidence (that receiver's share × how much matching weight there is; about 0.33 after one throw, 0.75 after six). A rollout is now a cue, and the defense still never sees the call.
+
+**Each defender's anticipation** (`anticFor`, `HABIT_PLAYERS`) is the team's read × his play recognition × the DC's film × the team's smarts, plus his own:
+- **Experience:** the defender nearest the catch on a 6+ yd completion gets +1 (decaying 0.85 a pass), worth 0.25 of anticipation. The corner who keeps getting beaten learns first.
+- **Nerve:** sitting in the lane or jumping it and giving up 15+ yd costs 0.35 for a few snaps; getting to the ball (an incompletion or a pick) adds 0.1.
+
+**The answers** (`anticRoles`, then `anticipate` in `thinkDefense`; strength `s` = his anticipation × the read's confidence):
+
+| Answer | Who | When | What | The cost |
+| --- | --- | --- | --- | --- |
+| Lane | the man on the expected receiver, else the underneath zone defender nearest the spot | `s` ≥ 0.12 | his goal moves up to 85% toward 2.5 yd in front of the catch, on the line to the QB; eyes on the QB (a flat bullet can be tipped or picked, `TIP`) | his trail is `lag` × s later: the double move, a route continuing deeper, a lob over him |
+| Jump | the same man | `s` ≥ 0.38, within 0.35 s of the expected release | drives to the catch spot before the throw | a hold, a pump or a throw elsewhere leaves him out of position |
+| Break | anyone answering | on the throw | 35% × s faster to the expected throw (that receiver, within 4 yd of the spot), 30% × s slower to anything else | |
+| Chase | one second-level defender to a rolled QB's side, not on the receiver | `s` = anticipation × the rollout share ≥ 0.2, after his reaction (0.25–0.5 s by `prc`) | pursues the QB; the end to that side plays contain (`rollContain`) | his zone or man is open (the drag behind him) |
+
+**The tell:** a man corner with anticipation 0.45+ lines up a yard shallower. With no throws seen, every snap is exactly as before.
+
+**The DC learns them too** (`game/offModel.ts`):
+- **Signatures.** Each throw is a signature (`sigOf`: pocket or rolled strong or weak; behind the line, under 8, under 15 or deeper; inside or outside 12 yd across; the throw type), counted overall and by look.
+- **Residuals by signature.** What a throw gained against a call over film, less the family's residual (so a snap isn't counted twice), by `sig|call` backed off to `sig|man or zone, pressure`.
+- **A coaching prior** (`HABIT_PRIOR`), until those residuals arrive:
+  - a rolling QB beats man and Cover 3, and is walled by a hard flat (Cover 2, Tampa 2, Sky)
+  - the quick out is the Cover 2 corner's
+  - the deep ball wants two high
+- `dcMix` adds the pass share × Σ P(signature) × its residual to each call's expected damage.
+- **Contain and spy** odds rise with the share of throws on the move (`DEF_BRAIN.tag.roll`, `rollSpy`).
+- **The trap** (`DefTags.trap`, `trapRead`): when the throws pile up on one receiver from one side, the DC calls the corner and flat defender there to sit on it (`ANTIC.trap` 0.8, whatever their own read). It works even for a defense whose players are slow to learn, if the DC is sharp. Odds by the habit's concentration past 0.35, × 2, × his lean budget, at most 60%.
+- **Film** carries the signatures, their residuals and the throws.
+
+**Measured** (ADAPT, yards per play by snap window 1–6 / 7–15 / 16+; `boot bullet` is PA Boot Flood every snap, a bullet to the out at 1.7 s):
+
+| Offense | STATIC | NORMAL, DC 45 | NORMAL, DC 75 | SHARP, DC 75 |
+| --- | --- | --- | --- | --- |
+| Boot bullet (before this work) | 12.1 / 11.0 / 11.7 | 11.6 / 8.6 / 8.5 | 11.3 / 8.7 / 7.8 | 11.7 / 7.7 / 8.0 |
+| Boot bullet | 12.1 / 11.0 / 11.7, int 1.3% | 11.6 / 8.3 / 7.9, int 6.7% | 11.1 / 6.7 / 6.7, int 7.3% | 10.3 / 6.4 / 6.1, int 9.2% |
+| … ×8, then the drag (counter ypp) | 6.5 | 6.8 | 7.0 | 6.7 |
+| … ×8, then a lob to the go (counter ypp) | 22.2 | 20.6 | 17.7 | 18.8 |
+| RPO slant only | 8.9 / 8.8 / 8.4 | 7.1 / 5.4 / 3.1 | 6.0 / 3.3 / 2.3 | 4.4 / 2.2 / 2.2 |
+| Glance ×8 then smoke (counter ypp) | 2.4 | 3.9 | 4.1 | 4.4 |
+
+- **Tiers:** the boot bullet loses 45% against the strong defense and 28% against the weak one (`team` × smarts).
+- **Unchanged:** balanced and quick-only are within noise. Every row outside ADAPT is byte-identical.
+- **Flag:** a pure pass spam now loses 45–60% (the slant the most). The harness throws it into a defender sitting on it every time, which a person wouldn't, but it's past the old 30–50% band.
+- **Flag:** the DC's habit features (signatures, the prior, the trap) add little over the players' answers in these rows. The players do most of the work.
+
+**What the user sees:** "THEY'RE SITTING ON YOUR THROW TO <NAME>", "THEIR BACKERS ARE CHASING THE ROLLOUT", the shallow corner, and on F1 the throw they expect and who's on it.
+
+ (`CHECK`, `lookOf`, `checkFor`)
 The defense sees your **personnel and formation** once you break the huddle, never the play. Audibles are planned to keep personnel, so the look is the defense's key.
 - **The players know the look:** their leans move toward what that look has shown (`CHECK.lean` × the team's smarts × confidence). A formation that has only run gets them sitting on the run, and play action from it is the counter.
 - **The check:** the DC works out his mix again with only the plays he expects from that look. If it moved by `from` (0.15 of the package's mix, total variation) or more, he may check, with odds `odds` × his skill (`skillMin` for a weak DC) × the team's smarts × IQ, at most `max`. He checks only to a call the look says is better than the one he's in, in the same package. It happens once a snap, at the huddle break; an audible keeps the defense. A check is played straight (no disguise), and the presnap shows "THEY CHECKED: THEY'VE SEEN THIS LOOK".

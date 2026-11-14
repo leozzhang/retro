@@ -2,6 +2,7 @@ import { FIELD_W, STEP } from '../engine/constants';
 import { add, clamp, dist, len, lerp, limit, norm, scale, sub, type Vec } from '../engine/math';
 import type { Assign } from '../data/defenses';
 import type { Play } from '../game/playState';
+import { lanePoint, type AnticRole } from '../game/habits';
 import { engagedGoal, fitSpot, runLeverage, runTechnique } from './runFits';
 import { accelOf, isEligible, LEAN_FX, maxSpeed, seek, seekTimed, setPose, startJuke, type Player } from './player';
 import { CATCH_REACH, PLACEMENT } from './catching';
@@ -80,6 +81,25 @@ export const PREVENT = { cushion: 3, deep: 4 };
  * breaks `react` sooner on a ball to him. The cost: the deep help leaves the other side thinner, and a ball thrown `deepAir`+ yd to him beats his
  * tight man (`deep` slower), and every defender is `others` slower on a ball to anyone else.
  */
+/**
+ * Anticipating a throw the defense has seen before (game/habits.ts `anticRoles`; docs/DEFENSE.md, "The players
+ * learn your throws"). A defender's strength `s` is his `antic` × the read's confidence.
+ * - `laneFrom`: from this he sits in the lane: his goal moves `laneW` × s (at most `laneMax`) toward the
+ *   point `ahead` yd in front of the expected catch, on the line to the QB, with his eyes on the QB (so a
+ *   flat bullet through him can be tipped or picked, `TIP`). The cost: his trail is `lag` × s s later.
+ * - `jumpFrom`: from this, within `lead` s of the expected release, he drives to the catch spot before the throw.
+ * - `plusFrom`: a backer to a rolling QB's side chases him from this, `plusReact` s after the roll (more with
+ *   less play recognition, less the surer he is); the end to that side plays contain.
+ * - On the throw: `react` × s faster to the expected throw (to his man, within `near` yd of the spot),
+ *   `wrong` × s slower to anything else.
+ * - `trap`: the DC's trap (`DefTags.trap`) gives the corner and flat defenders to its side at least this.
+ * - `tell`: a corner sitting on it lines up this many yd shallower before the snap (`antic` from `tellFrom`).
+ */
+export const ANTIC = {
+  laneFrom: 0.12, jumpFrom: 0.42, lead: 0.35, plusFrom: 0.2, plusReact: 0.25, trap: 0.8,
+  ahead: 2.5, laneW: 1.2, laneMax: 0.85, lag: 0.25, react: 0.35, wrong: 0.3, near: 4, tell: 1, tellFrom: 0.45,
+};
+
 export const KEY = { lag: 0.35, cushion: 1, zone: 4, robber: 14, react: 0.3, deep: 0.35, others: 0.12, shade: 0.4 };
 /** A spy sits this deep, mirroring the QB across the field. */
 const SPY_DEPTH = 5;
@@ -288,6 +308,8 @@ export function eyesOf(play: Play, p: Player): number {
     return clamp((play.time - p.lookAt) / turnTime(p), 0, 1);
   }
   if (p.assign?.kind !== 'man' || p.manTarget?.isBlocker) return 1;
+  // Sitting on the throw he expects, he's reading the QB, not his man.
+  if (play.antic.get(p)) return 1;
   if (!p.turned) return FIND.backpedal;
   return p.role === 'LB' ? FIND.lbMan : 0;
 }
@@ -483,7 +505,31 @@ export function thinkDefense(play: Play, d: Player): void {
     pursue(d, st, 0.9);
     return;
   }
+  // The throw he's seen before: sit in the lane, jump it, or chase the rolling QB (game/habits.ts).
+  const an = play.antic.get(d);
+  if (an && play.phase === 'live' && play.expect && anticipate(play, d, an)) return;
   runAssignment(play, d);
+}
+
+/** Act on the expected throw (`ANTIC`); false leaves him to his assignment. */
+function anticipate(play: Play, d: Player, an: { role: AnticRole; s: number }): boolean {
+  const e = play.expect!;
+  if (an.role === 'jump') {
+    d.goal = e.spot;
+    d.want = seek(d, e.spot, maxSpeed(d), 0.5);
+    return true;
+  }
+  if (an.role === 'plus') {
+    d.goal = play.qb.pos;
+    pursue(d, play.qb, 1, PURSUIT_LEAD);
+    return true;
+  }
+  runAssignment(play, d);
+  const lp = lanePoint(e.spot, play.qb.pos, ANTIC.ahead);
+  const w = Math.min(ANTIC.laneMax, an.s * ANTIC.laneW);
+  const to = seek(d, lp, maxSpeed(d) * 0.95, 0.6);
+  d.want = { x: lerp(d.want.x, to.x, w), y: lerp(d.want.y, to.y, w) };
+  return true;
 }
 
 /**
@@ -696,7 +742,7 @@ function rush(play: Play, d: Player): void {
     return;
   }
   const a = d.assign;
-  if (a?.kind === 'rush' && a.contain && dist(d.pos, play.qb.pos) > CONTAIN_CLOSE) {
+  if (a?.kind === 'rush' && (a.contain || d === play.rollContain) && dist(d.pos, play.qb.pos) > CONTAIN_CLOSE) {
     // Contain: work to the QB's outside shoulder and stay level with him, so he can't escape that way.
     const out = Math.sign(d.start.y - play.ballY) || 1;
     const tgt = { x: play.qb.pos.x + 0.5, y: play.qb.pos.y + out * CONTAIN_WIDTH };
@@ -725,7 +771,9 @@ function cover(play: Play, d: Player): void {
   // Defenders react to what the receiver did a moment ago; better man coverage = shorter lag.
   // Eyes in the backfield on a run he's expecting: a step late on his man.
   const keyed = r === play.keyed;
-  const lagFrames = Math.round((0.6 - (d.r.mcv / 100) * 0.35 + LEAN_FX.eyes * Math.max(0, d.lean.run)) * (keyed ? 1 - KEY.lag : 1) * 60);
+  const an = play.antic.get(d);
+  const peek = an && an.role === 'lane' ? ANTIC.lag * an.s : 0;
+  const lagFrames = Math.round(((0.6 - (d.r.mcv / 100) * 0.35 + LEAN_FX.eyes * Math.max(0, d.lean.run)) * (keyed ? 1 - KEY.lag : 1) + peek) * 60);
   const hist = play.history.get(r.id);
   const lp = hist && hist.length ? hist[Math.max(0, hist.length - 1 - lagFrames)] : r.pos;
   const since = play.time - play.snapTime;

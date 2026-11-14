@@ -226,6 +226,11 @@ export interface DefTags {
    * takes him, and everyone breaks faster on a ball to him; the rest of the coverage is a beat slower.
    */
   key?: OffSlot;
+  /**
+   * A trap to the side the user's habit throws to (game/defBrain.ts `trapRead`): the corner and flat defender
+   * there sit on the throw they've seen (`ANTIC.trap`, sim/ai.ts), whatever their own read.
+   */
+  trap?: 'strong' | 'weak';
 }
 
 /**

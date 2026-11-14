@@ -210,3 +210,6 @@ The THROW rows throw each type to one route against the man and the zone calls. 
 - **LOB:** the most intercepted throw (THROW ALL: 7.5–11.5%, against 0–3.3% for touch). Best over the top against zone (go: 72% complete, 33.5 yards per throw). On short routes it's picked 10–16% of the time, so it's the wrong throw there.
 - **TOUCH:** the middle. About equal to BULLET on curls and drags against zone, better than BULLET deep against zone.
 - **Flag:** BULLET still edges TOUCH on most short and intermediate routes when the lane is clean. The harness picks receivers by separation, not by lane, so it under-counts tips.
+
+## Defenders sitting on a throw (2026-11-14)
+A defender who has learned the user's throw (DEFENSE.md, "The players learn your throws") sits in the lane with his eyes on the QB. A flat bullet through him is a tip or a pick by the existing `TIP` model. A lob sails over him, and a touch pass gets over him when it's thrown early enough. So against a defense sitting on the out, the lob over the top and the vacated drag are the counters. The THROW rows don't change: they have no throws on record.

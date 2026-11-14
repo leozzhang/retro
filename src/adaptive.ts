@@ -9,8 +9,9 @@ import { LEGACY, PLAYBOOK, type PlayDef } from './data/plays';
 import { DEF_SLOTS } from './data/teams';
 import { OPP_GOAL } from './engine/constants';
 import { mulberry32, type Rng } from './engine/math';
-import { callFor, checkFor, halftime, laneOf, leansFor, newBrain, newDrive, observe, teamSmarts, type DefBrain, type DefenseIq } from './game/defBrain';
+import { anticFor, callFor, checkFor, halftime, laneOf, leansFor, newBrain, newDrive, observe, teamSmarts, type DefBrain, type DefenseIq } from './game/defBrain';
 import { mergeFilm, rosterRead, type FilmBook } from './game/offModel';
+import type { ThrowKind } from './sim/ball';
 import * as H from './harness';
 import { successful } from './season/grades';
 import { playTraits } from './season/scouting';
@@ -59,6 +60,27 @@ export const SCRIPTS: Record<string, Script> = {
     r() < 0.5 ? any([book('outside-zone'), book('split-zone')], r) : any([book('mesh'), book('dagger'), book('stick'), book('curl-flat')], r),
   // A star X (`FAVORITE`): quick and dropback passes, most of them forced to him (the key's row).
   'elite X': (_n, _d, _t, r) => any(xPasses, r),
+  // The rollout habit (`THROW_TO`): PA Boot Flood every snap, a bullet to the out once the QB is on the move.
+  'boot bullet': () => book('pa-boot'),
+  // The counters after 8: a lob over the top to the go, or the drag the chasing backer left.
+  'boot x8 then lob': () => book('pa-boot'),
+  'boot x8 then drag': () => book('pa-boot'),
+  // The same throw with the QB kept in the pocket: no rollout to read.
+  'boot bullet pocket': () => pocketBoot,
+};
+
+/** PA Boot Flood with the QB kept in the pocket (the same look and id, no boot). */
+const pocketBoot: PlayDef = { ...book('pa-boot'), dropY: 0 };
+
+/**
+ * Scripts that throw a set route with a set throw type after `hold` s (the user's habit), by snap: the
+ * out as a bullet, or the counter after the 8th snap of 12.
+ */
+const THROW_TO: Record<string, { hold: number; to: (n: number) => { route: string; kind: ThrowKind } }> = {
+  'boot bullet': { hold: 1.7, to: () => ({ route: 'deepOut', kind: 'bullet' }) },
+  'boot bullet pocket': { hold: 1.7, to: () => ({ route: 'deepOut', kind: 'bullet' }) },
+  'boot x8 then lob': { hold: 1.7, to: (n) => (n % 12 < 8 ? { route: 'deepOut', kind: 'bullet' } : { route: 'go', kind: 'lob' }) },
+  'boot x8 then drag': { hold: 1.7, to: (n) => (n % 12 < 8 ? { route: 'deepOut', kind: 'bullet' } : { route: 'drag', kind: 'touch' }) },
 };
 
 /** Passes with a route for the X: the quick game and dropbacks. */
@@ -75,6 +97,8 @@ const rpoGive = (name: string, n: number, rng: Rng) =>
   name === 'RPO glance mix' ? rng() < 0.3 : name === 'glance x8 then give' ? n % 12 >= 8 : false;
 /** The counter rows: which plays count as the counter, after the spam. */
 const COUNTER: Record<string, (p: PlayDef) => boolean> = {
+  'boot x8 then lob': () => true,
+  'boot x8 then drag': () => true,
   'IZ x8 then PA': (p) => p.kind === 'pa',
   'glance x8 then smoke': (p) => p.id === 'rpo-smoke',
   'glance x8 then give': () => true,
@@ -94,6 +118,8 @@ export interface AdaptiveResult {
   counter: number;
   /** RPO pulls: completion rate and yards per throw. */
   pulls: { n: number; comp: number; ypa: number };
+  /** Interceptions a snap. */
+  ints: number;
   /** A favorite receiver's script (`FAVORITE`): yards a throw to him, and to everyone else. */
   fav?: { to: number; rest: number };
 }
@@ -125,6 +151,7 @@ export function adaptive(
   let drives = 0;
   let counter = 0;
   let counterN = 0;
+  let ints = 0;
   const pulls = { n: 0, comp: 0, yds: 0 };
   const isCounter = COUNTER[name];
   for (let g = 0; g < games; g++) {
@@ -147,14 +174,16 @@ export function adaptive(
       const checked = brain && parts.dc && parts.check ? checkFor(brain, ident, play, pick.call, down, toGo, ytg) : null;
       if (checked) pick.call = checked;
       const reads = brain && parts.players ? leansFor(brain, prc, pick.call, play, { down, toGo, yardsToGoal: ytg }) : undefined;
-      const x = { tags: pick.tags, reads };
+      const x = { tags: pick.tags, reads, ...(brain && parts.players ? { habits: brain.habits, antic: anticFor(brain, prc) } : {}) };
       const rpo = play.read === 'rpo';
       const give = rpo && rpoGive(name, n, rng);
       const forced = fav && favRng() < fav.share;
-      const to = forced ? (o: { slot: string }) => o.slot === fav.slot : undefined;
+      const habit = THROW_TO[name]?.to(n);
+      const to = habit ? (o: { routeName?: string | null }) => o.routeName === habit.route : forced ? (o: { slot: string }) => o.slot === fav.slot : undefined;
       const r =
         rpo ? H.rpoRep(m, play, pick.call, give, rng, los, x)
-        : play.kind === 'run' ? H.runRep(m, play, pick.call, rng, los, x) : H.passRep(m, play, pick.call, holdFor(play), rng, x, los, 'touch', to);
+        : play.kind === 'run' ? H.runRep(m, play, pick.call, rng, los, x)
+        : H.passRep(m, play, pick.call, habit ? THROW_TO[name].hold : holdFor(play), rng, x, los, habit?.kind ?? 'touch', to);
       const o = r.o;
       if (!o) continue;
       const turnover = o.type === 'int' || o.type === 'pick6';
@@ -188,11 +217,13 @@ export function adaptive(
           air: r.play.thrown && r.play.ballTarget ? r.play.ballTarget.x - los : 0,
           handedOff: r.play.handedOff, lane: laneOf(r.play), tags: pick.tags, target: r.play.thrown ? r.play.intended?.slot ?? null : null,
           lost: turnover || o.type === 'sack' || o.type === 'fumble',
+          throw: r.play.throwRecord(gain), antic: Object.fromEntries([...r.play.anticLog].map(([d, a]) => [d.slot, a])),
         });
       }
       // The drive: a score, a turnover or a failed fourth down starts a new one at the 25.
       let over = o.type === 'td' || turnover;
       if (o.type === 'td') td++;
+      if (turnover) ints++;
       if (!over) {
         los += gain;
         if (los >= first) {
@@ -208,13 +239,14 @@ export function adaptive(
         if (brain) newDrive(brain);
       }
     }
-    if (brain && opts.keepFilm) opts.keepFilm(brain.model.raw);
+    if (brain && opts.keepFilm) opts.keepFilm({ ...brain.model.raw, throws: brain.habits.slice(0, 12) });
   }
   return {
     ypp: win.map((y, i) => y / Math.max(1, winN[i])), succ: succ / (games * snaps), td: td / drives, drives,
     counter: counter / Math.max(1, counterN),
     pulls: { n: pulls.n, comp: pulls.comp / Math.max(1, pulls.n), ypa: pulls.yds / Math.max(1, pulls.n) },
     fav: fav ? { to: favN.toYds / Math.max(1, favN.to), rest: favN.restYds / Math.max(1, favN.rest) } : undefined,
+    ints: ints / Math.max(1, games * snaps),
   };
 }
 
@@ -230,13 +262,14 @@ export function adaptiveRows(games = 30, snaps = 40, seed = 23): string[] {
         `ADAPT ${name.padEnd(20)} ${label.padEnd(13)} | ypp ${r.ypp.map((y) => y.toFixed(1)).join(' / ')} succ ${(r.succ * 100).toFixed(0)}% ` +
           `td/drive ${r.td.toFixed(2)}${COUNTER[name] ? ` counter ypp ${r.counter.toFixed(1)}` : ''}` +
           (r.pulls.n ? ` pulls comp ${(r.pulls.comp * 100).toFixed(0)}% ypa ${r.pulls.ypa.toFixed(1)}` : '') +
-          (r.fav ? ` to him ${r.fav.to.toFixed(1)} ypa, the rest ${r.fav.rest.toFixed(1)}` : ''),
+          (r.fav ? ` to him ${r.fav.to.toFixed(1)} ypa, the rest ${r.fav.rest.toFixed(1)}` : '') +
+          (THROW_TO[name] ? ` int ${(r.ints * 100).toFixed(1)}%` : ''),
       );
     }
   }
   // Film: one game of the same offense on tape, then the next games' first snaps, with and without it, by the DC's SCOUT.
   rows.push('ADAPT FILM: three games of the same offense on film, then NORMAL DC 75 with a SCOUT 40 or 85 DC: ypp snaps 1-6 without -> with the film');
-  for (const name of ['IZ only', 'slant only', 'elite X', 'pistol run trips pass']) {
+  for (const name of ['IZ only', 'slant only', 'elite X', 'pistol run trips pass', 'boot bullet']) {
     if (process.env.ADAPT_ONLY && !process.env.ADAPT_ONLY.split(',').includes(name)) continue;
     let film: FilmBook | undefined;
     adaptive(SCRIPTS[name], 'NORMAL', 75, 3, snaps, seed + 999, undefined, name, H.REF_DEF, { keepFilm: (f) => (film = mergeFilm(film, f)) });
@@ -250,7 +283,7 @@ export function adaptiveRows(games = 30, snaps = 40, seed = 23): string[] {
   // The smarts check: the same spammed RPO and the formation tell against a strong and a weak defense,
   // static and sharp. A weak defense (less play recognition, `teamSmarts`) has to adapt clearly less.
   rows.push('ADAPT TIERS: the same offense against a strong (88) and a weak (70) defense: STATIC -> SHARP DC 75, ypp snaps 7+');
-  for (const name of ['RPO glance', 'pistol run trips pass']) {
+  for (const name of ['RPO glance', 'pistol run trips pass', 'boot bullet']) {
     if (process.env.ADAPT_ONLY && !process.env.ADAPT_ONLY.split(',').includes(name)) continue;
     for (const lvl of [88, 70]) {
       const late = (r: AdaptiveResult) => (r.ypp[1] + r.ypp[2]) / 2;

@@ -69,7 +69,7 @@ export function referenceMatchup(off = REF_OFF, def = REF_DEF): Matchup {
 }
 
 /** The DC's tags, the defenders' leans (game/defBrain.ts) and a disguise for a snap; none plays the call as written. */
-export type DefExtras = Pick<PlaySetup, 'tags' | 'reads' | 'disguise' | 'ablate'>;
+export type DefExtras = Pick<PlaySetup, 'tags' | 'reads' | 'disguise' | 'ablate' | 'habits' | 'antic'>;
 
 export function newPlay(m: Matchup, playDef: PlayDef, call: DefCall, rng: Rng, los = LOS, x?: DefExtras): Play {
   return new Play({

@@ -77,7 +77,7 @@ import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
 import { mergeFilm, rosterRead } from './offModel';
-import { adjustments, callFor, checkFor, lastRead, halftime as brainHalftime, headline, laneOf, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
+import { adjustments, anticFor, callFor, checkFor, lastRead, halftime as brainHalftime, headline, laneOf, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
 import { successful } from '../season/grades';
 import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog, lineupOf, simPart } from '../season/simGame';
@@ -2205,7 +2205,7 @@ export class Game {
     // The film this game leaves for next week's DC (game/offModel.ts).
     if (this.brain) {
       const ts = (s.teamState[s.config.userTeamId] ??= {});
-      ts.film = mergeFilm(ts.film, this.brain.model.raw);
+      ts.film = mergeFilm(ts.film, { ...this.brain.model.raw, throws: this.brain.habits.slice(0, 12) });
     }
     advanceWeek(s, result, this.liveDrives ?? undefined);
     this.liveDrives = null;
@@ -2509,6 +2509,8 @@ export class Game {
       defCall: this.defCall!,
       press: this.press,
       tags: this.defTags,
+      habits: this.brain && !this.drive.try ? this.brain.habits : undefined,
+      antic: this.brain && !this.drive.try ? anticFor(this.brain, this.defPrc()) : undefined,
       reads: this.brain && !this.drive.try ? leansFor(this.brain, this.defPrc(), this.defCall!, def, { down: this.drive.down, toGo: this.drive.firstDownX - this.drive.los, yardsToGoal: OPP_GOAL - this.drive.los }) : undefined,
       los: this.drive.los,
       ballY: this.drive.ballY,
@@ -2540,6 +2542,7 @@ export class Game {
       scrambled: play.scramble, kept: play.kept, air: play.ballTarget && play.thrown ? play.ballTarget.x - d.los : 0,
       handedOff: play.handedOff, lane: laneOf(play), tags: play.tags, target: play.thrown ? play.intended?.slot ?? null : null,
       lost: turnover || o.type === 'sack',
+      throw: play.throwRecord(gain), antic: Object.fromEntries([...play.anticLog].map(([d, r]) => [d.slot, r])),
     });
   }
 
@@ -3393,8 +3396,14 @@ export class Game {
     const lines = [
       `DC EXPECTS: ${r.expect.slice(0, 4).map((x) => `${playName(x.id)} ${Math.round(x.w * 100)}`).join(', ')}`,
       `CALLS: ${Object.keys(r.mix).sort((x, y) => r.mix[y] - r.mix[x]).slice(0, 4).map((k) => `${k} ${Math.round(r.mix[k] * 100)}% (id ${Math.round(r.base[k] * 100)}, +${Math.round(r.gain[k] * 100)})`).join('  ')}`,
-      `KEY: ${b.keyRead ? `${b.keyRead.slot} ${Math.round(b.keyRead.odds * 100)}%${b.keyed ? ' ON' : ''}` : '-'}   HEAVY: ${b.heavy ?? '-'}   SNAPS SEEN ${b.model.n.toFixed(1)}`,
+      `KEY: ${b.keyRead ? `${b.keyRead.slot} ${Math.round(b.keyRead.odds * 100)}%${b.keyed ? ' ON' : ''}` : '-'}   TRAP ${Math.round(b.trapOdds * 100)}%   HEAVY: ${b.heavy ?? '-'}   SNAPS SEEN ${b.model.n.toFixed(1)}`,
     ];
+    // The players: the throw they expect right now, and who's on it.
+    const e = this.play?.expect;
+    if (e) {
+      const who = [...this.play!.antic].map(([d, a]) => `${d.slot} ${a.role} ${Math.round(a.s * 100)}`).join(', ');
+      lines.push(`THROW: ${e.slot} ${Math.round(e.spot.x - this.play!.los)} YD AT ${e.t.toFixed(1)}S, ${Math.round(e.conf * 100)}%   ${who}`);
+    }
     lines.forEach((l, i) => text(g, l.toUpperCase(), 4, 40 + i * 8, { size: 6, color: '#9fe8ff' }));
   }
 
