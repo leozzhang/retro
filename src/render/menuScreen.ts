@@ -52,6 +52,9 @@ function button(g: CanvasRenderingContext2D, b: Box, label: string, hot: boolean
 /** The big button at the foot of the setup screens: KICK OFF, NEXT, START DYNASTY. */
 export const GO_BTN: Box = { x: VIEW_W / 2 - 90, y: 290, w: 180, h: 20 };
 
+/** The exhibition's SIM GAME, beside KICK OFF: the game played through the engine, watched at the DRIVES level. */
+export const SIM_GAME_BTN: Box = { x: VIEW_W / 2 + 100, y: 290, w: 100, h: 20 };
+
 /** The gold GO button, like the hub's main action. */
 function goButton(g: CanvasRenderingContext2D, label: string, hot: boolean): void {
   const b = GO_BTN;
@@ -127,7 +130,12 @@ export function drawExhibition(g: CanvasRenderingContext2D, user: Team, cpu: Tea
   text(g, `<  ${quarter}  >   (Q / E)`, VIEW_W / 2, 266, { align: 'center', color: ACCENT });
   text(g, keys, VIEW_W / 2, 280, { align: 'center', color: my >= 280 && my < 290 ? GOLD : SOFT, shadow: false });
   goButton(g, 'KICK OFF', inBox(GO_BTN, mx, my));
-  drawHint(g, 'ENTER: KICK OFF   R / T: ROSTERS   ESC: BACK');
+  const b = SIM_GAME_BTN;
+  const hot = inBox(b, mx, my);
+  g.fillStyle = hot ? '#2c3d58' : '#1f2a3a';
+  g.fillRect(b.x, b.y, b.w, b.h);
+  text(g, 'SIM GAME', b.x + b.w / 2, b.y + 6, { align: 'center', color: hot ? GOLD : '#ffffff', shadow: false });
+  drawHint(g, 'ENTER: KICK OFF   X: SIM GAME   R / T: ROSTERS   ESC: BACK');
 }
 
 export function drawNewTeam(g: CanvasRenderingContext2D, t: Team, slot: number, mx: number, my: number): void {

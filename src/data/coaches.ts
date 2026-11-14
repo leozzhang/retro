@@ -226,6 +226,11 @@ export function dcAdjust(c: Coach): number {
   const g = gauss(mulberry32(hashString(`dc-adjust:${c.id}`)));
   return Math.round(clamp(c.r.scout + g * STAFF.ratingSd * ADJUST_SPREAD, STAFF.min, STAFF.max));
 }
+/** An OC's in-game adjustments (ADJUST), as `dcAdjust` is the DC's: how fast and how well he answers the defense (game/ocBrain.ts). */
+export function ocAdjust(c: Coach): number {
+  const g = gauss(mulberry32(hashString(`oc-adjust:${c.id}`)));
+  return Math.round(clamp(c.r.scout + g * STAFF.ratingSd * ADJUST_SPREAD, STAFF.min, STAFF.max));
+}
 /** How far ADJUST strays from SCOUT, as a share of the rating SD. */
 const ADJUST_SPREAD = 0.8;
 

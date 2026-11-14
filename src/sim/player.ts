@@ -301,9 +301,24 @@ export function makePlayer(side: Side, rp: RosterPlayer, uniform: Uniform, pos: 
   };
 }
 
-/** Top speed in yards/second. A 90-speed player tops out around 8.6 yd/s. */
+/**
+ * Top speed (`maxSpeed`): `base` + `per` yd/s a point of `spd`, with each player's speed pulled toward his
+ * position's typical speed (`mid`, the middle FBS tier's starters) by `squeeze` (1 is none). The engine turns a
+ * small top-speed edge into the whole play (pursuit angles, closing on a throw, trailing in man), so between two
+ * corners it counts `squeeze` of the rating gap; a receiver's edge over a backer is the positions' gap, untouched.
+ * A 90-speed corner tops out around 8.6 yd/s. `npm run drives`' unit swap measures it (docs/ENGINEDRIVES.md).
+ */
+export const SPEED = {
+  base: 4.8,
+  per: 0.042,
+  squeeze: 0.6,
+  mid: { QB: 74, RB: 90, WR: 91, TE: 78, OL: 56, DL: 73, LB: 79, CB: 92, S: 89, K: 60, P: 60 } as Record<string, number>,
+};
+
+/** Top speed in yards/second (`SPEED`). */
 export function maxSpeed(p: Player): number {
-  return 4.8 + (p.r.spd / 100) * 4.2;
+  const mid = SPEED.mid[p.role] ?? p.r.spd;
+  return SPEED.base + SPEED.per * (mid + SPEED.squeeze * (p.r.spd - mid));
 }
 
 /**

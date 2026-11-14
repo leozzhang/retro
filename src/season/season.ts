@@ -26,6 +26,7 @@ import { openRecruiting, recruitWeek } from './recruiting';
 import { STANDARD } from '../data/emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { GameStory } from './story';
+import { engineGame, type EngineTeamIn, type SnapWatch } from './engineGame';
 import type { DriveLog, GameResult, InjuryEvent, SeasonConfig, SeasonGame, SeasonState, SeasonSummary, TeamState } from './types';
 import { baseRoster, seasonRng, squadFor, staffFor } from './world';
 
@@ -120,6 +121,8 @@ interface WeekContext {
   userDrives?: DriveLog[];
   /** Records the user's simulated game drive by drive, for its highlights. */
   userStory?: GameStory;
+  /** The user's simulated game's snaps by story play (`record`: on tape), for watching it. */
+  userWatch?: { snaps: SnapWatch; record: boolean };
   plans: Map<string, GamePlan>;
   /** Weekly emphases by team: only the user's staff picks any so far (CPU staffs stay on standard). */
   emph: Map<string, TeamMods>;
@@ -145,7 +148,20 @@ const prep: WeekStep = (state, ctx) => {
   if (mods) ctx.emph.set(user, mods);
 };
 
-/** Play: the user's game takes its live result; every other game is simulated. */
+/**
+ * A team in the user's engine game: its staff in the chair and plan; the CPU's DC plays the DEFENSE IQ
+ * setting and the disguises setting, with the user's film as his prior; the user's DC is himself.
+ */
+export function engineTeam(state: SeasonState, id: string, squad: Squad, plan: GamePlan): EngineTeamIn {
+  const user = id === state.config.userTeamId;
+  const st = staffFor(state, id);
+  return {
+    squad, oc: st.OC, dc: st.DC, passShare: plan.passShare,
+    ...(user ? { film: state.teamState[id]?.film } : { iq: state.config.defIq ?? 'NORMAL', disguises: state.config.disguises !== false }),
+  };
+}
+
+/** Play: the user's game takes its live result, or is played through the engine; every other game is simulated. */
 const play: WeekStep = (state, ctx) => {
   const user = state.config.userTeamId;
   for (const g of gamesInWeek(state, ctx.week)) {
@@ -158,9 +174,14 @@ const play: WeekStep = (state, ctx) => {
     if (ctx.userResult && (g.home === user || g.away === user)) {
       drives.push(...(ctx.userDrives ?? []));
       g.result = { ...settleTie(ctx.userResult, home, away, rng, g.neutral, drives, emph), live: true };
+    } else if (g.home === user || g.away === user) {
+      // The user's game is played through the engine, both sides (docs/ENGINEDRIVES.md, phase 4).
+      const w = ctx.userWatch;
+      g.result = engineGame(engineTeam(state, g.home, home, ctx.plans.get(g.home)!), engineTeam(state, g.away, away, ctx.plans.get(g.away)!), rng, {
+        drives, story: ctx.userStory, watch: w?.snaps, record: w?.record,
+      });
     } else {
-      const story = g.home === user || g.away === user ? ctx.userStory : undefined;
-      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives, emph, story });
+      g.result = simGame(home, away, rng, { neutral: g.neutral, plans: { home: ctx.plans.get(g.home)!, away: ctx.plans.get(g.away)! }, drives, emph });
     }
     ctx.played.set(g.id, { drives, home, away, neutral: g.neutral });
     // Wins over the pregame odds, for the staffs' scouting growth.
@@ -380,12 +401,15 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
 /**
  * Play out the current week: the user's game with `userResult` (and its drives, for progression) if
  * they played it on the field, everything else simulated. Does nothing once the season is complete.
- * The user's weekly emphases are spent: every week starts on standard. A simulated user game fills
- * `userStory` (season/story.ts) as it goes; that only watches, so the week plays the same without it.
+ * The user's weekly emphases are spent: every week starts on standard. A simulated user game is played
+ * through the engine (`engineGame`) and fills `userStory` (season/story.ts) and `userWatch` (its snaps,
+ * on tape when asked) as it goes; that only watches, so the week plays the same without them.
  */
-export function advanceWeek(state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[], userStory?: GameStory): void {
+export function advanceWeek(
+  state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[], userStory?: GameStory, userWatch?: WeekContext['userWatch'],
+): void {
   if (seasonOver(state)) return;
-  const ctx: WeekContext = { week: state.week, userResult, userDrives, userStory, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map() };
+  const ctx: WeekContext = { week: state.week, userResult, userDrives, userStory, userWatch, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map() };
   for (const step of WEEK_STEPS) step.run(state, ctx);
   delete state.teamState[state.config.userTeamId]?.emph;
   if (!seasonOver(state)) state.week++;

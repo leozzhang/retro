@@ -28,6 +28,9 @@ import { simulateDrive } from './game/rules';
 import { progressTeam } from './season/progression';
 import { SCOUT_TIERS } from './season/scouting';
 import { simGame, simPart } from './season/simGame';
+import { engineGame, type EngineTeamIn } from './season/engineGame';
+import { newStory } from './season/story';
+import type { GameResult } from './season/types';
 import { autoGamePlan } from './season/staff';
 import { SCHEME_PASS } from './season/staff';
 import { START_SLOTS } from './season/confidence';
@@ -1222,6 +1225,81 @@ function gamePages(seasons: SeasonState[]): string[] {
   ];
 }
 
+
+/**
+ * USER GAMES (docs/ENGINEDRIVES.md, phase 4): the user's simulated games are played through the engine
+ * (`engineGame`); everyone else's stay on the drive sim. The same matchups both ways, neutral site, by the
+ * overall gap: favorite win %, and per team points, yards, the pass share of them, plays, completion,
+ * sacks, turnovers, possessions; then the margins. `USER_GAMES` per bucket (default 40).
+ */
+function userGames(): string[] {
+  const rng = mulberry32(777);
+  const squads = new Map(TEAMS.map((t) => [t.id, buildSquad(t)]));
+  const ovr = new Map([...squads].map(([id, sq]) => [id, teamRatings(sq).ovr]));
+  const side = (id: string, opp: string): EngineTeamIn => {
+    const st = buildStaff(teamById(id));
+    return { squad: squads.get(id)!, oc: st.OC, dc: st.DC, passShare: autoGamePlan(squads.get(id)!, squads.get(opp)!, st.OC).passShare };
+  };
+  const buckets = [[0, 4], [4, 8], [8, 14], [14, 99]] as const;
+  const per = Number(process.env.USER_GAMES ?? 40);
+  type Acc = { n: number; win: number; pts: number; yds: number; pass: number; plays: number; cmp: number; att: number; sk: number; to: number; poss: number; one: number; by28: number };
+  const blank = (): Acc => ({ n: 0, win: 0, pts: 0, yds: 0, pass: 0, plays: 0, cmp: 0, att: 0, sk: 0, to: 0, poss: 0, one: 0, by28: 0 });
+  const acc = buckets.map(() => ({ eng: blank(), sim: blank() }));
+  const add = (a: Acc, r: GameResult, drives: number) => {
+    a.n++;
+    a.win += r.home > r.away ? 1 : r.home === r.away ? 0.5 : 0;
+    a.pts += (r.home + r.away) / 2;
+    const m = Math.abs(r.home - r.away);
+    if (m <= 8) a.one++;
+    if (m >= 28) a.by28++;
+    for (const t of [r.box.home, r.box.away]) {
+      a.yds += t.yards / 2;
+      a.pass += t.passYds / 2;
+      a.plays += t.plays / 2;
+      a.to += t.turnovers / 2;
+    }
+    for (const l of r.box.players) {
+      a.cmp += l.cmp / 2;
+      a.att += l.att / 2;
+      a.sk += l.sk / 2;
+    }
+    a.poss += drives / 2;
+  };
+  let guard = 0;
+  let ms = 0;
+  while (acc.some((a) => a.eng.n < per) && guard++ < 200_000) {
+    const a = TEAMS[Math.floor(rng() * TEAMS.length)].id;
+    const b = TEAMS[Math.floor(rng() * TEAMS.length)].id;
+    if (a === b) continue;
+    const [fav, dog] = ovr.get(a)! >= ovr.get(b)! ? [a, b] : [b, a];
+    const gap = ovr.get(fav)! - ovr.get(dog)!;
+    const i = buckets.findIndex(([lo, hi]) => gap >= lo && gap < hi);
+    if (i < 0 || acc[i].eng.n >= per) continue;
+    const st = newStory(fav, dog);
+    const t0 = Date.now();
+    const e = engineGame(side(fav, dog), side(dog, fav), rng, { story: st });
+    ms += Date.now() - t0;
+    add(acc[i].eng, e, st.drives.filter((d) => !d.try).length);
+    const ss = newStory(fav, dog);
+    add(acc[i].sim, simGame(squads.get(fav)!, squads.get(dog)!, rng, { neutral: true, story: ss }), ss.drives.filter((d) => !d.try).length);
+  }
+  const head = `  ${'gap'.padEnd(8)}${'kind'.padEnd(7)}${'n'.padStart(4)}${'fav%'.padStart(7)}${'pts'.padStart(6)}${'yds'.padStart(6)}${'pass%'.padStart(7)}${'plays'.padStart(7)}${'cmp%'.padStart(6)}${'sk'.padStart(5)}${'TO'.padStart(5)}${'poss'.padStart(6)}${'1score'.padStart(8)}${'28+'.padStart(7)}`;
+  const row = (label: string, kind: string, a: Acc) =>
+    `  ${label.padEnd(8)}${kind.padEnd(7)}${String(a.n).padStart(4)}${pctText(a.win / a.n).padStart(7)}${(a.pts / a.n).toFixed(1).padStart(6)}${(a.yds / a.n).toFixed(0).padStart(6)}` +
+    `${pctText(a.pass / a.yds).padStart(7)}${(a.plays / a.n).toFixed(1).padStart(7)}${(100 * a.cmp / a.att).toFixed(0).padStart(6)}${(a.sk / a.n).toFixed(1).padStart(5)}` +
+    `${(a.to / a.n).toFixed(1).padStart(5)}${(a.poss / a.n).toFixed(1).padStart(6)}${pctText(a.one / a.n).padStart(8)}${pctText(a.by28 / a.n).padStart(7)}`;
+  const rows = ['', '== USER GAMES ==', '', 'the user\'s simulated games through the engine (engine) vs the drive sim (sim), same matchups, neutral site; per team', head];
+  const all = { eng: blank(), sim: blank() };
+  buckets.forEach(([lo, hi], i) => {
+    const label = hi >= 99 ? `${lo}+` : `${lo}-${hi}`;
+    rows.push(row(label, 'engine', acc[i].eng), row('', 'sim', acc[i].sim));
+    for (const k of ['eng', 'sim'] as const) for (const f of Object.keys(all[k]) as (keyof Acc)[]) all[k][f] += acc[i][k][f];
+  });
+  rows.push(row('all', 'engine', all.eng), row('', 'sim', all.sim));
+  rows.push(`  engine game ${(ms / all.eng.n).toFixed(0)} ms; real FBS: ${REAL.ppg} points, ~390 yards, ~44% of yards passing, 62% completions, 2.3 sacks, 1.3 turnovers, ~12 possessions a team`);
+  return rows;
+}
+
 it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const n = Number(process.env.SEASONS ?? 5);
   const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
@@ -1251,7 +1329,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
     ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
-    ...portalReport(n), ...coaches(), ...partialSim(), ...gamePages(seasons), ...detail(seasons[0]),
+    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

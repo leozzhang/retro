@@ -143,11 +143,16 @@ export function bangedUp(a: Athlete): boolean {
   return healthy(a) && healthOf(a) < 100;
 }
 
-/** The player in each slot right now: the first healthy one on its depth list not already starting elsewhere. */
+/**
+ * The player in each slot right now: the first healthy one on its depth list not already starting elsewhere.
+ * A slot whose list runs dry (injuries on a thin roster) takes the best healthy player left, at one of the
+ * slot's positions if there is one, then anyone: the engine needs eleven on each side.
+ */
 export function starters(squad: Squad): Record<string, Athlete> {
   const byId = new Map(squad.athletes.map((a) => [a.id, a]));
   const used = new Set<string>();
   const out: Record<string, Athlete> = {};
+  const empty: string[] = [];
   for (const slot of PICK_ORDER) {
     for (const id of squad.depth[slot] ?? []) {
       const a = byId.get(id);
@@ -156,6 +161,17 @@ export function starters(squad: Squad): Record<string, Athlete> {
       out[slot] = a;
       break;
     }
+    if (!out[slot]) empty.push(slot);
+  }
+  for (const slot of empty) {
+    const pos = SLOT_POS[slot];
+    const left = squad.athletes.filter((a) => !used.has(a.id) && healthy(a));
+    const fits = left.filter((a) => SLOT_CANDIDATES[slot]?.includes(a.pos));
+    const pool = fits.length ? fits : left;
+    if (!pool.length) continue;
+    const best = pool.reduce((b, a) => (overall(a.r, pos ?? a.pos) > overall(b.r, pos ?? b.pos) ? a : b));
+    used.add(best.id);
+    out[slot] = best;
   }
   return out;
 }

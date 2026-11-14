@@ -1,6 +1,227 @@
 # Progress
 
-_Last updated: 2026-11-13_
+_Last updated: 2026-11-14_
+
+## Done: defense through the engine, phase 4: every snap of your games, simulated too (2026-11-14)
+ENGINEDRIVES.md "Phase 4" has the details.
+
+**What changed:**
+- **Your simulated games are engine games** (`season/engineGame.ts`): SIM GAME (`engineGame` in the week's `play` step), PLAY GAME from the 2nd quarter, halftime or the 4th (`enginePart`, whose brains keep learning into the live part). Both offenses are their OC's book run by the CPU QB; both defenses their DC's brain. CPU-vs-CPU games stay on the drive sim.
+- **SIM GAMES has an EVERY SNAP level:** every snap of a simulated game or stretch plays on tape, with the call over it ("YOUR O: MESH VS COVER 3", "YOUR D: TAMPA 2, QB SPY"). The other levels show their key plays on tape too.
+- **The exhibition has SIM GAME** (X, or the button beside KICK OFF), watched at its DRIVES level, then back to the setup.
+- **`starters()` fills a slot whose depth list runs dry** (injuries on a thin roster) with the best healthy player left. The engine needs eleven; a later season of an open dynasty crashed without it, and a played game would have too.
+- **`npm run season` has a USER GAMES section:** the same matchups through the engine and the drive sim.
+- **The weekly emphases' game-day edge now reaches no game** (it was the drive sim's, in your simulated games). Practice is unchanged. Open question in COACHES.md.
+
+**Checked:**
+- `npm test`: 465 pass, 1 fails (the portal test below). `engineDrive.test.ts` "Phase 4" covers watching changing nothing, the box score and game page adding up to the final, EVERY SNAP picking every snap, and the hand-offs.
+- **In the browser:** an exhibition SIM GAME on EVERY SNAP (126 shows, 330 ms to simulate, both notes, the final, back to the setup); a dynasty SIM GAME on EVERY SNAP (the game page reads the engine's box score and plays); PLAY GAME from the 2nd quarter, halftime and the 4th (each hand-off right, your DC's halftime card, his lines carried on).
+
+**Measured (USER GAMES, 160 games):** the engine against the drive sim on the same matchups.
+- Per team: 24.0 points (drive sim 26.7, FBS 26.5), 393 yards (422, ~390), 62% completions, 2.2 sacks, 67.6 plays.
+- Favorites win as often (88% vs 87.5%) but by far more: 39% of games are won by 28+ (25%, FBS 19%).
+- Fixed: a snap tackled inches short of the goal rounded to a touchdown on the game page, and a kick could be spotted at "the 100". Played games' CPU drives had it too. `drives.txt` is regenerated (200 games, within noise).
+
+**Failing test, not touched:** `portal.test.ts` "a buried gem at a power program looks to leave" wants gems to enter 1.5× as often as T1 starters, measured on one seeded season. Georgia's games are now engine games, so that season changed and it measures 1.45×. Across seeds 7–11 it ranges 1.02×–1.62×, so the threshold was luck before. It needs a decision: a portal fix or a fair test.
+
+**Next:**
+1. Calibration, now that the user's whole game is the engine's: talent gaps are too steep (USER GAMES: by 28+ in half the games at an 8–14 gap).
+2. Emphasis on the field, or practice only (a design call).
+3. Phase 5 (the fitted DC table for CPU-vs-CPU sims). A postgame defense line and per-opponent film for your DC.
+
+## Done: defense through the engine, phase 3: the CPU's drives in your games (2026-11-14)
+ENGINEDRIVES.md "Phase 3" has the details.
+
+**What changed:**
+- **The engine plays every CPU possession in a game you play:** regulation, overtime and the two-point try.
+  - Their OC calls with his identity and learns your defense.
+  - Your DC calls with his identity and a learning brain.
+- **Key plays are the real snaps on tape.** Each shows your defense's call ("YOUR D: COVER 2, CONTAIN").
+- **CPU DRIVES has a new EVERY SNAP level**, which watches each CPU drive play out.
+- **Your DC speaks:** one line a drive at most ("YOUR DC: WE'RE SPYING THEIR QB").
+- **At halftime** you get his adjustments and their OC's.
+- **Your defense can score:** a pick six (then your try) or a safety.
+- **The box score and grades read the real snaps.** There's no casting and there are no phantom incompletions.
+- **Emphases:** your defense's game-day edge no longer applies in played games (COACHES.md).
+
+**Checked:**
+- `npm test` passes (`engineDrive.test.ts`: watching changes nothing, the credit, the box score, the try).
+- **Driven in the browser:** an exhibition with EVERY SNAP. The snaps play on tape, mirrored, with the call and the caption. 14 CPU drives in a row give sensible results and DC lines, and halftime shows both cards.
+
+**Not checked by hand:**
+- a full season game (the box score, the game page, the postgame reel)
+- the pick-six try flow
+
+**Next:**
+1. Play a dynasty game by hand: the box score, the game page, the reel with CPU tapes, and a pick six.
+2. A postgame defense line, and per-opponent film for your DC.
+3. Phase 4: your SIM GAME and simulated quarters through the engine. Then the FULL every-snap sim and exhibition sims.
+4. Still open: the coordinator battle's leverage, the deep-shot share for Pro/Power, the DL `bsh` vs OL `rbk` roster edge.
+
+## In progress: defense through the engine, phase 0 (2026-11-14)
+ENGINEDRIVES.md has the design, the bands and the baseline. The plan: every snap of the user's games, played or simulated, runs in the engine. Your DC calls the defense with the learning brain. Each offense calls and throws like itself. CPU-vs-CPU games keep the drive sim plus a DC edge fitted from the engine. Phases 6–7 (the game plan screen, controlling a defender) are rough drafts, not approved.
+
+**Built (phase 0):**
+- **`game/cpuOffense.ts`:** `ocCall` (pass or run by `passOdds`, the play by style weights) and `CpuQb`, a reading QB:
+  - his read opens by family
+  - targets only receivers whose heads are around
+  - throws to the projected window at the catch point, high to low, past the sticks on 3rd down
+  - checkdown, scramble or throwaway under pressure
+  - `prc` sets his scan speed, hold time and misreads
+- **`game/engineDrive.ts`:** one possession through the engine:
+  - the defense calls as `Game.toCall` does, brain included, and the brain watches each snap
+  - the drive sim's coaching
+  - `EngineSnap` credit for every snap
+- **`npm run drives`:** engine against drive sim on the same real matchups. 60 games in about 15 s, about 250 ms an engine game.
+- `replay.ts` shares `bookPick` and `callSit` (same draws). `npm test` passes (`src/engineDrive.test.ts` is new).
+
+**Baseline:**
+- Points a drive 2.25 against 2.20, but by the wrong route: 20+ plays 12.8% (sim 4.1%), 36% of attempts thrown 20+ yards in the air (56% complete), 4.5 plays a drive, 38 points a team a game (sim 28).
+- Sacks 1.6% of dropbacks. The favorite wins 86% against 73%.
+- DC style moves nothing (2.24–2.26).
+
+**Phase 1, first pass (2026-11-14;** ENGINEDRIVES.md "Phase 1, first pass" has the numbers**):**
+- **The CPU QB:**
+  - reads depth at the catch point
+  - a progression with a reach by family, and a short checkdown
+  - decides on scans, and aims with the user's lag
+  - deep attempts 36% → 22%, sacks 1.6% → 8.8%, throwaways about 5.6%
+- **Man coverage (`MAN_TRAIL` 0.5, the user's games too):** a man defender carries the lagged spot along his man's lagged velocity. He used to trail every vertical by 1.5–2.5 yd.
+  - Balance at a 2.2 s hold: 2 Man 8.2 → 7.1 ypp, Cover 1 Robber 12.6 → 8.9 (YAC 7.9 → 5.3), Cover 1 Fire 15.1 → 10.4. Man now sits beside the zones (6.5–10), which answers DEFENSE.md's old "zones softer than man" flag from the other side.
+- **Speed squeeze (`SPEED.squeeze` 0.6, the user's games too):** the unit swap showed speed carried most of the talent slope (DB speed alone −0.92 points a drive). Each player's speed is pulled toward his position's typical speed, so same-position gaps count 60%.
+  - Balance: GAP −20 13.8 → 9.3 ypc, Georgia vs Kent 18.1 → 11.8. Even rows, POCKET and ADAPT hold.
+- **Lost fumbles** about 0.8% of plays.
+- `npm run film` rerun, so `filmPayoff.ts` is rewritten. `npm test` passes.
+- **Where it stands:**
+  - points a team 26.2 (sim 27.9)
+  - favorite win % by gap 40 / 82 / 91 (sim 43 / 68 / 88)
+  - but 4.4 plays a drive (sim 6.0), 20+ plays 8.7% (4.1), 3rd down 36% (47)
+  - run game 3.3 ypc at even talent
+  - DC style still moves nothing
+
+**Phase 1, second pass (2026-11-14;** ENGINEDRIVES.md has the numbers and the FBS comparison**): boom or bust diagnosed.**
+- **The drive killers were bugs, not the deep ball:**
+  - The CPU never handed off on an RPO (they're `kind: 'pa'`). Fixed: it gives on the box read and tucks on a dead pull.
+  - `autoRun` turned a bubble or screen catcher behind the line back into the run's crease. Fixed for the CPU, replays and harness: only a runner reads the line.
+  - The auto-runner couldn't cut a shed lineman in the backfield (89% of stuffs). Fixed: `AUTO_JUKE.behind` 3, toward the side with room (`cutSide`).
+- **`RUN_BLOCK_EDGE` 5 was tried and reverted to 3.** With the cut it pushed the user's GAP rows past target (even 7.0 ypc). With the cut at edge 3 every GAP row is in target (even 5.3, +5 3.9).
+- **Engine against FBS now:**
+  - success 46% (FBS about 42), 3rd down 38.5% (about 40), completion 65.5%
+  - but ypa 9.8 (about 7.5), deep attempts 21% (about 13%), sacks 9.3%
+  - RB runs too bimodal: stuffs 23%, 10+ 16%
+  - 26 points a team (sim 28); the favorite wins 80% (73)
+- `vite.config.ts` sets `testTimeout` 20 s: the season tests sat at the 5 s default under the full parallel run.
+- Film rerun, so `filmPayoff.ts` is rewritten. `npm test` passes.
+
+**Open:** runs into Cover 0 Blitz are 5.6 ypc (target 2.5–3.5).
+
+**Next:** the QB's deep share and sacks, then the run bimodality.
+
+**Phase 1, third pass (2026-11-14;** ENGINEDRIVES.md "third pass"**):**
+- **The CPU's deep judgment (`CPU_QB.far`):** 20+ air completion 60% → 46%, ypa 7.7.
+- **A presnap check (`ocCheck`, the first piece of a smart OC):** the QB reads the box and the shown shell, weighs the calls behind it by the defense's identity and disguise rate, and checks to the play from the same formation with the best film damage over that read. It moves points about +0.04 a drive and run success +4.
+  - Tag-only checks did nothing.
+  - Checks into shots were dropped: the film table overrates shots.
+- **Shorter hold:** sacks 7.7%.
+- **New rows:** red zone and starts.
+- **Measured at 200 games:**
+  - per play near FBS (success 46%, 3rd down 37%, completion 62%, ypa 7.7, 20+ plays 6.4%)
+  - the favorite's win % matches the sim's (85 / 84)
+  - but 24.2 points a team (sim 26.9) on 1.49 points a drive and 14 drives
+  - DC style still moves nothing
+- `npm test` passes.
+
+**Next:**
+1. 3rd down and run bimodality.
+2. Screens.
+3. `SNAP_SECS` and possessions.
+4. Phase 2 (the adapting OC, `OffIdentity`), which is also the smart-playcalling lever.
+
+**Phase 1, fourth pass (2026-11-14;** ENGINEDRIVES.md "fourth pass"**):**
+- **Parity: engine snaps carry everything a played snap does.** New this pass:
+  - confidence at the leverage (`clutchRoster`, late and close from the drive's clock)
+  - the shaken QB's aim nerves, in the CPU QB's lag
+  - the kicker's confidence on field goals
+
+  A test holds it.
+- **Money downs (`CPU_OC`):** a pass floor on 3rd and 4th (85% at 7+, 60% at 3–6), and the sneak on inches. 3rd down by distance is now about FBS: 61 / 50 / 36 / 20%.
+- **The runs aren't bimodal at even talent** (21 / 28 / 21 / 16 / 14). The aggregate is the random pairings' mismatches.
+- **Screens:** thrown once the line releases and the back has turned. 72% complete, 5.0 ypa; before, 35%, about 1.
+  - The `screen` route turns only at its end (about 1.9 s), so an early RB screen from the user is dropped too.
+- **Not tuned:**
+  - possessions (plays a game are about FBS)
+  - the 3–4 points a team still short. The likely cause is defensive penalties, which the engine doesn't have (FBS about 3 a game, many automatic first downs).
+- `npm test` passes. Balance and film are unchanged (CPU side only).
+
+**Next:**
+1. A defensive penalty model (also for the user's games), or accept the gap.
+2. Phase 2.
+
+**Phase 2 (2026-11-14;** ENGINEDRIVES.md "Phase 2"**):** the user accepted the scoring gap for now.
+- **`data/offIdentity.ts`:** each offense's identity, from the OC in the chair and the roster:
+  - the OC's taste, pass lean and go-to plays
+  - target shares by talent
+  - the QB's run lean and aggression
+- **The CPU QB plays it:**
+  - His eyes go to his best receiver first, more on money downs. The top receiver gets 26% of targets (31% on 3rd down); backs drop from 23% to 14.5%.
+  - When the pocket breaks down he runs by his lean, or slides out and keeps reading. Scrambles: pocket 3.8%, dual 10.6%, runner 14.9% of dropbacks; before, 11–13% for all of them, nearly all RPO keeps. Throws on the move are new.
+- **`game/ocBrain.ts`:** the adapting OC. He learns:
+  - their calls by situation, and what hides behind each shell (the QB's presnap check reads it)
+  - what's working, by family and by receiver
+
+  He leans his calls the way the DC does. ADJUST (`ocAdjust`) with game-day form; a weak OC overreacts and carries misjudgments.
+- **`data/enginePayoff.ts`:**
+  - **The film table is wrong for engine play:** its slope against engine success is 0.21–0.35.
+  - **The engine's own table:** fitted by `DRIVES_PAYOFF=1 npm run drives`, slope 0.90–1.05 out of sample.
+  - **Who reads it:** the DC's brain in engine drives, the OC's brain and the QB's check. Your games keep the film table, so their path is unchanged.
+- **DC style shows** in the drives:
+  - aggressive: 42% blitz, 60% man, shorter drives, more big plays
+  - soft: 56% two-high, longer drives, fewer explosives
+
+  Points a drive are about the same for all three.
+- **The coordinators' battle** (`DRIVES_ADAPT=1`, 600 games):
+  - **The DC's brain helps his defense:** about −1 point of success rate, −0.05 points a drive.
+  - **The OC's brain:** nothing measurable.
+  - **The ADJUST gap:** no measurable gradient.
+  - **Why:** calling from tendencies has almost no leverage in the engine. Even a perfect OC gains +0.06 a drive. A presnap coverage diagnosis for the CPU QB was tried and taken out (no effect).
+- **Scouting report:** their offense's section reads the identity:
+  - the QB's real run lean, the go-to target and his money-down share
+  - the OC's go-to calls, his lean and his ADJUST
+- **`npm run drives`** gains FILM CHECK, TENDENCIES (by style, targets by rank and slot, the QB by type, the DC by style) and `DRIVES_ADAPT=1` (the arms and the battle).
+- **The numbers:** points a team 24.6 (sim 26.9), favorite win 84.5% (sim 83.8%). `npm test` passes (`src/offIdentity.test.ts` is new). Balance and film are unchanged: CPU side only, and the user's DC brain keeps its default path.
+
+**Scheming players open (2026-11-14, the user's request;** ENGINEDRIVES.md has the tables**):**
+- **The OC's film of the defenders,** and five switches (`ML_OC.x`):
+  - **What he watches:** play-action bites, corners off, success by route kind and by the defender beaten, coverage matchups.
+  - **What the switches lean:** his calls, the presnap check and the QB's eyes.
+- **Tested one at a time** (400 games each): none moved success past the noise (−0.5 to +0.5 points, SE 0.35).
+- **Why: the engine's defenders don't have these flaws.**
+  - Every defense bites on play action alike (63%). Off corners give up nothing: an off man's cushion closes 2.2 yd/s.
+  - With trial mechanics (`DRIVES_MECH`: `OFF_MAN.close`, `PA_BITE`) the signals appear, and the OC still gains nothing: the edges are small and on few snaps.
+- **Where it stands:**
+  - Switches off, mechanics at today's values: the user's games are unchanged.
+  - `EngineSnap` now records `soft`, `paSeen`, `paBit` and `beaten`, and `DRIVES_DUMP` writes them.
+  - `npm test` passes.
+
+**Next:**
+1. **Decide with the user** where the coordinator battle's leverage should come from. Candidates:
+   - protection and hot adjustments against pressure
+   - receivers' sight adjustments
+   - accepting the DC-only effect
+2. **Deep shots:** Pro and Power throw 34–40% of attempts 20+ air yards (FBS about 13%).
+3. **Phase 3:** engine CPU drives in live games.
+4. **Once the full engine sim is built (phases 3–4)** (the user's requests):
+   - a "FULL" sim of the user's games that plays every snap, replacing today's FULL (key plays only)
+   - simulating exhibition matches
+
+**Needs a decision:** generated rosters give the DL's `bsh` a 3–6 point edge over the OL's `rbk` at every tier, so "even" teams aren't even in the trenches.
+
+**Next:**
+1. Drive efficiency: the run game at even talent, the deep ball (59% complete when thrown), possessions a game.
+2. The underdog and moderate-gap slope.
+3. Then phase 2 (`OffIdentity`, the adapting OC).
+
+Not played by hand yet: the man coverage and speed changes are in the user's games.
 
 ## Done: the players learn your throws (2026-11-14)
 DEFENSE.md, "The players learn your throws", has the design and numbers.

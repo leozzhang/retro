@@ -54,15 +54,15 @@ PLAY GAME on the hub opens a choice:
 
 K cycles the simulated quarters' key-play level.
 
-`simPart` (`season/simGame.ts`) simulates up to the quarter you chose:
+Since phase 4 of ENGINEDRIVES.md the stretch is played through the engine, both sides (`enginePart`, `season/engineGame.ts`): your OC's book run by the CPU QB against their DC's brain, their OC against your DC's. Those brains go on learning into the quarters you play. `simPart` (`season/simGame.ts`) is the drive-sim version it replaced, kept for the PARTIAL SIM section. Either way it simulates up to the quarter you chose:
 - **Clock:** it runs on the live clock (the dynasty's quarter length), so the score is on a played game's scale.
 - **Conventions:** it keeps the field's conventions. You receive the opening kickoff and the CPU receives the second half. It uses the CPU drive's late-game rules.
-- **From `simGame`:** the home edge, pace and game script.
+- **From `simGame`:** pace (and, in `simPart` only, the home edge and game script; the engine reads the score itself and has no home edge, as on the field).
 - **The quarter break:** the last quarter before the hand-off ends at its break (`DriveClock.quarterBreak`). A drive still going stops there and goes on live from the same spot (a new set of downs), so you always get the whole quarter.
 - **Hand-off:** your ball, the CPU's ball (its drive through `cpuDrive`), your kickoff after your score, or halftime.
-- **Stats:** the simulated quarters' box score is kept in the result. The played quarters still record only the score, as before. The game is marked `live`, since its box score is partial.
+- **Stats:** the simulated quarters' box score is kept in the result (the engine's real snaps). The played quarters still record only the score, as before. The game is marked `live`, since its box score is partial.
 
-**Balance:** at live pace a game has the possessions of a played game, about 5 a team at STANDARD, not `simGame`'s about 12. So it scores like one, about 9–11 points a team, and favorites win a little less often than in SIM GAME. `npm run season`'s PARTIAL SIM section shows this by overall gap. It's shown, not compensated: it's the same gap as "live games score less" in PROGRESS.md.
+**Balance (the drive sim's `simPart`; the engine's is in USER GAMES):** at live pace a game has the possessions of a played game, about 5 a team at STANDARD, not `simGame`'s about 12. So it scores like one, about 9–11 points a team, and favorites win a little less often than in SIM GAME. `npm run season`'s PARTIAL SIM section shows this by overall gap. It's shown, not compensated: it's the same gap as "live games score less" in PROGRESS.md.
 
 | Gap | SIM GAME win % | simPart win % | Points per team |
 | --- | --- | --- | --- |
@@ -72,10 +72,12 @@ K cycles the simulated quarters' key-play level.
 | 14+ | 100.0 | 93.3 | 29.2 vs 11.1 |
 
 ## SIM GAME with key plays
-With SIM GAMES above RESULT ONLY, X (or SIM GAME) does three things:
-1. Captures the two squads, simulates the week with a story (`advanceWeek(..., story)`) and saves. The result is in before you watch, so quitting mid-watch changes nothing.
-2. Shows the game's key plays, with 15:00 quarters on the clock, as `simGame` models.
+Your SIM GAME is played through the engine (`engineGame`, ENGINEDRIVES.md phase 4), so its key plays are the real snaps on tape, with the call over each ("YOUR O: MESH VS COVER 3", "YOUR D: TAMPA 2, QB SPY"). Field goals still show as kick replays. With SIM GAMES above RESULT ONLY, X (or SIM GAME) does three things:
+1. Captures the two squads, simulates the week with a story and its snaps on tape (`advanceWeek(..., story, watch)`) and saves. The result is in before you watch, so quitting mid-watch changes nothing.
+2. Shows the game's key plays (EVERY SNAP: all of them), with 15:00 quarters on the clock.
 3. Ends on the final. Esc skips to the final.
+
+The exhibition screen has the same SIM GAME (X, or the button beside KICK OFF), watched at its DRIVES level.
 
 ## Key plays (`game/keyPlays.ts`)
 Each snap of a drive gets a priority:
@@ -95,12 +97,13 @@ Fourth-down tries are logged when the drive sim knows the score, which every cal
 | LEAN | 1 | 1 | 3 |
 | NORMAL | 2 | 2 | 4 |
 | FULL | 4 | 3 | 7 |
+| EVERY SNAP | all | all | all |
 
-Priority-3 plays ignore the quarter cap.
+Priority-3 plays ignore the quarter cap. EVERY SNAP (`all`, `WATCH_LEVELS`) shows every snap but punts and kneels, in order.
 
 The settings are `SeasonConfig.keyPlays`, shown as two rows on the new-dynasty screen and on the hub's SETTINGS page:
-- **SIM GAMES:** RESULT ONLY / LEAN / NORMAL / FULL. Missing means RESULT ONLY.
-- **CPU DRIVES:** SUMMARY / LEAN / NORMAL / FULL. Missing means NORMAL.
+- **SIM GAMES:** RESULT ONLY / LEAN / NORMAL / FULL / EVERY SNAP. Missing means RESULT ONLY.
+- **CPU DRIVES:** SUMMARY / LEAN / NORMAL / FULL / EVERY SNAP. Missing means NORMAL.
 
 Exhibitions have their own CPU DRIVES line (K).
 

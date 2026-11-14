@@ -5,7 +5,7 @@ import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type PlayDef } fr
 import { ocBook, ocStyle, STYLES } from '../data/offStyles';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
-import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, teamRatings, type Squad } from '../data/depth';
+import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, type Squad } from '../data/depth';
 import type { Athlete } from '../data/athletes';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
@@ -34,7 +34,7 @@ import {
   type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
-  drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
+  drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
   slotConfirmRects, slotDeleteRect, slotRect, type MenuItem, type SettingRow, type SlotsView,
 } from '../render/menuScreen';
 import {
@@ -50,11 +50,12 @@ import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from
 import { ROOMS } from '../data/office';
 import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
-import { buildStaff, coachName, dcAdjust, GROUPS, type Coach, type Group } from '../data/coaches';
+import { buildStaff, coachName, dcAdjust, GROUPS, ocAdjust, type Coach, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
-import { advanceWeek, defaultConfig, newSeason, seasonOver, userGameThisWeek } from '../season/season';
+import { advanceWeek, defaultConfig, engineTeam, newSeason, seasonOver, userGameThisWeek } from '../season/season';
+import { engineGame, enginePart, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
 import { advanceOffseason, startOffseason } from '../season/offseason';
 import { actOnLeaving, offer, pursue, setTarget, withdraw } from '../season/portal';
@@ -73,20 +74,22 @@ import {
 } from '../render/departuresScreen';
 import { meetOnWatch } from '../season/departures';
 import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
-import { driveMods, emphasisMods, type TeamMods } from '../season/emphasis';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
 import { mergeFilm, rosterRead } from './offModel';
-import { adjustments, anticFor, callFor, checkFor, lastRead, halftime as brainHalftime, headline, laneOf, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
+import { driveStream, engineDrive, engineTry, type EngineDrive, type EngineSide, type EngineSnap } from './engineDrive';
+import { newOcBrain, ocAdjustments, ocHalftime, type OcBrain } from './ocBrain';
+import { offIdentity } from '../data/offIdentity';
+import { adjustments, anticFor, callFor, checkFor, lastRead, halftime as brainHalftime, headline, laneOf, ourLine, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
 import { successful } from '../season/grades';
 import { SCOUT_TIERS } from '../season/scouting';
-import { driveLog, lineupOf, simPart } from '../season/simGame';
-import { castDrive } from '../season/cast';
-import { newStory, type DriveCredit, type StoryDrive } from '../season/story';
+import { driveLog } from '../season/simGame';
+import { engineCredit } from '../season/cast';
+import { newStory, type DriveCredit, type GameStory, type StoryDrive } from '../season/story';
 import type { DriveLog, GameResult, KeyLevel, OfficeState, SeasonGame, SeasonState } from '../season/types';
 import type { SimPlay as LiveSimPlay } from './rules';
 import { cueShow, drawShow, drawShowStill, keyShow, prefetchShow, showFocus, updateShow, type KeyShow, type ShowCtx } from './highlights';
-import { KEY_LEVELS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
+import { WATCH_LEVELS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { text, textWidth } from '../render/text';
 import {
@@ -98,7 +101,7 @@ import { KickPlay } from './kickPlay';
 import { HARD_COUNT, Play } from './playState';
 import { personnelOf } from './resolvePlay';
 import {
-  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, PAT, simTwoPoint, xpOdds, simulateDrive, startDrive, userStartAfter,
+  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, PAT, xpOdds, startDrive, userStartAfter,
   type Applied, type Drive, type DriveClock, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
@@ -152,16 +155,16 @@ const SETTINGS: {
     read: (c) => Math.max(0, QUARTER_OPTIONS.indexOf(c.quarter ?? DEFAULT_QUARTER)),
   },
   {
-    label: 'SIM GAMES', help: 'SIMULATED GAMES AND QUARTERS: THE RESULT, OR WATCH THE KEY PLAYS',
-    options: ['RESULT ONLY', ...KEY_LABELS], start: 0,
-    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, sim: KEY_LEVELS[i] }),
-    read: (c) => KEY_LEVELS.indexOf(keyLevels(c).sim),
+    label: 'SIM GAMES', help: 'SIMULATED GAMES AND QUARTERS: THE RESULT, THE KEY PLAYS, OR EVERY SNAP',
+    options: ['RESULT ONLY', ...KEY_LABELS, 'EVERY SNAP'], start: 0,
+    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, sim: WATCH_LEVELS[i] }),
+    read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).sim),
   },
   {
-    label: 'CPU DRIVES', help: 'IN GAMES YOU PLAY: A SUMMARY, OR THE KEY PLAYS OF EACH CPU DRIVE',
-    options: ['SUMMARY', ...KEY_LABELS], start: 2,
-    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: KEY_LEVELS[i] }),
-    read: (c) => KEY_LEVELS.indexOf(keyLevels(c).defense),
+    label: 'CPU DRIVES', help: 'IN GAMES YOU PLAY: A SUMMARY, THE KEY PLAYS OF EACH CPU DRIVE, OR EVERY SNAP',
+    options: ['SUMMARY', ...KEY_LABELS, 'EVERY SNAP'], start: 2,
+    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: WATCH_LEVELS[i] }),
+    read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).defense),
   },
   {
     label: 'DEFENSE IQ', help: 'HOW MUCH THE CPU DEFENSE LEARNS YOUR OFFENSE DURING A GAME',
@@ -214,6 +217,8 @@ interface Notice {
   score?: { user: number; cpu: number };
   /** A key play shown on the field in place of the banner (game/highlights.ts). */
   show?: KeyShow;
+  /** A line over the banner: the user's DC on a CPU drive. */
+  note?: string;
 }
 
 /** Slow motion while the QB (or a punter) aims, when the SLOW AIM setting is on. */
@@ -391,8 +396,15 @@ export class Game {
   private homeId = '';
   /** A season game's drives for the progression grades: the user's snaps and kicks first, then each CPU drive. */
   private liveDrives: DriveLog[] | null = null;
-  /** A season game's weekly emphases for the user's team: the user's defense plays them in the CPU's simulated drives. */
-  private userEmph: TeamMods | undefined;
+  /**
+   * The CPU's possessions, played through the engine (docs/ENGINEDRIVES.md, Phase 3): its offense and the
+   * user's defense as the engine plays them, the user's DC learning their offense, and their OC learning
+   * the user's defense.
+   */
+  private cpuOff: EngineSide | null = null;
+  private userDef: EngineSide | null = null;
+  private userDc: DefBrain | null = null;
+  private cpuOc: OcBrain | null = null;
   /** The two teams as the key plays show them. */
   private showCtx: ShowCtx | null = null;
   /** Key plays for the CPU's drives in an exhibition (K on its setup screen). */
@@ -455,7 +467,7 @@ export class Game {
   /** The exhibition setup's options line, one segment per key (clicks pick a segment). */
   private exhibitionOptions(): string[] {
     return [
-      `DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : this.exhibitionKeys.toUpperCase()} (K)`,
+      `DRIVES: ${this.exhibitionKeys === 'off' ? 'SUMMARY' : this.exhibitionKeys === 'all' ? 'EVERY SNAP' : this.exhibitionKeys.toUpperCase()} (K)`,
       `IQ: ${this.exhibitionIq} (I)`,
       `ASSIST: ${this.exhibitionAssist} (L)`,
       `SLOW AIM: ${this.exhibitionAimSlow ? 'ON' : 'OFF'} (M)`,
@@ -547,8 +559,9 @@ export class Game {
             this.finishSeasonGame();
           } else if (this.watchOnly) {
             this.watchOnly = false;
+            // A season's SIM GAME goes to its game page; a simulated exhibition back to its setup.
             if (this.watchGame) this.toGame(this.watchGame, true);
-            else this.screen = 'season';
+            else this.screen = 'exhibition';
             this.watchGame = null;
           } else this.screen = 'exhibition';
         }
@@ -624,7 +637,7 @@ export class Game {
     if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
-    const cycleKeys = () => (this.exhibitionKeys = KEY_LEVELS[(KEY_LEVELS.indexOf(this.exhibitionKeys) + 1) % KEY_LEVELS.length]);
+    const cycleKeys = () => (this.exhibitionKeys = WATCH_LEVELS[(WATCH_LEVELS.indexOf(this.exhibitionKeys) + 1) % WATCH_LEVELS.length]);
     if (input.hit('KeyK')) cycleKeys();
     const cycleIq = () => (this.exhibitionIq = IQ_OPTIONS[(IQ_OPTIONS.indexOf(this.exhibitionIq) + 1) % IQ_OPTIONS.length]);
     if (input.hit('KeyI')) cycleIq();
@@ -661,7 +674,14 @@ export class Game {
       } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
+      } else if (inRect(x, y, SIM_GAME_BTN)) {
+        this.simExhibition();
+        return;
       }
+    }
+    if (input.hit('KeyX')) {
+      this.simExhibition();
+      return;
     }
     if (input.hit('Enter', 'Space')) this.startGame();
     this.cam.follow(32, 0.5);
@@ -876,7 +896,6 @@ export class Game {
     this.tapeRec = null;
     this.lastSnap = null;
     const s = this.season;
-    this.userEmph = this.seasonGame && s ? emphasisMods(staffFor(s, user.id), s.teamState[user.id]?.emph) : undefined;
     this.book = ocBook(this.ocOf(user));
     const dc = this.dcOf(cpu);
     const qbSpd = this.userRoster.QB?.r.spd ?? 70;
@@ -888,6 +907,7 @@ export class Game {
       book: this.book, style: ocStyle(this.ocOf(user)), roster: rosterRead(this.userRoster),
       film: this.seasonGame && s ? s.teamState[user.id]?.film : undefined,
     });
+    this.setupEngine();
     this.dcNote = null;
     if (from > 1 && this.seasonGame) this.simAhead(from);
     else this.toCall();
@@ -895,33 +915,56 @@ export class Game {
 
   /** The key-play level for the CPU's drives in this game, or for simulated stretches. */
   private keyLevel(kind: 'sim' | 'defense'): KeyLevel {
-    if (this.seasonGame || this.watchOnly) return keyLevels(this.season?.config)[kind];
-    return kind === 'defense' ? this.exhibitionKeys : 'off';
-  }
-
-  /** Queue key plays to show, each on the field in its own notice. */
-  private queueShows(picks: KeyPlay[]): void {
-    for (const k of picks) {
-      this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0) });
-    }
+    if (this.seasonGame || (this.watchOnly && this.watchGame)) return keyLevels(this.season?.config)[kind];
+    // An exhibition: its DRIVES setting for both (a simulated exhibition is watched at it).
+    return this.exhibitionKeys;
   }
 
   /**
-   * Simulate the season game's first quarters (`simPart`, on this game's clock) until quarter
-   * `from`, show their key plays, and hand the field the score, the clock and the ball.
+   * Queue key plays to show, each on the field in its own notice: a snap the engine played (`watch`) as
+   * its tape, with the call over it.
+   */
+  private queueShows(picks: KeyPlay[], watch?: SnapWatch): void {
+    for (const k of picks) {
+      const s = watch?.get(k.play);
+      const opts = s?.tape ? { tape: s.tape, note: this.snapNote(s, k.drive.off === this.user.id) } : {};
+      this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0, opts) });
+    }
+  }
+
+  /** The two sides of this game for the engine (`engineGame`, `enginePart`): the season's staffs and settings, or an exhibition's. */
+  private engineTeams(): { user: EngineTeamIn; cpu: EngineTeamIn } {
+    const s = this.season;
+    const g = this.seasonGame;
+    if (g && s) {
+      const own = !s.config.delegate.gamePlan ? s.teamState[this.user.id]?.plan : undefined;
+      const plan = own ?? autoGamePlan(this.userSquad, this.cpuSquad, this.ocOf(this.user));
+      return {
+        user: engineTeam(s, this.user.id, this.userSquad, plan),
+        cpu: engineTeam(s, this.cpu.id, this.cpuSquad, autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu))),
+      };
+    }
+    const team = (t: Team, squad: Squad, opp: Squad): EngineTeamIn => {
+      const st = buildStaff(t);
+      return { squad, oc: st.OC, dc: st.DC, passShare: autoGamePlan(squad, opp, st.OC).passShare };
+    };
+    return { user: team(this.user, this.userSquad, this.cpuSquad), cpu: { ...team(this.cpu, this.cpuSquad, this.userSquad), iq: this.exhibitionIq } };
+  }
+
+  /**
+   * Simulate the season game's first quarters through the engine (`enginePart`, on this game's clock)
+   * until quarter `from`, show their key plays (on tape), and hand the field the score, the clock and the ball.
    */
   private simAhead(from: number): void {
-    const s = this.season!;
     const g = this.seasonGame!;
     const story = newStory(g.home, g.away);
-    const own = !s.config.delegate.gamePlan ? s.teamState[this.user.id]?.plan : undefined;
-    const r = simPart(this.userSquad, this.cpuSquad, g.home === this.user.id, this.clock.qSecs / 60, from, this.rng, {
-      neutral: g.neutral,
-      plans: { user: own ?? autoGamePlan(this.userSquad, this.cpuSquad, this.ocOf(this.user)), cpu: autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)) },
-      emph: { user: this.userEmph },
-      drives: this.liveDrives ?? undefined,
-      story,
-    });
+    // Through the engine, both sides; the user's DC, the CPU's DC and OC go on learning into the live part.
+    const teams = this.engineTeams();
+    const watch: SnapWatch = new Map();
+    const r = enginePart(
+      { ...teams.user, dcBrain: this.userDc }, { ...teams.cpu, dcBrain: this.brain, ocBrain: this.cpuOc }, g.home === this.user.id, this.clock.qSecs / 60, from, this.rng,
+      { drives: this.liveDrives ?? undefined, story, watch, record: this.keyLevel('sim') !== 'off' },
+    );
     // The simulated quarters' stats carry into the live box score.
     if (this.liveBox) {
       const uh = g.home === this.user.id;
@@ -929,12 +972,13 @@ export class Game {
         home: g.home, away: g.away, story: r.story,
         from: { user: uh ? r.box.home : r.box.away, cpu: uh ? r.box.away : r.box.home, players: r.box.players },
       });
+      for (const [p, a] of r.against) this.liveBox.against.set(p, a);
     }
     this.score = { user: r.user, cpu: r.cpu };
     this.clock.quarter = r.quarter;
     this.clock.time = r.time;
     adminStop(this.clock);
-    this.queueShows(pickGame(story, this.keyLevel('sim')));
+    this.queueShows(pickGame(story, this.keyLevel('sim')), watch);
     const to = ['', '', 'THE 2ND QUARTER', 'HALFTIME', 'THE 4TH QUARTER'][from];
     const summary = (extra: string) => this.notify({ title: `SIMULATED TO ${to}`, sub: this.scoreLine(), extra, color: '#9ad7ff' });
     switch (r.next.kind) {
@@ -970,15 +1014,38 @@ export class Game {
     // The squads as they took the field, before the week's injuries and progression.
     const squads = { user: squadFor(s, u), cpu: squadFor(s, opp) };
     const story = newStory(game.home, game.away);
-    advanceWeek(s, undefined, undefined, story);
+    const level = keyLevels(s.config).sim;
+    const watch: SnapWatch = new Map();
+    advanceWeek(s, undefined, undefined, story, { snaps: watch, record: level !== 'off' });
     this.save();
-    const r = game.result!;
     this.seasonGame = null;
-    this.watchOnly = true;
     this.watchGame = game.id;
     this.setupField(teamById(u), teamById(opp), squads, game.home);
+    this.showSimmed(story, game.result!, game.home === u, level, watch);
+  }
+
+  /**
+   * The exhibition's SIM GAME: the whole game through the engine (`engineGame`), both sides' staffs, then
+   * watched at the DRIVES level (EVERY SNAP plays them all), ending on the final.
+   */
+  private simExhibition(): void {
+    this.seasonGame = null;
+    this.watchGame = null;
+    const user = TEAMS[this.userIdx];
+    this.setupField(user, TEAMS[this.cpuIdx]);
+    const teams = this.engineTeams();
+    const story = newStory(user.id, this.cpu.id);
+    const watch: SnapWatch = new Map();
+    const r = engineGame(teams.user, teams.cpu, this.rng, { story, watch, record: this.exhibitionKeys !== 'off' });
+    this.showSimmed(story, r, true, this.exhibitionKeys, watch);
+  }
+
+  /** Show a simulated game's plays at `level` (`watch`: its snaps on tape), then its final. */
+  private showSimmed(story: GameStory, r: GameResult, userHome: boolean, level: KeyLevel, watch: SnapWatch): void {
+    const u = this.user.id;
+    this.watchOnly = true;
     this.notices = [];
-    this.score = { user: game.home === u ? r.home : r.away, cpu: game.home === u ? r.away : r.home };
+    this.score = { user: userHome ? r.home : r.away, cpu: userHome ? r.away : r.home };
     this.ot = null;
     this.clock = newClock(15);
     // The final's clock: the 4th quarter, or the overtime period it ended in.
@@ -990,8 +1057,8 @@ export class Game {
     this.applied = null;
     this.callMode = 'normal';
     this.cam.follow(OWN_GOAL + 50, 0.5);
-    const picks = pickGame(story, keyLevels(s.config).sim);
-    this.queueShows(picks.filter((k) => k.drive.half < 2));
+    const picks = pickGame(story, level);
+    this.queueShows(picks.filter((k) => k.drive.half < 2), watch);
     const firstOt = story.drives.find((d) => d.half >= 2);
     if (firstOt) {
       // Tied after four: say so before the overtime's plays.
@@ -1001,7 +1068,7 @@ export class Game {
         color: '#9ad7ff', clock: 'OT', score: { user: tied, cpu: tied },
       });
     }
-    this.queueShows(picks.filter((k) => k.drive.half >= 2));
+    this.queueShows(picks.filter((k) => k.drive.half >= 2), watch);
     this.showNotices('final');
   }
 
@@ -1156,7 +1223,7 @@ export class Game {
     if (input.hit('KeyS', 'ArrowDown')) v.playMenu = (v.playMenu! + 1) % n;
     if (input.hit('KeyK') || (m.pressed && inRect(m.x, m.y, PLAY_KEYS_BTN))) {
       const lv = keyLevels(s.config).sim;
-      s.config.keyPlays = { ...s.config.keyPlays, sim: KEY_LEVELS[(KEY_LEVELS.indexOf(lv) + 1) % KEY_LEVELS.length] };
+      s.config.keyPlays = { ...s.config.keyPlays, sim: WATCH_LEVELS[(WATCH_LEVELS.indexOf(lv) + 1) % WATCH_LEVELS.length] };
       this.save();
       return;
     }
@@ -1635,6 +1702,36 @@ export class Game {
     if (tab >= 0) setPos(tab);
     else if (row >= 0) pick(row);
     else if (mode >= 0) v.mode = mode;
+  }
+
+  /**
+   * The CPU's drives through the engine: its OC calling his book with his identity (`offIdentity`) and
+   * learning the user's defense as it goes (`OcBrain`); the user's DC calling the defense from his identity
+   * and learning their offense (`DefBrain`). What the user's DC knows at kickoff is what a CPU DC knows
+   * of the user: their OC's book and style (public) and their roster. The DEFENSE IQ setting is the CPU
+   * defense's; the user's DC is always himself.
+   */
+  private setupEngine(): void {
+    const oc = this.ocOf(this.cpu);
+    const userDc = this.dcOf(this.user);
+    const userOc = this.ocOf(this.user);
+    this.cpuOff = {
+      team: this.cpu, roster: this.cpuRoster, conf: teamConf(this.cpuSquad), ident: defIdentity(this.cpu, this.dcOf(this.cpu)),
+      oc: { book: ocBook(oc), style: ocStyle(oc), passShare: autoGamePlan(this.cpuSquad, this.userSquad, oc).passShare, id: offIdentity(oc, this.cpuRoster) },
+    };
+    this.userDef = {
+      team: this.user, roster: this.userRoster, conf: teamConf(this.userSquad), ident: defIdentity(this.user, userDc),
+      oc: { book: ocBook(userOc), style: ocStyle(userOc), passShare: 0.5 },
+    };
+    const qbSpd = this.cpuRoster.QB?.r.spd ?? 70;
+    this.userDc = newBrain({
+      iq: 'NORMAL', adjust: dcAdjust(userDc), scout: userDc.r.scout, qbMobility: Math.max(0, Math.min(1, (qbSpd - 70) / 20)), seed: (this.rng() * 2 ** 31) >>> 0,
+      smarts: teamSmarts(DEF_SLOTS.map((sl) => this.userRoster[sl]?.r.prc ?? 60)),
+      book: this.cpuOff.oc.book, style: this.cpuOff.oc.style, roster: rosterRead(this.cpuRoster), table: 'engine',
+    });
+    this.cpuOc = newOcBrain({
+      adjust: ocAdjust(oc), scout: oc.r.scout, qbPrc: this.cpuRoster.QB?.r.prc ?? 60, def: this.userDef.ident, seed: (this.rng() * 2 ** 31) >>> 0, defRoster: this.userRoster,
+    });
   }
 
   // ------------------------------------------------------------ playbook page
@@ -2878,13 +2975,9 @@ export class Game {
       this.otNext();
       return;
     }
-    const plays: SimPlay[] = [];
-    const cpuConf = teamConf(this.cpuSquad);
-    const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: true };
     const otClock: DriveClock = { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first' };
-    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, OVERTIME.start, this.rng, otClock,
-      (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)).passShare));
-    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, true));
+    const { sim, plays, credit, snaps } = this.engineCpu(OVERTIME.start, otClock);
+    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, true, credit.snaps));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
     // otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
     const td = sim.result === 'TOUCHDOWN';
@@ -2892,14 +2985,21 @@ export class Game {
     const walkOff = td && second && six > this.score.user;
     const kick = td && !walkOff && period < OVERTIME.mustGoForTwo && !(second && this.score.user - six === 2);
     const points = td ? (kick ? 7 : 6) : sim.points;
-    const credit = this.castCpu(plays, otClock, OVERTIME.start);
     const told: StoryDrive = {
       off: this.cpu.id, half: period + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-      start: OVERTIME.start, result: sim.result, points, plays, credit,
+      start: OVERTIME.start, result: sim.result, points, plays, credit, live: true,
     };
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
-    this.showCpuDrive(told);
+    this.showCpuDrive(told, plays, snaps);
     this.score.cpu += points;
+    if (sim.defPoints) {
+      // The user's defense scored on the CPU's overtime possession: that ends it (NCAA).
+      this.score.user += sim.defPoints === 7 ? 6 : sim.defPoints;
+      if (this.liveBox) storyAgainst(this.liveBox, plays[plays.length - 1], sim.defPoints === 7 ? 6 : sim.defPoints, sim.defPoints === 7 ? 'pick6' : 'safety');
+      this.notify({ title: `${this.user.abbr} DEFENSE SCORES`, sub: this.scoreLine(), extra: sim.defPoints === 7 ? 'Pick six' : 'Safety', color: '#ffd23f' });
+      this.showNotices('final');
+      return;
+    }
     this.notify({
       title: `${this.cpu.abbr} DRIVE: ${sim.result}`, sub: `${sim.plays} plays, ${sim.yards} yards`,
       extra: kick ? 'Extra point is good' : td && !walkOff ? 'Going for two' : '',
@@ -2913,20 +3013,21 @@ export class Game {
    * regulation touchdown (`at`: that drive's half and the half's seconds when it ended).
    */
   private cpuTwoPoint(at?: { half: number; left: number }): void {
-    const good = simTwoPoint(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, this.rng);
-    const plays: SimPlay[] = [{ gain: good ? 3 : 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev: 1 }];
     const lead = this.score.cpu - this.score.user;
-    const tryClock: DriveClock = at
-      ? { timeLeft: at.left, hurry: false, milk: false, lead, finalHalf: at.half >= 1, qSecs: this.clock.qSecs }
-      : { timeLeft: Infinity, hurry: false, milk: false, lead, ot: 'second' };
+    const sit: Situation = at
+      ? { down: 1, toGo: 3, yardsToGoal: 3, secsLeft: at.left, qSecs: this.clock.qSecs, finalHalf: at.half >= 1, lead }
+      : { down: 1, toGo: 3, yardsToGoal: 3, secsLeft: 0, qSecs: this.clock.qSecs, finalHalf: true, lead, ot: 'second' };
+    const r = engineTry(this.cpuOff!, this.userDef!, sit, driveStream(this.rng), { brain: this.userDc, ocBrain: this.cpuOc, record: true, homeId: this.homeId });
+    const good = r.good;
+    const plays: SimPlay[] = [r.play];
     const told: StoryDrive = {
       off: this.cpu.id, half: at?.half ?? this.otPeriods() + 1, left: at?.left ?? 0, qSecs: this.clock.qSecs,
       score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-      start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, plays,
-      credit: this.castCpu(plays, tryClock, 97),
+      start: 97, result: good ? 'TOUCHDOWN' : 'DOWNS', points: good ? 2 : 0, try: true, plays, live: true,
+      credit: { snaps: [engineCredit(r.play, r.snap, starters(this.cpuSquad), starters(this.userSquad))] },
     };
     if (this.liveBox) storyCpuDrive(this.liveBox, told);
-    this.showCpuDrive(told);
+    this.showCpuDrive(told, plays, [r.snap]);
     if (good) this.score.cpu += 2;
     this.notify({ title: `${this.cpu.abbr} TWO-POINT TRY: ${good ? 'GOOD' : 'NO GOOD'}`, sub: this.scoreLine(), extra: '', color: good ? '#ff5a5a' : '#ffd23f' });
   }
@@ -2974,20 +3075,68 @@ export class Game {
   }
 
   /**
-   * Who made each snap of a CPU drive (season/cast.ts), so its key plays show the real players: the
-   * CPU's best receivers get more of the big catches, the user's best cover men more of the picks. On
-   * a stream of its own, seeded by the drive: the game's random stream is untouched.
+   * A CPU possession through the engine (`engineDrive`), on a stream of its own from the game's: the drive,
+   * its snaps as the story logs them, who made each (`engineCredit`: the players who did it, no casting),
+   * and the engine's snaps (each on tape) aligned with `plays`.
    */
-  private castCpu(plays: SimPlay[], clock: DriveClock, salt: number): DriveCredit {
-    const plan = autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu));
-    const seed = (salt * 7919 + plays.length * 131 + this.score.user * 17 + this.score.cpu * 3 + this.clock.quarter * 1009) >>> 0;
-    return { snaps: castDrive(plays, lineupOf(this.cpuSquad, plan), lineupOf(this.userSquad, plan), clock, mulberry32(seed)) };
+  private engineCpu(start: number, clock: DriveClock): { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] } {
+    const plays: SimPlay[] = [];
+    const snaps: (EngineSnap | undefined)[] = [];
+    if (this.userDc) newDrive(this.userDc);
+    const sim = engineDrive(this.cpuOff!, this.userDef!, start, driveStream(this.rng), clock, {
+      brain: this.userDc, ocBrain: this.cpuOc, record: true, homeId: this.homeId,
+      onPlay: (p, snap) => {
+        plays.push(p);
+        snaps.push(snap);
+      },
+    });
+    const on = this.liveBox?.cpu.on ?? starters(this.cpuSquad);
+    const dOn = this.liveBox?.user.on ?? starters(this.userSquad);
+    return { sim, plays, credit: { snaps: plays.map((p, i) => engineCredit(p, snaps[i], on, dOn)) }, snaps };
   }
 
-  /** Queue a CPU drive's key plays at the defense's key-play level. */
-  private showCpuDrive(d: StoryDrive): void {
+  /**
+   * What was called on an engine snap, for its show: the user's defense's call on a CPU snap ("YOUR D: COVER 1
+   * ROBBER, KEYING J. SMITH"), or the user's OC's play and what it met on the user's ("YOUR O: MESH VS COVER 3").
+   */
+  private snapNote(s: EngineSnap, userBall: boolean): string {
+    if (userBall) return `YOUR O: ${s.play.name.toUpperCase()} VS ${s.call.name.toUpperCase()}${s.disguised ? ', DISGUISED' : ''}`;
+    const t = s.tags;
+    const bits = [s.call.name.toUpperCase()];
+    if (s.disguised) bits.push('DISGUISED');
+    if (t.prevent) bits.push('PREVENT');
+    if (t.key) bits.push(`KEYING ${(this.cpuRoster[t.key]?.name ?? t.key).toUpperCase()}`);
+    if (t.spy) bits.push('QB SPY');
+    if (t.contain) bits.push('CONTAIN');
+    if (t.trap) bits.push('SITTING ON THE THROW');
+    if (t.game) bits.push('STUNT');
+    return `YOUR D: ${bits.join(', ')}`;
+  }
+
+  /**
+   * Queue a CPU drive's key plays at the defense's key-play level (`all`: every snap), each the real snap on
+   * tape with the user's call over it. The biggest go to the postgame reel's pool too.
+   */
+  private showCpuDrive(d: StoryDrive, plays: SimPlay[] = [], snaps: (EngineSnap | undefined)[] = []): void {
     const level = this.keyLevel('defense');
-    if (level !== 'off') this.queueShows(pickDrive(d, level, 'defense'));
+    const at = new Map(plays.map((p, i) => [p, snaps[i]] as const));
+    for (const [p, s] of at) if (s?.tape) this.keepCpuTape(p, s.tape);
+    if (level === 'off') return;
+    for (const k of pickDrive(d, level, 'defense')) {
+      const s = at.get(k.play);
+      this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0, s ? { tape: s.tape, note: this.snapNote(s, false) } : {}) });
+    }
+  }
+
+  /** Keep a CPU snap's tape for the postgame reel if it's one of the game's best (as `keepTape`). */
+  private keepCpuTape(p: LiveSimPlay, tape: Tape): void {
+    const score = tapeScore(p);
+    if (score <= 0 || tape.frames.length < 2) return;
+    this.tapes.set(p, { tape, score });
+    if (this.tapes.size > TAPE.keep) {
+      const worst = [...this.tapes].sort((a, b) => a[1].score - b[1].score)[0][0];
+      this.tapes.delete(worst);
+    }
   }
 
   /** The user's overtime snap or kick is over: the possession goes on, ends, or ends the game. */
@@ -3057,6 +3206,18 @@ export class Game {
         this.notify({ title: `${this.cpu.abbr} ADJUSTS`, sub: shown[0], extra: shown.slice(1).join('. '), color: '#ffd23f' });
       }
       this.dcNote = null;
+    }
+    // The other side of the ball: your DC's adjustments, and theirs on offense as far as his scouting sees them.
+    if (this.userDc) {
+      brainHalftime(this.userDc);
+      const ours = adjustments(this.userDc, playName).slice(0, 2).map(ourLine);
+      if (ours.length) this.notify({ title: 'YOUR DC ADJUSTS', sub: ours[0], extra: ours[1] ?? '', color: '#9ad7ff' });
+    }
+    if (this.cpuOc) {
+      ocHalftime(this.cpuOc);
+      const scout = this.dcOf(this.user).r.scout;
+      const theirs = ocAdjustments(this.cpuOc, this.cpuOff?.oc.id?.star ?? undefined).slice(0, scout >= SCOUT_TIERS[3] ? 3 : scout >= SCOUT_TIERS[2] ? 2 : 1);
+      if (theirs.length) this.notify({ title: `${this.cpu.abbr} OFFENSE ADJUSTS`, sub: theirs[0], extra: theirs.slice(1).join('. '), color: '#ffd23f' });
     }
     nextQuarter(this.clock);
     this.showNotices('kickoff');
@@ -3197,41 +3358,55 @@ export class Game {
   }
 
   /**
-   * Simulate a CPU possession from `from` (yards from its own goal), burning game clock. The spot is
-   * rounded: it's where a live play or kick ended, and the drive sim and its box score count whole yards.
+   * A CPU possession from `from` (yards from its own goal), played through the engine against the user's
+   * defense (`engineCpu`), burning game clock. The spot is rounded: it's where a live play or kick ended.
    */
   private cpuDrive(from: number): void {
     const start = Math.round(from);
     const c = this.clock;
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
-    const plays: SimPlay[] = [];
-    const cpuConf = teamConf(this.cpuSquad);
-    const conf = { off: cpuConf.off, def: teamConf(this.userSquad).def, k: cpuConf.k, late: lateAndClose(c.quarter, diff) };
-    // Watching the snaps (for the grades and the key plays) draws no random numbers.
     const dc: DriveClock = { timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs };
-    const sim = simulateDrive(teamRatings(this.cpuSquad).off, teamRatings(this.userSquad).def, start, this.rng, dc, (p) => plays.push(p), conf, driveMods(undefined, this.userEmph, autoGamePlan(this.cpuSquad, this.userSquad, this.ocOf(this.cpu)).passShare));
-    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim));
-    const credit = this.castCpu(plays, dc, start + left);
+    const { sim, plays, credit, snaps } = this.engineCpu(start, dc);
+    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, false, credit.snaps));
     const told: StoryDrive = {
       off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
-      start, result: sim.result, points: sim.points, plays, credit,
+      start, result: sim.result, points: sim.points, plays, credit, live: true,
     };
-    // The drive sim's touchdown counts the kick: here the six goes up first and the try is its own play.
+    // The drive's touchdown counts the kick: here the six goes up first and the try is its own play.
     const td = sim.result === 'TOUCHDOWN';
     if (td) told.points = 6;
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
-    const level = this.keyLevel('defense');
-    if (level !== 'off') this.queueShows(pickDrive(told, level, 'defense'));
+    this.showCpuDrive(told, plays, snaps);
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += told.points;
+    const said = this.userDc ? headline(this.userDc, playName) : null;
     const notice = this.notify({
       title: `${this.cpu.abbr} DRIVE: ${sim.result}`,
       sub: `${sim.plays} plays, ${sim.yards} yards, ${mmss(sim.secs)}`,
       extra: '',
+      ...(said ? { note: `YOUR DC: ${ourLine(said)}` } : {}),
     });
     // A touchdown that wins the game on the final play needs no try (NCAA rules).
-    if (td && !(halfOver && c.quarter >= 4 && this.score.cpu > this.score.user)) this.cpuTry(told, conf.late);
+    if (td && !(halfOver && c.quarter >= 4 && this.score.cpu > this.score.user)) this.cpuTry(told, lateAndClose(c.quarter, diff));
+    if (sim.defPoints === 7) {
+      // The user's defense took it back: six, then the user's own try (even with no time left), then the kickoff.
+      this.score.user += 6;
+      if (this.liveBox) storyAgainst(this.liveBox, plays[plays.length - 1], 6, 'pick6');
+      notice.title = `${this.user.abbr} DEFENSE: PICK SIX`;
+      notice.color = '#ffd23f';
+      notice.extra = this.scoreLine();
+      this.drive = { los: OPP_GOAL - 3, ballY: FIELD_W / 2, down: 1, firstDownX: OPP_GOAL, try: true };
+      adminStop(c);
+      this.showNotices('pat');
+      return;
+    }
+    if (sim.defPoints === 2) {
+      this.score.user += 2;
+      if (this.liveBox) storyAgainst(this.liveBox, plays[plays.length - 1], 2, 'safety');
+      notice.title = `${this.user.abbr} DEFENSE: SAFETY`;
+      notice.color = '#ffd23f';
+    }
     if (halfOver) {
       if (c.quarter === 2) {
         this.halftime();
@@ -3240,7 +3415,7 @@ export class Game {
       }
       return;
     }
-    this.drive = this.freshDrive(userStartAfter(sim, this.rng));
+    this.drive = this.freshDrive(sim.defPoints === 2 ? 40 : userStartAfter(sim, this.rng));
     adminStop(c);
     notice.extra = `Your ball at the ${fieldLabel(this.drive.los)}  ${clockText(c)}`;
     this.showNotices('call');
@@ -3382,6 +3557,11 @@ export class Game {
     else if (this.screen === 'notice' && this.notices.length) {
       const n = this.notices[0];
       drawBanner(g, n.title, n.sub, n.color ?? '#ffffff', n.extra);
+      if (n.note) {
+        g.fillStyle = 'rgba(8,10,14,0.78)';
+        g.fillRect(0, 100, VIEW_W, 16);
+        text(g, n.note, VIEW_W / 2, 104, { size: 8, align: 'center', color: '#9ad7ff' });
+      }
       drawHint(g, 'CLICK OR SPACE TO CONTINUE');
     } else if (this.screen === 'final') this.renderFinal(g);
     else if (this.kick) this.renderKickHud(g, this.kick);
@@ -3450,7 +3630,7 @@ export class Game {
     const final = ot ? `FINAL/${quarterName(4 + ot)}` : 'FINAL';
     const title = user === cpu ? `${final}: TIE` : user > cpu ? `${final}: ${this.user.abbr} WINS` : `${final}: ${this.cpu.abbr} WINS`;
     drawBanner(g, title, this.scoreLine(), user >= cpu ? '#ffd23f' : '#ff5a5a', `${this.user.school.toUpperCase()} VS ${this.cpu.school.toUpperCase()}`);
-    drawHint(g, this.seasonGame || this.watchOnly ? 'CLICK OR SPACE TO CONTINUE THE SEASON' : 'CLICK OR SPACE FOR THE EXHIBITION SCREEN');
+    drawHint(g, this.seasonGame || this.watchGame ? 'CLICK OR SPACE TO CONTINUE THE SEASON' : 'CLICK OR SPACE FOR THE EXHIBITION SCREEN');
   }
 
   private drawBallSpot(g: CanvasRenderingContext2D): void {

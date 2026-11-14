@@ -2,6 +2,7 @@ import type { Athlete } from '../data/athletes';
 import { athleteName } from '../data/depth';
 import { overall, SLOT_POS } from '../data/positions';
 import { pickWeighted, type Rng } from '../engine/math';
+import type { EngineSnap } from '../game/engineDrive';
 import { snapSituation, type DriveClock, type SimPlay } from '../game/rules';
 import { passOdds } from '../game/situation';
 import type { Credited } from './story';
@@ -133,4 +134,23 @@ export function castSnap(p: SimPlay, off: Lineup, def: Lineup, sitPass: number, 
 /** Cast a drive's snaps, each in its situation on `clock` (the score as the drive started). Aligned with `plays`. */
 export function castDrive(plays: SimPlay[], off: Lineup, def: Lineup, clock: DriveClock, rng: Rng): (SnapCredit | null)[] {
   return plays.map((p) => castSnap(p, off, def, passOdds(off.passShare, snapSituation(clock, p.down, p.toGo, p.yard, p.t)), rng));
+}
+
+/**
+ * Who made a snap played through the engine (game/engineDrive.ts): no casting, the players who did it.
+ * The thrower's target on a pass, the carrier on a run or scramble, the sacker and the picker. Kicks and
+ * punts have none (null); a kneel is the QB's.
+ */
+export function engineCredit(p: SimPlay, s: EngineSnap | undefined, off: Record<string, Athlete>, def: Record<string, Athlete>): SnapCredit | null {
+  if (p.fg || p.punt) return null;
+  const who = (slot: string | null, yds: number) => (slot && off[slot] ? { who: credited(off, slot, yds) } : {});
+  const by = (slot: string | null) => (slot && def[slot] ? { by: credited(def, slot, 0) } : {});
+  if (p.kneel || !s) return { kind: 'kneel', pass: false, ...who('QB', p.gain) };
+  const yds = Math.min(s.gain, 100 - s.yard);
+  if (s.type === 'int' || s.type === 'pick6') return { kind: 'int', pass: true, ...by(s.takeaway) };
+  if (s.lostFumble) return { kind: 'fumble', pass: s.thrown, ...who(s.carrier, 0), ...by(s.takeaway) };
+  if (s.type === 'sack') return { kind: 'sack', pass: true, ...who('QB', yds), ...by(s.tackler) };
+  if (s.thrown && !s.complete) return { kind: 'inc', pass: true, ...who(s.target, 0) };
+  if (s.thrown) return { kind: 'catch', pass: true, ...who(s.carrier, yds) };
+  return { kind: 'run', pass: false, ...who(s.carrier ?? 'QB', yds) };
 }

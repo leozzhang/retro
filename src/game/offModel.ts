@@ -1,3 +1,4 @@
+import { ENGINE_PAYOFF } from '../data/enginePayoff';
 import { FILM_PAYOFF } from '../data/filmPayoff';
 import { DEF_CALLS, rushers, type DefCall, type DefTags } from '../data/defenses';
 import { CALL_SITUATION, callWeight, OFF_STYLES, type OffStyle } from '../data/offStyles';
@@ -152,6 +153,8 @@ export interface OffModel {
   sres: Record<string, Resid>;
   /** The DC's knobs, for the residual of a residual (`learn`). */
   prm: ModelParams;
+  /** The payoff table he reads (missing: the film's). */
+  table?: PayoffTable;
 }
 
 /**
@@ -228,7 +231,7 @@ const PASSY = new Set<string>(['quick', 'dropback', 'shot', 'screen', 'pa', 'boo
  * A new model for one game: the prior from the league, the offense's OC style and book, and its roster.
  * `film` (from past games, `season/film.ts`) is laid on as counts already seen.
  */
-export function newModel(o: { book: readonly PlayDef[]; style?: OffStyle; roster?: RosterRead; prm: ModelParams }): OffModel {
+export function newModel(o: { book: readonly PlayDef[]; style?: OffStyle; roster?: RosterRead; prm: ModelParams; table?: PayoffTable }): OffModel {
   const M = OFF_MODEL;
   // No book given (an exhibition harness): he expects anything in the library.
   const book = o.book.length ? o.book : PLAYBOOK;
@@ -264,7 +267,7 @@ export function newModel(o: { book: readonly PlayDef[]; style?: OffStyle; roster
   return {
     book: book.map((p) => p.id), prior, tgtPrior, fam: {}, exp: {}, sit: {}, look: {}, plays: {}, tgt: {}, tgtAll: {}, tgtExp: {},
     give: { n: 0, g: 0 }, res: {}, tres: {}, n: 0, raw: { ...emptyFilm(), g: 1, who: { ...(o.roster?.who ?? {}) } },
-    sig: {}, sigLook: {}, sres: {}, prm: o.prm,
+    sig: {}, sigLook: {}, sres: {}, prm: o.prm, ...(o.table && o.table !== 'film' ? { table: o.table } : {}),
   };
 }
 
@@ -333,7 +336,7 @@ export function learn(m: OffModel, s: ModelSnap): void {
   }
   // What it was worth against film: success less what this call should have given up.
   const row = rpo ? `${p.id}:${s.handedOff ? 'give' : 'pull'}` : p.id;
-  const e = cell(row, f, s.call, s.tags, OFF_MODEL.filmTrust).s;
+  const e = cell(row, f, s.call, s.tags, OFF_MODEL.filmTrust, m.table).s;
   const d = (filmOk(p, s.gain, s.yardsToGoal, s.lost) ? 1 : 0) - e;
   const bump = (to: Record<string, Resid>, k: string, x: number) => {
     const r = (to[k] ??= { n: 0, d: 0 });
@@ -703,8 +706,27 @@ function famMean(f: Family): { s: number[]; e: number[] } | undefined {
   return famMeans.get(f);
 }
 
+/**
+ * Which payoff table a learner reads: the film room's (`filmPayoff.ts`, the user's games: his passing is closer to
+ * the film room's QB) or the engine's (`enginePayoff.ts`, engine drives: the CPU QB reading the field).
+ */
+export type PayoffTable = 'film' | 'engine';
+
+const ECOL = new Map((ENGINE_PAYOFF?.cols ?? []).map((c, i) => [c, i]));
+/** An engine cell as rates (0..1): the family against the call; the film's family mean before the table exists. */
+function engineCell(f: Family, call: DefCall): { s: number; e: number } | null {
+  const r = ENGINE_PAYOFF?.rows[f];
+  const i = ECOL.get(call.id);
+  if (!r || i === undefined || r.s[i] < 0) return null;
+  return { s: r.s[i] / 100, e: r.e[i] / 100 };
+}
+
 /** A film cell as rates (0..1): the row against the call with its tags, falling back to the plain call, then the family. */
-export function cell(row: string, f: Family, call: DefCall, tags?: DefTags, trust = 1): { s: number; e: number } {
+export function cell(row: string, f: Family, call: DefCall, tags?: DefTags, trust = 1, table: PayoffTable = 'film'): { s: number; e: number } {
+  if (table === 'engine') {
+    const c = engineCell(f, call);
+    if (c) return c;
+  }
   const r = FILM_PAYOFF.rows[row] ?? famMean(f);
   if (!r) return { s: 0.45, e: 0.1 };
   const tagged = tags?.rpo ? `${call.id}+rpo` : tags?.spy ? `${call.id}+spy` : null;
@@ -730,13 +752,13 @@ function rowMean(r: { s: number[]; e: number[] }): { s: number; e: number } {
 }
 
 /** A play's film damage against a call (success plus `expl` × explosives); an RPO by the give rate. */
-export function damage(p: PlayDef, call: DefCall, give: number, tags?: DefTags): number {
+export function damage(p: PlayDef, call: DefCall, give: number, tags?: DefTags, table: PayoffTable = 'film'): number {
   const f = famOf(p);
   const one = (row: string) => {
-    const k = `${row}|${call.id}|${tags?.rpo ? 'r' : ''}${tags?.spy ? 's' : ''}`;
+    const k = `${table}|${row}|${call.id}|${tags?.rpo ? 'r' : ''}${tags?.spy ? 's' : ''}`;
     let v = DAMAGE.get(k);
     if (v === undefined) {
-      const c = cell(row, f, call, tags, OFF_MODEL.filmTrust);
+      const c = cell(row, f, call, tags, OFF_MODEL.filmTrust, table);
       DAMAGE.set(k, (v = c.s + OFF_MODEL.expl * c.e));
     }
     return v;

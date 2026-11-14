@@ -27,6 +27,12 @@ const TRASH_RANGE = 1.6;
 const TRASH_SPEED = 0.85;
 /** Man coverage on a player still behind the line: hold this deep past the LOS and read him. */
 const MAN_DEPTH = 3;
+/**
+ * A man defender plays the receiver as he saw him a reaction lag ago (`cover`, by `mcv`), carried `lead` of the
+ * lag along the way the receiver was going then. 0 aims at the lagged spot itself, which left him trailing a
+ * straight vertical by speed x lag (1.5-2.5 yd) the whole way; 1 trails only on a change of direction.
+ */
+export const MAN_TRAIL = { lead: 0.5 };
 
 /**
  * How far ahead (seconds) a scrimmage pursuer leads the ball carrier, so deep defenders take an angle
@@ -73,6 +79,8 @@ const ZONE_UNDER = 1.5;
  * deeper, and deep zones sit `deep` yards deeper and stay that much farther over the top.
  */
 export const PREVENT = { cushion: 3, deep: 4 };
+/** A man defender playing off: the cushion he gives closes `close` yd a second from the snap (his backpedal against the stem). */
+export const OFF_MAN = { close: 2.2 };
 /**
  * Keying a receiver (`DefTags.key`, the DC's read of who's beating him; game/defBrain.ts). On the keyed man:
  * his man defender reacts `lag` sooner to his moves and plays `cushion` yd tighter; underneath zones score
@@ -775,9 +783,15 @@ function cover(play: Play, d: Player): void {
   const peek = an && an.role === 'lane' ? ANTIC.lag * an.s : 0;
   const lagFrames = Math.round(((0.6 - (d.r.mcv / 100) * 0.35 + LEAN_FX.eyes * Math.max(0, d.lean.run)) * (keyed ? 1 - KEY.lag : 1) + peek) * 60);
   const hist = play.history.get(r.id);
-  const lp = hist && hist.length ? hist[Math.max(0, hist.length - 1 - lagFrames)] : r.pos;
+  const at = hist && hist.length ? Math.max(0, hist.length - 1 - lagFrames) : -1;
+  // What he saw a moment ago, carried along the way the man was going then (`MAN_TRAIL`): the lag costs him
+  // on a break, not on a straight line.
+  const seen = at >= 0 ? hist![at] : r.pos;
+  const was = at >= 1 ? hist![at - 1] : seen;
+  const ahead = (lagFrames / 60) * MAN_TRAIL.lead;
+  const lp = { x: seen.x + (seen.x - was.x) * 60 * ahead, y: seen.y + (seen.y - was.y) * 60 * ahead };
   const since = play.time - play.snapTime;
-  const cushion = d.press ? 0.8 : Math.max(1.0, d.cushion - since * 2.2 - (keyed ? KEY.cushion : 0));
+  const cushion = d.press ? 0.8 : Math.max(1.0, d.cushion - since * OFF_MAN.close - (keyed ? KEY.cushion : 0));
   // Inside leverage, more (or outside) as he leans on the routes his man has been running.
   const inside = Math.sign(play.ballY - lp.y) * (0.6 + LEAN_FX.shade * d.lean.inside);
   // A man still behind the line gets played from just past it: read him, don't chase him into the backfield.
@@ -845,9 +859,26 @@ function robber(play: Play, d: Player): void {
 /**
  * The auto-runner's cut (a back on a called run, one a play, like the user's): a free defender in front closing inside
  * `range` yd draws it with odds `chance` (a fair user, not a perfect one); a pass on it waits `retry`
- * s before the next look.
+ * s before the next look. From `behind` yd behind the line he cuts a defender closing on him (one who beat his block),
+ * toward the side with room (`cutSide`, `look`); before, he couldn't cut until the line, so a shed lineman stuffed him.
  */
-export const AUTO_JUKE = { range: 2, chance: 0.5, retry: 0.5 };
+export const AUTO_JUKE = { range: 2, chance: 0.5, retry: 0.5, behind: 3, look: 2.5 };
+
+/**
+ * Which way the auto-runner cuts: away from the man on him, unless the space that way (the nearest other free
+ * defender to a spot `look` yd over and a yard upfield) is clearly worse than the other way.
+ */
+function cutSide(play: Play, c: Player, d: Player): 1 | -1 {
+  const away = (Math.sign(c.pos.y - d.pos.y) || 1) as 1 | -1;
+  const room = (side: number) => {
+    const spot = { x: c.pos.x + 1, y: c.pos.y + side * AUTO_JUKE.look };
+    if (spot.y < 1 || spot.y > FIELD_W - 1) return 0;
+    let near = Infinity;
+    for (const o of play.def) if (o !== d && !o.down && !o.engagedBy.length) near = Math.min(near, dist(o.pos, spot));
+    return near;
+  };
+  return room(-away) > room(away) + 1.5 ? (-away as 1 | -1) : away;
+}
 
 /**
  * Pressing the design: a back on a called run (or a QB carrying: his hole) follows his drawn path (the aiming point: the B gap on inside
@@ -885,10 +916,12 @@ export function autoRun(play: Play, c: Player): void {
     c.want = c.jukeVel;
     return;
   }
-  if (c.jukeCd <= 0 && c.pos.x > play.los - 1 && play.canCut(c)) {
+  if (c.jukeCd <= 0 && c.pos.x > play.los - AUTO_JUKE.behind && play.canCut(c)) {
     for (const d of play.def) {
       if (d.down || d.engagedBy.length || d.tackleCd > 0 || d.pos.x < c.pos.x - 0.5 || dist(d.pos, c.pos) > AUTO_JUKE.range) continue;
-      if (play.rng() < AUTO_JUKE.chance) startJuke(c, Math.sign(c.pos.y - d.pos.y) || 1);
+      // Behind the line only against a man closing on him (one who's beaten his block into the backfield).
+      if (c.pos.x <= play.los - 1 && (d.vel.x * (c.pos.x - d.pos.x) + d.vel.y * (c.pos.y - d.pos.y)) <= 0) continue;
+      if (play.rng() < AUTO_JUKE.chance) startJuke(c, cutSide(play, c, d));
       else c.jukeCd = AUTO_JUKE.retry;
       if (c.juke > 0) {
         c.want = c.jukeVel;
@@ -901,7 +934,9 @@ export function autoRun(play: Play, c: Player): void {
   const press = pressPoint(play, c);
   if (press) {
     dir = norm(sub(press, c.pos));
-  } else if (c.pos.x < play.los + 1) {
+  } else if (c.pos.x < play.los + 1 && !play.thrown) {
+    // A runner reads the line for his crease. A receiver who caught it behind the line (a bubble, a screen)
+    // doesn't: the line's creases are the run's, and reading them turned him back inside into the front.
     if (c.pos.x < play.los - 0.5 || Number.isNaN(play.laneY)) play.laneY = pickLane(play, c); // commit at the line
     dir = norm(sub({ x: Math.max(c.pos.x + 2, play.los + 1.5), y: play.laneY }, c.pos));
   }

@@ -26,7 +26,8 @@ import {
  */
 
 /** Seconds: a scorer running into the end zone before the caption, at most this long for a loose ball to be recovered, at least this long finding the replay, the lineup before the snap, the caption after. */
-export const SHOW = { tdRun: 0.6, fumble: 2.2, find: 0.45, set: 0.8, hold: 2.4, cardMove: 1.1, cardHold: 2.6, prefetchMs: 3 };
+/** `snapSet`, `snapHold`: the lineup and caption of an ordinary snap when every snap of a CPU drive is shown. */
+export const SHOW = { tdRun: 0.6, fumble: 2.2, find: 0.45, set: 0.8, hold: 2.4, cardMove: 1.1, cardHold: 2.6, prefetchMs: 3, snapSet: 0.5, snapHold: 1.1 };
 
 /** The two teams on the field for the key plays. */
 export interface ShowCtx {
@@ -66,12 +67,14 @@ export interface KeyShow {
   tape: Tape | null;
   /** The corner label: KEY PLAY, or the postgame's HIGHLIGHT. */
   label: string;
+  /** A line under the label: the user's defense's call on a CPU snap played through the engine. */
+  note?: string;
 }
 
 /** Kinds that are good news for the defense. */
 const DEFENSIVE = new Set<KeyKind>(['int', 'fumble', 'fourthStop', 'thirdStop', 'redZoneStop', 'sack', 'missedFg', 'twoPtStop', 'xpMiss']);
 
-export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: Tape; label?: string } = {}): KeyShow {
+export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: Tape; label?: string; note?: string } = {}): KeyShow {
   const d = k.drive;
   const userBall = d.off === ctx.user.id;
   const [off, def] = userBall ? [ctx.userSide, ctx.cpuSide] : [ctx.cpuSide, ctx.userSide];
@@ -91,7 +94,7 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: T
   return {
     k, userBall, search, setup: null, play: null, fgSetup: null, kick: null,
     phase: tape ? 'set' : 'find', t: 0, over: 0, before, after, clock: c.quarter > 4 ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
-    tape, label: opts.label ?? 'KEY PLAY',
+    tape, label: opts.label ?? (k.kind === 'snap' ? 'LIVE' : 'KEY PLAY'), ...(opts.note ? { note: opts.note } : {}),
   };
 }
 
@@ -125,7 +128,7 @@ export function updateShow(sh: KeyShow, dt: number): boolean {
       return false;
     case 'set':
       cam.follow(sh.tape ? sh.tape.frames[0].focus : los, 0.35);
-      if (sh.t >= SHOW.set) {
+      if (sh.t >= (sh.k.kind === 'snap' ? SHOW.snapSet : SHOW.set)) {
         // A tape just runs (from 0, as `t` restarts).
         if (sh.kick) sh.kick.release(sh.fgSetup!.kick);
         else sh.play?.snap();
@@ -138,7 +141,7 @@ export function updateShow(sh: KeyShow, dt: number): boolean {
         const f = frameAt(sh.tape, sh.t);
         cam.follow(f.focus, f.lead);
         if (sh.t >= tapeLength(sh.tape)) sh.over += dt;
-        return sh.over >= SHOW.hold;
+        return sh.over >= (sh.k.kind === 'snap' ? SHOW.snapHold : SHOW.hold);
       }
       if (sh.kick) {
         stepFg(sh.kick, sh.fgSetup!);
@@ -187,6 +190,7 @@ function playLine(sh: KeyShow): string {
   const o = sh.play?.outcome;
   const credit = creditFor(k);
   const ball = sh.play ? (o?.type === 'incomplete' ? sh.play.intended : sh.play.carrier) : null;
+  const inc = o?.type === 'incomplete' || (!sh.play && credit?.kind === 'inc');
   const who = (ball?.name ?? credit?.who?.name ?? '').toUpperCase();
   const pass = sh.play ? sh.play.thrown : credit?.pass ?? false;
   const by = (s: string) => (who ? `${who} ${s}` : s);
@@ -196,7 +200,7 @@ function playLine(sh: KeyShow): string {
     case 'twoPt':
       return by(`IN ON THE TWO-POINT ${pass ? 'CATCH' : 'RUN'}`);
     case 'twoPtStop':
-      return o?.type === 'incomplete' ? 'TWO-POINT PASS FALLS INCOMPLETE' : by('STOPPED SHORT ON THE TWO-POINT TRY');
+      return inc ? 'TWO-POINT PASS FALLS INCOMPLETE' : by('STOPPED SHORT ON THE TWO-POINT TRY');
     case 'int': {
       const picker = sh.play ? who : (credit?.by?.name ?? '').toUpperCase();
       return picker ? `PICKED OFF BY ${picker}` : 'PICKED OFF';
@@ -216,7 +220,7 @@ function playLine(sh: KeyShow): string {
     case 'xpMiss':
       return `THE EXTRA POINT ${k.kind === 'xp' ? 'IS GOOD' : 'IS NO GOOD'}`;
     default:
-      if (o?.type === 'incomplete') return 'PASS FALLS INCOMPLETE';
+      if (inc) return who ? `PASS FOR ${who} FALLS INCOMPLETE` : 'PASS FALLS INCOMPLETE';
       if (yds <= 0) return by(yds === 0 ? 'STOPPED FOR NO GAIN' : `STOPPED FOR A ${yardsWord(yds)} LOSS`);
       return by(`${yardsWord(yds)} ${pass ? 'CATCH' : 'RUN'}`);
   }
@@ -268,9 +272,13 @@ export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx,
   const situation = `${sh.k.drive.try ? 'TWO-POINT TRY' : downText(p)}  ${spotLabel(p.yard, off.abbr, def.abbr)}`;
   drawScorebug(g, ctx.user, ctx.cpu, captioned ? sh.after : sh.before, sh.clock, situation, `${off.abbr} OFFENSE`);
   text(g, sh.label, 8, 40, { size: 8, color: '#ffd23f' });
+  if (sh.note) text(g, sh.note, 8, 52, { size: 8, color: '#9ad7ff' });
   if (captioned) {
-    const good = DEFENSIVE.has(sh.k.kind) !== sh.userBall;
-    drawBanner(g, KEY_TITLE[sh.k.kind], playLine(sh), good ? '#ffd23f' : '#ff5a5a', situation);
+    const k = sh.k;
+    const stop = k.kind === 'snap' && k.play.gain < k.play.toGo && !k.play.turnover;
+    const good = (DEFENSIVE.has(k.kind) || stop) !== sh.userBall;
+    const title = k.kind !== 'snap' ? KEY_TITLE[k.kind] : k.play.gain >= k.play.toGo ? 'FIRST DOWN' : `${downText({ ...k.play, yard: k.play.yard + k.play.gain, down: Math.min(4, k.play.down + 1), toGo: k.play.toGo - k.play.gain })} NEXT`;
+    drawBanner(g, title, playLine(sh), good ? '#ffd23f' : '#ff5a5a', situation);
   }
   drawHint(g, sh.label === 'HIGHLIGHT' ? 'SPACE: NEXT   ESC: BACK TO THE GAME' : 'SPACE: NEXT   ESC: SKIP THE KEY PLAYS');
 }

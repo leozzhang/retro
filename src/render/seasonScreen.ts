@@ -345,7 +345,7 @@ function drawPlayMenu(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView
   const lv = s.config.keyPlays?.sim ?? 'off';
   const b = PLAY_KEYS_BTN;
   const hot = inBox(b, v.mx, v.my);
-  const label = lv === 'off' ? 'RESULT ONLY' : `${lv.toUpperCase()} KEY PLAYS`;
+  const label = lv === 'off' ? 'RESULT ONLY' : lv === 'all' ? 'EVERY SNAP' : `${lv.toUpperCase()} KEY PLAYS`;
   text(g, `SIMMED QUARTERS: ${label}  (K)`, b.x + b.w / 2, b.y + 4, { align: 'center', color: hot ? GOLD : ACCENT, shadow: false });
 }
 

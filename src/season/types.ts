@@ -39,7 +39,7 @@ export interface SeasonConfig {
   quarter?: number;
   /**
    * Key-play highlights (game/keyPlays.ts): `sim` for simulated games and stretches (missing: off,
-   * the result only), `defense` for the CPU's drives in games the user plays (missing: normal).
+   * the result only), `defense` for the CPU's drives in games the user plays (missing: normal; `all` watches every snap).
    */
   keyPlays?: { sim?: KeyLevel; defense?: KeyLevel };
   /** How much the CPU defense learns the user's offense in live games (game/defBrain.ts). Missing means NORMAL. */
@@ -59,7 +59,8 @@ export interface SeasonConfig {
   history?: 'real' | 'fresh';
 }
 
-export type KeyLevel = 'off' | 'lean' | 'normal' | 'full';
+/** `all`: every snap of a CPU drive in a played game, watched on the field (the CPU DRIVES setting only). */
+export type KeyLevel = 'off' | 'lean' | 'normal' | 'full' | 'all';
 
 export type InjuryLevel = 'off' | 'light' | 'normal';
 

@@ -20,7 +20,8 @@
     "runfit": "vitest run src/runfit.test.ts",
     "trace": "vitest run src/trace.test.ts --reporter=verbose",
     "audit": "vitest run src/runAudit.test.ts",
-    "adapt": "vitest run src/adapt.test.ts"
+    "adapt": "vitest run src/adapt.test.ts",
+    "drives": "vitest run src/drives.test.ts"
   },
   "build": {
     "appId": "com.leo.saturdaygridiron",

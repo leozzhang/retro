@@ -123,9 +123,9 @@ export function creditUserFg(box: LiveBox, k: Athlete | undefined, made: boolean
   if (made) l.fgm++;
 }
 
-/** One of the CPU's simulated drives, cast to its players (the snaps from `castDrive`), and told in the story. */
+/** One of the CPU's drives, played through the engine (the snaps from `engineCredit`), and told in the story. */
 export function creditCpuDrive(box: LiveBox, d: DriveSim, plays: SimPlay[], snaps: DriveCredit['snaps'], told?: StoryDrive): void {
-  creditSnaps(box.cpu, d, plays, snaps, box.user);
+  creditSnaps(box.cpu, d, plays, snaps, box.user, true);
   if (told) storyCpuDrive(box, told);
 }
 

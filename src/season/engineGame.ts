@@ -1,0 +1,375 @@
+import type { Coach } from '../data/coaches';
+import { dcAdjust, ocAdjust } from '../data/coaches';
+import { lateAndClose, leverage, unitEdge, type UnitConf } from '../data/confidence';
+import { onField, starters, teamConf, type Squad } from '../data/depth';
+import { defIdentity } from '../data/identity';
+import { offIdentity } from '../data/offIdentity';
+import { ocBook, ocStyle } from '../data/offStyles';
+import { DEF_SLOTS, type RosterPlayer } from '../data/teams';
+import { clamp, gauss, mulberry32, type Rng } from '../engine/math';
+import { advanceSim, newClock, nextQuarter, timeLeftInHalf } from '../game/clock';
+import { halftime, newBrain, newDrive, teamSmarts, type DefBrain, type DefenseIq } from '../game/defBrain';
+import { driveStream, engineDrive, engineTry, type EngineDrive, type EngineSide, type EngineSnap } from '../game/engineDrive';
+import { newOcBrain, ocHalftime, type OcBrain } from '../game/ocBrain';
+import { rosterRead, type FilmBook } from '../game/offModel';
+import { OVERTIME, PAT, userStartAfter, xpOdds, type DriveClock, type SimPlay } from '../game/rules';
+import { goForTwo, type Situation } from '../game/situation';
+import { engineCredit } from './cast';
+import { gamePlays, type Against } from './gamePlays';
+import { blankTeamLine, creditSnaps, driveLog, GAME_SIM, type BoxSide, type LiveNext, type PartResult } from './simGame';
+import { newStory, type DriveCredit, type GameStory, type StoryDrive } from './story';
+import type { DriveLog, GameResult } from './types';
+
+/**
+ * The user's games played through the engine with nobody at the controls (docs/ENGINEDRIVES.md, phase 4):
+ * SIM GAME, the simulated quarters before the user takes over, and the exhibition's SIM GAME. Both
+ * offenses are their OC's book called by `ocCall` and run by the reading CPU QB; both defenses are their
+ * DC's identity with his learning brain; each OC's brain learns the other defense. Every snap is real, so
+ * the box score, the grades and the highlights read the players who made it, with no casting. CPU-vs-CPU
+ * games stay on `simGame`.
+ *
+ * The coaching around the snaps is the engine drive's (the drive sim's rules); the game around the drives
+ * is a played game's: the try after a touchdown (the two-point chart, or the kick by the kicker), the
+ * defense's scores, FBS overtime. There's no home edge, as on the field.
+ */
+
+/** One team as the engine game needs it. */
+export interface EngineTeamIn {
+  squad: Squad;
+  oc: Coach;
+  dc: Coach;
+  /** The OC's pass share this week (the game plan). */
+  passShare: number;
+  /** This team's DC brain's IQ: the DEFENSE IQ setting for the CPU, NORMAL for the user's DC. */
+  iq?: DefenseIq;
+  /** Film of this team's offense (`TeamState.film`), the other DC's prior. */
+  film?: FilmBook;
+  /** This team's defense disguises its shell (missing: yes). */
+  disguises?: boolean;
+  /** Brains made by the caller and kept going (a live game picking up from simulated quarters). */
+  dcBrain?: DefBrain | null;
+  ocBrain?: OcBrain | null;
+}
+
+/** Each snap the engine played, by the story's play, with its tape when recording: for watching a simulated game. */
+export type SnapWatch = Map<SimPlay, EngineSnap>;
+
+export interface EngineGameOpts {
+  /** Collects every drive for the progression grades. */
+  drives?: DriveLog[];
+  /** Tells the game drive by drive (season/story.ts). */
+  story?: GameStory;
+  /** Each snap by its story play (`record`: on tape). Watching draws nothing from the game's streams. */
+  watch?: SnapWatch;
+  record?: boolean;
+  /** Quarter length in minutes (15 for a whole simulated game). */
+  qMin?: number;
+}
+
+interface ESide extends BoxSide {
+  squad: Squad;
+  roster: Record<string, RosterPlayer>;
+  side: EngineSide;
+  conf: UnitConf;
+  /** This team's DC (defending) and OC (on offense) brains. */
+  dcBrain: DefBrain | null;
+  ocBrain: OcBrain | null;
+  noDisguise: boolean;
+}
+
+const seedOf = (rng: Rng) => (rng() * 2 ** 31) >>> 0;
+
+function sideOf(t: EngineTeamIn): Omit<ESide, 'dcBrain' | 'ocBrain'> {
+  const roster = onField(t.squad);
+  const team = t.squad.team;
+  return {
+    id: team.id, squad: t.squad, roster, on: starters(t.squad), cast: mulberry32(0), tl: blankTeamLine(), lines: new Map(), conf: teamConf(t.squad),
+    noDisguise: t.disguises === false,
+    side: {
+      team, roster, conf: teamConf(t.squad), ident: defIdentity(team, t.dc),
+      oc: { book: ocBook(t.oc), style: ocStyle(t.oc), passShare: t.passShare, id: offIdentity(t.oc, roster) },
+    },
+  };
+}
+
+/** `t`'s DC brain against `opp`'s offense: what he knows at kickoff (as `Game` builds the CPU's), on the engine's payoff table. */
+export function engineDcBrain(t: EngineTeamIn, opp: EngineTeamIn, seed: number): DefBrain | null {
+  const roster = onField(t.squad);
+  const oppRoster = onField(opp.squad);
+  return newBrain({
+    iq: t.iq ?? 'NORMAL', adjust: dcAdjust(t.dc), scout: t.dc.r.scout, qbMobility: clamp(((oppRoster.QB?.r.spd ?? 70) - 70) / 20, 0, 1), seed,
+    smarts: teamSmarts(DEF_SLOTS.map((sl) => roster[sl]?.r.prc ?? 60)),
+    book: ocBook(opp.oc), style: ocStyle(opp.oc), roster: rosterRead(oppRoster), film: opp.film, table: 'engine',
+  });
+}
+
+/** `t`'s OC brain against `opp`'s defense. */
+export function engineOcBrain(t: EngineTeamIn, opp: EngineTeamIn, seed: number): OcBrain {
+  const roster = onField(t.squad);
+  return newOcBrain({ adjust: ocAdjust(t.oc), scout: t.oc.r.scout, qbPrc: roster.QB?.r.prc ?? 60, def: defIdentity(opp.squad.team, opp.dc), seed, defRoster: onField(opp.squad) });
+}
+
+/** The two sides with their brains (the caller's, else new ones from `rng`). */
+function sides(a: EngineTeamIn, b: EngineTeamIn, rng: Rng): [ESide, ESide] {
+  const s = [seedOf(rng), seedOf(rng), seedOf(rng), seedOf(rng)];
+  const sa: ESide = { ...sideOf(a), dcBrain: a.dcBrain !== undefined ? a.dcBrain : engineDcBrain(a, b, s[0]), ocBrain: a.ocBrain !== undefined ? a.ocBrain : engineOcBrain(a, b, s[1]) };
+  const sb: ESide = { ...sideOf(b), dcBrain: b.dcBrain !== undefined ? b.dcBrain : engineDcBrain(b, a, s[2]), ocBrain: b.ocBrain !== undefined ? b.ocBrain : engineOcBrain(b, a, s[3]) };
+  return [sa, sb];
+}
+
+/** One game's run: its sides, streams and records. */
+class Run {
+  readonly story: GameStory;
+  readonly against: Against = new Map();
+  constructor(
+    readonly rng: Rng, readonly home: ESide, readonly away: ESide, readonly opts: EngineGameOpts, story: GameStory, readonly qSecs: number,
+  ) {
+    this.story = story;
+  }
+
+  private score(o: ESide, d: ESide) {
+    return { [o.id]: o.tl.points, [d.id]: d.tl.points };
+  }
+
+  private watch(plays: SimPlay[], snaps: (EngineSnap | undefined)[]): void {
+    const w = this.opts.watch;
+    if (w) plays.forEach((p, i) => snaps[i] && w.set(p, snaps[i]!));
+  }
+
+  /** A possession: the drive, its credit, its log and its story. A touchdown counts six here; the try is the caller's. */
+  drive(o: ESide, d: ESide, start: number, clock: DriveClock, half: number, left: number, ot = false): { e: EngineDrive; told: StoryDrive; log: DriveLog } {
+    if (d.dcBrain) newDrive(d.dcBrain);
+    const plays: SimPlay[] = [];
+    const snaps: (EngineSnap | undefined)[] = [];
+    const e = engineDrive(o.side, d.side, start, driveStream(this.rng), clock, {
+      brain: d.dcBrain, ocBrain: o.ocBrain, record: this.opts.record, homeId: this.home.id, noDisguise: d.noDisguise,
+      onPlay: (p, s) => {
+        plays.push(p);
+        snaps.push(s);
+      },
+    });
+    const credit: DriveCredit = { snaps: plays.map((p, i) => engineCredit(p, snaps[i], o.on, d.on)) };
+    const points = e.result === 'TOUCHDOWN' ? 6 : e.points;
+    const told: StoryDrive = { off: o.id, half, left, qSecs: this.qSecs, score: this.score(o, d), start, result: e.result, points, plays, credit, live: true };
+    this.story.drives.push(told);
+    creditSnaps(o, { ...e, points }, plays, credit.snaps, d, true);
+    const log = driveLog(o.id, plays, e, ot, credit.snaps);
+    this.opts.drives?.push(log);
+    this.watch(plays, snaps);
+    return { e, told, log };
+  }
+
+  /** A two-point try by `o`, told as its own one-snap drive from the 3. */
+  twoPoint(o: ESide, d: ESide, sit: Situation, half: number, left: number): boolean {
+    const r = engineTry(o.side, d.side, sit, driveStream(this.rng), {
+      brain: d.dcBrain, ocBrain: o.ocBrain, record: this.opts.record, homeId: this.home.id, noDisguise: d.noDisguise,
+    });
+    this.story.drives.push({
+      off: o.id, half, left, qSecs: this.qSecs, score: this.score(o, d), start: 97, result: r.good ? 'TOUCHDOWN' : 'DOWNS', points: r.good ? 2 : 0,
+      try: true, plays: [r.play], credit: { snaps: [engineCredit(r.play, r.snap, o.on, d.on)] }, live: true,
+    });
+    this.watch([r.play], [r.snap]);
+    if (r.good) o.tl.points += 2;
+    return r.good;
+  }
+
+  /**
+   * The try after `o`'s regulation touchdown (`told`, already counting six): the two-point chart, or the
+   * kick by the kicker's accuracy and confidence. `log` is the drive's log, whose kick it settles.
+   * Returns the kick's point (a two-point try is told as its own drive).
+   */
+  tryAfter(o: ESide, d: ESide, told: StoryDrive | null, log: DriveLog | null, half: number, left: number): number {
+    const lead = o.tl.points - d.tl.points;
+    const sit: Situation = { down: 1, toGo: 3, yardsToGoal: 3, secsLeft: left, qSecs: this.qSecs, finalHalf: half === 1, lead };
+    const xpAt = log ? log.plays.findIndex((p) => p.kick?.unit === 'xp') : -1;
+    if (goForTwo(sit)) {
+      if (xpAt >= 0) log!.plays.splice(xpAt, 1);
+      this.twoPoint(o, d, sit, half, left);
+      return 0;
+    }
+    const late = half === 1 && left <= this.qSecs && lateAndClose(4, lead);
+    const made = this.rng() < xpOdds(o.on.K?.r.kac ?? PAT.mid, unitEdge(o.conf.k, leverage(1, 3, late, PAT.dist)));
+    if (xpAt >= 0) log!.plays[xpAt].kick!.good = made;
+    if (made) {
+      o.tl.points += 1;
+      if (told) told.points += 1;
+    }
+    return made ? 1 : 0;
+  }
+
+  /** The defense scored on `e` (a pick six: then its try; a safety). */
+  defScore(o: ESide, d: ESide, e: EngineDrive, half: number, left: number): void {
+    const last = e.result === 'TURNOVER' ? this.story.drives[this.story.drives.length - 1].plays.at(-1) : undefined;
+    if (e.defPoints === 7) {
+      d.tl.points += 6;
+      // The defense's try: with no log of its own (the grades have the snap that scored). Its kick counts
+      // on the pick six, as a touchdown drive's does.
+      const kick = this.tryAfter(d, o, null, null, half, left);
+      if (last) this.against.set(last, { pts: 6 + kick, kind: 'pick6' });
+    } else if (e.defPoints === 2) {
+      d.tl.points += 2;
+      if (last) this.against.set(last, { pts: 2, kind: 'safety' });
+    }
+  }
+
+  /** Halftime: every brain adjusts. */
+  halftime(): void {
+    for (const s of [this.home, this.away]) {
+      if (s.dcBrain) halftime(s.dcBrain);
+      if (s.ocBrain) ocHalftime(s.ocBrain);
+    }
+  }
+
+  /**
+   * Regulation on the clock from `first`'s opening possession (the other team takes the second-half
+   * kickoff) until quarter `toQuarter` starts (5: the whole game). A drive still going at the break before
+   * `toQuarter` stops there. `kickedBy` is who kicked off for the possession that's next, if anyone did.
+   */
+  regulation(first: ESide, qMin: number, toQuarter: number): { next: LiveNext; quarter: number; time: number; off: ESide; kickedBy: ESide | null } {
+    const clock = newClock(qMin);
+    const pace = clamp(1 + gauss(this.rng) * GAME_SIM.paceSd, 0.7, 1.3);
+    const other = (s: ESide) => (s === this.home ? this.away : this.home);
+    let off = first;
+    let start = 25;
+    let kickedBy: ESide | null = other(first);
+    let next: LiveNext | null = null;
+    const part = toQuarter <= 4;
+    while (!next) {
+      if (clock.quarter >= toQuarter) {
+        next = { kind: 'cpu', start }; // the caller reads `off` and `kickedBy`
+        break;
+      }
+      const dfn = other(off);
+      const q = clock.quarter;
+      const left = timeLeftInHalf(clock);
+      const half = q <= 2 ? 0 : 1;
+      const lead = off.tl.points - dfn.tl.points;
+      const cut = part && (toQuarter === 2 || toQuarter === 4) && q === toQuarter - 1;
+      const dc: DriveClock = {
+        timeLeft: cut ? clock.time : left, hurry: false, milk: false, pace, quarterBreak: cut, pastBreak: cut ? left - clock.time : 0, lead, finalHalf: q >= 3, qSecs: clock.qSecs,
+      };
+      const { e, told, log } = this.drive(off, dfn, start, dc, half, left);
+      if (cut && e.result === 'END OF HALF') {
+        advanceSim(clock, e.secs);
+        next = { kind: 'cpu', start: e.endYard, mid: true };
+        kickedBy = null;
+        break;
+      }
+      const { halfOver } = advanceSim(clock, e.secs);
+      const leftAfter = timeLeftInHalf(clock);
+      // A touchdown that wins the game on its last play needs no try.
+      if (e.result === 'TOUCHDOWN' && !(halfOver && clock.quarter >= 4 && off.tl.points > dfn.tl.points)) this.tryAfter(off, dfn, told, log, half, leftAfter);
+      if (e.defPoints) this.defScore(off, dfn, e, half, leftAfter);
+      if (halfOver) {
+        if (clock.quarter >= 4) {
+          next = { kind: 'final' };
+          break;
+        }
+        if (toQuarter <= 3) {
+          next = { kind: 'halftime' };
+          break;
+        }
+        this.halftime();
+        nextQuarter(clock);
+        off = other(first);
+        start = 25;
+        kickedBy = first;
+        continue;
+      }
+      if (e.defPoints === 7) {
+        // The defense kicks off after its try: the same offense gets the ball back.
+        start = 25;
+        kickedBy = dfn;
+        continue;
+      }
+      start = e.defPoints === 2 ? 40 : userStartAfter(e, this.rng);
+      kickedBy = e.result === 'TOUCHDOWN' || e.result === 'FIELD GOAL' || e.defPoints === 2 ? off : null;
+      off = dfn;
+    }
+    return { next, quarter: clock.quarter, time: clock.time, off, kickedBy };
+  }
+
+  /** FBS overtime (`OVERTIME`) until a side leads after a period; `first` has the ball first in odd periods. */
+  overtime(first: ESide, second: ESide): number {
+    const O = OVERTIME;
+    let period = 0;
+    while (first.tl.points === second.tl.points) {
+      period++;
+      const half = period + 1;
+      const order = period % 2 ? [first, second] : [second, first];
+      for (let i = 0; i < 2; i++) {
+        const [o, d] = [order[i], order[1 - i]];
+        const lead = o.tl.points - d.tl.points;
+        const otSit: Situation = { down: 1, toGo: 3, yardsToGoal: 3, secsLeft: 0, qSecs: this.qSecs, finalHalf: true, lead, ot: i === 0 ? 'first' : 'second' };
+        if (period >= O.shootout) {
+          this.twoPoint(o, d, otSit, half, 0);
+          continue;
+        }
+        const clock: DriveClock = { timeLeft: Infinity, hurry: false, milk: false, lead, ot: i === 0 ? 'first' : 'second' };
+        const { e, told } = this.drive(o, d, O.start, clock, half, 0, true);
+        if (e.defPoints) {
+          // A defensive score ends it.
+          d.tl.points += e.defPoints === 7 ? 6 : 2;
+          const last = told.plays.at(-1);
+          if (last) this.against.set(last, { pts: e.defPoints === 7 ? 6 : 2, kind: e.defPoints === 7 ? 'pick6' : 'safety' });
+          return period;
+        }
+        const td = e.result === 'TOUCHDOWN';
+        const six = o.tl.points;
+        const walkOff = td && i === 1 && six > d.tl.points;
+        const kick = td && !walkOff && period < O.mustGoForTwo && !(i === 1 && d.tl.points - six === 2);
+        if (kick) {
+          o.tl.points += 1;
+          told.points += 1;
+        }
+        if (walkOff) return period;
+        if (td && !kick) this.twoPoint(o, d, { ...otSit, lead: o.tl.points - d.tl.points }, half, 0);
+      }
+      if (period >= 8 && first.tl.points === second.tl.points) (this.rng() < 0.5 ? first : second).tl.points += 2;
+    }
+    return period;
+  }
+
+  box() {
+    return { home: this.home.tl, away: this.away.tl, players: [...this.home.lines.values(), ...this.away.lines.values()] };
+  }
+}
+
+/** A whole game through the engine, on 15:00 quarters (or `qMin`). */
+export function engineGame(home: EngineTeamIn, away: EngineTeamIn, rng: Rng, opts: EngineGameOpts = {}): GameResult {
+  const [h, a] = sides(home, away, rng);
+  const story = opts.story ?? newStory(h.id, a.id);
+  const qMin = opts.qMin ?? 15;
+  const run = new Run(rng, h, a, opts, story, qMin * 60);
+  const first = rng() < 0.5 ? h : a;
+  run.regulation(first, qMin, 5);
+  const ot = h.tl.points === a.tl.points ? run.overtime(a, h) : 0;
+  return {
+    home: h.tl.points, away: a.tl.points, ot, box: run.box(),
+    plays: gamePlays({ ...story, home: h.id, away: a.id }, { [h.id]: h.on, [a.id]: a.on }, run.against),
+  };
+}
+
+/**
+ * The first quarters of a game the user plays, through the engine (as `simPart`): the user receives the
+ * opening kickoff, the CPU the second half's, and a drive going at the break before `toQuarter` stops
+ * there. The brains the caller passes in (`dcBrain`, `ocBrain`) go on learning into the live game.
+ */
+export function enginePart(
+  user: EngineTeamIn, cpu: EngineTeamIn, userHome: boolean, qMin: number, toQuarter: number, rng: Rng, opts: EngineGameOpts = {},
+): PartResult & { against: Against } {
+  const [u, c] = sides(user, cpu, rng);
+  const story = opts.story ?? (userHome ? newStory(u.id, c.id) : newStory(c.id, u.id));
+  const run = new Run(rng, userHome ? u : c, userHome ? c : u, opts, story, qMin * 60);
+  const r = run.regulation(u, qMin, toQuarter);
+  let next = r.next;
+  if (next.kind === 'cpu') {
+    // Regulation stopped at the hand-off: whose ball, or the user's kickoff after a user score.
+    if (r.off === u) next = { kind: 'user', start: next.start, ...(next.mid ? { mid: true } : {}) };
+    else if (r.kickedBy === u && !next.mid) next = { kind: 'userKickoff' };
+  }
+  return {
+    quarter: r.quarter, time: r.time, user: u.tl.points, cpu: c.tl.points, next, box: run.box(),
+    story, against: run.against,
+  };
+}

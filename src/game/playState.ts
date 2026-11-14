@@ -166,6 +166,9 @@ const QB_RUN_WAIT: Partial<Record<RunScheme, number>> = { gap: 0.35, draw: DRAW_
 /** A blocker split out wider than this from the ball is a stalk blocker, not a pass protector. */
 export const STALK_SPLIT = 6.5;
 /** Screens: the line pass-sets this long, then lets its rushers go and releases to block. */
+/** Biting on play action: a backer's or safety's odds by his job (`base`, a `robber`, a `deep` safety), less `prc` a point of play recognition over 70. */
+export const PA_BITE = { base: 0.8, robber: 0.7, deep: 0.35, prc: 0.01 };
+
 export const SCREEN_SET = 0.8;
 /** A box defender with a run-first (`fit`) zone reads the run this much sooner. */
 const FIT_EARLY = 0.15;
@@ -355,6 +358,9 @@ export class Play {
   /** The ball in the air is a pitch, not a forward pass. */
   pitch = false;
   faked = false;
+  /** On the fake: the backers and safeties who could have bitten, and the slots of those who did (what an OC watches on film). */
+  paSeen = 0;
+  paBit: string[] = [];
   /** Zone read: the read key crashes on the back this snap (decided at the snap). */
   keyCrash = false;
   /** Zone read: the back has reached the mesh. */
@@ -1298,8 +1304,10 @@ export class Play {
     for (const d of this.def) {
       if ((d.role !== 'LB' && d.role !== 'S') || this.passRead.has(d)) continue;
       const a = d.assign?.kind;
-      const chance = (a === 'deep' ? 0.35 : a === 'robber' ? 0.7 : 0.8) - (d.r.prc - 70) * 0.01 + LEAN_FX.paBite * d.lean.run;
+      const chance = (a === 'deep' ? PA_BITE.deep : a === 'robber' ? PA_BITE.robber : PA_BITE.base) - (d.r.prc - 70) * PA_BITE.prc + LEAN_FX.paBite * d.lean.run;
+      this.paSeen++;
       if (this.rng() >= chance) continue;
+      this.paBit.push(d.slot);
       d.fitAt = this.time;
       d.fitUntil = this.time + 0.35 + (1 - d.r.prc / 100) * 0.6 + LEAN_FX.biteLong * Math.max(0, d.lean.run);
     }

@@ -163,11 +163,10 @@ A pick does two things:
 - **Side effect, kept on purpose:** practicing a rating with a small overall weight (WR blocking, `rbk` 6 of 100) grows the overall a little slower than the standard draw. That's the cost of a blocking week.
 - **Measured:** over 12 weeks of one emphasis, the odds of a point landing on its ratings rise ×1.6–2.2 at every group but ST. Odds, not shares, because a group whose focus already takes most of its points can't double its share. Kickers and punters run higher (×2.3–3.0): they level about half as often, so the tags pile up toward the cap.
 
-### 2. Game day: simulated play only
-- **Where it plays:**
-  - the user's simulated games, both units
-  - **the user's defense in live games**, since the CPU's possessions are always simulated (`Game.cpuDrive` passes the user's defensive mods)
-- **Where it doesn't:** the user's live offense, by design.
+### 2. Game day: the drive sim only (nowhere in play since phase 4)
+- **Where it plays:** only in `simulateDrive` (`DriveMods`). Since phase 4 of ENGINEDRIVES.md every snap of the user's games runs through the engine, played or simulated (SIM GAME, simulated quarters), and CPU staffs stay on standard, so **the game-day effect currently reaches no game.** Practice (above) is unchanged.
+- **Open:** whether to bring it back on the field (an engine edge by group and situation) or let emphasis be practice only. The rest of this section describes the mechanism as built.
+- **Where it doesn't:** anything played on the field or simulated through the engine.
 - **How it plays:** `simulateDrive` takes optional `DriveMods` (`emphasisMods` → `driveMods`). Per snap:
   - **edge:** rating points on the gain, from `snapEdge`
   - **explosive:** the big-play odds × (1 + offense − defense)

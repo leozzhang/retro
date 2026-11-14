@@ -9,7 +9,7 @@ import { playTraits } from '../season/scouting';
 import { breaksInside, LEAN_KEYS, NO_LEAN, type Lean } from '../sim/player';
 import {
   damage, famDist, giveRate, layFilm, learn, residSig, rollShare, sigDist, leagueDist, leagueShares, lookKey, newModel, playDist, resid, sitBin, targetDist, type ModelParams, type OffModel, type RosterRead,
-  type SitBin, OFF_MODEL, type FilmBook,
+  type SitBin, OFF_MODEL, type FilmBook, type PayoffTable,
 } from './offModel';
 import { personnelOf } from './resolvePlay';
 import type { Situation } from './situation';
@@ -220,6 +220,8 @@ const tally = (): Tally => ({ n: Object.fromEntries(BUCKETS.map((b) => [b, 0])) 
 export function newBrain(o: {
   iq: DefenseIq; adjust: number; scout: number; qbMobility: number; seed: number; smarts?: number;
   book?: readonly PlayDef[]; style?: OffStyle; roster?: RosterRead; film?: FilmBook;
+  /** The payoff table he reads: the film room's (the user's offense, the default) or the engine's (engine drives). */
+  table?: PayoffTable;
 }): DefBrain | null {
   const iq = DEF_BRAIN.iq[o.iq];
   if (!iq) return null;
@@ -227,7 +229,7 @@ export function newBrain(o: {
   const scout = clamp(o.scout / 100, 0, 1);
   const b: DefBrain = {
     iq, skill, scout, smarts: o.smarts ?? 1, half: false,
-    model: newModel({ book: o.book ?? [], style: o.style, roster: o.roster, prm: { skill, scout } }),
+    model: newModel({ book: o.book ?? [], style: o.style, roster: o.roster, prm: { skill, scout }, table: o.table }),
     looks: {}, book: tally(), flow: tally(), short: tally(),
     shift: { ...ZERO_DIALS }, tags: { spy: 0, contain: 0, rpo: 0 }, heavy: null, keyed: null, keyRead: null, who: o.roster?.who ?? {}, habits: [], exp: {}, jumpNerve: {}, answered: {}, trapOdds: 0,
     lanes: { in: 0, out: 0 }, read: { ...NO_LEAN },
@@ -535,9 +537,9 @@ export function dcMix(
       const f = x.p.tags.family;
       let rf = res.get(f);
       if (rf === undefined) res.set(f, (rf = resid(b.model, prm, f, c, z)));
-      mine += x.w * (damage(x.p, c, give) + rf);
+      mine += x.w * (damage(x.p, c, give, undefined, b.model.table) + rf);
     }
-    gain[cid] = leagueDamage(sit, c) - mine - passShare * habit + gauss(r) * misread;
+    gain[cid] = leagueDamage(sit, c, b.model.table) - mine - passShare * habit + gauss(r) * misread;
   }
   const beta = at(ML_DC.beta) * b.iq;
   const lam = at(ML_DC.lam) * execute(b) * Math.min(1, b.iq);
@@ -573,12 +575,12 @@ export function dcMix(
 
 const leagueCache = new Map<string, number>();
 /** What a normal offense does to a call in a situation (film damage over the league's plays). */
-function leagueDamage(sit: SitBin, c: DefCall): number {
-  const k = `${sit}|${c.id}`;
+function leagueDamage(sit: SitBin, c: DefCall, table: PayoffTable = 'film'): number {
+  const k = `${table}|${sit}|${c.id}`;
   let v = leagueCache.get(k);
   if (v === undefined) {
     v = 0;
-    for (const x of leagueDist(sit)) v += x.w * damage(x.p, c, 0.5);
+    for (const x of leagueDist(sit)) v += x.w * damage(x.p, c, 0.5, undefined, table);
     leagueCache.set(k, v);
   }
   return v;
@@ -814,6 +816,16 @@ export function headline(b: DefBrain, name: (id: string) => string): string | nu
 /** A new drive: one more line allowed. */
 export function newDrive(b: DefBrain): void {
   b.saidThisDrive = false;
+}
+
+/**
+ * A line in the user's own DC's voice: the lines are written as the user hears the CPU's defense
+ * ("THEY'RE SITTING ON YOUR SLANT"); the user's DC says it of the CPU's offense ("WE'RE SITTING ON THEIR SLANT").
+ */
+export function ourLine(line: string): string {
+  return line
+    .replace(/THEY'RE/g, "WE'RE").replace(/THEY'VE/g, "WE'VE").replace(/THEY WON'T/g, "WE WON'T")
+    .replace(/\bTHEIR\b/g, 'OUR').replace(/\bYOUR\b/g, 'THEIR').replace(/\bLET YOU\b/g, 'LET THEM');
 }
 
 /** Their adjustments so far, biggest first (the halftime card). */

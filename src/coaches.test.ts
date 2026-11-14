@@ -219,7 +219,7 @@ describe('emphases in the season', () => {
     return s;
   }
 
-  it('reach the simulated game, then reset to standard', () => {
+  it("don't reach the user's game, played through the engine, and reset to standard", () => {
     const plain = ready();
     const picked = ready();
     picked.teamState.georgia = { ...picked.teamState.georgia, emph: { DL: 'dl-rush', DB: 'db-tackling', QB: 'qb-accuracy' } };
@@ -228,7 +228,8 @@ describe('emphases in the season', () => {
     advanceWeek(picked);
     expect(picked.teamState.georgia?.emph).toBeUndefined();
     const res = (s: SeasonState) => s.games.find((x) => x.id === g.id)!.result!;
-    expect(res(picked)).not.toEqual(res(plain));
+    // The game-day edge is the drive sim's: the user's game is the engine's (ENGINEDRIVES.md phase 4).
+    expect(res(picked)).toEqual(res(plain));
     // Other games are untouched.
     const other = plain.games.find((x) => x.week === g.week && x.id !== g.id && x.result)!;
     expect(picked.games.find((x) => x.id === other.id)!.result).toEqual(other.result);

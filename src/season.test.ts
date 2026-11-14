@@ -207,7 +207,7 @@ describe('season', () => {
     expect(s.awards.find((a) => a.id === 'heisman')?.finalists.length).toBe(5);
     expect(s.history).toMatchObject([{ year: 2026, champion: b.champion, heisman: s.awards[0].finalists[0].name }]);
     expect(s.history[0].ap).toHaveLength(25);
-  }, 20_000);
+  }, 60_000);
 
   it('state is plain JSON: a saved season continues identically', () => {
     const a = newSeason(defaultConfig('texas'), 21);
@@ -216,7 +216,7 @@ describe('season', () => {
     simSeason(a);
     simSeason(b);
     expect(JSON.parse(JSON.stringify(b))).toEqual(JSON.parse(JSON.stringify(a)));
-  }, 20_000);
+  }, 60_000);
 
   it('a user depth chart survives the week and a save; handing it back restores the staff chart', () => {
     const s = newSeason(defaultConfig('georgia'), 11);

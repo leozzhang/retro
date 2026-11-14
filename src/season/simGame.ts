@@ -101,7 +101,7 @@ function credit(s: Side, dfn: Side, d: DriveSim, plays: SimPlay[], clock: DriveC
  * Credit a drive's cast snaps to the offense's box score (also the CPU's drives in a live game), and
  * the defense's sacks and interceptions to `dfn`'s.
  */
-export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: DriveCredit['snaps'], dfn?: BoxSide): void {
+export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: DriveCredit['snaps'], dfn?: BoxSide, played = false): void {
   const tl = s.tl;
   tl.plays += d.plays;
   tl.yards += d.yards;
@@ -126,8 +126,8 @@ export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: Dr
           ql.cmp++;
           ql.passYds += yds;
           if (td) ql.passTd++;
-          // The incompletions the drive sim doesn't log as snaps.
-          if (s.cast() < extraInc) ql.att++;
+          // The incompletions the drive sim doesn't log as snaps (a played drive logs every one).
+          if (!played && s.cast() < extraInc) ql.att++;
         }
         if (who) {
           who.rec++;
@@ -168,10 +168,17 @@ export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: Dr
   if (d.result === 'TURNOVER') tl.turnovers++;
 }
 
-/** A simulated drive's snaps as a progression log, with the try and kickoff after a score. */
-export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false): DriveLog {
-  const out: LoggedPlay[] = plays.map((p) => {
+/**
+ * A simulated drive's snaps as a progression log, with the try and kickoff after a score. A drive played
+ * through the engine passes its credit (`engineCredit`), so each snap says what it was: pass, sack, pick.
+ */
+export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false, credit?: DriveCredit['snaps']): DriveLog {
+  const out: LoggedPlay[] = plays.map((p, i) => {
     const l: LoggedPlay = { gain: p.gain, down: p.down, toGo: p.toGo };
+    const c = credit?.[i];
+    if (c && c.kind !== 'kneel') l.pass = c.pass;
+    if (c?.kind === 'sack') l.sack = true;
+    if (c?.kind === 'int') l.int = true;
     if (p.lev) l.lev = p.lev;
     if (p.em) l.em = p.em;
     if (p.explosive) l.explosive = true;

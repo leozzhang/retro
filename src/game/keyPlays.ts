@@ -11,6 +11,8 @@ import type { KeyLevel } from '../season/types';
 
 export type { KeyLevel };
 export const KEY_LEVELS: KeyLevel[] = ['off', 'lean', 'normal', 'full'];
+/** The settings' levels: the key plays, or every snap (`all`: CPU drives in a played game, and simulated games and quarters). */
+export const WATCH_LEVELS: KeyLevel[] = [...KEY_LEVELS, 'all'];
 
 /** The dynasty's levels, with their defaults for saves from before the setting. */
 export function keyLevels(c: { keyPlays?: { sim?: KeyLevel; defense?: KeyLevel } } | undefined): { sim: KeyLevel; defense: KeyLevel } {
@@ -27,7 +29,9 @@ export type KeyKind =
   | 'td' | 'int' | 'fumble' | 'fourthConv' | 'fourthStop' | 'explosive' | 'thirdConv' | 'thirdStop'
   | 'redZoneStop' | 'sack' | 'fg' | 'missedFg' | 'gain' | 'twoPt' | 'twoPtStop'
   /** A CPU extra point in a played game: shown on its own, never picked from a drive. */
-  | 'xp' | 'xpMiss';
+  | 'xp' | 'xpMiss'
+  /** Any other snap, shown when every snap of a CPU drive is (`all`). */
+  | 'snap';
 
 export interface KeyPlay {
   drive: StoryDrive;
@@ -47,11 +51,11 @@ export interface KeyPlay {
  */
 export const KEY_PLAYS = {
   perDrive: {
-    defense: { off: 0, lean: 1, normal: 2, full: 4 },
-    sim: { off: 0, lean: 1, normal: 2, full: 3 },
+    defense: { off: 0, lean: 1, normal: 2, full: 4, all: 99 },
+    sim: { off: 0, lean: 1, normal: 2, full: 3, all: 3 },
   },
-  perQuarter: { off: 0, lean: 3, normal: 4, full: 7 },
-  minPriority: { off: 9, lean: 3, normal: 2, full: 1 },
+  perQuarter: { off: 0, lean: 3, normal: 4, full: 7, all: 7 },
+  minPriority: { off: 9, lean: 3, normal: 2, full: 1, all: 0 },
   /** Yards for a big play, and for a notable one (FULL only). */
   explosive: 20,
   gain: 12,
@@ -110,8 +114,8 @@ function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last:
   return null;
 }
 
-/** Every snap of a drive worth showing at some level, in order. */
-export function driveEvents(d: StoryDrive, view: KeyView): KeyPlay[] {
+/** Every snap of a drive worth showing at some level, in order; with `every`, the rest too (as `snap`, priority 0), but never a punt or a kneel. */
+export function driveEvents(d: StoryDrive, view: KeyView, every = false): KeyPlay[] {
   const plays = withFourthDowns(d);
   // The last snap before the drive's kick or end, for red-zone stops.
   let lastSnap = -1;
@@ -120,7 +124,7 @@ export function driveEvents(d: StoryDrive, view: KeyView): KeyPlay[] {
   });
   const out: KeyPlay[] = [];
   plays.forEach(([p, snap], i) => {
-    const c = classify(d, p, snap, i === lastSnap, view);
+    const c = classify(d, p, snap, i === lastSnap, view) ?? (every && !p.punt && !p.kneel ? { kind: 'snap' as const, priority: 0 } : null);
     if (c) out.push({ drive: d, play: p, ...(snap ? { snap } : {}), ...c });
   });
   return out;
@@ -132,12 +136,15 @@ const inOrder = (a: KeyPlay, b: KeyPlay) => a.play.t - b.play.t;
 /** A drive's key plays at `level`, in order. */
 export function pickDrive(d: StoryDrive, level: KeyLevel, view: KeyView): KeyPlay[] {
   const T = KEY_PLAYS;
+  if (level === 'all') return driveEvents(d, view, true);
   const ev = driveEvents(d, view).filter((k) => k.priority >= T.minPriority[level]);
   return ev.sort(byImportance).slice(0, T.perDrive[view][level]).sort(inOrder);
 }
 
 /** A simulated stretch's key plays at `level`, in order: each drive's picks, then each quarter's cap. */
 export function pickGame(story: GameStory, level: KeyLevel): KeyPlay[] {
+  // Every snap, in order: no caps.
+  if (level === 'all') return story.drives.flatMap((d) => pickDrive(d, level, 'sim'));
   const cap = KEY_PLAYS.perQuarter[level];
   const byQuarter = new Map<number, KeyPlay[]>();
   for (const d of story.drives) {
@@ -164,7 +171,7 @@ export const KEY_TITLE: Record<KeyKind, string> = {
   td: 'TOUCHDOWN', int: 'INTERCEPTION', fumble: 'FUMBLE', fourthConv: '4TH DOWN CONVERSION', fourthStop: 'STOPPED ON 4TH DOWN',
   explosive: 'BIG PLAY', thirdConv: '3RD DOWN CONVERSION', thirdStop: 'STOPPED ON 3RD DOWN', redZoneStop: 'RED ZONE STOP',
   sack: 'SACK', fg: 'FIELD GOAL', missedFg: 'FIELD GOAL NO GOOD', gain: 'NICE GAIN', twoPt: 'TWO-POINT TRY GOOD', twoPtStop: 'TWO-POINT TRY STOPPED',
-  xp: 'EXTRA POINT', xpMiss: 'EXTRA POINT NO GOOD',
+  xp: 'EXTRA POINT', xpMiss: 'EXTRA POINT NO GOOD', snap: 'THE SNAP',
 };
 
 const ORD = ['1ST', '2ND', '3RD', '4TH'];

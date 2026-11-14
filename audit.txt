@@ -1,4 +1,4 @@
-RUN AUDIT: every designed run against 2-man, c2, c3, c4, cat, c3-sky, c1-fire, fire-zone, c0-blitz, bear (short-yardage plays also Goal Line, and 3rd and 1 on half the Bear and Goal snaps), defense at -10 / 0 / +10 against a 70 offense, 90 snaps a cell.
+RUN AUDIT: every designed run against 2-man, c2, c3, c4, cat, c3-sky, c1-fire, fire-zone, c0-blitz, bear (short-yardage plays also Goal Line, and 3rd and 1 on half the Bear and Goal snaps), defense at -10 / 0 / +10 against a 70 offense, 30 snaps a cell.
 Snap flags (shown on  15%+ of snaps): IDLE no job; DEAD DOUBLE two on one, nobody climbs, with a playside man free; WRONG SIDE a lead or kick on a backside man; FREE PLAYSIDE a playside box defender nobody has (box/hats per call shown).
 OWES: a blocker whose man at the snap made  20%+ of the tackles. POA: a pull, lead or kick on a man as the ball gets 2 yd past the line under  40%. Grid: success % (4+ yd; 3rd and 1: a gain of 1+) / ypc, by call, at each defense level.
 
@@ -7,842 +7,844 @@ OWES: a blocker whose man at the snap made  20%+ of the tackles. POA: a pull, le
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        58%   6.5     51%   6.0     29%   3.2    
-  c2           71%   5.1     43%   3.4     26%   2.1    
-  c3           70%   8.0     50%   5.4     24%   2.5    
-  c4           71%   6.9     38%   3.9     33%   3.2    
-  cat          19%   8.2      3%   1.7     11%   1.1    
-  c3-sky       71%   9.7     49%   5.1     30%   2.4    
-  c1-fire      59%   3.9     28%   2.1     10%   0.9    
-  fire-zone    59%   5.3     24%   2.2     23%   1.6    
-  c0-blitz     51%   5.0      3%   1.4      7%   1.5    
-  bear         32%   2.0     13%   0.5      7%  -0.2    
+  2-man        60%   7.7     50%   5.1     30%   3.4    
+  c2           70%   4.8     53%   3.8     43%   2.8    
+  c3           73%   7.4     57%   5.0     33%   3.2    
+  c4           77%   8.2     57%   7.9     37%   3.6    
+  cat          27%   5.2     17%   3.1     20%   2.8    
+  c3-sky       83%   9.5     53%   5.7     33%   2.4    
+  c1-fire      53%   3.8     37%   3.1      7%   0.7    
+  fire-zone    63%   8.6     47%   3.6     13%   1.0    
+  c0-blitz      3%   2.6      7%   1.8      7%   1.3    
+  bear         37%   2.1     20%   1.5     13%   0.7    
 
-=== Outside Zone (outside-zone) | Pistol | outside-zone | beats lightBox stops blitz | aim OUT on aim  75%
+=== Outside Zone (outside-zone) | Pistol | outside-zone | beats lightBox stops blitz | aim OUT on aim  79%
   tip: Stretch the edge, cut up behind blocks.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  flags: OWES Z  22%
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        63%   6.9     58%   4.8     37%   2.9    
-  c2           82%   8.7     66%   5.1     57%   4.3    
-  c3           69%   9.0     50%   4.9     30%   2.8    
-  c4           68%   6.9     54%   6.4     40%   3.6    
-  cat          66%   7.7     39%   4.0     14%   2.1    
-  c3-sky       67%   7.2     49%   4.3     37%   2.6    
-  c1-fire      57%   5.7     34%   3.9     10%   2.1    
-  fire-zone    47%   4.5     21%   2.9     12%   1.5    
-  c0-blitz     52%  11.0     11%   3.0      7%   2.1    
-  bear         12%   1.4      1%  -0.2      0%  -1.1    
+  2-man        73%   8.0     70%   4.8     37%   3.5    
+  c2           83%   6.4     67%   4.9     50%   3.4    
+  c3           73%  10.1     57%   4.6     53%   4.6    
+  c4           80%  15.8     63%   4.6     47%   3.5    
+  cat          60%   4.9     23%   3.1     10%   2.4    
+  c3-sky       77%   8.4     63%   4.5     70%   5.2    
+  c1-fire      60%   5.0     43%   7.0      7%   2.6    
+  fire-zone    47%   3.9      7%   1.3     13%   2.0    
+  c0-blitz     40%   6.5     10%   3.2      7%   2.4    
+  bear          3%   0.3      7%   0.5      7%  -0.8    
 
 === Power (power) | Singleback | power | beats lightBox stops heavyBox | aim C on aim  61%
   tip: Downhill off tackle. Good in short yardage.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9  goal 9/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (270)
-  card goal  goal: X:CB1 Z:CB2 SL:SS TE:DE2 LT:WLB(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:SAM (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (90)
+  card goal  goal: X:CB1 Z:CB2 SL:SS TE:DE2 LT:WLB(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:SAM (90)
   call        def -10       def 0         def +10       
-  2-man        71%   8.3     68%   7.6     46%   4.3    
-  c2           62%   4.5     69%   4.6     12%   1.9    
-  c3           71%   6.7     53%   4.1     30%   2.1    
-  c4           70%   6.2     54%   4.2     31%   2.5    
-  cat          63%   8.2     63%   8.6     48%   5.2    
-  c3-sky       68%   4.8     48%   3.3     14%   1.4    
-  c1-fire      27%   2.6     19%   2.8      2%   0.5    
-  fire-zone    59%   6.0     44%   4.4     14%   1.3    
-  c0-blitz     61%  15.5     43%   5.3     44%   5.9    
-  bear         42%   2.9     18%   1.3      7%   0.2    
-  bear*3rd1    69%   3.8     36%   2.7     36%   0.2    
-  goal          2%   1.7      7%   1.8      4%   0.1    
-  goal*3rd1    80%   2.6     64%   1.7     13%   0.3    
+  2-man        60%   6.9     67%   7.9     43%   4.1    
+  c2           77%   5.5     53%   3.2     13%   2.2    
+  c3           63%   5.6     43%   3.5     23%   2.6    
+  c4           67%   5.8     57%   4.6     30%   2.9    
+  cat          67%   9.1     63%   9.9     37%   6.0    
+  c3-sky       60%   4.1     47%   3.3     20%   2.0    
+  c1-fire      13%   2.7     13%   2.2     13%   3.4    
+  fire-zone    63%  10.2     40%   5.2     13%   1.4    
+  c0-blitz     63%   9.4     43%   9.1     27%   2.9    
+  bear         27%   2.9      0%   0.6      0%   0.7    
+  bear*3rd1    60%   2.1     53%   2.6     53%   1.0    
+  goal          0%   1.9     13%   1.9      7%   0.8    
+  goal*3rd1    73%   1.7     80%   1.7     33%   0.6    
 
-=== Toss (toss) | Singleback | toss | beats heavyBox stops blitz | aim OUT on aim  66%
+=== Toss (toss) | Singleback | toss | beats heavyBox stops blitz | aim OUT on aim  63%
   tip: R-click right away to pitch. Beat them wide.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: OWES TE  24% | OWES RT  25%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  flags: OWES TE  26% | OWES RT  24%
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        57%   5.3     38%   3.5     13%   1.9    
-  c2           80%   6.3     60%   4.6     29%   3.0    
-  c3           82%   6.7     46%   4.1     23%   2.8    
-  c4           73%  11.6     44%   5.7     24%   2.5    
-  cat          54%   6.5     28%   3.4     18%   1.8    
-  c3-sky       64%   8.0     47%   3.9     32%   2.6    
-  c1-fire      12%   1.8      8%   1.1      0%   0.5    
-  fire-zone    21%   2.6      3%   0.0      2%  -0.8    
-  c0-blitz     14%   2.1      2%   0.1      3%  -0.7    
-  bear         29%   3.2      8%   2.3      4%   1.3    
+  2-man        63%   5.0     60%   4.5     27%   2.5    
+  c2           60%   5.5     43%   3.3     33%   2.8    
+  c3           50%   4.6     50%   4.5     27%   2.1    
+  c4           57%  12.9     67%   6.8     33%   3.2    
+  cat          40%   6.0     20%   2.5     13%   2.2    
+  c3-sky       63%   6.8     33%   2.6     40%   2.8    
+  c1-fire      20%   2.2      3%   1.2      3%   0.5    
+  fire-zone    13%   1.6      7%   0.8      0%  -0.2    
+  c0-blitz      0%   1.2      0%   0.3      0%  -0.6    
+  bear         30%   3.7     20%   2.1      3%   1.9    
 
-=== Zone Read (zone-read) | Gun Doubles | zone-read | beats man stops heavyBox | aim B on aim  75%
+=== Zone Read (zone-read) | Gun Doubles | zone-read | beats man stops heavyBox | aim B on aim  73%
   tip: R-click to give, or keep it and run the QB.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        71%   9.9     66%   8.3     53%   6.5    
-  c2           71%   6.5     44%   5.4     23%   4.1    
-  c3           74%   6.4     69%   4.8     53%   3.7    
-  c4           71%   6.9     61%   4.5     41%   3.0    
-  cat          37%   5.8     34%   6.8     22%   3.3    
-  c3-sky       70%   4.4     63%   3.8     41%   2.9    
-  c1-fire      58%  11.7     34%   4.2     18%   2.7    
-  fire-zone    70%   7.3     39%   3.6     24%   2.1    
-  c0-blitz     60%  24.8     37%   8.2     29%   4.5    
-  bear         47%   6.6     40%   7.8     30%   3.2    
+  2-man        80%  14.5     53%   9.7     63%   8.6    
+  c2           77%   7.5     40%   4.6     23%   3.6    
+  c3           77%   7.0     63%   4.3     40%   2.8    
+  c4           73%   8.3     63%   5.2     60%   4.6    
+  cat          37%   6.8     37%   8.3     13%   1.1    
+  c3-sky       63%   6.4     57%   4.0     33%   3.1    
+  c1-fire      40%   4.2     43%  11.9     17%   1.7    
+  fire-zone    73%  13.3     37%   3.1     13%   1.4    
+  c0-blitz     57%  18.6     23%   7.5     20%   5.4    
+  bear         57%   9.7     33%   3.5     20%   2.4    
 
-=== Split Zone (split-zone) | Pistol | split-zone | beats lightBox stops heavyBox | aim B on aim  58%
+=== Split Zone (split-zone) | Pistol | split-zone | beats lightBox stops heavyBox | aim B on aim  56%
   tip: Zone to the TE side; the TE slices back on the end. Cutback lane.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2^MLB RG:DT2 RT:DE2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1 LG:DT1^MLB C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2^MLB RG:DT2 RT:DE2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1 LG:DT1^MLB C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        72%   8.1     54%   6.1     39%   3.5    
-  c2           72%   5.5     61%   4.3     39%   2.4    
-  c3           71%   7.6     51%   4.9     46%   3.7    
-  c4           74%   9.9     61%   4.7     41%   3.1    
-  cat          57%   9.5     34%   5.7     16%   1.3    
-  c3-sky       78%   9.0     59%   5.4     39%   3.0    
-  c1-fire      21%   2.7      8%   1.0      4%   0.8    
-  fire-zone    23%   2.4     21%   2.6     11%   1.7    
-  c0-blitz      4%   1.9      1%   1.0      0%   0.6    
-  bear         50%   3.3     27%   1.9      4%  -0.3    
+  2-man        83%   9.6     53%   6.1     43%   3.9    
+  c2           83%   5.8     57%   5.0     50%   3.1    
+  c3           83%  10.4     70%   6.0     30%   2.8    
+  c4           80%  10.3     63%   5.4     30%   2.1    
+  cat          37%   6.2     27%   5.8     17%   1.0    
+  c3-sky       77%   8.3     83%   7.6     43%   3.2    
+  c1-fire      33%   3.3     27%   2.7     13%   1.7    
+  fire-zone    27%   3.0     37%   2.9     13%   2.3    
+  c0-blitz     23%   3.0     23%   3.2      3%   1.5    
+  bear         13%   2.1     23%   1.5      0%   0.2    
 
-=== I-Form Stretch (i-stretch) | I-Form | outside-zone | beats lightBox stops blitz | aim OUT on aim  73%
+=== I-Form Stretch (i-stretch) | I-Form | outside-zone | beats lightBox stops blitz | aim OUT on aim  74%
   tip: Stretch to the field behind the FB. Press the edge, then cut up.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
   flags: POA FB(force) held  32%
-  card even  2-man: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-(force) TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-(force) TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        70%   8.8     59%   4.8     39%   3.3    
-  c2           93%  12.3     67%   5.9     54%   4.0    
-  c3           91%  14.5     79%   8.6     67%   4.9    
-  c4           84%   7.9     86%   7.7     66%   4.3    
-  cat          72%   5.7     10%   2.3      3%   1.4    
-  c3-sky       87%  10.3     77%   7.1     71%   6.4    
-  c1-fire      37%   7.5      4%   1.4     10%   1.1    
-  fire-zone    50%   6.1     34%   3.8     10%   0.5    
-  c0-blitz     44%   9.9      9%   1.8      6%   0.3    
-  bear         31%   3.9     10%   1.2      0%  -1.2    
+  2-man        50%   9.1     60%   5.7     17%   5.1    
+  c2           93%  14.4     87%  12.6     37%   3.0    
+  c3           83%   9.8     87%   7.0     60%   4.2    
+  c4           90%   7.5     80%   8.9     70%   6.5    
+  cat          53%   7.8      7%   2.9      0%   1.2    
+  c3-sky       77%  11.8     80%   7.6     87%   9.3    
+  c1-fire      40%   9.6      3%   1.3      3%   0.4    
+  fire-zone    47%   4.5     33%   3.9     13%   1.0    
+  c0-blitz     37%   6.4     13%   2.9     13%   1.1    
+  bear         30%   4.9     17%   3.9      0%  -1.6    
 
-=== Power O (power-o) | I-Form | power | beats lightBox stops heavyBox | aim C on aim  68%
+=== Power O (power-o) | I-Form | power | beats lightBox stops heavyBox | aim C on aim  64%
   tip: FB kicks out the end, guard leads through. Downhill, 21 personnel.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-@WLB(lead) TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-@WLB(lead) TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        72%   7.5     67%   6.1     49%   4.5    
-  c2           80%   9.8     72%   7.5     60%   5.0    
-  c3           77%   9.4     48%   3.8     39%   3.4    
-  c4           79%   7.2     49%   4.3     41%   3.1    
-  cat          86%  12.3     50%   9.1     14%   1.1    
-  c3-sky       79%   9.6     63%   9.0     47%   3.6    
-  c1-fire      10%   2.0      6%   0.9      3%   0.5    
-  fire-zone    82%   5.0     38%   2.5     12%   1.9    
-  c0-blitz     79%  18.7     52%   8.2     37%   6.6    
-  bear         39%   3.9     14%   1.4      6%  -0.1    
+  2-man        70%   7.2     63%   6.7     30%   2.8    
+  c2           70%  11.0     67%   6.3     47%   3.7    
+  c3           63%   6.4     63%   7.3     33%   3.0    
+  c4           80%   8.0     47%   5.0     40%   3.4    
+  cat          47%   7.9     57%   6.7     13%   0.7    
+  c3-sky       77%  12.8     53%   5.8     47%   5.6    
+  c1-fire      13%   2.4     20%   2.3     10%   1.2    
+  fire-zone    80%   6.2     27%   2.1     30%   2.3    
+  c0-blitz     63%   7.0     57%   6.8     47%  10.7    
+  bear         13%   2.6      3%   1.2      7%   0.8    
 
-=== Counter GT (counter) | Gun Doubles | counter | beats lightBox stops blitz,heavyBox | aim C on aim  46%
+=== Counter GT (counter) | Gun Doubles | counter | beats lightBox stops blitz,heavyBox | aim C on aim  44%
   tip: Jab away, then follow the guard and tackle off tackle. Beats flow.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:WLB LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:SS LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^SS LT:-@MLB(lead) LG:-@WLB(lead) C:DT1 RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:WLB LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:SS LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^SS LT:-@MLB(lead) LG:-@WLB(lead) C:DT1 RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        87%   8.0     74%   5.3     43%   2.6    
-  c2           43%   4.0     37%   3.7      8%   0.3    
-  c3           72%   8.8     52%   4.8     33%   1.9    
-  c4           87%  12.6     51%   6.0     37%   2.9    
-  cat           0%  -2.6      1%  -2.9      3%  -1.0    
-  c3-sky       69%   5.7     32%   2.5     19%   2.0    
-  c1-fire      59%   7.8     33%   3.2      7%   0.2    
-  fire-zone     2%   1.8      2%   1.0      1%   0.1    
-  c0-blitz      3%  -0.1      0%  -1.1      0%  -1.6    
-  bear         32%   4.8     21%   1.9      6%  -0.1    
+  2-man        87%   9.1     40%   2.8     57%   4.4    
+  c2           10%   1.8     10%   1.3      0%  -0.0    
+  c3           63%   4.4     67%   7.8     30%   2.7    
+  c4           70%  11.9     57%   7.6     30%   2.5    
+  cat           7%  -2.3      0%  -3.1      3%  -0.6    
+  c3-sky       70%   5.1     30%   1.7     23%   1.3    
+  c1-fire      60%   8.1     40%   4.8     17%   0.6    
+  fire-zone    23%   2.7      3%   1.3      0%  -0.0    
+  c0-blitz      3%   1.5      0%  -0.9      3%  -0.3    
+  bear         50%   3.4     27%   1.4      7%   0.1    
 
-=== Duo (duo) | Ace | duo | beats lightBox stops heavyBox | aim B on aim  60%
+=== Duo (duo) | Ace | duo | beats lightBox stops heavyBox | aim B on aim  64%
   tip: Two double teams, no pullers. Downhill; read the MIKE.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
   flags: none
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:WLB LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:DE2^MLB LT:DE1^SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:WLB LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:DE2^MLB LT:DE1^SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        50%   6.7     37%   4.6     21%   2.2    
-  c2           66%   8.3     40%   4.5     18%   2.6    
-  c3           66%   5.3     47%   3.9     41%   3.3    
-  c4           60%   7.2     47%   4.8     20%   2.4    
-  cat          59%   3.9     40%   4.4     16%   1.1    
-  c3-sky       68%   4.4     43%   2.5     23%   1.6    
-  c1-fire      43%   9.3     11%   2.4      3%   0.5    
-  fire-zone    40%   3.6     38%   2.6     13%   1.0    
-  c0-blitz     28%   8.7     22%   6.4      4%   0.9    
-  bear         19%   7.7     14%   2.0     10%   1.3    
+  2-man        63%   8.3     40%   4.8     30%   3.2    
+  c2           47%   7.1     23%   3.3     17%   3.0    
+  c3           77%   7.6     37%   3.4     30%   3.9    
+  c4           63%   6.3     47%   5.8     43%   5.0    
+  cat          60%   3.3     37%   2.3     10%   1.4    
+  c3-sky       60%   3.7     47%   2.9     23%   2.3    
+  c1-fire      43%   4.2     10%   3.4     10%   1.3    
+  fire-zone    43%   4.1     30%   2.2     10%   0.8    
+  c0-blitz     33%   6.8     20%   7.6      0%   0.9    
+  bear         27%   2.2     13%   1.9     17%   1.7    
 
 === Iso (iso) | I-Form | iso | beats lightBox stops heavyBox | aim B on aim  61%
   tip: FB isolates the MIKE. Short yardage: hit it hard behind him.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9  goal 9/9
-  flags: OWES RG  21%
+  flags: none
   free playside: FREE PLAYSIDE SS (even)  18%
-  card even  2-man: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2^SAM RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^SAM (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2^SS LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (270)
-  card goal  goal: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:SAM (270)
+  card even  2-man: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2^SAM RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^SAM (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2^SS LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (90)
+  card goal  goal: X:CB1 Z:CB2 FB:-@MLB(lead) TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:SAM (90)
   call        def -10       def 0         def +10       
-  2-man        34%   5.0     20%   2.5     12%   1.7    
-  c2           74%  11.5     43%   5.7     39%   3.5    
-  c3           66%   5.0     49%   4.5     31%   1.8    
-  c4           60%   4.9     53%   3.5     29%   2.0    
-  cat          52%  12.0     37%   7.8      4%   1.0    
-  c3-sky       62%   4.2     49%   3.0     26%   1.5    
-  c1-fire      16%   5.5     18%   4.1      8%   0.7    
-  fire-zone    66%   6.3     47%   3.2     13%   0.8    
-  c0-blitz     30%   2.9      9%   1.9      0%   0.3    
-  bear         27%   5.2     29%   6.3     11%   0.4    
-  bear*3rd1    51%   3.9     38%   0.7     33%  -0.3    
-  goal          0%   0.8      7%   1.1      4%  -0.2    
-  goal*3rd1    67%   1.2     40%   0.2     38%   0.0    
+  2-man        57%   7.2     30%   4.1      7%   0.6    
+  c2           63%   9.8     73%   8.8     33%   3.6    
+  c3           60%   4.8     53%   3.3     33%   2.2    
+  c4           57%   4.5     57%   7.3     30%   1.4    
+  cat          50%  11.7     27%   9.7      3%   1.2    
+  c3-sky       77%   4.8     63%   3.4     37%   2.3    
+  c1-fire      13%   4.9     20%   2.3      3%   0.1    
+  fire-zone    70%   8.7     53%   5.7     23%   1.4    
+  c0-blitz     33%   5.3      3%   0.9      0%   0.7    
+  bear         20%   2.6     13%   1.2      0%  -0.5    
+  bear*3rd1    60%   2.4     40%   0.7     40%   0.8    
+  goal          7%   2.1      0%  -0.4      7%   0.3    
+  goal*3rd1    47%   0.5     33%   0.0     33%   0.6    
 
-=== Trap (trap) | Singleback | trap | beats blitz stops heavyBox | aim A on aim  55%
+=== Trap (trap) | Singleback | trap | beats blitz stops heavyBox | aim A on aim  52%
   tip: Let the 3-tech in, the guard traps him. Quick hitter vs penetration.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: OWES LG  23%
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@DT2(kick) C:DT1 RG:WLB RT:MLB (261)
-  card even  c3-sky: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@DT2(kick) C:DT1 RG:WLB RT:MLB (260)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:MLB LT:-(hinge) LG:-@DT2(kick) C:DT1 RG:SS RT:DE2 (184)
+  flags: none
+  card even  cat: X:CB1 Z:CB2 SL:SS TE:DE2 LT:-(hinge) LG:NB(kick) C:DT1 RG:DT2 RT:MLB (89)
+  card even  c0-blitz: X:CB1 Z:CB2 SL:NB TE:DE2 LT:-(hinge) LG:-@DT2(kick) C:DT1 RG:FS RT:MLB (89)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:MLB LT:-(hinge) LG:-@DT2(kick) C:DT1 RG:SS RT:DE2 (64)
   call        def -10       def 0         def +10       
-  2-man        64%   7.8     43%   4.3      0%   0.3    
-  c2           67%   8.0     30%   3.7      2%   1.6    
-  c3           69%   4.6     57%   3.7     27%   2.4    
-  c4           66%   4.3     57%   3.8     22%   2.0    
-  cat          53%  16.6      4%   1.8      9%   1.2    
-  c3-sky       60%   3.6     39%   2.5     21%   2.4    
-  c1-fire      10%   1.2      3%   0.3      0%   0.2    
-  fire-zone    38%   2.1     29%   2.4      6%   2.0    
-  c0-blitz     47%  19.4     23%   8.6     15%   4.4    
-  bear         25%   6.2     29%   4.5     11%   0.5    
+  2-man        83%   9.1     60%   6.9     12%   1.3    
+  c2           33%   4.5     37%   4.7      5%   2.0    
+  c3           73%   4.9     40%   2.9     46%   3.8    
+  c4           77%   5.7     60%   3.6     46%   3.3    
+  cat          47%  15.4     17%   6.3      3%   1.0    
+  c3-sky       73%   6.8     57%   3.7     12%   1.9    
+  c1-fire      17%   4.0      3%   2.7      0%   0.4    
+  fire-zone    57%   3.4     23%   1.6      0%   1.2    
+  c0-blitz     17%   8.0     13%   6.1      0%   1.6    
+  bear         41%   7.5     23%   1.4     20%   1.3    
 
 === Lead Toss (lead-toss) | I-Form | toss | beats heavyBox stops blitz | aim OUT on aim  68%
   tip: R-click right away to pitch. FB leads the edge; follow him.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
-  flags: OWES TE  23% | OWES RT  33% | POA FB(force) held  33%
-  card even  2-man: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-(force) TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  flags: OWES TE  21% | OWES RT  30% | POA FB(force) held  36%
+  card even  2-man: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-(force) TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        63%   6.5     42%   4.1     23%   2.7    
-  c2           60%   5.3     47%   3.3     29%   2.6    
-  c3           67%   7.1     42%   3.3     39%   2.4    
-  c4           59%   5.6     39%   3.4     22%   2.1    
-  cat          14%   2.9     23%   3.5     18%   1.7    
-  c3-sky       78%   8.9     61%   5.4     37%   2.9    
-  c1-fire      20%   3.3      9%   0.2      4%  -0.9    
-  fire-zone    40%   4.8     18%   2.5      4%  -0.8    
-  c0-blitz     21%  11.0     10%   3.2      4%   0.3    
-  bear         24%   4.8     21%   3.0      9%   1.3    
+  2-man        53%   5.3     43%   4.3     23%   2.6    
+  c2           57%   6.5     40%   3.5     40%   2.6    
+  c3           77%   5.0     63%   4.2     30%   1.7    
+  c4           67%   7.3     53%   4.3     40%   4.0    
+  cat          13%   3.0     23%   2.1     20%   2.0    
+  c3-sky       70%   7.1     60%   4.3     50%   3.2    
+  c1-fire      13%   0.9     17%   0.7     10%   0.4    
+  fire-zone    47%   5.1     23%   1.0      3%   0.2    
+  c0-blitz     10%   2.7      7%   2.9      3%  -0.1    
+  bear          7%   3.4     17%   1.6     10%   1.8    
 
-=== Pin-Pull Sweep (pin-pull) | Gun Trips Rt | pin-pull | beats heavyBox stops blitz | aim OUT on aim  62%
+=== Pin-Pull Sweep (pin-pull) | Gun Trips Rt | pin-pull | beats heavyBox stops blitz | aim OUT on aim  58%
   tip: Tackle logs the force, guard leads up on the backer. Stay on their hips.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 6/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: OWES SL  28%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:-@MLB(lead) RT:-(force) (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:-@MLB(lead) RT:-(force) (270)
-  card bear  bear: X:CB1 Z:CB2 SL:SS TE:NB LT:DE1 LG:DT1 C:DT2 RG:-@MLB(lead) RT:DE2(force) (270)
+  flags: OWES SL  34%
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:-@MLB(lead) RT:-(force) (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:-@MLB(lead) RT:-(force) (90)
+  card bear  bear: X:CB1 Z:CB2 SL:SS TE:NB LT:DE1 LG:DT1 C:DT2 RG:-@MLB(lead) RT:DE2(force) (90)
   call        def -10       def 0         def +10       
-  2-man        26%   3.1     14%   2.4      6%   0.3    
-  c2           63%   4.2     42%   3.5     23%   2.1    
-  c3           57%   8.5     36%   3.9     11%   2.1    
-  c4           59%   4.8     33%   3.7     16%   2.8    
-  cat           1%  -2.5      0%  -2.9      0%  -3.2    
-  c3-sky       49%   5.3     26%   3.2     26%   2.6    
-  c1-fire      14%   2.7     17%   1.7     10%   1.0    
-  fire-zone    39%   4.9     14%   3.0      8%   2.5    
-  c0-blitz     16%   3.8     10%   2.7      2%   0.3    
-  bear         47%   3.9     19%   0.8     13%   0.1    
+  2-man        27%   6.5     23%   5.0     20%   2.8    
+  c2           67%   5.5     53%   8.2     30%   3.2    
+  c3           70%   5.0     40%   6.2      7%   1.6    
+  c4           47%   4.7     20%   2.2     17%   2.6    
+  cat           0%  -2.8      0%  -3.0      0%  -3.2    
+  c3-sky       23%   3.2     30%   3.5     30%   2.9    
+  c1-fire      37%   5.7     23%   2.3     23%   1.6    
+  fire-zone    40%   5.4     13%   2.6     13%   2.4    
+  c0-blitz     23%  13.1     13%   3.2      7%   1.5    
+  bear         37%   4.6     23%   0.9     13%  -0.1    
 
-=== Draw (draw) | Gun Doubles | draw | beats blitz,lightBox stops heavyBox | aim A on aim  92%
+=== Draw (draw) | Gun Doubles | draw | beats blitz,lightBox stops heavyBox | aim A on aim  91%
   tip: Show pass, then hand it off. Beats a hard rush and two-high.
   box/hats: 2-man 6/9  c2 4/9  c3 4/9  c4 4/9  cat 7/9  c3-sky 4/9  c1-fire 7/9  fire-zone 5/9  c0-blitz 8/9  bear 6/9
   flags: IDLE Z  40% | IDLE X  28%
-  card even  c2: X:- Z:CB2 SL:WLB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (270)
-  card even  c3: X:CB1 Z:- SL:WLB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:MLB LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (172)
-  card bear  bear: X:- Z:CB2 SL:NB TE:MLB LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (98)
+  card even  c2: X:- Z:CB2 SL:WLB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (90)
+  card even  c3: X:CB1 Z:- SL:WLB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:MLB LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (58)
+  card bear  bear: X:- Z:CB2 SL:NB TE:MLB LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (32)
   call        def -10       def 0         def +10       
-  2-man        74%   6.5     59%   5.3     30%   3.9    
-  c2           80%   4.4     74%   4.1     10%   3.7    
-  c3           92%   5.1     39%   3.1      0%   1.5    
-  c4          100%   6.3     87%   4.9     53%   4.6    
-  cat          81%   5.7     48%   4.8     44%   3.7    
-  c3-sky       94%   5.7     38%   3.8      0%   1.4    
-  c1-fire      28%   5.0     27%   6.2      0%   1.5    
-  fire-zone    66%   7.2     34%   4.5     38%   4.1    
-  c0-blitz      1%   1.2      0%   1.3      1%   1.0    
-  bear         26%   5.2      1%   3.3      0%   2.8    
+  2-man        63%   6.2     37%   4.1     30%   3.3    
+  c2           80%   4.4     83%   4.3     63%   4.5    
+  c3           83%   5.7      0%   1.6      0%   1.5    
+  c4           87%   5.1     87%   5.1     93%   5.9    
+  cat          87%   8.8     60%   7.2     43%   3.6    
+  c3-sky       67%   4.2      0%   1.7      0%   1.2    
+  c1-fire      37%   6.6      0%   1.5      0%   1.5    
+  fire-zone    53%   6.2     73%   5.7     27%   4.2    
+  c0-blitz     40%   3.8      3%   1.3      0%   0.7    
+  bear         10%   3.7      0%   3.1      0%   2.7    
 
-=== Empty QB Draw (qb-draw) | Gun Empty | qb-draw | beats man,lightBox stops heavyBox | aim A on aim  87%
+=== Empty QB Draw (qb-draw) | Gun Empty | qb-draw | beats man,lightBox stops heavyBox | aim A on aim  83%
   tip: Five wide empties the box. Sell pass, then the QB runs it.
-  box/hats: 2-man 4/10  c2 4/10  c3 4/10  c4 4/10  cat 4/10  c3-sky 4/10  c1-fire 5/10  fire-zone 4/10  c0-blitz 7/10  bear 4/10
-  flags: IDLE SL  32% | IDLE Z  28% | IDLE X  27% | OWES RB  28%
-  card even  c2: RB:WLB X:- Z:- SL:DE2 WR4:DT2 LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (270)
-  card even  c3-sky: RB:WLB X:CB1 Z:DIME SL:SS WR4:SS LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (270)
-  card bear  bear: RB:WLB X:CB1 Z:CB2 SL:- WR4:DIME LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (118)
-  card bear  bear: RB:WLB X:- Z:CB2 SL:- WR4:DIME LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (56)
+  box/hats: 2-man 5/10  c2 4/10  c3 4/10  c4 4/10  cat 5/10  c3-sky 4/10  c1-fire 6/10  fire-zone 4/10  c0-blitz 7/10  bear 4/10
+  flags: IDLE SL  33% | IDLE Z  27% | IDLE X  27% | OWES RB  31%
+  card even  c3: RB:WLB X:CB1 Z:DIME SL:DE2 WR4:NB LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (90)
+  card even  c4: RB:WLB X:CB1 Z:DIME SL:DE2 WR4:NB LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (90)
+  card bear  bear: RB:WLB X:CB1 Z:CB2 SL:- WR4:DIME LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (43)
+  card bear  bear: RB:WLB X:CB1 Z:- SL:NB WR4:DIME LT:DE1 LG:DT1 C:DT1 RG:DT2 RT:DE2 (19)
   call        def -10       def 0         def +10       
-  2-man        82%   5.2     78%   4.5     38%   4.1    
-  c2           13%   4.0      8%   3.9      2%   3.4    
-  c3           53%   4.5     51%   4.1     39%   3.8    
-  c4           99%   6.3    100%   6.1     99%   5.9    
-  cat          78%   4.5     51%   4.1     14%   3.7    
-  c3-sky       69%   4.9     56%   4.2     41%   3.9    
-  c1-fire      99%   7.5    100%   6.2     93%   5.6    
-  fire-zone    78%   4.9     83%   4.7     64%   3.8    
-  c0-blitz     59%   5.5     43%   4.0     54%   4.1    
-  bear          1%   3.4      0%   2.9      0%   2.1    
+  2-man        90%   5.1     47%   4.1     20%   3.8    
+  c2           13%   4.0      3%   3.6      0%   3.3    
+  c3           67%   4.4     50%   4.3     27%   3.6    
+  c4          100%   6.4    100%   6.0    100%   5.8    
+  cat          57%   3.9     17%   3.8     10%   3.3    
+  c3-sky       67%   4.7     57%   4.4     33%   3.7    
+  c1-fire      97%   7.1    100%   5.9     43%   3.8    
+  fire-zone    80%   5.0     60%   4.1     77%   4.2    
+  c0-blitz     47%   4.0     50%   3.9     40%   4.3    
+  bear          0%   3.3      0%   2.9      0%   2.4    
 
-=== Power Read (power-read) | Gun Doubles | power-read | beats lightBox stops blitz,heavyBox | aim OUT on aim  44%
+=== Power Read (power-read) | Gun Doubles | power-read | beats lightBox stops blitz,heavyBox | aim OUT on aim  47%
   tip: Read the playside end. He widens with the sweep? Keep it inside.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: POA TE(force) held  30%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:-(force) LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:-(force) LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:-(force) LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^SS (270)
+  flags: POA TE(force) held  29%
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:-(force) LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:-(force) LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:-(force) LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^SS (90)
   call        def -10       def 0         def +10       
-  2-man        53%   6.2     23%   2.3     20%   1.7    
-  c2           60%   4.6     34%   2.7     23%   2.3    
-  c3           43%   4.8     54%   4.1     33%   3.0    
-  c4           41%   3.3     48%   6.7     28%   3.7    
-  cat          66%   8.2     38%   2.9     30%   2.0    
-  c3-sky       68%   8.7     58%  10.7     30%   3.6    
-  c1-fire      27%   2.8     16%   2.0      4%   0.8    
-  fire-zone    21%   5.8      1%   1.2      4%   0.6    
-  c0-blitz      8%   3.6      3%   1.4      1%  -0.0    
-  bear          8%   0.8      2%  -0.1      0%  -0.9    
+  2-man        43%   5.1     23%   1.7     27%   3.0    
+  c2           67%   4.8     43%   2.9     13%   1.7    
+  c3           40%   5.9     47%   3.6     40%   3.1    
+  c4           43%   3.2     47%   7.6     40%   5.5    
+  cat          50%   6.4     27%   2.3     20%   1.7    
+  c3-sky       77%   9.2     47%   3.7     17%   1.6    
+  c1-fire      27%   5.0     27%   2.3      3%   1.3    
+  fire-zone    27%   3.1      0%   0.9     20%   1.5    
+  c0-blitz      7%   3.7      3%   2.8      0%   0.4    
+  bear         23%   2.1      3%   0.6     10%   0.5    
 
-=== Speed Option (speed-option) | Pistol | speed-option | beats heavyBox stops - | aim OUT on aim  85%
+=== Speed Option (speed-option) | Pistol | speed-option | beats heavyBox stops - | aim OUT on aim  88%
   tip: Attack the end. He takes you? R-click to pitch. He takes the pitch? Keep.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: OWES Z  25% | OWES TE  20%
-  card even  2-man: X:CB1 Z:SS SL:NB TE:CB2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:MLB LT:DE1 LG:DT1 C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:SS LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (191)
+  flags: OWES Z  26% | OWES TE  20%
+  card even  2-man: X:CB1 Z:SS SL:NB TE:CB2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:MLB LT:DE1 LG:DT1 C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:SS LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (72)
   call        def -10       def 0         def +10       
-  2-man        84%  16.0     80%   6.7     20%   2.5    
-  c2           81%  14.1     37%   5.1     33%   2.6    
-  c3           87%   8.8     84%   6.2     76%   4.9    
-  c4           84%   7.2     76%   5.1     51%   3.7    
-  cat          79%  20.1     82%  11.0     57%   7.8    
-  c3-sky       82%   9.4     53%   5.1     33%   2.2    
-  c1-fire      59%  12.2     42%   7.1     38%   3.3    
-  fire-zone    78%   5.6     45%   5.0     69%   6.1    
-  c0-blitz     53%  18.4     45%  14.9     41%  12.8    
-  bear         26%   3.6     29%   7.3     23%   2.3    
+  2-man        87%  16.8     77%   7.4     40%   5.5    
+  c2           83%   7.8     70%   5.0     30%   2.5    
+  c3           77%  11.5     67%  10.1     80%   9.4    
+  c4           87%   7.5     83%   4.8     37%   4.1    
+  cat          90%  19.9     70%   6.0     37%   3.4    
+  c3-sky       60%   9.6     60%   5.2     40%   8.3    
+  c1-fire      57%   9.3     69%   8.4     33%   3.2    
+  fire-zone    74%  12.0     58%   4.2     75%   5.7    
+  c0-blitz     71%  15.8     57%  19.1     50%  21.6    
+  bear         29%   6.8     35%   3.7     28%   7.1    
 
 === QB Power (qb-power) | Gun Trips Rt | qb-power | beats man stops heavyBox | aim C on aim  47%
   tip: Back kicks the end, guard wraps. QB follows. Short-yardage hammer.
   box/hats: 2-man 6/10  c2 6/10  c3 6/10  c4 6/10  cat 6/10  c3-sky 6/10  c1-fire 7/10  fire-zone 6/10  c0-blitz 8/10  bear 7/10  goal 8/10
-  flags: OWES SL  22% | OWES RG  21% | POA RB(kick) held  31%
-  card even  2-man: RB:DE2(kick) X:CB1 Z:CB2 SL:NB TE:WLB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2 (270)
-  card even  c2: RB:DE2(kick) X:CB1 Z:CB2 SL:NB TE:SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: RB:-@NB(kick) X:CB1 Z:CB2 SL:WLB TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (270)
-  card goal  goal: RB:SAM(kick) X:CB1 Z:CB2 SL:SS TE:DE2 LT:WLB(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^FS (270)
+  flags: OWES SL  21% | OWES RG  22% | POA RB(kick) held  31%
+  card even  2-man: RB:DE2(kick) X:CB1 Z:CB2 SL:NB TE:WLB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2 (90)
+  card even  c2: RB:DE2(kick) X:CB1 Z:CB2 SL:NB TE:SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: RB:-@NB(kick) X:CB1 Z:CB2 SL:WLB TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (90)
+  card goal  goal: RB:SAM(kick) X:CB1 Z:CB2 SL:SS TE:DE2 LT:WLB(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^FS (90)
   call        def -10       def 0         def +10       
-  2-man        66%   4.6     41%   2.7     26%   1.1    
-  c2           59%   4.5     38%   2.6     11%  -0.0    
-  c3           54%   4.9     27%   2.0     29%   1.8    
-  c4           54%   4.9     33%   2.2     26%   1.1    
-  cat          29%   2.1      7%   0.3      2%  -0.1    
-  c3-sky       54%   4.4     28%   1.6     11%   0.4    
-  c1-fire      32%   2.1     14%   0.5      4%  -0.4    
-  fire-zone    20%   1.3     10%   0.7      4%   0.1    
-  c0-blitz      7%   1.3      4%   0.2      0%  -0.4    
-  bear         18%   1.0      4%  -1.5      0%  -1.7    
-  bear*3rd1    44%   1.1      7%  -1.8     11%  -1.9    
-  goal          0%  -0.4      0%  -0.8      0%  -1.2    
-  goal*3rd1    29%   0.5     16%  -0.5      2%  -1.2    
+  2-man        60%   4.1     37%   2.5     17%   0.3    
+  c2           63%   4.6     37%   2.2     40%   2.6    
+  c3           60%   5.2     27%   2.6     13%   0.2    
+  c4           47%   3.7     33%   2.1     17%  -0.0    
+  cat          17%   1.5      7%   1.0      0%   0.0    
+  c3-sky       47%   3.4     23%   1.2     30%   0.7    
+  c1-fire      33%   2.2     13%   1.0      3%  -0.4    
+  fire-zone    10%   1.1      3%   0.3      3%   0.2    
+  c0-blitz     17%   1.6      7%   0.4      0%  -0.8    
+  bear         20%   0.4      0%  -1.4      0%  -2.4    
+  bear*3rd1    27%   0.7     27%  -0.6      0%  -2.3    
+  goal          0%  -0.2      0%  -0.8      0%  -0.9    
+  goal*3rd1    13%   0.2     20%  -0.1      0%  -0.8    
 
 === QB Sneak (qb-sneak) | Singleback | sneak | beats - stops - | aim A on aim  89%
   tip: Short yardage. Hold D and push the pile.
   box/hats: 2-man 6/10  c2 6/10  c3 6/10  c4 6/10  cat 7/10  c3-sky 6/10  c1-fire 7/10  fire-zone 6/10  c0-blitz 8/10  bear 7/10  goal 9/10
-  flags: OWES RB  52%
+  flags: OWES RB  50%
   free playside: FREE PLAYSIDE MLB (even)  45% | FREE PLAYSIDE SS (even)  18%
-  card even  2-man: RB:WLB X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (270)
-  card even  c2: RB:WLB X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (270)
-  card bear  bear: RB:WLB X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (270)
-  card goal  goal: RB:WLB X:CB1 Z:CB2 SL:SS TE:SAM LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (270)
+  card even  2-man: RB:WLB X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (90)
+  card even  c2: RB:WLB X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (90)
+  card bear  bear: RB:WLB X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (90)
+  card goal  goal: RB:WLB X:CB1 Z:CB2 SL:SS TE:SAM LT:DE1 LG:DT1 C:DT2 RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        80%   3.9      0%   3.7      0%   3.4    
-  c2           68%   3.8      1%   3.6      0%   3.1    
-  c3           84%   4.0      0%   3.6      0%   3.2    
-  c4           83%   4.1      0%   3.6      0%   3.3    
-  cat          77%   3.8      0%   3.4      0%   3.1    
-  c3-sky       82%   3.9      0%   3.6      1%   3.3    
-  c1-fire      11%   3.8      0%   3.5      0%   3.1    
-  fire-zone    97%   6.9     91%   6.1     86%   5.5    
-  c0-blitz     71%   4.0     37%   3.6      0%   3.3    
-  bear          2%   3.0      0%   2.4      0%   2.2    
-  bear*3rd1    98%   2.6     96%   2.7     80%   2.1    
-  goal          0%   2.3      0%   1.7      0%   1.3    
-  goal*3rd1    98%   2.3     91%   2.0     73%   1.5    
+  2-man        87%   4.0      0%   3.6      0%   3.3    
+  c2           70%   4.0      0%   3.4      0%   3.3    
+  c3           83%   4.0      0%   3.7      0%   3.1    
+  c4           80%   3.9      0%   3.7      0%   3.1    
+  cat          67%   3.6      0%   3.2      0%   3.0    
+  c3-sky       63%   4.2      0%   3.4      0%   3.4    
+  c1-fire      23%   3.7      3%   3.5      0%   3.0    
+  fire-zone    97%   6.8     80%   5.5     93%   5.9    
+  c0-blitz     70%   3.9     40%   3.5      0%   2.9    
+  bear          0%   3.1      0%   2.6      0%   1.8    
+  bear*3rd1   100%   2.8     93%   2.5    100%   2.5    
+  goal          0%   2.1      0%   1.9      0%   1.7    
+  goal*3rd1   100%   2.2     67%   1.7     80%   1.6    
 
 === Trey Inside Zone (trey-iz) | Gun Trey | inside-zone | beats lightBox stops heavyBox | aim B on aim  63%
   tip: Zone to the trey side: the TE is a sixth blocker. Find the B gap.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        73%   9.2     46%   5.9     20%   2.6    
-  c2           69%   5.0     58%   3.1     36%   2.0    
-  c3           69%   9.0     50%   5.0     29%   2.8    
-  c4           67%   7.3     57%   5.5     32%   3.4    
-  cat           8%   4.2      6%   3.2      2%   0.8    
-  c3-sky       79%   9.0     47%   4.8     30%   3.0    
-  c1-fire      61%   6.3     32%   2.2     20%   1.1    
-  fire-zone    54%   6.4     31%   3.3     12%   0.9    
-  c0-blitz     49%   4.8      8%   2.2      7%   0.8    
-  bear         39%   3.1     13%   0.7      6%   0.0    
+  2-man        73%  10.0     50%  10.3     20%   2.0    
+  c2           70%   3.9     43%   3.4     43%   2.5    
+  c3           80%   8.9     60%   6.5     30%   3.4    
+  c4           67%   8.2     53%   5.0     37%   4.0    
+  cat          33%   8.5     27%   3.3     17%   3.8    
+  c3-sky       70%   9.3     50%   5.4     33%   3.1    
+  c1-fire      50%   2.9     30%   2.4     13%   0.6    
+  fire-zone    57%   3.7     50%   4.0     17%   1.6    
+  c0-blitz      7%   2.5     17%   3.1      3%   0.7    
+  bear         50%   2.9     20%   1.9     23%   1.1    
 
-=== Trey Duo (trey-duo) | Gun Trey | duo | beats lightBox stops heavyBox | aim B on aim  61%
+=== Trey Duo (trey-duo) | Gun Trey | duo | beats lightBox stops heavyBox | aim B on aim  60%
   tip: Two double teams from the gun. Read the MIKE and hit it downhill.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: none
+  flags: OWES TE  20%
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        46%   5.2     34%   4.8     22%   3.2    
-  c2           71%   4.9     51%   3.2     42%   2.1    
-  c3           73%   9.5     52%   4.6     42%   3.4    
-  c4           63%   7.9     43%   4.5     44%   4.0    
-  cat          30%   3.3     10%   1.7     13%   1.8    
-  c3-sky       73%   7.4     54%   5.1     50%   3.8    
-  c1-fire       6%   2.8      3%   1.1      4%   0.8    
-  fire-zone    58%   6.2     39%   3.3     26%   2.1    
-  c0-blitz     49%   6.4      6%   1.6      1%   0.6    
-  bear         37%   2.7     16%   0.7      4%   0.2    
+  2-man        67%   9.5     50%   6.5     17%   2.3    
+  c2           67%   7.5     57%   3.4     37%   2.6    
+  c3           73%  10.1     53%   5.2     27%   2.1    
+  c4           60%   7.6     43%   4.4     53%   7.4    
+  cat          53%  12.5     43%  10.0     27%   3.4    
+  c3-sky       63%   6.8     63%   5.6     23%   2.3    
+  c1-fire      17%   2.2      7%   1.6     10%   1.0    
+  fire-zone    63%   5.0     37%   2.5     13%   1.5    
+  c0-blitz      0%   2.1      0%   1.2      3%   1.0    
+  bear         50%   3.0     33%   2.6      7%   1.1    
 
-=== Trey Counter (trey-counter) | Gun Trey | counter | beats lightBox stops blitz,heavyBox | aim C on aim  42%
+=== Trey Counter (trey-counter) | Gun Trey | counter | beats lightBox stops blitz,heavyBox | aim C on aim  44%
   tip: Jab away, then follow the guard and tackle back to the trey side.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:WLB LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:SS LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:WLB TE:DE2^SS LT:-@MLB(lead) LG:-@NB(kick) C:DT1 RG:DT2 RT:DE2 (270)
+  flags: OWES SL  21%
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:WLB LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:SS LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:WLB TE:DE2^SS LT:-@MLB(lead) LG:-@NB(kick) C:DT1 RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        26%   3.5     11%   1.7      2%   0.6    
-  c2           69%   6.7     53%   4.1      9%   0.2    
-  c3           70%   4.5     50%   2.7     28%   1.8    
-  c4           76%   8.6     44%   3.6     33%   2.5    
-  cat           2%  -2.2      0%  -3.0      2%  -0.9    
-  c3-sky       68%   4.8     39%   2.6     14%   1.7    
-  c1-fire       9%   2.0      8%   1.3      1%  -0.1    
-  fire-zone     1%   0.2      3%  -0.7      0%  -1.6    
-  c0-blitz      4%   0.0      0%  -1.1      0%  -1.6    
-  bear         46%   9.1     16%   1.3      3%  -0.2    
+  2-man        23%   2.9     17%   2.1      7%   0.9    
+  c2           73%   6.6     60%   4.8      0%  -0.1    
+  c3           77%   5.6     50%   2.5     33%   2.7    
+  c4           93%   9.2     50%   2.8     40%   3.4    
+  cat          13%   0.5      0%  -3.3      0%  -1.0    
+  c3-sky       77%   5.0     40%   2.8     17%   1.7    
+  c1-fire      13%   2.0      7%   2.4      0%  -0.1    
+  fire-zone     7%   0.3      0%  -1.0      0%  -1.2    
+  c0-blitz      0%  -0.3      0%  -0.8      0%  -1.3    
+  bear         27%   5.0     13%   1.4     13%   2.3    
 
-=== Wing Split Zone (wing-split-zone) | Gun Wing | split-zone | beats lightBox stops heavyBox | aim B on aim  63%
+=== Wing Split Zone (wing-split-zone) | Gun Wing | split-zone | beats lightBox stops heavyBox | aim B on aim  61%
   tip: Zone one way, the wing slices back on the end. Cutback lane.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
-  flags: OWES RG  20%
+  flags: none
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2^MLB RG:DT2 RT:DE2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2^MLB RG:DT2 RT:DE2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:-@DE1(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        74%   8.7     64%   7.0     56%   5.2    
-  c2           72%   7.2     52%   5.4     48%   3.5    
-  c3           82%   7.6     67%   6.3     47%   4.1    
-  c4           78%   7.7     57%   6.5     41%   3.8    
-  cat          63%   6.6     33%   4.1     12%   1.6    
-  c3-sky       83%   9.3     50%   4.8     41%   2.9    
-  c1-fire      43%   4.0     36%   1.9      1%   0.9    
-  fire-zone    42%   4.2     39%   3.1     13%   0.9    
-  c0-blitz     37%   4.2      2%   1.5      4%   1.3    
-  bear         29%   1.5     13%   0.7     19%   1.0    
+  2-man        63%   7.9     70%   7.9     40%   3.8    
+  c2           60%   5.8     37%   2.6     33%   2.8    
+  c3           63%   7.6     57%   4.6     57%   5.1    
+  c4           67%   6.6     53%   6.3     43%   3.9    
+  cat          27%   5.8     47%   8.0     33%   6.7    
+  c3-sky       73%   7.8     37%   3.0     60%   3.7    
+  c1-fire      30%   2.8     60%   3.4     17%   1.2    
+  fire-zone    47%   3.7     33%   2.9     17%   1.9    
+  c0-blitz      7%   2.0      7%   1.7      3%   0.8    
+  bear         37%   2.1     17%   0.5      7%   0.1    
 
-=== QB Counter (qb-counter) | Gun Wing | qb-counter | beats man stops blitz,heavyBox | aim C on aim  50%
+=== QB Counter (qb-counter) | Gun Wing | qb-counter | beats man stops blitz,heavyBox | aim C on aim  49%
   tip: The QB keeps it behind the guard and tackle. Man coverage turns its back.
   box/hats: 2-man 6/10  c2 6/10  c3 6/10  c4 6/10  cat 7/10  c3-sky 6/10  c1-fire 7/10  fire-zone 6/10  c0-blitz 8/10  bear 7/10
-  flags: WRONG SIDE LT(lead)@WLB  40% | OWES RG  24%
-  card even  2-man: RB:-@MLB(lead) X:CB1 Z:CB2 SL:NB TE:SS LT:-@WLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2 (270)
-  card even  c2: RB:-@MLB(lead) X:CB1 Z:CB2 SL:FS TE:SS LT:-@NB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: RB:-@MLB(lead) X:CB1 Z:CB2 SL:NB TE:FS LT:-@WLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2^SS (270)
+  flags: WRONG SIDE LT(lead)@WLB  40% | OWES RG  23%
+  card even  2-man: RB:-@MLB(lead) X:CB1 Z:CB2 SL:NB TE:SS LT:-@WLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2 (90)
+  card even  c2: RB:-@MLB(lead) X:CB1 Z:CB2 SL:FS TE:SS LT:-@NB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: RB:-@MLB(lead) X:CB1 Z:CB2 SL:NB TE:FS LT:-@WLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2 RT:DT2^SS (90)
   call        def -10       def 0         def +10       
-  2-man        61%   5.0     41%   2.5     33%   1.7    
-  c2           50%   4.4     44%   3.1     21%   0.7    
-  c3           39%   2.6     29%   1.7      8%  -0.3    
-  c4           63%   3.8     32%   1.6     23%   0.6    
-  cat          46%   3.4     42%   2.5     29%   1.2    
-  c3-sky       58%   3.6     32%   1.6     18%   0.6    
-  c1-fire      58%   5.2     32%   1.9     19%   0.2    
-  fire-zone    44%   3.0     22%   1.2      6%  -0.1    
-  c0-blitz     51%   6.0     30%   2.3      9%   0.2    
-  bear         31%   0.9     17%  -0.5     13%  -1.4    
+  2-man        73%   6.1     40%   3.1     27%   1.2    
+  c2           50%   4.3     33%   1.9     17%   0.4    
+  c3           53%   3.4     20%   0.5     10%  -0.6    
+  c4           33%   1.7     30%   1.3     20%   0.6    
+  cat          40%   2.9     50%   2.5     27%   1.1    
+  c3-sky       50%   3.6     40%   2.1     13%  -0.4    
+  c1-fire      57%   6.0     40%   2.8     17%   0.9    
+  fire-zone    50%   3.9     27%   0.8     23%   0.8    
+  c0-blitz     43%   4.0     40%   2.8     27%   1.9    
+  bear         27%   0.7     20%  -0.1      0%  -2.2    
 
-=== Ace Wide Zone (ace-wide-zone) | Ace | outside-zone | beats lightBox stops blitz | aim OUT on aim  73%
+=== Ace Wide Zone (ace-wide-zone) | Ace | outside-zone | beats lightBox stops blitz | aim OUT on aim  78%
   tip: Under center wide zone: press the edge, one cut, get downhill.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
-  flags: none
-  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^SAM LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^WLB LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:SS LT:DE1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  flags: OWES Z  22%
+  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^SAM LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^WLB LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:SS LT:DE1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        86%   8.5     68%   6.0     39%   2.6    
-  c2           92%  10.8     80%   6.6     56%   4.2    
-  c3           87%  15.4     67%   6.9     44%   3.1    
-  c4           86%   7.8     74%   5.7     43%   3.0    
-  cat          83%   6.4     69%   4.6     22%   1.4    
-  c3-sky       81%   8.7     57%   5.6     20%   1.2    
-  c1-fire      84%   9.1     67%   5.5     26%   2.7    
-  fire-zone    87%  15.5     58%   8.1     40%   3.2    
-  c0-blitz     72%   6.6      3%   1.3      0%   0.1    
-  bear         17%   2.3     12%   0.7      0%  -1.1    
+  2-man        93%   8.3     67%   5.4     33%   2.8    
+  c2           80%  10.0     63%   8.8     67%   4.9    
+  c3           87%  12.9     77%   7.6     60%   4.5    
+  c4           87%   9.1     80%   7.5     60%   4.2    
+  cat          77%   7.7     57%   3.8     23%   2.8    
+  c3-sky       80%   8.1     67%   6.0     20%   1.0    
+  c1-fire      93%  13.0     53%   4.6     23%   2.4    
+  fire-zone    97%  14.5     70%   6.5     63%   9.3    
+  c0-blitz     77%   4.4     17%   1.7      3%   0.9    
+  bear         13%   1.9      3%  -0.0      0%  -1.1    
 
-=== Pistol Ace Zone (pistol-ace-oz) | Pistol Ace | outside-zone | beats lightBox stops blitz | aim OUT on aim  75%
+=== Pistol Ace Zone (pistol-ace-oz) | Pistol Ace | outside-zone | beats lightBox stops blitz | aim OUT on aim  80%
   tip: Two tight ends, stretch to the field. Cut up behind the reach blocks.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
-  flags: none
-  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^SAM LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^WLB LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:SS LT:DE1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  flags: OWES Z  23%
+  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^SAM LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:DT1^WLB LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:SS LT:DE1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        78%   9.3     61%   5.2     32%   2.8    
-  c2           74%   9.9     71%   5.1     49%   2.5    
-  c3           67%   8.3     46%   5.1     39%   3.1    
-  c4           71%   6.6     61%   5.5     42%   2.7    
-  cat          74%   6.5     52%   3.8     36%   2.6    
-  c3-sky       61%   6.2     48%   4.0     34%   2.9    
-  c1-fire      83%   8.8     64%   5.0     30%   3.0    
-  fire-zone    73%   9.2     50%   5.2     36%   2.9    
-  c0-blitz     54%  10.2     11%   3.9     11%   2.3    
-  bear         12%   1.2      1%  -0.8      1%  -1.1    
+  2-man        70%  10.6     60%   4.8     43%   3.4    
+  c2           80%  16.7     73%   5.4     70%   5.6    
+  c3           70%   9.4     63%   6.6     50%   5.8    
+  c4           80%   6.8     73%   5.7     53%   3.4    
+  cat          73%   6.2     37%   3.2     13%   1.3    
+  c3-sky       83%   8.1     50%   4.3     47%   3.7    
+  c1-fire      83%   7.8     53%   5.2     27%   3.1    
+  fire-zone    67%   9.8     67%   5.8     43%   3.7    
+  c0-blitz     60%  19.6      3%   4.9     13%   3.8    
+  bear         17%   1.3      0%  -0.8      0%  -1.3    
 
 === Pistol Duo (pistol-duo) | Pistol Ace | duo | beats lightBox stops heavyBox | aim B on aim  62%
   tip: Double teams at the point, two tight ends. Downhill; read the MIKE.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
   flags: none
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:WLB LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:DE2^MLB LT:DE1^SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 TE2:DE1 TE:DE2 LT:WLB LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 TE2:DE1 TE:DE2^MLB LT:DE1^SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        34%   5.0     26%   3.2     11%   1.5    
-  c2           38%   4.2     47%   4.0     16%   1.8    
-  c3           62%   6.7     50%   4.7     52%   4.2    
-  c4           60%   5.8     49%   4.1     36%   2.6    
-  cat          47%   4.3     30%   2.6     19%   2.1    
-  c3-sky       61%   5.2     42%   3.8     34%   2.7    
-  c1-fire       6%   2.0      4%   1.1      0%   0.5    
-  fire-zone    56%   6.7     37%   4.1     17%   1.3    
-  c0-blitz     47%   7.1     16%   2.6      4%   1.4    
-  bear         36%   3.1     18%   0.8      6%   0.3    
+  2-man        30%   5.2     17%   3.8     20%   2.9    
+  c2           27%   3.5     20%   1.5     17%   1.5    
+  c3           73%   9.2     50%   5.3     30%   2.9    
+  c4           60%   5.6     27%   3.8     33%   2.6    
+  cat          47%   4.8     40%   3.9     20%   2.1    
+  c3-sky       63%   6.2     67%   4.4     47%   3.7    
+  c1-fire      10%   4.4     20%   2.0      0%   0.9    
+  fire-zone    67%   6.0     40%   3.8     17%   2.1    
+  c0-blitz     37%   9.4     13%   3.0     13%   1.4    
+  bear         23%   1.4      7%   1.4     10%   0.9    
 
-=== Ace Wing Counter (ace-counter) | Ace Wing | counter | beats lightBox stops blitz,heavyBox | aim C on aim  67%
+=== Ace Wing Counter (ace-counter) | Ace Wing | counter | beats lightBox stops blitz,heavyBox | aim C on aim  59%
   tip: Counter from under center: the guard and tackle pull across, follow them.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
-  flags: POA LT(lead) held  30%
-  card even  2-man: X:CB1 Z:CB2 TE2:FS TE:WLB LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^SAM RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 TE2:FS TE:SAM LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 TE2:WLB TE:DE2^SS LT:-@MLB(lead) LG:-(lead) C:DT1 RG:DT2 RT:DE2 (270)
+  flags: OWES LT  25% | POA LT(lead) held  30%
+  card even  2-man: X:CB1 Z:CB2 TE2:FS TE:WLB LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^SAM RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 TE2:FS TE:SAM LT:-@MLB(lead) LG:-@DE2(kick) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 TE2:WLB TE:DE2^SS LT:-@MLB(lead) LG:-(lead) C:DT1 RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        59%   6.4     38%   4.2     48%   4.5    
-  c2           51%   6.0     37%   4.4     37%   3.5    
-  c3           57%   8.9     43%   4.5     31%   2.4    
-  c4           66%   6.5     47%   5.3     32%   2.5    
-  cat          58%  26.4     42%  16.2     39%   3.7    
-  c3-sky       68%  13.0     47%   4.7     33%   2.9    
-  c1-fire      48%   7.7     18%   3.4     20%   1.8    
-  fire-zone    62%   4.3     28%   2.6      4%   1.6    
-  c0-blitz     40%   7.7     20%   4.1      4%   1.9    
-  bear         51%  13.9     21%   4.2     16%   1.4    
+  2-man        33%   5.6     23%   3.9     37%   4.0    
+  c2           47%   9.0     17%   2.9     40%   4.0    
+  c3           53%   9.6     30%   3.8     37%   2.6    
+  c4           53%   5.6     40%   5.0     37%   3.1    
+  cat          20%   7.3     33%   8.3     27%   7.3    
+  c3-sky       70%  19.3     53%   6.4     20%   2.7    
+  c1-fire      37%   4.3     27%   5.6     10%   0.9    
+  fire-zone    40%   3.8     37%   3.6     10%   1.1    
+  c0-blitz     43%   3.4      3%   1.7     10%   1.1    
+  bear         50%   5.8     20%   2.1      7%   0.7    
 
-=== Strong I Power (strong-i-power) | Strong I | power | beats lightBox stops heavyBox | aim C on aim  64%
+=== Strong I Power (strong-i-power) | Strong I | power | beats lightBox stops heavyBox | aim C on aim  63%
   tip: The offset FB kicks out the end, the guard leads up. Downhill.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
-  flags: none
-  card even  2-man: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-@SAM(lead) TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (270)
+  flags: POA FB(kick) held  40%
+  card even  2-man: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-@SAM(lead) TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        74%   7.3     62%   5.6     28%   2.9    
-  c2           69%   8.7     62%   6.6     40%   4.1    
-  c3           49%   6.7     23%   2.0     22%   2.0    
-  c4           58%   4.6     16%   2.4     19%   1.9    
-  cat          77%   9.3     41%   7.7      2%  -0.2    
-  c3-sky       87%  15.6     71%   8.4     47%   4.7    
-  c1-fire      34%   6.8      3%   1.1      9%   1.1    
-  fire-zone    74%   5.5     31%   2.2      7%   1.3    
-  c0-blitz     61%  10.2     48%   8.7     29%   3.9    
-  bear         31%   4.9     13%   2.2      8%   0.8    
+  2-man        53%   5.8     53%   5.7     30%   2.9    
+  c2           57%   9.9     37%   3.5     43%   3.8    
+  c3           73%   8.1     27%   3.7     20%   3.0    
+  c4           43%   4.2     23%   2.8     13%   2.1    
+  cat          30%   6.6     43%  10.4     10%   0.0    
+  c3-sky       87%  13.8     80%   9.4     47%   4.8    
+  c1-fire      13%   2.1     10%   1.9     17%   2.3    
+  fire-zone    17%   3.1     33%   1.9     17%   1.9    
+  c0-blitz     40%   6.3     50%   3.8     27%   5.0    
+  bear         10%   4.8     10%   1.6      0%  -0.0    
 
-=== Strong I Toss (strong-i-toss) | Strong I | toss | beats heavyBox stops blitz | aim OUT on aim  65%
+=== Strong I Toss (strong-i-toss) | Strong I | toss | beats heavyBox stops blitz | aim OUT on aim  66%
   tip: R-click right away to pitch. The FB is already on the edge: follow him.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
-  flags: OWES TE  22% | OWES RT  30%
-  card even  2-man: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-@SAM(lead) TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  flags: OWES Z  22% | OWES RT  27%
+  card even  2-man: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 FB:-(force) TE:DE2 LT:DE1 LG:DT1 C:DT2^SAM RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-@SAM(lead) TE:SS LT:DE1 LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        68%   5.7     46%   4.1     26%   3.0    
-  c2           71%   6.8     47%   3.0     27%   2.4    
-  c3           72%   6.4     67%   5.7     61%   3.3    
-  c4           71%   7.9     49%   5.2     41%   3.3    
-  cat          24%   4.0     21%   2.4     17%   1.6    
-  c3-sky       72%   6.8     54%   5.0     41%   2.7    
-  c1-fire      17%   2.1      9%   1.1      3%  -0.7    
-  fire-zone     2%   1.0      0%  -0.1      2%  -1.0    
-  c0-blitz     31%  18.7     17%   6.4      2%  -0.7    
-  bear          8%   0.3     13%   0.8      8%   1.6    
+  2-man        70%   5.0     33%   2.6     27%   2.3    
+  c2           60%   4.3     47%   3.1     20%   2.7    
+  c3           67%   9.5     73%   7.2     63%   6.7    
+  c4           80%   6.8     37%   3.5     30%   2.6    
+  cat          30%   5.6     30%   2.7     17%   2.3    
+  c3-sky       77%   8.3     57%   3.3     43%   3.8    
+  c1-fire       7%   4.6     23%   4.4     10%   0.3    
+  fire-zone    13%   3.6      3%   0.6      0%  -0.6    
+  c0-blitz     20%   8.5     13%   2.5      3%   1.1    
+  bear         13%   0.6     17%   0.8      3%   0.9    
 
-=== Heavy Iso (heavy-iso) | Heavy I | iso | beats lightBox stops heavyBox | aim B on aim  59%
+=== Heavy Iso (heavy-iso) | Heavy I | iso | beats lightBox stops heavyBox | aim B on aim  60%
   tip: Two tight ends and a fullback. Short yardage: follow the FB into the hole.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9  goal 9/9
-  flags: OWES RG  22%
-  card even  c2: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2 LT:WLB LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^SAM (270)
-  card even  c3: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2 LT:SAM LG:DT1 C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2^SS LT:DE1^SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (270)
-  card goal  goal: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2 LT:SS LG:DT1 C:DT1^WLB RG:DT2 RT:SAM (270)
+  flags: OWES RG  24%
+  card even  c2: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2 LT:WLB LG:DT1 C:DT1^WLB RG:DT2 RT:DT2^SAM (90)
+  card even  c3: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2 LT:SAM LG:DT1 C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2^SS LT:DE1^SAM LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (90)
+  card goal  goal: X:CB1 TE2:DE1 FB:-@MLB(lead) TE:DE2 LT:SS LG:DT1 C:DT1^WLB RG:DT2 RT:SAM (90)
   call        def -10       def 0         def +10       
-  2-man        52%   5.4     40%   3.2     20%   1.2    
-  c2           40%   4.2     10%   2.6      6%   0.9    
-  c3           57%   5.6     52%   4.9     26%   1.5    
-  c4           67%   8.1     50%   4.5     31%   1.8    
-  cat          58%   5.1     38%   3.3     26%   1.3    
-  c3-sky       69%   4.4     39%   2.7     26%   1.3    
-  c1-fire      19%   2.2     22%   2.1     14%   1.0    
-  fire-zone    63%   5.4     53%   4.4     32%   1.8    
-  c0-blitz     37%   8.4     24%   4.7     16%   1.8    
-  bear         18%   4.6      7%  -0.1      2%  -0.1    
-  bear*3rd1    47%   4.1     49%   2.8     24%  -0.4    
-  goal         20%   3.0     16%   1.2      2%  -0.4    
-  goal*3rd1    64%   6.2     42%   0.9     36%   0.0    
+  2-man        63%   5.5     33%   3.3     23%   1.4    
+  c2           37%   5.7     17%   2.2      7%   3.7    
+  c3           67%   6.3     53%   4.0     37%   2.9    
+  c4           50%   5.2     60%   5.6     23%   2.2    
+  cat          40%   7.8     37%   7.6     27%   1.7    
+  c3-sky       67%   4.1     27%   2.0     33%   1.2    
+  c1-fire      47%   3.6     20%   3.9     17%   1.4    
+  fire-zone    70%   4.6     60%   4.5     13%   0.8    
+  c0-blitz     40%  15.4     27%   5.0      7%   0.6    
+  bear         27%   7.7      7%   0.4      0%  -0.1    
+  bear*3rd1    53%   1.5     67%   2.5     27%  -0.5    
+  goal          0%   0.6      7%   0.2      0%  -0.0    
+  goal*3rd1    67%   1.5     40%   0.4     20%  -0.5    
 
-=== Heavy Power (heavy-power) | Heavy I | power | beats lightBox stops heavyBox | aim C on aim  67%
+=== Heavy Power (heavy-power) | Heavy I | power | beats lightBox stops heavyBox | aim C on aim  63%
   tip: Goal line power: the FB kicks out, the guard leads. Get a yard.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9  goal 9/9
   flags: none
-  card even  2-man: X:CB1 TE2:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card even  c2: X:CB1 TE2:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 TE2:WLB FB:-@SAM(lead) TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (183)
-  card bear  bear: X:CB1 TE2:WLB FB:-@SAM(lead) TE:DE2^SS LT:CB2(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (87)
-  card goal  goal: X:CB1 TE2:WLB FB:SAM(kick) TE:DE2 LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^FS (168)
-  card goal  goal: X:CB1 TE2:WLB FB:SAM(kick) TE:DE2 LT:CB2(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^FS (102)
+  card even  2-man: X:CB1 TE2:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card even  c2: X:CB1 TE2:CB2 FB:DE2(kick) TE:SAM LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 TE2:WLB FB:-@SAM(lead) TE:DE2^SS LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (59)
+  card bear  bear: X:CB1 TE2:WLB FB:-@SAM(lead) TE:DE2^SS LT:CB2(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DE2 (31)
+  card goal  goal: X:CB1 TE2:WLB FB:SAM(kick) TE:DE2 LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^FS (67)
+  card goal  goal: X:CB1 TE2:WLB FB:SAM(kick) TE:DE2 LT:CB2(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^FS (23)
   call        def -10       def 0         def +10       
-  2-man        83%   8.7     68%   7.5     54%   4.6    
-  c2           82%   9.7     47%   5.1     38%   3.9    
-  c3           81%   6.3     53%   4.1     38%   3.3    
-  c4           73%  11.2     50%   6.1     39%   3.2    
-  cat          68%   4.7     37%   4.4     21%   1.7    
-  c3-sky       67%   5.9     54%   5.2     42%   4.4    
-  c1-fire      77%  11.4     28%   6.3     44%   5.2    
-  fire-zone    87%   9.6     44%   4.1     22%   2.2    
-  c0-blitz     76%  34.3     46%   9.7     29%   6.2    
-  bear         47%   5.4     18%   2.0     11%   0.2    
-  bear*3rd1    80%   7.2     44%   1.1     42%   1.1    
-  goal         13%   1.8      7%   1.0      4%   0.3    
-  goal*3rd1    53%   3.3     49%   1.9     42%   0.8    
+  2-man        77%  17.6     70%  10.4     33%   3.8    
+  c2           77%  12.8     40%   3.6     27%   3.3    
+  c3           70%   5.9     47%   4.1     37%   2.6    
+  c4           77%  17.4     60%   6.9     37%   2.7    
+  cat          73%   4.7     30%   3.7     10%   1.6    
+  c3-sky       73%  10.5     57%   8.0     47%   3.9    
+  c1-fire      67%  12.4     30%   7.4     43%   3.2    
+  fire-zone    90%  11.6     57%   3.6     33%   4.2    
+  c0-blitz     87%  43.5     50%  20.1     40%  11.8    
+  bear         53%   4.7     20%   5.8     27%   2.1    
+  bear*3rd1    80%  12.6     67%   2.5     40%   0.2    
+  goal         20%   7.3      0%   1.5      7%   0.8    
+  goal*3rd1    73%   2.6     60%   1.9     53%   0.9    
 
-=== Split Zone Read (split-zone-read) | Gun Split | zone-read | beats man stops heavyBox | aim B on aim  68%
+=== Split Zone Read (split-zone-read) | Gun Split | zone-read | beats man stops heavyBox | aim B on aim  70%
   tip: The H leads the give. The end crashes? Keep it the other way.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
-  card even  c2: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
+  card even  c2: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        82%  10.4     71%   9.0     52%   6.4    
-  c2           76%   9.4     69%   8.1     54%   6.0    
-  c3           76%   8.7     66%   7.8     52%   5.5    
-  c4           81%  12.4     59%   6.7     52%   5.6    
-  cat          40%   8.6     29%   3.0     19%   1.8    
-  c3-sky       80%  11.4     71%   8.3     40%   3.7    
-  c1-fire       3%   2.9      2%   1.1      0%   0.7    
-  fire-zone    71%   5.2     41%   4.5     24%   2.1    
-  c0-blitz     17%   6.6     12%   3.6      3%   0.7    
-  bear         51%  12.0     39%   4.9     42%   4.4    
+  2-man        73%  11.5     83%  10.8     57%   7.1    
+  c2           87%  11.2     67%   7.7     50%   5.7    
+  c3           90%  13.2     73%   8.8     53%   5.1    
+  c4           77%  10.4     80%   9.8     43%   3.8    
+  cat          27%   6.5     33%   6.5      3%   1.2    
+  c3-sky       87%  12.3     67%   6.3     60%   6.1    
+  c1-fire       3%   4.1      0%   1.0      3%   0.6    
+  fire-zone    80%   5.1     40%   6.2     20%   2.5    
+  c0-blitz     23%  11.7      3%   1.6      7%   1.0    
+  bear         63%   6.0     40%   5.7     33%   5.0    
 
-=== Split Zone Lead (split-iz) | Gun Split | inside-zone | beats lightBox stops heavyBox | aim B on aim  60%
+=== Split Zone Lead (split-iz) | Gun Split | inside-zone | beats lightBox stops heavyBox | aim B on aim  63%
   tip: Inside zone with the H leading on the backer. Follow him into the B gap.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
   free playside: FREE PLAYSIDE DE2 (even)  20%
-  card even  2-man: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
-  card even  c2: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
-  card bear  bear: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
+  card even  c2: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
+  card bear  bear: X:CB1 Z:CB2 FB:-@MLB(lead) WR4:NB LT:DE1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        68%   8.2     52%   6.6     39%   4.1    
-  c2           77%  10.0     61%   6.9     38%   3.7    
-  c3           69%   9.9     48%   5.2     41%   4.1    
-  c4           70%   8.2     46%   4.5     47%   4.3    
-  cat          24%   3.6      8%   1.7      3%   0.8    
-  c3-sky       62%   7.4     52%   5.7     50%   4.7    
-  c1-fire      11%   1.8      4%   1.1      2%   0.3    
-  fire-zone    53%   6.5     34%   3.4     14%   1.6    
-  c0-blitz     10%   2.1      9%   1.3      2%   0.8    
-  bear         41%   3.6     22%   1.6      9%   0.7    
+  2-man        67%   8.9     67%   8.1     20%   1.9    
+  c2           80%   9.5     63%   6.8     33%   3.5    
+  c3           73%  10.6     57%   5.7     37%   3.4    
+  c4           73%   6.8     67%   6.8     43%   3.6    
+  cat           3%   2.2      3%   1.4      0%   0.9    
+  c3-sky       73%   7.9     50%   6.0     50%   4.1    
+  c1-fire       3%   1.7      7%   1.2     10%   0.9    
+  fire-zone    47%   2.6     40%   2.7     27%   2.3    
+  c0-blitz     20%   6.7      3%   1.7      3%   1.1    
+  bear         50%   4.0     33%   2.2     23%   2.5    
 
-=== Split Counter (split-counter) | Gun Split | counter | beats lightBox stops blitz,heavyBox | aim C on aim  38%
+=== Split Counter (split-counter) | Gun Split | counter | beats lightBox stops blitz,heavyBox | aim C on aim  36%
   tip: Jab away; the H kicks out the end, the guard leads. Follow them.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 FB:DE2(kick) WR4:NB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card even  c2: X:CB1 Z:CB2 FB:DE2(kick) WR4:NB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (270)
-  card bear  bear: X:CB1 Z:CB2 FB:DE2(kick) WR4:NB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^SS (270)
+  card even  2-man: X:CB1 Z:CB2 FB:DE2(kick) WR4:NB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card even  c2: X:CB1 Z:CB2 FB:DE2(kick) WR4:NB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2^WLB RT:DT2 (90)
+  card bear  bear: X:CB1 Z:CB2 FB:DE2(kick) WR4:NB LT:-(hinge) LG:-@MLB(lead) C:DT1 RG:DT2 RT:DT2^SS (90)
   call        def -10       def 0         def +10       
-  2-man        18%   2.4      9%   1.4      4%   0.5    
-  c2           52%   4.4     39%   3.1     18%   0.8    
-  c3           61%   9.7     37%   2.8     12%   1.3    
-  c4           48%   5.6     31%   1.9     22%   1.3    
-  cat          50%   5.4     28%   3.8     14%   1.0    
-  c3-sky       57%   5.1     16%   1.5      3%   0.3    
-  c1-fire      16%   3.5     10%   1.1      6%   0.3    
-  fire-zone     3%  -0.7      4%  -0.8      2%  -0.8    
-  c0-blitz      2%   0.5      1%  -1.2      0%  -1.4    
-  bear         42%   4.8     31%   2.0      8%   0.1    
+  2-man        17%   2.5     13%   1.5     10%   0.7    
+  c2           37%   3.3     40%   2.7     10%   0.7    
+  c3           73%   6.7     27%   2.7     10%   0.6    
+  c4           37%   3.0     37%   3.2     20%   1.4    
+  cat          37%   5.5     27%   4.1     10%   0.0    
+  c3-sky       53%   7.5     17%   1.8      0%  -0.1    
+  c1-fire      23%   2.3     13%   1.2      7%   0.1    
+  fire-zone    17%   0.9      7%  -0.2      3%  -0.7    
+  c0-blitz      0%  -0.6     13%   2.6      0%  -0.7    
+  bear         33%   2.8     17%   1.0     17%   1.0    
 
-=== Pistol Zone Read (pistol-zone-read) | Pistol | zone-read | beats man stops heavyBox | aim B on aim  71%
+=== Pistol Zone Read (pistol-zone-read) | Pistol | zone-read | beats man stops heavyBox | aim B on aim  68%
   tip: Downhill mesh from the pistol. R-click to give, or keep it off the end.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        74%   8.5     64%   7.6     44%   4.9    
-  c2           69%   5.5     26%   4.4     16%   2.7    
-  c3           78%  10.3     48%   3.5     40%   3.3    
-  c4           74%   6.4     54%   3.7     38%   2.8    
-  cat          49%  12.1     39%   4.9     29%   2.3    
-  c3-sky       66%   5.7     27%   2.9     10%   2.0    
-  c1-fire      53%   5.5     22%   2.4     13%   1.7    
-  fire-zone    59%   4.1     26%   2.0      9%   1.0    
-  c0-blitz     34%  11.4     22%   4.1      7%   1.4    
-  bear         49%   8.8     50%   7.6     34%   4.5    
+  2-man        67%   8.1     57%   5.9     33%   4.1    
+  c2           53%   4.6     10%   3.1      7%   1.4    
+  c3           80%   7.2     37%   3.3     43%   3.1    
+  c4           80%   6.8     43%   3.5     40%   3.3    
+  cat          37%   5.8     57%   5.7     30%   4.1    
+  c3-sky       80%   9.0     43%   3.9     10%   2.5    
+  c1-fire      53%   7.9     30%   3.4      7%   1.5    
+  fire-zone    60%   7.4     27%   2.2     13%   1.2    
+  c0-blitz     40%  12.6     23%  11.1      3%   0.8    
+  bear         63%  12.3     43%   6.9     13%   1.9    
 
-=== Trey Zone Read (trey-zone-read) | Gun Trey | zone-read | beats man stops heavyBox | aim B on aim  74%
+=== Trey Zone Read (trey-zone-read) | Gun Trey | zone-read | beats man stops heavyBox | aim B on aim  75%
   tip: Zone to the trey side, read the backside end. R-click to give.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: none
-  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:DE2 LT:DT1 LG:DT1 C:DT2^WLB RG:DT2 RT:DE2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 SL:NB TE:DE2^MLB LT:DT1 LG:DT1^SS C:DT2^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        83%  11.2     63%   8.5     49%   6.5    
-  c2           76%   6.2     74%   8.3     43%   5.1    
-  c3           67%   6.7     70%   7.5     49%   5.2    
-  c4           74%   7.8     58%   6.1     47%   5.0    
-  cat          42%  12.4     21%   2.8     17%   2.8    
-  c3-sky       72%   9.5     64%   7.4     47%   4.5    
-  c1-fire      59%   6.8     39%   6.4     20%   2.2    
-  fire-zone    68%   6.4     58%   5.6     29%   3.4    
-  c0-blitz     54%  20.5     50%  13.8     24%   3.9    
-  bear         53%  12.1     32%   6.2     38%   4.5    
+  2-man        70%  11.8     60%   8.3     43%   5.6    
+  c2           80%   6.3     63%   7.8     47%   5.9    
+  c3           83%   8.1     57%   7.7     53%   5.9    
+  c4           73%   8.5     50%   7.6     57%   5.8    
+  cat          33%   4.9     30%   3.4      7%   0.9    
+  c3-sky       83%  11.8     60%   5.7     47%   4.5    
+  c1-fire      63%   9.1     43%   5.8     17%   1.8    
+  fire-zone    63%   7.7     33%   2.5     27%   3.3    
+  c0-blitz     53%  13.3     47%  16.1     17%   4.8    
+  bear         60%   8.0     27%   5.2     17%   2.2    
 
-=== Wing Zone Read (wing-zone-read) | Gun Wing | zone-read | beats man stops heavyBox | aim B on aim  71%
+=== Wing Zone Read (wing-zone-read) | Gun Wing | zone-read | beats man stops heavyBox | aim B on aim  65%
   tip: The wing bluffs the end and blocks the next man. Keep it behind him.
   box/hats: 2-man 6/9  c2 6/9  c3 6/9  c4 6/9  cat 7/9  c3-sky 6/9  c1-fire 7/9  fire-zone 6/9  c0-blitz 8/9  bear 7/9
   flags: POA TE(kick) held   8%
-  card even  2-man: X:CB1 Z:CB2 SL:FS TE:-(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
-  card even  c2: X:CB1 Z:CB2 SL:NB TE:-(lead) LT:DT1^WLB LG:DT1 C:DT2^MLB RG:DT2 RT:DE2 (270)
-  card bear  bear: X:CB1 Z:CB2 SL:SS TE:-(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 SL:FS TE:-(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
+  card even  c2: X:CB1 Z:CB2 SL:NB TE:-(lead) LT:DT1^WLB LG:DT1 C:DT2^MLB RG:DT2 RT:DE2 (90)
+  card bear  bear: X:CB1 Z:CB2 SL:SS TE:-(kick) LT:DT1^WLB LG:DT1 C:DT2 RG:DT2^MLB RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        54%   7.8     59%   5.9     41%   4.3    
-  c2           66%   5.0     47%   5.7     26%   4.3    
-  c3           70%   7.7     53%   4.3     50%   3.4    
-  c4           74%  10.0     60%   4.8     48%   3.0    
-  cat          52%   5.6     33%   3.6     29%   2.6    
-  c3-sky       74%   5.5     63%   4.0     33%   2.4    
-  c1-fire       8%   2.5      1%   1.2      0%   0.5    
-  fire-zone    39%   4.2     16%   1.6      0%   0.3    
-  c0-blitz      6%   2.0      0%   1.0      1%  -0.1    
-  bear         46%   3.2     30%   2.4     16%   2.1    
+  2-man        60%  13.1     53%   6.0     33%   3.8    
+  c2           60%   4.8     43%   6.5     30%   5.0    
+  c3           77%   8.7     57%   4.8     47%   3.4    
+  c4           63%   7.2     50%   4.0     47%   4.4    
+  cat          30%   3.6     20%   3.1     27%   2.5    
+  c3-sky       67%   4.8     50%   3.2     40%   2.8    
+  c1-fire      37%   2.7      7%   2.0      0%   0.9    
+  fire-zone    33%   2.7     30%   2.0     13%   1.0    
+  c0-blitz      0%   1.8      0%   1.2      0%   0.4    
+  bear         50%   3.4     27%   2.4     23%   2.3    
 
 === Weak I Duo (weak-i-duo) | Weak I | duo | beats lightBox stops heavyBox | aim B on aim  62%
   tip: Two double teams, the FB stays home on the backside. Read the MIKE.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
   flags: OWES RG  22%
   free playside: FREE PLAYSIDE SS (even)  20%
-  card even  2-man: X:CB1 Z:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (270)
-  card even  c2: X:CB1 Z:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (270)
-  card bear  bear: X:CB1 Z:CB2 FB:SAM TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (270)
+  card even  2-man: X:CB1 Z:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (90)
+  card even  c2: X:CB1 Z:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (90)
+  card bear  bear: X:CB1 Z:CB2 FB:SAM TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (90)
   call        def -10       def 0         def +10       
-  2-man        56%   8.3     31%   4.4     10%   1.1    
-  c2           70%  10.1     44%   5.3     13%   1.7    
-  c3           60%   5.8     49%   3.5     33%   2.4    
-  c4           66%   8.8     58%   5.8     31%   2.7    
-  cat          51%  12.3     36%   6.2     13%   1.7    
-  c3-sky       68%   4.6     43%   2.7     19%   1.7    
-  c1-fire      11%   2.5      8%   1.7      4%   0.5    
-  fire-zone    64%   6.7     36%   2.6     23%   1.2    
-  c0-blitz      4%   2.2      1%   1.4      2%   0.3    
-  bear         42%  12.5     20%   3.3      4%  -0.5    
+  2-man        40%   6.2     17%   2.8      3%   1.4    
+  c2           57%   8.5     30%   5.4      3%   1.3    
+  c3           83%   6.2     47%   3.1     37%   3.0    
+  c4           80%   8.0     47%   4.6     57%   3.2    
+  cat          63%  14.1     13%   3.0     13%   1.3    
+  c3-sky       67%   4.3     43%   2.7     37%   2.2    
+  c1-fire       7%   1.7      3%   1.5      7%   1.0    
+  fire-zone    73%   4.8     37%   3.0     23%   1.4    
+  c0-blitz     27%  11.3      0%   1.0      3%   1.1    
+  bear         47%  10.6     27%   3.4      7%   0.1    
 
-=== Wing Duo (wing-duo) | I-Form Wing | duo | beats lightBox stops heavyBox | aim B on aim  61%
+=== Wing Duo (wing-duo) | I-Form Wing | duo | beats lightBox stops heavyBox | aim B on aim  65%
   tip: Doubles at the point with the wing and the TE. Hit it downhill.
   box/hats: 2-man 7/9  c2 6/9  c3 6/9  c4 6/9  cat 8/9  c3-sky 6/9  c1-fire 8/9  fire-zone 6/9  c0-blitz 9/9  bear 8/9
   flags: OWES RG  22%
-  free playside: FREE PLAYSIDE SS (even)  17%
-  card even  2-man: X:CB1 TE2:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (270)
-  card even  c2: X:CB1 TE2:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (270)
-  card bear  bear: X:CB1 TE2:SS FB:SAM TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (168)
-  card bear  bear: X:CB1 TE2:CB2 FB:SAM TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (102)
+  free playside: FREE PLAYSIDE SS (even)  16%
+  card even  2-man: X:CB1 TE2:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (90)
+  card even  c2: X:CB1 TE2:CB2 FB:WLB TE:DE2 LT:DE1 LG:DT1 C:DT1^SAM RG:DT2 RT:DT2^MLB (90)
+  card bear  bear: X:CB1 TE2:SS FB:SAM TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (62)
+  card bear  bear: X:CB1 TE2:CB2 FB:SAM TE:DE2^MLB LT:DE1 LG:DT1 C:DT1^WLB RG:DT2 RT:DE2 (28)
   call        def -10       def 0         def +10       
-  2-man        47%   8.3     38%   5.9     17%   1.4    
-  c2           62%   9.1     41%   5.5     10%   1.4    
-  c3           60%   7.5     49%   5.4     37%   2.7    
-  c4           62%   7.7     52%   5.1     34%   4.0    
-  cat          51%  18.6     34%   8.2     21%   1.9    
-  c3-sky       67%  11.0     56%   8.1     32%   2.3    
-  c1-fire      19%   5.0     10%   1.9      7%   0.5    
-  fire-zone    58%   6.8     41%   3.2     16%   0.9    
-  c0-blitz     19%   2.3      4%   2.1      2%   0.9    
-  bear         24%   5.8     13%   2.7      4%  -0.2    
+  2-man        47%   6.3     57%   7.6     37%   3.8    
+  c2           33%   5.4     50%   5.9     20%   3.2    
+  c3           47%   7.0     67%   6.4     53%   4.7    
+  c4           73%   9.9     57%   5.4     43%   3.9    
+  cat          53%  16.6     27%   7.3     27%   2.5    
+  c3-sky       57%  13.7     50%   4.9     27%   4.0    
+  c1-fire      10%   7.0      7%   1.6     10%   1.1    
+  fire-zone    50%   4.6     50%   3.5     43%   2.6    
+  c0-blitz     27%   5.7     10%   2.8      3%   2.2    
+  bear         47%   5.7      0%  -0.6     10%   1.7    
 
 SUMMARY (plays with a flag or under 50% on aim):
-Toss                   on aim  66% | OWES TE  24% | OWES RT  25%
-I-Form Stretch         on aim  73% | POA FB(force) held  32%
-Counter GT             on aim  46% | -
-Iso                    on aim  61% | OWES RG  21%
-Trap                   on aim  55% | OWES LG  23%
-Lead Toss              on aim  68% | OWES TE  23% | OWES RT  33% | POA FB(force) held  33%
-Pin-Pull Sweep         on aim  62% | OWES SL  28%
-Draw                   on aim  92% | IDLE Z  40% | IDLE X  28%
-Empty QB Draw          on aim  87% | IDLE SL  32% | IDLE Z  28% | IDLE X  27% | OWES RB  28%
-Power Read             on aim  44% | POA TE(force) held  30%
-Speed Option           on aim  85% | OWES Z  25% | OWES TE  20%
-QB Power               on aim  47% | OWES SL  22% | OWES RG  21% | POA RB(kick) held  31%
-QB Sneak               on aim  89% | OWES RB  52%
-Trey Counter           on aim  42% | -
-Wing Split Zone        on aim  63% | OWES RG  20%
-QB Counter             on aim  50% | WRONG SIDE LT(lead)@WLB  40% | OWES RG  24%
-Ace Wing Counter       on aim  67% | POA LT(lead) held  30%
-Strong I Toss          on aim  65% | OWES TE  22% | OWES RT  30%
-Heavy Iso              on aim  59% | OWES RG  22%
-Split Counter          on aim  38% | -
-Wing Zone Read         on aim  71% | POA TE(kick) held   8%
+Outside Zone           on aim  79% | OWES Z  22%
+Toss                   on aim  63% | OWES TE  26% | OWES RT  24%
+I-Form Stretch         on aim  74% | POA FB(force) held  32%
+Counter GT             on aim  44% | -
+Lead Toss              on aim  68% | OWES TE  21% | OWES RT  30% | POA FB(force) held  36%
+Pin-Pull Sweep         on aim  58% | OWES SL  34%
+Draw                   on aim  91% | IDLE Z  40% | IDLE X  28%
+Empty QB Draw          on aim  83% | IDLE SL  33% | IDLE Z  27% | IDLE X  27% | OWES RB  31%
+Power Read             on aim  47% | POA TE(force) held  29%
+Speed Option           on aim  88% | OWES Z  26% | OWES TE  20%
+QB Power               on aim  47% | OWES SL  21% | OWES RG  22% | POA RB(kick) held  31%
+QB Sneak               on aim  89% | OWES RB  50%
+Trey Duo               on aim  60% | OWES TE  20%
+Trey Counter           on aim  44% | OWES SL  21%
+QB Counter             on aim  49% | WRONG SIDE LT(lead)@WLB  40% | OWES RG  23%
+Ace Wide Zone          on aim  78% | OWES Z  22%
+Pistol Ace Zone        on aim  80% | OWES Z  23%
+Ace Wing Counter       on aim  59% | OWES LT  25% | POA LT(lead) held  30%
+Strong I Power         on aim  63% | POA FB(kick) held  40%
+Strong I Toss          on aim  66% | OWES Z  22% | OWES RT  27%
+Heavy Iso              on aim  60% | OWES RG  24%
+Split Counter          on aim  36% | -
+Wing Zone Read         on aim  65% | POA TE(kick) held   8%
 Weak I Duo             on aim  62% | OWES RG  22%
-Wing Duo               on aim  61% | OWES RG  22%
+Wing Duo               on aim  65% | OWES RG  22%

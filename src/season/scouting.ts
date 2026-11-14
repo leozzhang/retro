@@ -1,16 +1,16 @@
 import { filmSummary, type FilmBook } from '../game/offModel';
 import type { Athlete } from '../data/athletes';
-import { coachName, dcAdjust, type Coach, type CoachRole, type Group, type Staff } from '../data/coaches';
+import { coachName, dcAdjust, ocAdjust, type Coach, type CoachRole, type Group, type Staff } from '../data/coaches';
 import { fitRatings, healthOf, healthy, returnRating, starters, teamRatings, type Squad, type TeamRatings } from '../data/depth';
 import { defIdentity, defLabel, manShare, pressureShare, shellShares, situationMix, type DefIdentity } from '../data/identity';
 import { ocBook, ocIdentity, ocStyle, STYLES } from '../data/offStyles';
 import { overall, SLOT_POS } from '../data/positions';
+import { offIdentity } from '../data/offIdentity';
 import type { RatingKey } from '../data/ratings';
 import { emphasisById } from '../data/emphasis';
-import { DEF_SLOTS, OFF_SLOTS, TEAMS, teamById } from '../data/teams';
+import { DEF_SLOTS, OFF_SLOTS, TEAMS, teamById, type RosterPlayer } from '../data/teams';
 import { traitsOf, type Trait } from '../game/playFeatures';
 import { latestPoll, rankIn } from './polls';
-import { QB_RUN_SHARE, TARGETS } from './simGame';
 import { SCHEME_PASS } from './staff';
 import { records, recordText } from './standings';
 import type { SeasonGame, SeasonState } from './types';
@@ -239,25 +239,57 @@ function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach, f
   return { coach: 'OC', role: 'OC', title: 'THEIR DEFENSE', items };
 }
 
-/** The DC on their offense: what the defensive coaches' emphases answer. */
+/** The DC on their offense (`offIdentity`): what the defensive coaches' emphases answer. */
 function dcSection(opp: Squad, scout: number, oc: Coach): ScoutSection {
-  const prof = opp.team.profile.offense;
-  const passShare = SCHEME_PASS[ocIdentity(oc).scheme] ?? 0.5;
   const on = starters(opp);
+  const id = offIdentity(oc, Object.fromEntries(Object.entries(on).map(([sl, a]) => [sl, { r: fitRatings(a) } as RosterPlayer])));
+  const passShare = (SCHEME_PASS[ocIdentity(oc).scheme] ?? 0.5) + id.passLean;
   const items: ScoutItem[] = [{ tier: 1, text: `${offTag(oc)} OFFENSE: THEY PASS ${pctAt(passShare, scout)}.` }];
-  if (on.QB) items.push({ tier: 1, text: `QB ${short(on.QB)} (${ovrAt(on.QB, 'QB')}) ${QB_TAG[prof.qbStyle]}: HE RUNS ${pctAt(QB_RUN_SHARE[prof.qbStyle] ?? 0.1, scout)} OF THEIR CARRIES.` });
-  const targets = Object.entries(TARGETS).filter(([sl]) => on[sl]);
-  if (targets.length) {
-    const [sl] = targets.reduce((m, t) => (t[1] * (ovrAt(on[t[0]], t[0]) / 75) ** 2 > m[1] * (ovrAt(on[m[0]], m[0]) / 75) ** 2 ? t : m));
-    items.push({ tier: 1, warn: true, text: `GO-TO TARGET: ${who(on[sl], sl)}.` });
+  if (on.QB) {
+    const tag = id.qb.runLean >= QB_LEAN.runner ? 'runner' : id.qb.runLean >= QB_LEAN.dual ? 'dual' : 'pocket';
+    const tail = tag === 'pocket' ? ' FLUSH HIM AND HE LOOKS TO THROW, NOT RUN.' : tag === 'runner' ? ' WHEN THE POCKET BREAKS DOWN HE TUCKS IT: SPY OR CONTAIN.' : ' HE SLIDES OUT OF TROUBLE AND RUNS IF IT\'S THERE.';
+    items.push({ tier: 1, warn: tag === 'runner', text: `QB ${short(on.QB)} (${ovrAt(on.QB, 'QB')}) ${QB_TAG[tag]}.${tail}` });
+    if (id.qb.aggression >= QB_LEAN.gunslinger) items.push({ tier: 2, text: `QB ${short(on.QB)} THROWS INTO TIGHT WINDOWS DOWNFIELD: THE BALL IS THERE TO BE TAKEN.` });
+  }
+  if (id.star && on[id.star]) {
+    const share = id.targets[id.star];
+    items.push({ tier: 1, warn: true, text: `GO-TO TARGET: ${who(on[id.star], id.star)}, ABOUT ${pctAt(share, scout)} OF THE TARGETS.` });
+    items.push({ tier: 2, text: `ON 3RD DOWN AND IN THE RED ZONE THE QB LOOKS FOR ${id.star} FIRST.` });
   }
   if (on.RB) items.push({ tier: 1, text: `FEATURE BACK: ${who(on.RB, 'RB')}.` });
+  // The OC himself: his go-to calls, what he leans on, and how fast he answers you.
+  const book = ocBook(oc);
+  const favs = id.favorites.map((pid) => book.find((p) => p.id === pid)?.name).filter(Boolean);
+  if (favs.length) items.push({ tier: 2, text: `HIS GO-TO CALLS ON MONEY DOWNS: ${favs.join(', ').toUpperCase()}.` });
+  const lean = Object.entries(id.fam).filter(([f, w]) => (w ?? 1) >= FAM_LEAN && book.some((p) => p.tags.family === f)).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))[0];
+  if (lean) items.push({ tier: 3, text: `HE CALLS MORE ${FAM_WORD[lean[0]] ?? lean[0].toUpperCase()} THAN HIS SCHEME USUALLY DOES.` });
+  items.push(ocAdjustItem(oc));
   for (const sl of ['QB', 'RB', 'X', 'Z', 'SL', 'TE']) {
     const a = on[sl];
     const c = a?.conf ?? 0;
     if (a && Math.abs(c) >= 0.4) items.push({ tier: 2, text: `${sl} ${short(a)} IS ${c > 0 ? 'ROLLING' : 'SHAKY'} RIGHT NOW.` });
   }
   return { coach: 'DC', role: 'DC', title: 'THEIR OFFENSE', items };
+}
+
+/** The QB's tags by his run lean and aggression (`OffIdentity.qb`). */
+const QB_LEAN = { dual: 0.3, runner: 0.65, gunslinger: 0.5 };
+/** An OC's taste for a family this far over his scheme's reads as a lean. */
+const FAM_LEAN = 1.35;
+const FAM_WORD: Record<string, string> = {
+  quick: 'QUICK GAME', dropback: 'DROPBACK PASSES', shot: 'DEEP SHOTS', screen: 'SCREENS', pa: 'PLAY ACTION', boot: 'BOOTLEGS', rpo: 'RPOS',
+  insideZone: 'INSIDE ZONE', outsideZone: 'OUTSIDE ZONE', gap: 'GAP RUNS', perimeter: 'PERIMETER RUNS', read: 'OPTION READS', qbRun: 'QB RUNS', draw: 'DRAWS',
+};
+
+/** Their OC's in-game adjustments (ADJUST, game/ocBrain.ts): how fast he'll answer what your defense does. */
+function ocAdjustItem(oc: Coach): ScoutItem {
+  const a = ocAdjust(oc);
+  const word = a >= ADJUST_WORDS.fast ? 'FAST' : a <= ADJUST_WORDS.slow ? 'SLOW' : 'STEADY';
+  const tail =
+    word === 'FAST' ? " HE'LL ATTACK WHAT YOU SHOW WITHIN A DRIVE OR TWO: DON'T SIT IN ONE LOOK."
+    : word === 'SLOW' ? ' HE MOSTLY ADJUSTS AT HALFTIME: AN EARLY PLAN CAN HOLD.'
+    : ' HE ADJUSTS AS THE GAME GOES.';
+  return { tier: 2, warn: word === 'FAST', text: `THEIR OC ADJUSTS IN-GAME: ${word} (ADJ ${a}).${tail}` };
 }
 
 interface Edge {
