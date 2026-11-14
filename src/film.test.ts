@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEF_CALLS } from './data/defenses';
 import { PLAYBOOK } from './data/plays';
-import { beatsChecks, explainReport, FILM, filmDiff, filmReport, filmRows, filmTable, situations, type FilmTable } from './film';
+import { beatsChecks, explainReport, FILM, filmDiff, filmReport, filmRows, filmTable, payoffSource, situations, type FilmTable } from './film';
 
 describe('film room', () => {
   it('an RPO is two rows, the give and the pull; short-yardage plays are measured on 3rd and 1', () => {
@@ -55,4 +55,6 @@ it.runIf(process.env.npm_lifecycle_event === 'film')('film room report', () => {
   if (basePath && existsSync(basePath)) lines.push('', ...filmDiff(JSON.parse(readFileSync(basePath, 'utf8')) as FilmTable, t));
   writeFileSync(process.env.FILM_OUT ?? 'film.txt', lines.join('\n'));
   writeFileSync(process.env.FILM_JSON ?? 'film.json', JSON.stringify(t));
+  // The learning defense's payoff table: the whole book at the full reps only.
+  if (!only && !process.env.FILM_REPS) writeFileSync('src/data/filmPayoff.ts', payoffSource(t));
 }, 3_600_000);

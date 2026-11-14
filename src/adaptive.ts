@@ -10,6 +10,7 @@ import { DEF_SLOTS } from './data/teams';
 import { OPP_GOAL } from './engine/constants';
 import { mulberry32, type Rng } from './engine/math';
 import { callFor, checkFor, halftime, laneOf, leansFor, newBrain, newDrive, observe, teamSmarts, type DefBrain, type DefenseIq } from './game/defBrain';
+import { mergeFilm, rosterRead, type FilmBook } from './game/offModel';
 import * as H from './harness';
 import { successful } from './season/grades';
 import { playTraits } from './season/scouting';
@@ -56,7 +57,18 @@ export const SCRIPTS: Record<string, Script> = {
   // A tell by formation: always run from the pistol, always pass from trips (the checks read it).
   'pistol run trips pass': (_n, _d, _t, r) =>
     r() < 0.5 ? any([book('outside-zone'), book('split-zone')], r) : any([book('mesh'), book('dagger'), book('stick'), book('curl-flat')], r),
+  // A star X (`FAVORITE`): quick and dropback passes, most of them forced to him (the key's row).
+  'elite X': (_n, _d, _t, r) => any(xPasses, r),
 };
+
+/** Passes with a route for the X: the quick game and dropbacks. */
+const xPasses = passes.filter((p) => ['quick', 'dropback'].includes(p.tags.family) && !playTraits(p).has('screen'));
+
+/**
+ * Scripts with a favorite receiver: his slot, the share of throws forced to him, and his receiving
+ * ratings (a star on a 90 roster).
+ */
+const FAVORITE: Record<string, { slot: string; share: number; r: number }> = { 'elite X': { slot: 'X', share: 0.75, r: 99 } };
 
 /** RPO scripts: whether this snap is the give. 'RPO glance mix' gives 30%, 'glance x8 then give' after the 8th; the rest always pull. */
 const rpoGive = (name: string, n: number, rng: Rng) =>
@@ -82,6 +94,8 @@ export interface AdaptiveResult {
   counter: number;
   /** RPO pulls: completion rate and yards per throw. */
   pulls: { n: number; comp: number; ypa: number };
+  /** A favorite receiver's script (`FAVORITE`): yards a throw to him, and to everyone else. */
+  fav?: { to: number; rest: number };
 }
 
 /**
@@ -91,9 +105,16 @@ export interface AdaptiveResult {
  */
 export function adaptive(
   script: Script, iq: DefenseIq, adjust: number, games: number, snaps: number, seed: number, parts = { dc: true, players: true, check: true },
-  name = '', defLevel = H.REF_DEF,
+  name = '', defLevel = H.REF_DEF, opts: { film?: FilmBook; scout?: number; keepFilm?: (f: FilmBook) => void } = {},
 ): AdaptiveResult {
   const m = H.referenceMatchup(H.REF_OFF, defLevel);
+  const fav = FAVORITE[name];
+  if (fav) {
+    const p = m.offR[fav.slot];
+    m.offR[fav.slot] = { ...p, r: { ...p.r, spd: fav.r, acc: fav.r, cth: fav.r, cit: fav.r, rte: fav.r, rls: fav.r } };
+  }
+  const favRng = mulberry32(seed ^ 0x5eed);
+  const favN = { to: 0, toYds: 0, rest: 0, restYds: 0 };
   const ident = defIdentity(m.def);
   const prc = Object.fromEntries(DEF_SLOTS.map((s) => [s, m.defR[s].r.prc]));
   const smarts = teamSmarts(Object.values(prc));
@@ -108,7 +129,10 @@ export function adaptive(
   const isCounter = COUNTER[name];
   for (let g = 0; g < games; g++) {
     const rng = mulberry32(seed + g * 7919);
-    const brain: DefBrain | null = newBrain({ iq, adjust, scout: adjust, qbMobility: 0.3, seed: seed + g, smarts });
+    const brain: DefBrain | null = newBrain({
+      iq, adjust, scout: opts.scout ?? adjust, qbMobility: 0.3, seed: seed + g, smarts, book: LEGACY, film: opts.film,
+      roster: rosterRead(m.offR),
+    });
     let los = 35;
     let down = 1;
     let first = los + 10;
@@ -122,13 +146,15 @@ export function adaptive(
       // The presnap check off the look (the brain's own draws, so the snap's stream is the same).
       const checked = brain && parts.dc && parts.check ? checkFor(brain, ident, play, pick.call, down, toGo, ytg) : null;
       if (checked) pick.call = checked;
-      const reads = brain && parts.players ? leansFor(brain, prc, pick.call, play) : undefined;
+      const reads = brain && parts.players ? leansFor(brain, prc, pick.call, play, { down, toGo, yardsToGoal: ytg }) : undefined;
       const x = { tags: pick.tags, reads };
       const rpo = play.read === 'rpo';
       const give = rpo && rpoGive(name, n, rng);
+      const forced = fav && favRng() < fav.share;
+      const to = forced ? (o: { slot: string }) => o.slot === fav.slot : undefined;
       const r =
         rpo ? H.rpoRep(m, play, pick.call, give, rng, los, x)
-        : play.kind === 'run' ? H.runRep(m, play, pick.call, rng, los, x) : H.passRep(m, play, pick.call, holdFor(play), rng, x, los);
+        : play.kind === 'run' ? H.runRep(m, play, pick.call, rng, los, x) : H.passRep(m, play, pick.call, holdFor(play), rng, x, los, 'touch', to);
       const o = r.o;
       if (!o) continue;
       const turnover = o.type === 'int' || o.type === 'pick6';
@@ -142,6 +168,15 @@ export function adaptive(
         counter += gain;
         counterN++;
       }
+      if (fav && r.play.thrown) {
+        if (r.play.intended?.slot === fav.slot) {
+          favN.to++;
+          favN.toYds += gain;
+        } else {
+          favN.rest++;
+          favN.restYds += gain;
+        }
+      }
       if (rpo && !give && r.play.thrown) {
         pulls.n++;
         if (o.type !== 'incomplete' && !turnover) pulls.comp++;
@@ -151,7 +186,8 @@ export function adaptive(
         observe(brain, {
           play, call: pick.call, down, toGo, yardsToGoal: ytg, gain, success: ok, scrambled: r.play.scramble, kept: r.play.kept,
           air: r.play.thrown && r.play.ballTarget ? r.play.ballTarget.x - los : 0,
-          handedOff: r.play.handedOff, lane: laneOf(r.play),
+          handedOff: r.play.handedOff, lane: laneOf(r.play), tags: pick.tags, target: r.play.thrown ? r.play.intended?.slot ?? null : null,
+          lost: turnover || o.type === 'sack' || o.type === 'fumble',
         });
       }
       // The drive: a score, a turnover or a failed fourth down starts a new one at the 25.
@@ -172,11 +208,13 @@ export function adaptive(
         if (brain) newDrive(brain);
       }
     }
+    if (brain && opts.keepFilm) opts.keepFilm(brain.model.raw);
   }
   return {
     ypp: win.map((y, i) => y / Math.max(1, winN[i])), succ: succ / (games * snaps), td: td / drives, drives,
     counter: counter / Math.max(1, counterN),
     pulls: { n: pulls.n, comp: pulls.comp / Math.max(1, pulls.n), ypa: pulls.yds / Math.max(1, pulls.n) },
+    fav: fav ? { to: favN.toYds / Math.max(1, favN.to), rest: favN.restYds / Math.max(1, favN.rest) } : undefined,
   };
 }
 
@@ -191,9 +229,23 @@ export function adaptiveRows(games = 30, snaps = 40, seed = 23): string[] {
       rows.push(
         `ADAPT ${name.padEnd(20)} ${label.padEnd(13)} | ypp ${r.ypp.map((y) => y.toFixed(1)).join(' / ')} succ ${(r.succ * 100).toFixed(0)}% ` +
           `td/drive ${r.td.toFixed(2)}${COUNTER[name] ? ` counter ypp ${r.counter.toFixed(1)}` : ''}` +
-          (r.pulls.n ? ` pulls comp ${(r.pulls.comp * 100).toFixed(0)}% ypa ${r.pulls.ypa.toFixed(1)}` : ''),
+          (r.pulls.n ? ` pulls comp ${(r.pulls.comp * 100).toFixed(0)}% ypa ${r.pulls.ypa.toFixed(1)}` : '') +
+          (r.fav ? ` to him ${r.fav.to.toFixed(1)} ypa, the rest ${r.fav.rest.toFixed(1)}` : ''),
       );
     }
+  }
+  // Film: one game of the same offense on tape, then the next games' first snaps, with and without it, by the DC's SCOUT.
+  rows.push('ADAPT FILM: three games of the same offense on film, then NORMAL DC 75 with a SCOUT 40 or 85 DC: ypp snaps 1-6 without -> with the film');
+  for (const name of ['IZ only', 'slant only', 'elite X', 'pistol run trips pass']) {
+    if (process.env.ADAPT_ONLY && !process.env.ADAPT_ONLY.split(',').includes(name)) continue;
+    let film: FilmBook | undefined;
+    adaptive(SCRIPTS[name], 'NORMAL', 75, 3, snaps, seed + 999, undefined, name, H.REF_DEF, { keepFilm: (f) => (film = mergeFilm(film, f)) });
+    const parts = [40, 85].map((scout) => {
+      const a = adaptive(SCRIPTS[name], 'NORMAL', 75, games, snaps, seed, undefined, name, H.REF_DEF, { scout });
+      const b = adaptive(SCRIPTS[name], 'NORMAL', 75, games, snaps, seed, undefined, name, H.REF_DEF, { scout, film });
+      return `scout ${scout}: ${a.ypp[0].toFixed(1)} -> ${b.ypp[0].toFixed(1)}`;
+    });
+    rows.push(`ADAPT FILM ${name.padEnd(22)} | ${parts.join(' | ')}`);
   }
   // The smarts check: the same spammed RPO and the formation tell against a strong and a weak defense,
   // static and sharp. A weak defense (less play recognition, `teamSmarts`) has to adapt clearly less.

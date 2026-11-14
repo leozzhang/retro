@@ -8,7 +8,7 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, STEP } from '../engine/constant
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { cutKeep, eyesOf, facingQB, FIND, isRusher, matchZones, PREVENT, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
+import { cutKeep, eyesOf, facingQB, FIND, isRusher, KEY, matchZones, PREVENT, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
@@ -284,6 +284,8 @@ export class Play {
   readonly prevent: boolean;
   /** The DC's tags on the call (spy, contain, prevent, a line game). */
   readonly tags: DefTags;
+  /** The receiver the DC keyed (`DefTags.key`, `KEY` in sim/ai.ts), or null. */
+  readonly keyed: Player | null;
   /** Defensive personnel for this snap, matched to the offense's. */
   readonly defPackage: DefPackage;
   readonly qbDrop: Vec;
@@ -418,6 +420,7 @@ export class Play {
 
     this.prevent = !!s.tags?.prevent;
     this.tags = s.tags ?? {};
+    this.keyed = s.tags?.key ? bySlot.get(s.tags.key) ?? null : null;
     this.disguise = s.disguise ?? null;
     const plan = matchDefense(s.defCall, s.play, rp);
     this.defPackage = plan.pkg;
@@ -1434,7 +1437,10 @@ export class Play {
           air < LEAN_FX.shortAir ? leanMul(d.lean.screen)
           : air > LEAN_FX.deepAir ? leanMul(d.lean.deep) * (1 + LEAN_FX.late * Math.max(0, d.lean.screen, d.lean.run))
           : leanMul(-d.lean.deep) * (best ? leanMul(breaksInside(best.start.y, this.ballY, this.ballTarget.y) ? d.lean.inside : -d.lean.inside) : 1);
-        const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean;
+        // The keyed receiver: everyone's on a ball to him (but his tight man is beaten deep); a beat slow to the rest.
+        const k = this.keyed;
+        const key = !k ? 1 : best !== k ? 1 + KEY.others : air > LEAN_FX.deepAir && d.manTarget === k ? 1 + KEY.deep : 1 - KEY.react;
+        const react = (0.5 - (cov / 100) * 0.35 + rng() * 0.1) * lean * key;
         d.reactAt = this.time + lerp(Math.max(react, dur * FIND.trail, dur - FIND.trailLeft), react + 0.1, d.eyes);
         d.findAt = d.reactAt;
       }

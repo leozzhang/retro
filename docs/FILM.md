@@ -6,7 +6,7 @@
 
 It has two jobs:
 1. **A balancing tool for new plays.** Each play gets a row against all 13 calls, and the report flags plays that beat every call or none, and calls that no play beats. Run it after every playbook batch.
-2. **The table the ML defense will learn from** (DEFENSE.md, Hooks): the expected success of each call against each play, with a backoff by play family. Nothing in the game reads it yet.
+2. **The table the ML defense plays from** (DEFENSE.md, "The DC"): the expected success of each call against each play, with a backoff by play family. A full run (no `FILM_ONLY`, no `FILM_REPS`) also writes `src/data/filmPayoff.ts` (`payoffSource`): each row's success and explosive rate by column, and each pass row's targets by slot. It's committed, so the game ships with it: **rerun `npm run film` after changing plays or mechanics** and commit the new table.
 
 ## How it's measured (`src/film.ts`)
 - **Rows are plays.** An RPO is two rows, the give and the pull (`filmRows`). Each row records:

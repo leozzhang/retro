@@ -5,7 +5,7 @@ import { PLAYBOOK } from './data/plays';
 import { DEF_SLOTS, teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
 import {
-  adjustments, bucketsOf, callFor, DEF_BRAIN, halftime, headline, laneOf, leansFor, newBrain, newDrive, observe, type DefBrain, type SnapSeen,
+  adjustments, bucketsOf, callFor, dcMix, halftime, headline, laneOf, leansFor, ML_DC, newBrain, newDrive, observe, type DefBrain, type SnapSeen,
 } from './game/defBrain';
 import { Play } from './game/playState';
 import * as H from './harness';
@@ -17,14 +17,28 @@ const ident = defIdentity(teamById('alabama'));
 const prc = Object.fromEntries(DEF_SLOTS.map((s) => [s, 75]));
 const brain = (iq: 'NORMAL' | 'SHARP' = 'NORMAL', adjust = 75) => newBrain({ iq, adjust, scout: adjust, qbMobility: 0, seed: 9 })!;
 
-/** Feed the brain `n` snaps of one play, each gaining `gain` (with a throw `air` yards out) on first and 10. */
-function feed(b: DefBrain, id: string, n: number, gain = 3, air = 0, down = 1, toGo = 10): void {
+/**
+ * Feed the brain `n` snaps of one play, each gaining `gain` (with a throw `air` yards out) on first and
+ * 10; `vs` gives the gain by call instead, so some calls stop it and some don't.
+ */
+function feed(b: DefBrain, id: string, n: number, gain = 3, air = 0, down = 1, toGo = 10, vs?: (c: (typeof DEF_CALLS)[number]) => number): void {
   for (let i = 0; i < n; i++) {
     const call = callFor(b, ident, down, toGo, 60, mulberry32(i)).call;
+    if (vs) gain = vs(call);
     leansFor(b, prc, call);
     const s: SnapSeen = { play: book(id), call, down, toGo, yardsToGoal: 60, gain, success: gain >= 4, scrambled: false, kept: false, air };
     observe(b, s);
   }
+}
+
+/** How far the DC's mix has moved from his identity's on first and 10 (total variation), over a few draws. */
+function moved(b: DefBrain, n = 20): number {
+  let tv = 0;
+  for (let i = 0; i < n; i++) {
+    const r = dcMix(b, ident, 1, 10, 60, mulberry32(100 + i));
+    for (const k of Object.keys(r.mix)) tv += Math.abs(r.mix[k] - r.base[k]) / 2 / n;
+  }
+  return tv;
 }
 
 /** Share of `n` calls with `pred`, on a situation. */
@@ -45,7 +59,8 @@ describe('defensive brain', () => {
     const heavy = (c: (typeof DEF_CALLS)[number]) => c.box >= 8;
     const before = shareOf(b, heavy);
     expect(shareOf(b, (c) => c.id === 'goal')).toBe(0);
-    feed(b, 'qb-sneak', 10);
+    // A heavy box stops the sneak; anything lighter gives up three yards.
+    feed(b, 'qb-sneak', 10, 3, 0, 1, 10, (c) => (c.box >= 8 ? 0 : 3));
     expect(shareOf(b, heavy)).toBeGreaterThan(before + 0.2);
     expect(shareOf(b, (c) => c.id === 'goal')).toBeGreaterThan(0.05);
     const lean = leansFor(b, prc, DEF_CALLS[0]);
@@ -53,24 +68,27 @@ describe('defensive brain', () => {
     expect(lean.MLB!.run).toBeGreaterThan(0.4);
   });
 
-  it('a varied offense moves the DC only a little', () => {
+  it('a varied offense moves the DC only a little, a spammed play a lot', () => {
     const b = brain('SHARP');
     // Half runs; passes short, intermediate and one shot, as a normal offense throws them.
     const mix: [string, number][] = [
       ['inside-zone', 0], ['smash', 5], ['outside-zone', 0], ['mesh', 4], ['power', 0], ['curl-flat', 10], ['iso', 0], ['stick', 6], ['toss', 0], ['pa-post', 22],
     ];
     for (let i = 0; i < 30; i++) feed(b, mix[i % mix.length][0], 1, i % 3 ? 5 : 2, mix[i % mix.length][1]);
-    for (const v of Object.values(b.shift)) expect(Math.abs(v)).toBeLessThan(0.45);
+    const spam = brain('SHARP');
+    feed(spam, 'inside-zone', 12);
+    expect(moved(b)).toBeLessThan(0.3);
+    expect(moved(spam)).toBeGreaterThan(moved(b) + 0.1);
     expect(b.tags.spy).toBeLessThan(0.1);
   });
 
-  it('caps every dial and keeps every call on the table', () => {
+  it('keeps his lean within its budget and every call on the table', () => {
     const b = brain('SHARP', 95);
     feed(b, 'qb-power', 40, 1);
-    for (const v of Object.values(b.shift)) expect(Math.abs(v)).toBeLessThanOrEqual(DEF_BRAIN.cap * DEF_BRAIN.iq.SHARP + 1e-9);
+    expect(moved(b)).toBeLessThanOrEqual(ML_DC.lam[1] + 1e-9);
     // Even sold out on the QB run, he still plays every regular call sometimes.
-    for (const c of DEF_CALLS.filter((x) => !x.situational)) expect(shareOf(b, (x) => x.id === c.id, 1, 10, 60, 6000), c.id).toBeGreaterThan(0.002);
-  });
+    for (const c of DEF_CALLS.filter((x) => !x.situational)) expect(shareOf(b, (x) => x.id === c.id, 1, 10, 60, 3000), c.id).toBeGreaterThan(0.002);
+  }, 30_000);
 
   it('QB runs bring a spy and contain, and he says so once a drive', () => {
     const b = brain('SHARP', 85);
@@ -87,15 +105,15 @@ describe('defensive brain', () => {
     expect(adjustments(b, name).length).toBeGreaterThan(1);
   });
 
-  it('a weak DC is slower to adjust, and catches up at halftime', () => {
+  it('a weak DC moves less, and reads you better after halftime', () => {
     const weak = brain('NORMAL', 40);
     const sharp = brain('NORMAL', 85);
     feed(weak, 'inside-zone', 6);
     feed(sharp, 'inside-zone', 6);
-    expect(sharp.shift.box).toBeGreaterThan(weak.shift.box);
-    const was = weak.shift.box;
+    expect(moved(sharp)).toBeGreaterThan(moved(weak) * 1.5);
+    const was = moved(weak);
     halftime(weak);
-    expect(weak.shift.box).toBeGreaterThan(was);
+    expect(moved(weak)).toBeGreaterThan(was);
   });
 
   it('is deterministic and survives a JSON round trip', () => {

@@ -72,6 +72,15 @@ const ZONE_UNDER = 1.5;
  * deeper, and deep zones sit `deep` yards deeper and stay that much farther over the top.
  */
 export const PREVENT = { cushion: 3, deep: 4 };
+/**
+ * Keying a receiver (`DefTags.key`, the DC's read of who's beating him; game/defBrain.ts). On the keyed man:
+ * his man defender reacts `lag` sooner to his moves and plays `cushion` yd tighter; underneath zones score
+ * him `zone` yd closer, so they rally to him first; a robber within `robber` yd of him takes him; a deep
+ * defender with him in his band shades `shade` of the way toward him (help over the top); every defender
+ * breaks `react` sooner on a ball to him. The cost: the deep help leaves the other side thinner, and a ball thrown `deepAir`+ yd to him beats his
+ * tight man (`deep` slower), and every defender is `others` slower on a ball to anyone else.
+ */
+export const KEY = { lag: 0.35, cushion: 1, zone: 4, robber: 14, react: 0.3, deep: 0.35, others: 0.12, shade: 0.4 };
 /** A spy sits this deep, mirroring the QB across the field. */
 const SPY_DEPTH = 5;
 /** A contain rusher works to this far outside the QB and doesn't take the inside lane until he's this close. */
@@ -580,7 +589,7 @@ function zoneScore(play: Play, d: Player, a: Extract<Assign, { kind: 'zone' }>, 
   // A receiver running out to the flat is the threat he widens for; the man he's already on scores
   // closer, so he commits instead of flipping; anyone in the area comes before one he'd only lean toward.
   const flat = outside && o.vel.y * outward > 2 ? ZONE_OUTSIDE : 0;
-  const sc = dd - flat - (o === d.zoneMark ? ZONE_STICK : 0) + (dd > z.area ? 10 : 0);
+  const sc = dd - flat - (o === d.zoneMark ? ZONE_STICK : 0) - (o === play.keyed ? KEY.zone : 0) + (dd > z.area ? 10 : 0);
   return { sc, dd };
 }
 
@@ -715,11 +724,12 @@ function cover(play: Play, d: Player): void {
   }
   // Defenders react to what the receiver did a moment ago; better man coverage = shorter lag.
   // Eyes in the backfield on a run he's expecting: a step late on his man.
-  const lagFrames = Math.round((0.6 - (d.r.mcv / 100) * 0.35 + LEAN_FX.eyes * Math.max(0, d.lean.run)) * 60);
+  const keyed = r === play.keyed;
+  const lagFrames = Math.round((0.6 - (d.r.mcv / 100) * 0.35 + LEAN_FX.eyes * Math.max(0, d.lean.run)) * (keyed ? 1 - KEY.lag : 1) * 60);
   const hist = play.history.get(r.id);
   const lp = hist && hist.length ? hist[Math.max(0, hist.length - 1 - lagFrames)] : r.pos;
   const since = play.time - play.snapTime;
-  const cushion = d.press ? 0.8 : Math.max(1.0, d.cushion - since * 2.2);
+  const cushion = d.press ? 0.8 : Math.max(1.0, d.cushion - since * 2.2 - (keyed ? KEY.cushion : 0));
   // Inside leverage, more (or outside) as he leans on the routes his man has been running.
   const inside = Math.sign(play.ballY - lp.y) * (0.6 + LEAN_FX.shade * d.lean.inside);
   // A man still behind the line gets played from just past it: read him, don't chase him into the backfield.
@@ -736,7 +746,9 @@ function cover(play: Play, d: Player): void {
 }
 
 function deepZone(play: Play, d: Player, yMin: number, yMax: number): void {
-  const mid = (yMin + yMax) / 2;
+  // Help over the top of a keyed receiver in his band.
+  const k = play.keyed;
+  const mid = k && !k.down && k.pos.y >= yMin && k.pos.y <= yMax ? lerp((yMin + yMax) / 2, k.pos.y, KEY.shade) : (yMin + yMax) / 2;
   let deepest: Player | null = null;
   for (const o of play.off) {
     if (!isEligible(o) || o.isBlocker || o.down) continue;
@@ -757,6 +769,12 @@ function deepZone(play: Play, d: Player, yMin: number, yMax: number): void {
 
 function robber(play: Play, d: Player): void {
   const home = { x: play.los + 8, y: play.ballY };
+  // A keyed receiver near enough is his.
+  const k = play.keyed;
+  if (k && !k.down && dist(k.pos, home) < KEY.robber) {
+    d.want = seek(d, { x: k.pos.x + 1.5, y: k.pos.y }, maxSpeed(d) * 0.9, 1);
+    return;
+  }
   let best: Player | null = null;
   let bd = Infinity;
   for (const o of play.off) {

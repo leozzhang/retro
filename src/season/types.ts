@@ -1,3 +1,4 @@
+import type { FilmBook } from '../game/offModel';
 import type { DevTrait, Injury } from '../data/athletes';
 import type { AnyRole, CoachRatings, Group, HeadRatings, RatingName } from '../data/coaches';
 import type { DepthChart } from '../data/depth';
@@ -298,6 +299,8 @@ export interface TeamState {
   ga?: string[];
   /** The program's recruiting pipelines by state, 0-1, from recent classes (season/recruiting.ts). Carried across seasons. */
   pipe?: Record<string, number>;
+  /** The user's offense on film from its live games, for the next DC's prior (game/offModel.ts `FilmBook`). User team only. */
+  film?: FilmBook;
 }
 
 /** Includes `HC`: the head coach's chair. */

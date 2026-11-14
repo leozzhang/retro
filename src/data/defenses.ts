@@ -221,6 +221,11 @@ export interface DefTags {
   game?: { kind: GameKind; side: 1 | -1 };
   /** RPO pass-first: on an RPO, the hook and curl defenders to the tagged route's side ignore the run key (`Play.snap`). */
   rpo?: boolean;
+  /**
+   * A receiver the DC keys (`KEY`, sim/ai.ts): his man plays him tighter, the zones rally to him, the robber
+   * takes him, and everyone breaks faster on a ball to him; the rest of the coverage is a beat slower.
+   */
+  key?: OffSlot;
 }
 
 /**

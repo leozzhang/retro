@@ -2,6 +2,32 @@
 
 _Last updated: 2026-11-13_
 
+## Done: the ML defense (2026-11-13)
+DEFENSE.md, "The DC", "Keying a receiver", "Film study" and the measured section have the design and numbers.
+
+**The design: explicit structure, learned numbers.** No trained network: about 60 snaps a game is too little to learn from scratch, and the DC has to scale with ADJUST and explain himself.
+- **`game/offModel.ts`, the offense model:** what you call (family, then play) by situation and look, and who you throw to (pooled across plays, so a favorite shows). It's decayed counts smoothed toward a stacked prior: league, your OC's style and book, your roster, your film.
+- **The payoff:** the film room's table, `src/data/filmPayoff.ts`, written by a full `npm run film`. It's half-trusted (`filmTrust`), with residuals by family × call graded on the film's own scale (`filmOk`).
+- **The DC (`dcMix`):** each call's stop rate on you over a normal offense, a softmax (`beta`) on top of the identity, with `lam` of the mix as the difficulty budget. ADJUST, smarts and IQ set it (`ML_DC`). Thompson draws and misreads keep him unpredictable. The check re-reads with the look. The hand-written dials, the trait bandit and the spam boxes are gone.
+- **Keying a receiver (`DefTags.key`, `KEY` in sim/ai.ts):** a tighter man, zones rallying to him, the robber, a deep safety shading over him, and quicker breaks on balls to him. The rest of the coverage is a beat slow. A headline names him.
+- **Players' leans** also read the model for this situation and look (`modelRead`, `ML_DC.leans`).
+- **Film across games:** `TeamState.film` (`mergeFilm`, `layFilm`, weighed by SCOUT), carrying residuals too. It's written at a season game's final, and the prep page says what their DC has.
+- **F1** shows what the DC expects, his top calls and the key.
+- **Tools:** `npm run adapt` (the ADAPT section alone). The new ADAPT rows: elite X, and FILM.
+
+**Measured:**
+- Every balance row outside ADAPT is byte-identical to HEAD.
+- `npm test` passes (`src/offModel.test.ts` is new).
+- ADAPT is in target (spammed run −40–55% at DC 75, balanced unchanged, the counter pays, film works).
+
+**Flags:**
+- Quick-only is still untouched; the players' leans cost there, as before.
+- The elite X loses only 8–15%.
+- Film from simulated weeks, `+key` film columns and SHARP's equilibrium mix aren't built.
+- Not played by hand yet.
+
+**Next:** play a dynasty game by hand (headlines, F1, the prep line after a week), then the open flags.
+
 ## In progress: balancing the run game by intent (2026-11-12)
 The plan: measure what each run is drawn to do before tuning it, fix mechanics rather than plays, and build the ML defense after the run game is stable (it would learn the bugs). Each run should win in its `beats` situations and lose in its `stops` ones. What's missing is precision: who blocks whom, which gap the ball hits, what the back reads.
 
@@ -136,7 +162,7 @@ The plan: measure what each run is drawn to do before tuning it, fix mechanics r
 **Next:**
 1. Split Counter's design (H crossing to the one-receiver side?), the zone reads tagged "man", the −10 GAP row, OZ's backside cutoff.
 2. Re-baseline PROGRESS's balance section.
-3. The ML defense.
+3. ~~The ML defense~~ (done, above).
 
 Not played by hand yet: the auto-handoff, pressing and contact (the user's runner gets the drag too).
 

@@ -1,3 +1,4 @@
+import { filmSummary, type FilmBook } from '../game/offModel';
 import type { Athlete } from '../data/athletes';
 import { coachName, dcAdjust, type Coach, type CoachRole, type Group, type Staff } from '../data/coaches';
 import { fitRatings, healthOf, healthy, returnRating, starters, teamRatings, type Squad, type TeamRatings } from '../data/depth';
@@ -180,7 +181,24 @@ function averages(s: SeasonState, team: string): ScoutReport['averages'] {
 const DISGUISE_LOTS = 0.38;
 
 /** The OC on their defense: what they call, when they bring it, and who to account for. */
-function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach): ScoutSection {
+/**
+ * Your film in their DC's hands (`TeamState.film`, game/offModel.ts): what he'll expect from you at
+ * kickoff. A low-SCOUT DC got less out of it (`OFF_MODEL.film.w`).
+ */
+function filmItem(film: FilmBook | undefined, theirDc: Coach): ScoutItem | null {
+  if (!film || film.g < 0.5) return null;
+  const f = filmSummary(film);
+  const parts: string[] = [];
+  if (f.early !== null) parts.push(`${pct(f.early)} RUNS ON EARLY DOWNS`);
+  if (f.long !== null) parts.push(`${pct(f.long)} PASSES ON 3RD AND LONG`);
+  if (f.top && f.top.share >= 0.3) parts.push(`${pct(f.top.share)} OF THROWS TO ${(f.top.who ?? f.top.slot).replace(/ #\d+$/, '').toUpperCase()}`);
+  if (!parts.length) return null;
+  const sharp = theirDc.r.scout >= ADJUST_WORDS.fast;
+  const tail = sharp ? ' HE STUDIED IT: BREAK YOUR TENDENCIES EARLY.' : theirDc.r.scout <= ADJUST_WORDS.slow ? ' HE ONLY SKIMMED IT.' : '';
+  return { tier: 2, warn: sharp, text: `THEIR DC HAS YOUR FILM: ${parts.join(', ')}.${tail}` };
+}
+
+function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach, film?: FilmBook): ScoutSection {
   const N = (norms ??= leagueNorms());
   const sh = shellShares(id.mix);
   const blitz = pressureShare(id.mix);
@@ -198,6 +216,7 @@ function ocSection(opp: Squad, id: DefIdentity, scout: number, theirDc: Coach): 
       text: `3RD AND 7+: PRESSURE ${pctAt(blitzLong, scout)} (FBS ~${pct(N.blitzLong)}).${blitzLong > N.blitzLong + LEAN ? ' HAVE A HOT THROW READY.' : ''}`,
     },
     adjustItem(theirDc),
+    ...[filmItem(film, theirDc)].filter((x): x is ScoutItem => !!x),
     { tier: 2, text: `CORNERS PRESS: ${pctAt(press, scout)} (FBS ~${pct(N.press)}).${press >= 0.42 ? ' EXPECT JAMS: QUICK BREAKS AND RUBS.' : press <= 0.25 ? ' SOFT CUSHIONS: THE QUICK GAME IS THERE.' : ''}` },
     {
       tier: 2, warn: id.disguise >= DISGUISE_LOTS,
@@ -499,7 +518,7 @@ export function scoutReport(s: SeasonState, game: SeasonGame, starred: Set<strin
     offTag: `${offTag(oppOc)}, ${prof.qbStyle.toUpperCase()} QB`,
     recent: recentGames(s, oppId),
     averages: averages(s, oppId),
-    sections: scouted([ocSection(opp, id, st.OC.r.scout, staffFor(s, oppId).DC), dc, ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)], st),
+    sections: scouted([ocSection(opp, id, st.OC.r.scout, staffFor(s, oppId).DC, s.teamState[u]?.film), dc, ...positionSections(user, opp, m, id), medicalSection(opp), stSection(opp)], st),
     suggestions: suggest(id, m, starred, st),
     emphasis,
   };

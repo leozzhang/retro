@@ -19,7 +19,8 @@
     "app:build": "tsc --noEmit && vite build && electron-builder --win portable && electron-builder --win nsis",
     "runfit": "vitest run src/runfit.test.ts",
     "trace": "vitest run src/trace.test.ts --reporter=verbose",
-    "audit": "vitest run src/runAudit.test.ts"
+    "audit": "vitest run src/runAudit.test.ts",
+    "adapt": "vitest run src/adapt.test.ts"
   },
   "build": {
     "appId": "com.leo.saturdaygridiron",
