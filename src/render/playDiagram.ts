@@ -27,8 +27,13 @@ export function pullTurnLat(p: PlayDef, rp: ResolvedPlay, by: number, holeY: num
   return wide ? edgeY : holeY;
 }
 
-/** Route colors, handed out to receivers in slot order (run paths are white). */
-export const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
+/**
+ * Route colors, handed out to receivers in slot order (run paths are white). Picked to stay apart under
+ * red-green and blue-yellow color blindness and on the green turf: yellow, sky blue and vermillion differ
+ * in hue and lightness, the fourth is white (no hue, far lighter than the pink), and pink comes last
+ * since only a fifth receiver (empty sets) gets it.
+ */
+export const ROUTE_COLORS = ['#ffd23f', '#56b4e9', '#ff5a1f', '#ffffff', '#ff7aa8'];
 
 export interface Box {
   x: number;

@@ -6,13 +6,14 @@ import { facingQB } from '../sim/ai';
 import { flightPos, passParams, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH } from '../sim/catching';
 import { arcAngle, RUSH } from '../sim/passPro';
-import { endurance, isEligible, poseOf, type Player } from '../sim/player';
+import { endurance, poseOf, type Player } from '../sim/player';
 import type { Tape, TapeFrame } from '../game/tape';
 import { laneScores, levered } from '../sim/runBlocking';
 import { ANCHOR_X, ANCHOR_Y, carriesBall, getBallSprite, getSprite, POSE_LIFT, spinFrame, type Look } from './sprites';
+import { drawNumberTags, routeColors } from './numberTags';
+import { ROUTE_COLORS } from './playDiagram';
 import { text } from './text';
 
-const ROUTE_COLORS = ['#ffd23f', '#5ce1ff', '#ff7ad9', '#ff9f43', '#9dff7a'];
 
 /** Daylight on the field for the runner (the RUN ASSIST setting): always, only until the handoff, or never. */
 export type RunAssist = 'FULL' | 'LIGHT' | 'OFF';
@@ -40,11 +41,8 @@ export function drawLines(g: CanvasRenderingContext2D, cam: Camera, los: number,
 }
 
 function drawRoutePreview(g: CanvasRenderingContext2D, cam: Camera, play: Play): void {
-  let i = 0;
   g.lineWidth = 1;
-  for (const p of play.off) {
-    if (!isEligible(p)) continue;
-    const col = ROUTE_COLORS[i++ % ROUTE_COLORS.length];
+  for (const [p, col] of routeColors(play, ROUTE_COLORS)) {
     g.strokeStyle = col;
     g.globalAlpha = 0.75;
     if (p.isBlocker) {
@@ -379,9 +377,13 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
 
 /**
  * `replay`: a key-play replay, the CPU on both sides, so none of the user's aids (routes, ring, handoff
- * hint, daylight). `assist` is the RUN ASSIST setting.
+ * hint, daylight, number tags). `assist` is the RUN ASSIST setting; `mouse` (view px) picks the player
+ * whose name shows before the snap.
  */
-export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean, replay = false, assist: RunAssist = 'FULL'): void {
+export function drawPlay(
+  g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean, replay = false, assist: RunAssist = 'FULL',
+  mouse?: { x: number; y: number },
+): void {
   const presnap = play.phase === 'presnap';
   if (presnap && !replay) drawRoutePreview(g, cam, play);
   if (!replay) drawLanes(g, cam, play, assist);
@@ -439,6 +441,8 @@ export function drawPlay(g: CanvasRenderingContext2D, cam: Camera, play: Play, d
     const s = cam.toScreen(ball.pos.x, ball.pos.y, ball.pos.z);
     g.drawImage(bs, Math.round(s.x - 4), Math.round(s.y - 4));
   }
+
+  if (!replay) drawNumberTags(g, cam, play, routeColors(play, ROUTE_COLORS), mouse, ctl);
 
   if (ctl) {
     const s = cam.toScreen(ctl.pos.x, ctl.pos.y);

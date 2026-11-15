@@ -3602,7 +3602,7 @@ export class Game {
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
     drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
     if (this.kick) drawKickPlay(g, this.cam, this.kick, this.debug);
-    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, false, this.runAssist());
+    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, false, this.runAssist(), this.menuMouse);
     else this.drawBallSpot(g);
 
     const center = this.watchOnly ? 'FINAL' : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;

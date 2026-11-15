@@ -2,6 +2,10 @@
 
 _Last updated: 2026-11-14_
 
+## In review: jersey-number tags on the field (2026-11-14)
+
+Display only (`render/numberTags.ts`). Before the snap, QBs, backs, receivers, tight ends, linebackers and DBs wear a 3x5-pixel number chip under their feet (jersey color, trim digits); an eligible receiver's chip is ringed in his route-preview color. Linemen get none (too tight together), but hovering anyone shows his position and name over his head. After the snap each receiver's chip becomes a small dot of his route color (90%) until the catch or the run. Not drawn in replays. Waiting on the user's look; tuning knobs in `TAGS`.
+
 ## Done: clock management: kneel, spike, out of bounds (2026-11-14)
 - **You can kneel and spike** (game.ts `startClockPlay`):
   - K or the KNEEL card on the ST tab: the play clock runs to :01 (`KNEEL_AT`), then -1 yd, 2 s, and the clock keeps running.
