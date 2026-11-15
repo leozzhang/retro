@@ -9,7 +9,10 @@ import { LEGACY, PLAYBOOK, type PlayDef } from './data/plays';
 import { DEF_SLOTS } from './data/teams';
 import { OPP_GOAL } from './engine/constants';
 import { mulberry32, type Rng } from './engine/math';
-import { anticFor, callFor, checkFor, halftime, laneOf, leansFor, newBrain, newDrive, observe, teamSmarts, type DefBrain, type DefenseIq } from './game/defBrain';
+import { anticFor, callFor, checkFor, halftime, laneOf, leansFor, newBrain, newDrive, observe, recheckFor, releanFor, teamSmarts, type DefBrain, type DefenseIq } from './game/defBrain';
+import { CPU_CHECK, presnapRead, readDamage } from './game/cpuOffense';
+import { personnelOf } from './game/resolvePlay';
+import type { Situation } from './game/situation';
 import { mergeFilm, rosterRead, type FilmBook } from './game/offModel';
 import type { ThrowKind } from './sim/ball';
 import * as H from './harness';
@@ -122,6 +125,35 @@ export interface AdaptiveResult {
   ints: number;
   /** A favorite receiver's script (`FAVORITE`): yards a throw to him, and to everyone else. */
   fav?: { to: number; rest: number };
+  /** With `opts.audible`: audibles a snap, the share of them that shifted, and the DC's re-checks a shift. */
+  aud?: { rate: number; shift: number; recheck: number };
+}
+
+/** The plays an audibling offense can go to: the balanced script's (LEGACY's runs, passes and play action). */
+const AUDIBLE_POOL = [...runs, ...passes, ...pas];
+
+/**
+ * The audible scripts (`opts.audible`), after the huddle check: `check` goes to the best play in the same formation
+ * against the shell he sees (`presnapRead` on the defense's identity, `readDamage`, as the CPU QB's check, by
+ * `CPU_CHECK.gain`); `shift` to the best in the personnel; `spam` shifts to another formation every snap.
+ */
+function audibleTo(kind: 'check' | 'shift' | 'spam', play: PlayDef, read: ReturnType<typeof presnapRead>, rng: Rng): PlayDef {
+  const pers = personnelOf(play.formation);
+  const pool = AUDIBLE_POOL.filter((p) => personnelOf(p.formation) === pers && (kind !== 'check' || p.formation === play.formation));
+  if (kind === 'spam') {
+    const other = pool.filter((p) => p.formation !== play.formation);
+    return other.length ? any(other, rng) : play;
+  }
+  let best = play;
+  let bestD = readDamage(play, read) + CPU_CHECK.gain;
+  for (const p of pool) {
+    const d = readDamage(p, read);
+    if (d > bestD) {
+      best = p;
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 /**
@@ -131,7 +163,7 @@ export interface AdaptiveResult {
  */
 export function adaptive(
   script: Script, iq: DefenseIq, adjust: number, games: number, snaps: number, seed: number, parts = { dc: true, players: true, check: true },
-  name = '', defLevel = H.REF_DEF, opts: { film?: FilmBook; scout?: number; keepFilm?: (f: FilmBook) => void } = {},
+  name = '', defLevel = H.REF_DEF, opts: { film?: FilmBook; scout?: number; keepFilm?: (f: FilmBook) => void; audible?: 'check' | 'shift' | 'spam' } = {},
 ): AdaptiveResult {
   const m = H.referenceMatchup(H.REF_OFF, defLevel);
   const fav = FAVORITE[name];
@@ -154,6 +186,7 @@ export function adaptive(
   let ints = 0;
   const pulls = { n: 0, comp: 0, yds: 0 };
   const isCounter = COUNTER[name];
+  const aud = { n: 0, shift: 0, recheck: 0 };
   for (let g = 0; g < games; g++) {
     const rng = mulberry32(seed + g * 7919);
     const brain: DefBrain | null = newBrain({
@@ -169,11 +202,32 @@ export function adaptive(
       const toGo = Math.min(first, OPP_GOAL) - los;
       const ytg = OPP_GOAL - los;
       const pick = brain && parts.dc ? callFor(brain, ident, down, toGo, ytg, rng) : { call: pickDefCall(rng, situationMix(ident, down, toGo, ytg)), tags: {} };
-      const play = script(n, down, toGo, rng);
+      let play = script(n, down, toGo, rng);
+      const huddle = play;
       // The presnap check off the look (the brain's own draws, so the snap's stream is the same).
       const checked = brain && parts.dc && parts.check ? checkFor(brain, ident, play, pick.call, down, toGo, ytg) : null;
       if (checked) pick.call = checked;
-      const reads = brain && parts.players ? leansFor(brain, prc, pick.call, play, { down, toGo, yardsToGoal: ytg }) : undefined;
+      // An audible off what he sees: hidden in the same formation, a shift (the DC may re-check) out of it.
+      let shifted = false;
+      if (opts.audible) {
+        const sit: Situation = { down, toGo, yardsToGoal: ytg, secsLeft: Infinity, qSecs: 900, finalHalf: false, lead: 0 };
+        const next = audibleTo(opts.audible, play, presnapRead(ident, pick.call, null, sit), rng);
+        if (next !== play) {
+          aud.n++;
+          shifted = next.formation !== play.formation;
+          play = next;
+          if (shifted) {
+            aud.shift++;
+            const c = brain && parts.dc && parts.check ? recheckFor(brain, ident, play, pick.call, down, toGo, ytg, 20) : null;
+            if (c) {
+              pick.call = c;
+              aud.recheck++;
+            }
+          }
+        }
+      }
+      let reads = brain && parts.players ? leansFor(brain, prc, pick.call, huddle, { down, toGo, yardsToGoal: ytg }) : undefined;
+      if (shifted && brain && parts.players) reads = releanFor(brain, prc, pick.call, play, { down, toGo, yardsToGoal: ytg }, reads);
       const x = { tags: pick.tags, reads, ...(brain && parts.players ? { habits: brain.habits, antic: anticFor(brain, prc) } : {}) };
       const rpo = play.read === 'rpo';
       const give = rpo && rpoGive(name, n, rng);
@@ -218,6 +272,7 @@ export function adaptive(
           handedOff: r.play.handedOff, lane: laneOf(r.play), tags: pick.tags, target: r.play.thrown ? r.play.intended?.slot ?? null : null,
           lost: turnover || o.type === 'sack' || o.type === 'fumble',
           throw: r.play.throwRecord(gain), antic: Object.fromEntries([...r.play.anticLog].map(([d, a]) => [d.slot, a])),
+          ...(shifted ? { shifted: true } : {}),
         });
       }
       // The drive: a score, a turnover or a failed fourth down starts a new one at the 25.
@@ -247,6 +302,7 @@ export function adaptive(
     pulls: { n: pulls.n, comp: pulls.comp / Math.max(1, pulls.n), ypa: pulls.yds / Math.max(1, pulls.n) },
     fav: fav ? { to: favN.toYds / Math.max(1, favN.to), rest: favN.restYds / Math.max(1, favN.rest) } : undefined,
     ints: ints / Math.max(1, games * snaps),
+    ...(opts.audible ? { aud: { rate: aud.n / Math.max(1, games * snaps), shift: aud.shift / Math.max(1, aud.n), recheck: aud.recheck / Math.max(1, aud.shift) } } : {}),
   };
 }
 
@@ -279,6 +335,21 @@ export function adaptiveRows(games = 30, snaps = 40, seed = 23): string[] {
       return `scout ${scout}: ${a.ypp[0].toFixed(1)} -> ${b.ypp[0].toFixed(1)}`;
     });
     rows.push(`ADAPT FILM ${name.padEnd(22)} | ${parts.join(' | ')}`);
+  }
+  // Audibles (docs/DEFENSE.md, "The presnap"): the balanced offense checking off the shell it sees, quietly in its
+  // formation or by shifting in its personnel, and shifting every snap; against the same offense not audibling.
+  rows.push('ADAPT AUDIBLE: the balanced offense audibling off the shell (check: same formation; shift: same personnel; spam: shift every snap): ypp 1-6 / 7-15 / 16+, vs none');
+  for (const kind of ['check', 'shift', 'spam'] as const) {
+    if (process.env.ADAPT_ONLY && !process.env.ADAPT_ONLY.split(',').includes(`audible ${kind}`)) continue;
+    for (const [label, iq, adj] of modes) {
+      const base = adaptive(SCRIPTS.balanced, iq, adj, games, snaps, seed, undefined, 'balanced');
+      const r = adaptive(SCRIPTS.balanced, iq, adj, games, snaps, seed, undefined, 'balanced', H.REF_DEF, { audible: kind });
+      const a = r.aud!;
+      rows.push(
+        `ADAPT AUDIBLE ${kind.padEnd(6)} ${label.padEnd(13)} | ypp ${r.ypp.map((y) => y.toFixed(1)).join(' / ')} vs ${base.ypp.map((y) => y.toFixed(1)).join(' / ')} ` +
+          `succ ${(r.succ * 100).toFixed(0)}% vs ${(base.succ * 100).toFixed(0)}% | audibles ${(a.rate * 100).toFixed(0)}% shifted ${(a.shift * 100).toFixed(0)}% re-checked ${(a.recheck * 100).toFixed(0)}%`,
+      );
+    }
   }
   // The smarts check: the same spammed RPO and the formation tell against a strong and a weak defense,
   // static and sharp. A weak defense (less play recognition, `teamSmarts`) has to adapt clearly less.

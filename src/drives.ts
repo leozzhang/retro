@@ -73,7 +73,9 @@ function ctxOf(team: Team): Ctx {
     const book = ocBook(staff.OC);
     const style = ocStyle(staff.OC);
     const passShare = autoGamePlan(squad, squad, staff.OC).passShare;
-    const id = process.env.DRIVES_ID === '0' ? undefined : offIdentity(staff.OC, roster);
+    const full = process.env.DRIVES_ID === '0' ? undefined : offIdentity(staff.OC, roster);
+    // DRIVES_SHIFT=0: no designed shifts (audible shifts stay).
+    const id = full && process.env.DRIVES_SHIFT === '0' ? { ...full, shift: 0 } : full;
     c = { team, squad, roster, off: tr.off, def: tr.def, ovr: tr.ovr, side: { team, roster, oc: { book, style, passShare, id }, ident, conf: teamConf(squad) }, style, dc: staff.DC, dcStyle: ident.style, oc: staff.OC };
     ctxCache.set(team.id, c);
   }
@@ -509,6 +511,9 @@ export function drivesReport(): string[] {
       out.push(`  ${kind === 'engine' ? 'ENG' : 'SIM'} red zone trips ${f1(pct(rz.length, ds.length))}% of drives: TD ${f1(pct(td, rz.length))}%, FG ${f1(pct(fg, rz.length))}%   start own ${f1(st.reduce((a, b) => a + b, 0) / st.length)}   (FBS about 30% / 60% / 22%, start about 29)`);
     }
     out.push(`  presnap checks ${f1(pct(ck.length, snaps.length))}% of snaps, success ${f1(pct(ck.filter(ok).length, ck.length))}%, ypp ${f1(ck.reduce((a, x) => a + x.gain, 0) / (ck.length || 1))}`);
+    const sh = snaps.filter((x) => x.shifted);
+    const still = snaps.filter((x) => !x.shifted);
+    out.push(`  shifts ${f1(pct(sh.length, snaps.length))}% of snaps (designed ${f1(pct(sh.filter((x) => !x.checked).length, snaps.length))}%, on a check ${f1(pct(sh.filter((x) => x.checked).length, snaps.length))}%), the DC re-checked ${f1(pct(sh.filter((x) => x.rechecked).length, sh.length))}%, success ${f1(pct(sh.filter(ok).length, sh.length))}% ypp ${f1(sh.reduce((a, x) => a + x.gain, 0) / (sh.length || 1))}  (no shift ${f1(pct(still.filter(ok).length, still.length))}% ypp ${f1(still.reduce((a, x) => a + x.gain, 0) / (still.length || 1))})`);
     out.push(`  ALL success ${f1(pct(all, snaps.length))}%  runs ${f1(pct(runs.filter(ok).length, runs.length))}%  dropbacks ${f1(pct(passes.filter(ok).length, passes.length))}%   (FBS about 42 / 42 / 42)`);
     // The drive sim's success rate, for scale.
     const simPlays = recs.sim.flatMap((g) => g.drives.flatMap((d) => d.plays.filter((p) => !p.kneel && !p.spike && !p.fg && !p.punt)));

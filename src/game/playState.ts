@@ -74,8 +74,23 @@ export interface PlaySetup {
    * slot. Never set in a game.
    */
   ablate?: { backside?: number; slots?: OffSlot[] };
+  /**
+   * An audible: the snap this one replaces, before the snap. Everyone starts where he stands in it and goes to
+   * his spot in the new play (`AUDIBLE`): a shift if the formation changed, nothing moves on a quiet check.
+   */
+  from?: Play;
   rng: Rng;
 }
+
+/**
+ * Audibles (docs/DEFENSE.md, "The presnap"). Personnel can't change once the huddle breaks, so an audible is a
+ * quiet check (same formation: nobody moves) or a shift (another formation in the same personnel, or the play
+ * flipped). On a shift the offense jogs to its new spots at `jog` of top speed and the defense realigns at
+ * `MOTION.trail`; nobody can snap until all eleven on offense are within `setR` yd of their spots and slow, and
+ * then `set` s more (the NCAA's shift rule). Each disguiser rolls `spin` × (`DISGUISE.tipPrc` − prc/100) to
+ * give it away, as motion makes him.
+ */
+export const AUDIBLE = { jog: 0.55, set: 1, setR: 0.25, spin: 0.35 };
 
 const HISTORY_LEN = 60;
 /** A lead back's path runs this far (yd) playside of the carrier's track (`aimLeads`): he takes the backer's inside-out angle. */
@@ -396,6 +411,8 @@ export class Play {
   private readonly movedPre = new Set<Player>();
   /** Seconds on the play clock, set by the game each presnap frame (none headless). */
   clockLeft = Infinity;
+  /** An audible's shift under way (`AUDIBLE`): when the offense got set, or null until it is. */
+  shift: { setAt: number | null } | null = null;
 
   constructor(s: PlaySetup) {
     this.ablate = s.ablate;
@@ -495,6 +512,51 @@ export class Play {
 
     this.players = [...this.off, ...this.def];
     this.ball = makeBall(this.los, this.ballY);
+    if (s.from) this.carryPresnap(s.from);
+  }
+
+  /**
+   * An audible: everyone starts where he stood in `from` (matched by who he is) and goes to his spot in this play.
+   * Routes, holes and alignments were all laid out from the new spots. With the same call the disguise's state
+   * carries over (who's tipping it and when); an offense that has to move is a shift, which may force its hand.
+   */
+  private carryPresnap(from: Play): void {
+    const key = (p: Player) => `${p.side}|${p.name}|${p.num}`;
+    const was = new Map(from.players.map((p) => [key(p), p]));
+    this.time = from.time;
+    this.motions = from.motions;
+    let moves = false;
+    for (const p of this.players) {
+      const o = was.get(key(p));
+      if (!o) continue;
+      if (p.side === 'off' && dist(o.pos, p.start) > AUDIBLE.setR) moves = true;
+      p.pos = { ...o.pos };
+      p.vel = { ...o.vel };
+      p.anim = o.anim;
+      if (dist(p.pos, p.start) > 0.01) this.movedPre.add(p);
+    }
+    if (from.shift && from.shift.setAt === null) moves = true; // still shifting from the last one
+    if (this.defCall.id === from.defCall.id) {
+      const old = new Map(from.def.map((d) => [key(d), d]));
+      for (const d of this.realSpot.keys()) {
+        const o = old.get(key(d));
+        if (!o) continue;
+        this.tipAt.delete(d);
+        const at = from.tipAt.get(o);
+        if (at !== undefined) this.tipAt.set(d, at);
+        if (from.tipped.has(o)) this.tipped.add(d);
+      }
+    }
+    if (!moves) return;
+    this.shift = { setAt: null };
+    for (const d of this.realSpot.keys()) {
+      if (this.rng() < AUDIBLE.spin * (DISGUISE.tipPrc - d.r.prc / 100)) this.tipped.add(d);
+    }
+  }
+
+  /** The offense is shifting and not yet set (no snap until it is). */
+  shifting(): boolean {
+    return !!this.shift && (this.shift.setAt === null || this.time - this.shift.setAt < AUDIBLE.set);
   }
 
   /**
@@ -702,7 +764,7 @@ export class Play {
 
   /** Whether the ball can be snapped: not with a man in motion. */
   canSnap(): boolean {
-    return this.phase === 'presnap' && !this.motion;
+    return this.phase === 'presnap' && !this.motion && !this.shifting();
   }
 
   /** Receivers who can go in motion, the slots first, then the wideouts, then the tight ends. */
@@ -784,9 +846,22 @@ export class Play {
       }
       dy = w.pos.y - m.home.y;
     }
+    // An audible's shift: the offense jogs to its new spots; set once all eleven are there and still.
+    const sh = this.shift;
+    if (sh) {
+      let set = true;
+      for (const p of this.off) {
+        const far = dist(p.pos, p.start);
+        if (far > AUDIBLE.setR || len(p.vel) > 0.6) set = false;
+        if (far < 0.05 && len(p.vel) < 0.3) continue;
+        p.want = seek(p, p.start, maxSpeed(p) * AUDIBLE.jog, 0.8);
+      }
+      if (!set) sh.setAt = null;
+      else if (sh.setAt === null) sh.setAt = this.time;
+    }
     for (const d of this.def) {
       let to = this.restSpot(d);
-      let speed = maxSpeed(d) * DISGUISE.walk;
+      let speed = maxSpeed(d) * (sh && dist(d.pos, to) > 1 ? MOTION.trail : DISGUISE.walk);
       const f = this.flinches.get(d);
       if (f && this.time < f.until) {
         to = f.to;

@@ -1,6 +1,42 @@
 # Progress
 
-_Last updated: 2026-11-14_
+_Last updated: 2026-11-15_
+
+## In progress: realistic audibles, phases 1 and 2 (2026-11-15)
+DEFENSE.md "The presnap" has the design. Personnel is fixed once the huddle breaks, so the offense can't sub and neither can the defense.
+- **Esc before the snap** opens a strip over the live field (`render/audibleOverlay.ts`). It holds only your book's plays in the personnel on the field, the formation you're in first. Q/E tabs, W/S pages, 1-4 or a click picks, F flips the play. There's no limit but the play clock.
+  - **CHECK** (same formation): nobody moves, and it's hidden. The defense's call, alignment, disguise and leans stay. An audible keeps the strength side unless you flip it.
+  - **SHIFT** (another formation, or F): everyone jogs to the new spots (`Play` with `from`, `AUDIBLE` in game/playState.ts). There's no snap until the offense is set for 1 s. The defense:
+    - realigns
+    - may re-check in its package (`recheckFor`, `AUDIBLE_DC` in game/defBrain.ts: 0.6 of the huddle check's odds, more once you've shifted a lot, never under 6 s on the play clock)
+    - re-reads the new look by each player's prc (`releanFor`)
+    - may tip a disguise
+- **The DC learns** the snap as run. A shift counts toward `DefBrain.shifts`.
+- **The old path is gone:** Esc used to go back to the full call screen with any play.
+- **Tests:** `src/audible.test.ts`: a check moves no one; a shift carries positions, lays routes from the new spots and holds the snap; a flip is a shift; the re-check stays in the package, needs the clock and rises with shifts; the re-read goes by prc; shifts are counted.
+- **ADAPT AUDIBLE rows** (`opts.audible` in src/adaptive.ts): the balanced offense checking off the shell (check, shift, spam) against itself not audibling. The table is in DEFENSE.md.
+  - **Flag:** an oracle checking off the payoff table on 60%+ of snaps does worse against the learning defense. It narrows the offense, and the DC learns it. Against STATIC it's within noise, so audibles aren't an exploit.
+  - **Flag:** random shift spam holds up at NORMAL DC 75.
+  - Re-checks on shifts: 0% (DC 45), 4–6% (DC 75), 10–19% under spam.
+- **Checked:**
+  - `npm run balance` is byte-identical to HEAD (diffed against a baseline run).
+  - `npm test`: 474 pass. The 5 failures are the known ones: portal, plus 4 season-length tests that time out under the full parallel run and pass alone.
+- **Phase 2, engine drives** (ENGINEDRIVES.md "Audibles in engine drives"):
+  - The CPU QB checks within his personnel (`ocCheck`), and a shift needs `CPU_CHECK.shift` more.
+  - In `engineSnap`: the huddle's look, then the DC's re-check (none in the no-huddle) and the re-read, then the shift stepped until set.
+  - The shift is on tape (`Tape.shift`, played in the show's lineup) and on the EVERY SNAP line. On a running clock its seconds count.
+  - Every engine game gets it: SIM GAME, sim-ahead, CPU drives in a played game.
+  - The engine payoff table is refit on 500 games. Commit `src/data/enginePayoff.ts`.
+  - **Measured (60 games against HEAD):** points a drive 1.66 → 1.69; checks 7.0% → 10.7% of snaps, 45% of them shifts; the DC re-checks 1.6% of shifts.
+  - **Flag:** the re-check is rare against the CPU OC (see ENGINEDRIVES.md).
+  - **USER GAMES `sched` (200 games):** 23.1 points (last run 21.5); won by 28+ 20.0% (21.7%, FBS 18.9%); one-score 29.0% (26.5%, FBS 38%). All within noise.
+  - **`npm test`:** 478 pass. The portal test fails as before. coaching ×2 and defBrain time out under the full parallel run and pass alone.
+- **Designed shifts** (after a playtest showed none): CPU audibles alone shifted on 5% of snaps, about one shown key play a game. Now the OC also breaks the huddle in another formation of the personnel and shifts into the call by design (`OffIdentity.shift`, by style and his id: air raid 5% … power 25%; not in the hurry-up or the two-minute drill). Every engine offense: CPU drives in a played or exhibition game, your own simmed offense, SIM GAME.
+  - **200 games:** shifts 4.5% → 14.1% of snaps; points a drive 1.62 → 1.70 (designed shifts off/on, `DRIVES_SHIFT=0`); shifted snaps succeed 51.9% against 48.7%. A small edge. Payoff table refit on 500 games again.
+  - **Georgia–Alabama:** 22% of snaps shift, about 2.7 of the ~12 shown key plays a game.
+  - **USER GAMES `sched` (200 games):** 23.0 points (23.1 before); one-score 28.0% (29.0%, FBS 38%); won by 28+ 27.5% (20.0%, FBS 18.9%). **Flag:** the blowout rate is up about 2.4 sd. It may be noise, or shifts may help the better team more. Not tuned; check it with designed shifts off before tuning.
+- **Not yet:** an in-app playtest of the overlay and the shift on screen.
+
 
 ## In review: jersey-number tags on the field (2026-11-14)
 

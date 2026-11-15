@@ -492,6 +492,9 @@ export function tickTimers(p: Player, dt: number): void {
   p.jukeCd = Math.max(0, p.jukeCd - dt);
 }
 
+/** An offensive player drifting back slower than this (yd/s) turns to face upfield again. */
+const FACE_UPFIELD = 0.15;
+
 export function stepPlayer(p: Player, dt: number): void {
   let want = p.down ? { x: 0, y: 0 } : p.want;
   let caught = 1;
@@ -509,6 +512,10 @@ export function stepPlayer(p: Player, dt: number): void {
   else if (!p.down && !throwing) {
     if (p.vel.x > 0.3) p.facing = 1;
     else if (p.vel.x < -0.3) p.facing = -1;
+    // The offense faces upfield unless he's moving back: a QB setting at the end of his drop, or
+    // sliding sideways in the pocket, turns back to look downfield (the gap from -0.3 keeps a
+    // shuffling QB from flickering).
+    else if (p.side === 'off' && p.vel.x > -FACE_UPFIELD) p.facing = 1;
   }
   p.anim += len(p.vel) * dt;
 }

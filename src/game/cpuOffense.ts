@@ -1,3 +1,4 @@
+import { personnelOf } from './resolvePlay';
 import { CONCEPTS } from '../data/concepts';
 import { DEF_CALLS, type DefCall, type Disguise } from '../data/defenses';
 import { situationMix, type DefIdentity } from '../data/identity';
@@ -141,13 +142,15 @@ export function ocCall(oc: OcPlan, sit: Situation, r: () => number, desperate = 
  * The QB's presnap check (`ocCheck`, `CPU_CHECK`). He sees the box (a defense can't hide its numbers) and the
  * shell (a disguise shows another one), and weighs every call that could be behind it: the defense's mix for the
  * situation (its identity, which the scouting report has) x how often that call would show this shell (straight,
- * or disguised `ident.disguise` of the time). Against that, each play from the same formation (the personnel
- * doesn't change) gets its film damage (`damage`: the film room's success plus explosives, `filmPayoff.ts`), the
+ * or disguised `ident.disguise` of the time). Against that, each play in the same personnel (nobody subs once the
+ * huddle breaks) gets its film damage (`damage`: the film room's success plus explosives, `filmPayoff.ts`), the
  * number the DC reads the other way. He checks to the best when it beats the call by `gain`, with odds by `prc`.
  * - `odds`: from `prc` 40 to 99; he stays in a run on short yardage and in a pass on 3rd and long
  * - `boxSlack`: a call's box counts as seen within this many of the box he sees (a walked-down safety reads as one)
+ * - `shift`: what more a play from another formation has to beat the call by: the shift shows it, and the DC may
+ *   re-check (`recheckFor`), so he'd rather check in the formation he's in (docs/DEFENSE.md, "The presnap")
  */
-export const CPU_CHECK = { odds: [0.2, 0.8], gain: 0.06, boxSlack: 0, give: 0.5 };
+export const CPU_CHECK = { odds: [0.2, 0.8], gain: 0.06, boxSlack: 0, give: 0.5, shift: 0.04 };
 
 /**
  * What he may check to (`CHECK_TO`): out of a run, another run or the quick game (a quick throw, a screen, an RPO:
@@ -199,7 +202,7 @@ export function readDamage(p: PlayDef, read: [DefCall, number][]): number {
   return d / w;
 }
 
-/** The check: a better play for what he sees from the same formation, or null to run the call. */
+/** The check: a better play for what he sees in the same personnel (another formation is a shift), or null to run the call. */
 export function ocCheck(oc: OcPlan, play: PlayDef, read: [DefCall, number][], sit: Situation, prc: number, r: () => number, brain: OcBrain | null = null, soft = 0): PlayDef | null {
   // Corners playing off this snap: the quick game and screens are there for the taking (`ML_OC.x.check`).
   const free = (p: PlayDef) => (p.tags.family === 'quick' || p.tags.family === 'screen' ? ML_OC.x.check * soft : 0);
@@ -210,9 +213,9 @@ export function ocCheck(oc: OcPlan, play: PlayDef, read: [DefCall, number][], si
   let best: PlayDef | null = null;
   let bestD = now + CPU_CHECK.gain;
   for (const p of oc.book) {
-    if (p === play || p.formation.name !== play.formation.name || (p.short && sit.toGo > 2) || (keepKind && isPassCall(p) !== pass)) continue;
+    if (p === play || personnelOf(p.formation) !== personnelOf(play.formation) || (p.short && sit.toGo > 2) || (keepKind && isPassCall(p) !== pass)) continue;
     if (!checkable(play, p)) continue;
-    const d = readDamage(p, read) + free(p);
+    const d = readDamage(p, read) + free(p) - (p.formation.name !== play.formation.name ? CPU_CHECK.shift : 0);
     if (d > bestD) {
       best = p;
       bestD = d;

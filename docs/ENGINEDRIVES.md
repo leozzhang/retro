@@ -262,7 +262,7 @@ At 0.5, man lands beside the zones (6.5–10), about the NFL's parity (TARGETS.m
 **The presnap check (`ocCheck`, `CPU_CHECK`; the first piece of a smart OC).**
 - **What he reads:** the box (a defense can't hide its numbers) and the shell (a disguise shows another one).
 - **Weighing the calls:** every call that could be behind it, by the defense's mix for the situation (its identity: what scouting has) × how often that call would show this shell, straight or disguised.
-- **Scoring plays:** each play from the same formation gets its film damage over that read (`damage`, the number the DC reads the other way).
+- **Scoring plays:** each play in the same personnel gets its film damage over that read (`damage`, the number the DC reads the other way). One from another formation is a shift and needs `CPU_CHECK.shift` more (see "Audibles" below). Before 2026-11-15 it was the same formation only.
 - **The check:** to the best one when it beats the call by `gain`, with odds by `prc`. He stays in a run on short yardage and in a pass on 3rd and long.
 - **What it may check to:** out of a run, a run or the quick game; out of a pass, the same family.
 - **Tried and dropped:**
@@ -662,7 +662,46 @@ A line of 35 / 28 / 21 / 17 gave 24.7%. `npm run season`'s `sched` row (200 game
 - **The first-half talent slope.** It's about 15–20% steeper than the drive sim's: halftime margin 17.4 vs 15.1, and at a 4–8 gap the 28+ share is about twice the drive sim's. A `DRIVES_UNITS=1` unit swap would find the unit that carries it. Squeezing that unit, as `SPEED.squeeze` does, would reach the user's played games, so it needs `npm run balance`.
 - **One-score games** (32% vs 38%), even at a 0–4 gap (about 50% vs 62%).
 
+## Audibles in engine drives (2026-11-15)
+The CPU QB's presnap check (`ocCheck`) picks from his whole personnel group, as the user's audibles do (DEFENSE.md, "The presnap").
+- **How a shift plays out** (`engineSnap`): a check to another formation is a shift.
+  - The snap is laid out in the huddle's formation first; the players' leans read that look.
+  - The DC may re-check in his package (`recheckFor`). He has `ENGINE_SHIFT.clock` (15) s of play clock, or `hurry` (5, too few) in the no-huddle.
+  - The players re-read the new look (`releanFor`).
+  - The checked play is built from the huddle's (`Play` with `from`), keeping the strength side, and the presnap runs until the offense is set (at most `ENGINE_SHIFT.max` s).
+  - On a running clock the shift's seconds are added to the snap's (`stopped`).
+- **Designed shifts** (`OffIdentity.shift`): most shifts in real football aren't audibles. On a normal-tempo snap (not the hurry-up, not with the clock running out, not a heave) the OC may break the huddle in another formation of the called play's personnel (`showFormation`, by how many of his plays line up in it) and shift into the called one.
+  - The defense's huddle check and the leans read the shown look; then the shift plays out as above. A shift needs no check.
+  - His rate: the style's `OFF_ID.shift` (air raid 5%, spread 10%, pro 22%, power 25%) × exp(`shiftSd` × z) from his id, at most `shiftMax`, on a stream of its own (`shiftRate`).
+  - `DRIVES_SHIFT=0 npm run drives` turns them off.
+- **The record:** `EngineSnap.shifted` and `rechecked`; the DC's `observe` counts the shift.
+  - **On tape:** `Tape.shift` holds the shift's frames, which the show plays in its lineup (`shiftAt`).
+  - **On the EVERY SNAP line:** "YOUR O: <PLAY>, SHIFTED VS <CALL>", or "THEY SHIFTED" and "CHECKED ON THEIR SHIFT" on your defense's line.
+- **`npm run drives` reports it:** "shifts …% of snaps (designed …, on a check …), the DC re-checked …", with the success of shifted snaps against the rest.
+- **The payoff table is refit on 500 games** (`DRIVES_PAYOFF=1 DRIVES_GAMES=500`).
+- **Measured** (60 games against HEAD, before → after):
+
+  | | before | after |
+  | --- | --- | --- |
+  | points a drive | 1.66 | 1.69 |
+  | checks, share of snaps | 7.0% | 10.7% |
+  | shifts, share of checks | — | 45% |
+  | DC re-checks, share of shifts | — | 1.6% |
+
+  At 500 games, on the old table: 1.64 points a drive, checks 13.1%, shifts 37%, re-checks 1.1%.
+- **With designed shifts** (2026-11-15, 200 games each, the payoff table refit on 500):
+
+  | | designed shifts off | on |
+  | --- | --- | --- |
+  | points a drive | 1.62 | 1.70 |
+  | shifts, share of snaps | 4.5% | 14.1% (9.3% designed) |
+  | success, shifted snaps / the rest | 54.4% / 48.9% | 51.9% / 48.7% |
+  | DC re-checks, share of shifts | 1.1% | 0.9% |
+
+  A shift is a small edge (the defenders re-read late, by `prc`), not an exploit. Before them a played game showed about one shift at the normal key-play level; now about three (Georgia–Alabama, both shifting teams: 22% of snaps).
+- **Flag: the DC hardly re-checks on a CPU shift.** `checkFor` needs the new look to move his mix by `CHECK.from`, and a CPU OC's looks rarely do. Against the scripted user offenses (ADAPT) it's 4–19%. Shown, not tuned.
+
 ## Not built yet (later phases)
-- Live substitutions in played games: garbage-time twos on the field, and rotations. Build them with realistic audibles (a formation shift within the called personnel group only). Both need who is on the field to be explicit per snap.
+- Live substitutions in played games: garbage-time twos on the field, and rotations. Audibles already keep the called personnel ("Audibles" above); substitutions need who is on the field to be explicit per snap.
 - Kicks through `KickPlay`.
 - The fitted DC table for CPU-vs-CPU sims (phase 5).

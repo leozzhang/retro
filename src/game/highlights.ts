@@ -12,7 +12,7 @@ import { mmss, quarterName } from './clock';
 import { creditFor, downText, KEY_TITLE, shownGain, spotLabel, type KeyKind, type KeyPlay } from './keyPlays';
 import type { KickPlay } from './kickPlay';
 import type { Play } from './playState';
-import { frameAt, tapeLength, type Tape } from './tape';
+import { frameAt, shiftAt, shiftLength, tapeLength, type Tape } from './tape';
 import {
   FgSearch, fgTargetFor, makeFg, makeReplay, ReplaySearch, stepFg, stepReplay, targetFor, type FgSetup, type ReplaySetup, type ReplaySide, type ReplayTarget,
 } from './replay';
@@ -128,7 +128,8 @@ export function updateShow(sh: KeyShow, dt: number): boolean {
       return false;
     case 'set':
       cam.follow(sh.tape ? sh.tape.frames[0].focus : los, 0.35);
-      if (sh.t >= (sh.k.kind === 'snap' ? SHOW.snapSet : SHOW.set)) {
+      // A tape with a shift plays it in the lineup, then holds the set.
+      if (sh.t >= (sh.k.kind === 'snap' ? SHOW.snapSet : SHOW.set) + (sh.tape ? shiftLength(sh.tape) : 0)) {
         // A tape just runs (from 0, as `t` restarts).
         if (sh.kick) sh.kick.release(sh.fgSetup!.kick);
         else sh.play?.snap();
@@ -255,7 +256,7 @@ function drawShowField(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx, c
   drawField(g, cam, ctx.user, ctx.cpu, crowd);
   const los = OWN_GOAL + p.yard;
   drawLines(g, cam, los, Math.min(OPP_GOAL, los + p.toGo));
-  if (sh.tape) drawTape(g, cam, sh.tape, sh.phase === 'run' ? frameAt(sh.tape, sh.t) : sh.tape.frames[0]);
+  if (sh.tape) drawTape(g, cam, sh.tape, sh.phase === 'run' ? frameAt(sh.tape, sh.t) : sh.tape.shift?.length ? shiftAt(sh.tape, sh.t) : sh.tape.frames[0]);
   else if (sh.kick) drawKickPlay(g, cam, sh.kick, debug, true);
   else if (sh.play) drawPlay(g, cam, sh.play, debug, true);
   else {

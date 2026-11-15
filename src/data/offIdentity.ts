@@ -39,6 +39,14 @@ export const OFF_ID = {
   favorites: 2,
   favW: 1.8,
   money: 1.6,
+  /**
+   * Designed shifts: how often he breaks the huddle in another formation of the personnel and shifts into the
+   * called one, to make the defense re-read late (pro and gap teams shift a lot, the air raid hardly). The
+   * style's base × exp(`shiftSd` × z) from his id, at most `shiftMax`.
+   */
+  shift: { airRaid: 0.05, spreadRpo: 0.1, spreadOption: 0.1, pro: 0.22, power: 0.25 } as Record<OffStyle, number>,
+  shiftSd: 0.35,
+  shiftMax: 0.4,
 };
 
 export interface OffIdentity {
@@ -53,6 +61,8 @@ export interface OffIdentity {
   targets: Record<string, number>;
   star: string | null;
   qb: { runLean: number; aggression: number };
+  /** How often he shows one formation and shifts into the called one (`OFF_ID.shift`), on a normal-tempo snap. */
+  shift: number;
 }
 
 const FAMILIES: Family[] = ['quick', 'dropback', 'shot', 'screen', 'pa', 'boot', 'rpo', 'insideZone', 'outsideZone', 'gap', 'perimeter', 'read', 'qbRun', 'draw'];
@@ -106,5 +116,11 @@ export function offIdentity(oc: Pick<Coach, 'id'>, roster: Record<string, Roster
   const style = ocStyle(oc);
   const targets = targetShares(roster);
   const star = Object.entries(targets).filter(([sl]) => sl !== 'RB').sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-  return { style, ...ocTaste(oc, ocBook(oc), style), targets, star, qb: qbLean(roster.QB, style) };
+  return { style, ...ocTaste(oc, ocBook(oc), style), targets, star, qb: qbLean(roster.QB, style), shift: shiftRate(oc, style) };
+}
+
+/** His designed-shift rate (`OFF_ID.shift`), on a stream of its own so his other tastes don't move. */
+export function shiftRate(oc: Pick<Coach, 'id'>, style: OffStyle): number {
+  const z = gauss(mulberry32(hashString(`oc-shift:${oc.id}`)));
+  return Math.min(OFF_ID.shiftMax, OFF_ID.shift[style] * Math.exp(OFF_ID.shiftSd * z));
 }

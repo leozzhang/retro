@@ -205,6 +205,8 @@ export interface DefBrain {
   saidThisDrive: boolean;
   /** Plays seen that were runs (for `runSpam`). */
   runIds: string[];
+  /** The offense's shifts on audibles, decayed by `AUDIBLE_DC.decay` a snap: a defense that sees them waits for them. */
+  shifts: number;
   seed: number;
   draws: number;
 }
@@ -233,7 +235,7 @@ export function newBrain(o: {
     looks: {}, book: tally(), flow: tally(), short: tally(),
     shift: { ...ZERO_DIALS }, tags: { spy: 0, contain: 0, rpo: 0 }, heavy: null, keyed: null, keyRead: null, who: o.roster?.who ?? {}, habits: [], exp: {}, jumpNerve: {}, answered: {}, trapOdds: 0,
     lanes: { in: 0, out: 0 }, read: { ...NO_LEAN },
-    nerve: {}, last: null, said: [], saidThisDrive: false, runIds: [], seed: o.seed >>> 0, draws: 0,
+    nerve: {}, last: null, said: [], saidThisDrive: false, runIds: [], shifts: 0, seed: o.seed >>> 0, draws: 0,
   };
   // The pregame read: a mobile QB shows up as a couple of QB runs already in the book.
   const prior = clamp(scout * 2 * o.qbMobility, 0, 2);
@@ -344,11 +346,14 @@ export interface SnapSeen {
   /** The throw as the defense remembers it (`Play.throwRecord`), and who answered it how (`Play.anticLog`). */
   throw?: Omit<ThrowSeen, 'w'> | null;
   antic?: Partial<Record<DefSlot, AnticRole>>;
+  /** The offense audibled into a shift this snap (a quiet check is hidden: nobody moved). */
+  shifted?: boolean;
 }
 
 /** Learn from a snap: the model, the players' books, each defender's nerve, then the tag odds. */
 export function observe(b: DefBrain, s: SnapSeen): void {
   const bk = bucketsOf(s.play, s.scrambled, s.kept, s.air, s.handedOff);
+  b.shifts = (b.shifts || 0) * AUDIBLE_DC.decay + (s.shifted ? 1 : 0);
   if (s.play.kind === 'run' && !b.runIds.includes(s.play.id)) b.runIds.push(s.play.id);
   b.lanes.in *= DEF_BRAIN.flow;
   b.lanes.out *= DEF_BRAIN.flow;
@@ -664,7 +669,7 @@ export function callFor(
  * Draws only from the brain's own stream.
  */
 export function checkFor(
-  b: DefBrain, id: DefIdentity, play: PlayDef, now: DefCall, down: number, toGo: number, yardsToGoal: number, late?: Situation,
+  b: DefBrain, id: DefIdentity, play: PlayDef, now: DefCall, down: number, toGo: number, yardsToGoal: number, late?: Situation, oddsMul = 1,
 ): DefCall | null {
   const t = b.looks[lookOf(play)];
   if (!t || t.total < CHECK.min || preventLevel(late)) return null;
@@ -680,11 +685,49 @@ export function checkFor(
   const ms = sum(mix);
   let tv = 0;
   for (const k of Object.keys(mix)) if (pkg(DEF_CALLS_BY_ID[k]) === pkg(now)) tv += Math.abs(mix[k] / ms - (huddle.mix[k] ?? 0) / hs) / 2;
-  const odds = clamp(CHECK.odds * lerp(CHECK.skillMin, 1, b.skill) * b.smarts * b.iq, 0, CHECK.max);
+  const odds = clamp(CHECK.odds * lerp(CHECK.skillMin, 1, b.skill) * b.smarts * b.iq * oddsMul, 0, CHECK.max);
   if (tv < CHECK.from || r() >= odds) return null;
   // Only to a call the look says is better than the one he's in.
   const call = pickDefCall(r, mix);
   return call.id === now.id || pkg(call) !== pkg(now) || here.gain[call.id] <= (here.gain[now.id] ?? -Infinity) ? null : call;
+}
+
+/**
+ * The defense against an audible's shift (docs/DEFENSE.md, "The presnap"). It always realigns (the new `Play`
+ * does that); the DC may also re-check, in his package (the offense didn't sub, so neither can he).
+ * - `recheck`: his odds × the huddle check's (`checkFor`), up by `rise` × the offense's shift rate (`DefBrain.shifts`
+ *   × (1 − `decay`)): a defense that has seen shifts waits for them. Never with under `clock` s on the play clock.
+ * - `leanMin`: on the new look each defender's lean goes this far toward its read (a 0 reader), all the way at prc 100.
+ */
+export const AUDIBLE_DC = { recheck: 0.6, rise: 1, decay: 0.85, clock: 6, leanMin: 0.3 };
+
+/** The shift's re-check: `checkFor` on the new look at `AUDIBLE_DC` odds, or null to stay in the call. */
+export function recheckFor(
+  b: DefBrain, id: DefIdentity, play: PlayDef, now: DefCall, down: number, toGo: number, yardsToGoal: number, clockLeft: number, late?: Situation,
+): DefCall | null {
+  if (clockLeft < AUDIBLE_DC.clock) return null;
+  const rate = clamp((b.shifts || 0) * (1 - AUDIBLE_DC.decay), 0, 1);
+  return checkFor(b, id, play, now, down, toGo, yardsToGoal, late, AUDIBLE_DC.recheck * (1 + AUDIBLE_DC.rise * rate));
+}
+
+/**
+ * The players re-read the new look after a shift: each one's lean goes from `prev` toward his read of `look`
+ * (`leansFor`) by his play recognition (`AUDIBLE_DC.leanMin` at 0, all the way at 100). Sets `b.last`.
+ */
+export function releanFor(
+  b: DefBrain, prc: Partial<Record<DefSlot, number>>, call: DefCall, look: PlayDef, at: { down: number; toGo: number; yardsToGoal: number },
+  prev: Partial<Record<DefSlot, Lean>> | undefined,
+): Partial<Record<DefSlot, Lean>> {
+  const next = leansFor(b, prc, call, look, at);
+  if (!prev) return next;
+  const out: Partial<Record<DefSlot, Lean>> = {};
+  for (const [slot, n] of Object.entries(next) as [DefSlot, Lean][]) {
+    const p = prev[slot];
+    const w = lerp(AUDIBLE_DC.leanMin, 1, (prc[slot] ?? 60) / 100);
+    out[slot] = p ? { run: lerp(p.run, n.run, w), screen: lerp(p.screen, n.screen, w), qb: lerp(p.qb, n.qb, w), deep: lerp(p.deep, n.deep, w), inside: lerp(p.inside, n.inside, w) } : n;
+  }
+  b.last = { leans: out, call: call.id };
+  return out;
 }
 
 /**

@@ -263,10 +263,32 @@ The read is the receiver most of that weight went to, his catch spot, the releas
 
 **What the user sees:** "THEY'RE SITTING ON YOUR THROW TO <NAME>", "THEIR BACKERS ARE CHASING THE ROLLOUT", the shallow corner, and on F1 the throw they expect and who's on it.
 
- (`CHECK`, `lookOf`, `checkFor`)
-The defense sees your **personnel and formation** once you break the huddle, never the play. Audibles are planned to keep personnel, so the look is the defense's key.
+### The presnap: the look, the check and audibles (`CHECK`, `lookOf`, `checkFor`, `AUDIBLE`, `AUDIBLE_DC`)
+The defense sees your **personnel and formation** once you break the huddle, never the play. Personnel can't change after that: the offense didn't sub, so the defense can't either (the NCAA's substitution rule). Every check and audible stays inside both packages, so the look is the defense's key.
 - **The players know the look:** their leans move toward what that look has shown (`CHECK.lean` × the team's smarts × confidence). A formation that has only run gets them sitting on the run, and play action from it is the counter.
-- **The check:** the DC works out his mix again with only the plays he expects from that look. If it moved by `from` (0.15 of the package's mix, total variation) or more, he may check, with odds `odds` × his skill (`skillMin` for a weak DC) × the team's smarts × IQ, at most `max`. He checks only to a call the look says is better than the one he's in, in the same package. It happens once a snap, at the huddle break; an audible keeps the defense. A check is played straight (no disguise), and the presnap shows "THEY CHECKED: THEY'VE SEEN THIS LOOK".
+- **The check:** the DC works out his mix again with only the plays he expects from that look. If it moved by `from` (0.15 of the package's mix, total variation) or more, he may check, with odds `odds` × his skill (`skillMin` for a weak DC) × the team's smarts × IQ, at most `max`. He checks only to a call the look says is better than the one he's in, in the same package. It happens once a snap, at the huddle break. A check is played straight (no disguise), and the presnap shows "THEY CHECKED: THEY'VE SEEN THIS LOOK".
+- **Your audibles** (Esc before the snap opens a strip of your book's plays in the personnel on the field, over the live field). There's no limit but the play clock. There are two kinds:
+  - **A quiet check** (CHECK, a play in the same formation): nobody moves, and it's hidden. The call, alignment, disguise, its tips and the players' leans all stay as they were. It rewards reading the defense, limited to that formation's plays.
+  - **A shift** (SHIFT, another formation in the same personnel, or F to flip the play): everyone jogs to the new spots (`AUDIBLE.jog`), and there's no snap until the offense is set for `AUDIBLE.set` (1 s). The defense always realigns (its man matchups follow their men and the corners travel; it walks there at `MOTION.trail`). It may also answer:
+    - **The DC may re-check** (`recheckFor`): `checkFor` on the new look at `AUDIBLE_DC.recheck` (0.6) of its odds, up by `rise` × your shift rate (`DefBrain.shifts`, decayed `decay` a snap): a defense that has seen you shift waits for it. Never with under `clock` (6) s on the play clock, and only within his package. It's played straight: "THEY CHECKED AFTER THE SHIFT", else "THEY REALIGN TO THE SHIFT".
+    - **The players re-read the new look** (`releanFor`): each lean moves toward its read of the new look by his `prc` (`leanMin` 0.3 of the way at 0, all of it at 100). Slow readers keep the old one, and that's part of what a shift buys.
+    - **A disguiser may tip it**, as motion makes him (`AUDIBLE.spin`).
+- **Why both:** a quiet check is invisible but narrow; a shift opens the package but shows your hand, costs play clock, and gives the DC another look. Shifting every snap makes him wait for it. A check made on a disguised shell can be the wrong one.
+- **The CPU offense audibles too** (engine drives, ENGINEDRIVES.md "Audibles in engine drives"). Its QB checks within his personnel, a shift costs him `CPU_CHECK.shift` of edge, and the defense answers it the same way. Its OC also shifts by design (`OffIdentity.shift`, 5–25% of normal-tempo snaps by style): he shows one formation of the personnel and shifts into the call, and the defense reads the shown look first.
+- **What the DC learns:** the snap as it was run (the final play and formation). A shift counts toward `shifts`; a quiet check isn't seen. Breaking the huddle in one look and always shifting to another leaves the first with no tendencies, so the huddle-break check rarely fires; the re-check on the second look is the answer. If ADAPT shows that's an exploit, the next step is to credit the huddle look a share of the snap.
+
+**Measured** (ADAPT AUDIBLE, the balanced script audibling off the shell by the engine payoff table, `presnapRead` + `readDamage`; 30 games × 40 snaps, ypp by window 1–6 / 7–15 / 16+, against the same offense not audibling):
+
+| Audible | STATIC | NORMAL DC 45 | NORMAL DC 75 | SHARP DC 75 |
+| --- | --- | --- | --- | --- |
+| none | 6.3 / 5.6 / 5.7 | 6.7 / 5.5 / 6.5 | 8.0 / 6.3 / 5.0 | 7.2 / 6.3 / 5.3 |
+| check (61% of snaps) | 6.4 / 6.9 / 4.4 | 5.4 / 4.6 / 4.7 | 4.7 / 5.8 / 4.0 | 6.0 / 4.4 / 3.6 |
+| shift (67%, 38% shifted) | 7.3 / 5.4 / 5.4 | 5.7 / 4.1 / 5.8 | 6.1 / 4.5 / 4.9 | 5.4 / 4.5 / 3.0 |
+| spam (every snap shifts) | 5.8 / 5.7 / 5.7 | 6.1 / 5.9 / 5.8 | 7.4 / 7.1 / 6.2 | 5.9 / 6.3 / 6.7 |
+
+- **Re-checks** on a shift: 0% at DC 45, 4–6% at DC 75, and 10–19% under shift spam (the `shifts` rise works).
+- **Flag: the oracle audibler loses to a learning defense.** Checking to the table's best play off the shell 60%+ of the time narrows the offense to a few plays, and the DC and the players learn them (the pass-spam effect). Against STATIC it's within noise (about ±0.3 a window). So audibles aren't an exploit. Whether a person reading the shell gains is for playtesting: a person audibles far less, and on tells the table can't see (tips, press, the box).
+- **Flag: shift spam holds up** (NORMAL DC 75 7.4 / 7.1 / 6.2). Shifting at random spreads the plays, which the defense can't key, and that offsets the re-checks. Watch it in play; the levers are `AUDIBLE_DC.rise` and crediting the huddle look.
 
 ### Film study (`TeamState.film`, `FilmBook`, `mergeFilm`, `layFilm`)
 Your live games leave film. The model keeps an undecayed copy of each game's counts and residuals (`OffModel.raw`): families by situation and look, plays, targets by slot (with who played there), the RPO's give rate, and how you did against each kind of call. At the final whistle of a season game it's merged into your `TeamState.film` (each older game keeps 0.6 of its weight; small counts drop; about 2–4 KB).

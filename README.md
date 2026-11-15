@@ -55,7 +55,7 @@ The .exe isn't code-signed, so Windows SmartScreen warns on first launch: click 
 | Spike | X on the play-call screen (or the SPIKE card on the ST tab): stops the clock for a down. It snaps as soon as the line is set (the play clock at :36). A spike is an incomplete pass in the box score |
 | Speed option | Right-click to pitch while you attack the end; run past the line to keep it |
 | Flip the play | F on the play-call screen mirrors the next play (the cards redraw mirrored) |
-| Audible (pre-snap) | Esc |
+| Audible (pre-snap) | Esc opens a strip of the plays in your personnel over the field (Q/E tab, W/S page, 1-4 or click to pick, F flips the play). CHECK cards (same formation) move nobody and the defense can't see them; SHIFT cards (another formation) jog everyone to the new spots, the defense realigns and may check, and you can't snap until everyone's set for a second. The play clock keeps running |
 | Who's who (pre-snap) | Skill players and the back seven wear their jersey number under their feet; a receiver's chip is ringed in his route's color. Hover any player for his position and name. After the snap each receiver's chip turns into a dot of his route color until the ball's caught |
 | Snap | Space or click |
 | Motion (pre-snap) | M sends a receiver in toward the ball and back (each press, the next one: slots, then wideouts, then tight ends). His man defender travels with him; a zone only slides over. You can't snap until he's set |

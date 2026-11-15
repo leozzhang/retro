@@ -88,6 +88,8 @@ export interface Tape {
   /** Each man's sprite: uniform and skin, in the order of a frame's `men`. */
   cast: { uniform: Uniform; skin: string }[];
   frames: TapeFrame[];
+  /** An audible's shift before the snap (the men jogging to the new spots), timed from its start; played before `frames`. */
+  shift?: TapeFrame[];
 }
 
 export interface TapeRecorder {
@@ -95,6 +97,9 @@ export interface TapeRecorder {
   tape: Tape;
   /** The last presnap frame, until the snap. */
   pre: TapeFrame | null;
+  /** Seconds into a shift, and when its next frame is due. */
+  shiftT?: number;
+  shiftNext?: number;
   t: number;
   next: number;
 }
@@ -123,6 +128,14 @@ export function recordFrame(r: TapeRecorder, dt: number): void {
   const play = r.play;
   if (play.phase === 'presnap') {
     r.pre = frame(play, 0);
+    // A shift is on tape until the offense is set (`Play.shifting`).
+    if (play.shift && play.shifting()) {
+      r.shiftT = (r.shiftT ?? -dt) + dt;
+      if (r.shiftT >= (r.shiftNext ?? 0)) {
+        (r.tape.shift ??= []).push(frame(play, r.shiftT));
+        r.shiftNext = (r.shiftNext ?? 0) + 1 / TAPE.fps;
+      }
+    }
     return;
   }
   if (r.t > TAPE.maxSecs) return;
@@ -139,6 +152,14 @@ export function frameAt(tape: Tape, t: number): TapeFrame {
   let i = 0;
   while (i + 1 < f.length && f[i + 1].t <= t) i++;
   return f[i];
+}
+
+/** The shift before the snap's length in seconds (0 with none). */
+export const shiftLength = (tape: Tape): number => tape.shift?.[tape.shift.length - 1]?.t ?? 0;
+
+/** The shift's frame `t` s in. */
+export function shiftAt(tape: Tape, t: number): TapeFrame {
+  return frameAt({ ...tape, frames: tape.shift?.length ? tape.shift : tape.frames }, t);
 }
 
 /** The tape's length in seconds. */

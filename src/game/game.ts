@@ -29,6 +29,7 @@ import {
   BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookOwner, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
+import { AUDIBLE_PAGE, AUDIBLE_TABS, audibleCardRect, audiblePage, drawAudible, type AudibleKind, type AudibleView } from '../render/audibleOverlay';
 import {
   drawSeason, navAt, navItems, newSeasonView, newsMaxScroll, PLAY_KEYS_BTN, playMenuRect, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV,
   type NavItem, type SeasonView,
@@ -80,7 +81,7 @@ import { mergeFilm, rosterRead } from './offModel';
 import { driveStream, engineDrive, engineTry, type EngineDrive, type EngineSide, type EngineSnap } from './engineDrive';
 import { newOcBrain, ocAdjustments, ocHalftime, type OcBrain } from './ocBrain';
 import { offIdentity } from '../data/offIdentity';
-import { adjustments, anticFor, callFor, checkFor, lastRead, halftime as brainHalftime, headline, laneOf, ourLine, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
+import { adjustments, anticFor, callFor, checkFor, recheckFor, releanFor, lastRead, halftime as brainHalftime, headline, laneOf, ourLine, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
 import { successful } from '../season/grades';
 import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog } from '../season/simGame';
@@ -99,7 +100,7 @@ import {
 } from './clock';
 import { KickPlay } from './kickPlay';
 import { HARD_COUNT, Play } from './playState';
-import { personnelOf } from './resolvePlay';
+import { personnelOf, resolvePlay } from './resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, PAT, xpOdds, startDrive, userStartAfter,
   type Applied, type Drive, type DriveClock, type KickOutcome, type PlayOutcome, type SimPlay,
@@ -378,6 +379,16 @@ export class Game {
   /** The presnap check: whether this snap has had its chance (an audible keeps the defense), and the line if it checked. */
   private checkDone = false;
   private checkNote: string | null = null;
+  /** This snap's defenders' anticipation and leans (re-read after a shift), whether an audible shifted, and the play's flip. */
+  private snapAntic: Partial<Record<string, number>> | undefined;
+  private snapReads: ReturnType<typeof leansFor> | undefined;
+  private snapShifted = false;
+  private snapFlip = false;
+  /** The audible picker over the field (Esc before the snap): its tab, page and the card under the mouse. */
+  private audibleOpen = false;
+  private audTab = 0;
+  private audPage = 0;
+  private audHover = -1;
   private exhibitionIq: DefenseIq = 'NORMAL';
   private exhibitionAssist: RunAssist = 'FULL';
   private exhibitionAimSlow = false;
@@ -2609,7 +2620,32 @@ export class Game {
     // Everyone plays this snap with his confidence at its leverage.
     this.snapLev = this.snapLeverage();
     this.snapAt = null;
-    this.play = new Play({
+    const learn = this.brain && !this.drive.try;
+    this.snapAntic = learn ? anticFor(this.brain!, this.defPrc()) : undefined;
+    this.snapReads = learn ? leansFor(this.brain!, this.defPrc(), this.defCall!, def, this.snapSit()) : undefined;
+    this.snapShifted = false;
+    this.snapFlip = this.flipCall;
+    this.play = this.buildPlay(def, this.flipCall);
+    this.flipCall = false;
+    this.audibleOpen = false;
+    this.screen = 'play';
+    this.zoomFor(def);
+  }
+
+  /** Down, distance and the goal, for the leans. */
+  private snapSit() {
+    return { down: this.drive.down, toGo: this.drive.firstDownX - this.drive.los, yardsToGoal: OPP_GOAL - this.drive.los };
+  }
+
+  private zoomFor(def: PlayDef): void {
+    const run = def.kind === 'run';
+    this.cam.setZoom(run ? RUN_ZOOM.x : 1, run ? RUN_ZOOM.y : 1, { x: this.drive.los, y: this.drive.ballY });
+  }
+
+  /** The snap on the field: this play against the defense's call as it stands, carried over from `from` on an audible. */
+  private buildPlay(def: PlayDef, flip: boolean, from?: Play): Play {
+    const learn = this.brain && !this.drive.try;
+    return new Play({
       offTeam: this.user,
       defTeam: this.cpu,
       homeId: this.homeId,
@@ -2622,19 +2658,95 @@ export class Game {
       defCall: this.defCall!,
       press: this.press,
       tags: this.defTags,
-      habits: this.brain && !this.drive.try ? this.brain.habits : undefined,
-      antic: this.brain && !this.drive.try ? anticFor(this.brain, this.defPrc()) : undefined,
-      reads: this.brain && !this.drive.try ? leansFor(this.brain, this.defPrc(), this.defCall!, def, { down: this.drive.down, toGo: this.drive.firstDownX - this.drive.los, yardsToGoal: OPP_GOAL - this.drive.los }) : undefined,
+      habits: learn ? this.brain!.habits : undefined,
+      antic: this.snapAntic,
+      reads: this.snapReads,
       los: this.drive.los,
       ballY: this.drive.ballY,
-      flip: this.flipCall,
+      flip,
       disguise: this.disguise,
+      ...(from ? { from } : {}),
       rng: this.rng,
     });
-    this.flipCall = false;
-    this.screen = 'play';
-    const run = def.kind === 'run';
-    this.cam.setZoom(run ? RUN_ZOOM.x : 1, run ? RUN_ZOOM.y : 1, { x: this.drive.los, y: this.drive.ballY });
+  }
+
+  /**
+   * The plays the user can audible to: his book in the personnel on the field (no subs once the huddle breaks),
+   * the formation he's in first, then formation by formation. `kind` narrows it to a tab.
+   */
+  private audiblePlays(kind: AudibleKind): PlayDef[] {
+    const now = this.play!.playDef;
+    const pers = personnelOf(now.formation);
+    const pool = this.book.filter((p) => p.kind !== 'st' && (kind === 'all' || p.kind === kind));
+    const pkg = packagePlays(pool, pers);
+    return [...pkg.filter((p) => p.formation === now.formation), ...pkg.filter((p) => p.formation !== now.formation)];
+  }
+
+  /**
+   * An audible to `def` (flipped or not) before the snap. A quiet check (nobody moves) is hidden: the defense stays
+   * as it is. A shift is seen: the defense realigns to it, the DC may re-check in his package (`recheckFor`), and
+   * the players re-read the new look (`releanFor`). The play clock keeps running.
+   */
+  private audible(def: PlayDef, flip: boolean): void {
+    const from = this.play!;
+    let next = this.buildPlay(def, flip, from);
+    if (next.shift && this.brain && !this.drive.try) {
+      const d = this.drive;
+      const c = recheckFor(this.brain, defIdentity(this.cpu, this.dcOf(this.cpu)), def, this.defCall!, d.down, d.firstDownX - d.los, OPP_GOAL - d.los, this.clock.play, this.userSituation());
+      if (c) {
+        this.defCall = c;
+        this.disguise = null; // a late check is played straight
+        if (this.defTags.game && rushers(c) !== 4) this.defTags = { ...this.defTags, game: undefined };
+      }
+      this.checkNote = c ? 'THEY CHECKED AFTER THE SHIFT' : 'THEY REALIGN TO THE SHIFT';
+      this.snapReads = releanFor(this.brain, this.defPrc(), this.defCall!, def, this.snapSit(), this.snapReads);
+      next = this.buildPlay(def, flip, from);
+    } else if (next.shift) {
+      this.checkNote = null;
+    }
+    if (next.shift) this.snapShifted = true;
+    this.snapFlip = flip;
+    this.play = next;
+    this.zoomFor(def);
+  }
+
+  private audView(): AudibleView {
+    const now = this.play!.playDef;
+    return {
+      plays: this.audiblePlays(AUDIBLE_TABS[this.audTab].kind), page: this.audPage, tab: this.audTab, hover: this.audHover,
+      now, flip: this.snapFlip, pers: personnelOf(now.formation),
+    };
+  }
+
+  /** The audible picker's input. True when it audibled (the snap on the field is a new `Play`). */
+  private updateAudible(input: Input): boolean {
+    const n = AUDIBLE_TABS.length;
+    if (input.hit('KeyQ')) { this.audTab = (this.audTab + n - 1) % n; this.audPage = 0; }
+    if (input.hit('KeyE', 'Tab')) { this.audTab = (this.audTab + 1) % n; this.audPage = 0; }
+    const v = this.audView();
+    const pages = Math.max(1, Math.ceil(v.plays.length / AUDIBLE_PAGE));
+    const step = (input.hit('KeyS') ? 1 : 0) - (input.hit('KeyW') ? 1 : 0) + Math.sign(input.mouse.wheel);
+    if (step) this.audPage = (Math.min(this.audPage, pages - 1) + step + pages) % pages;
+    const cards = audiblePage({ ...v, page: this.audPage });
+    const { x, y } = input.mouse;
+    this.audHover = -1;
+    for (let i = 0; i < cards.length; i++) if (inRect(x, y, audibleCardRect(i))) this.audHover = i;
+    let chosen = -1;
+    for (let i = 0; i < cards.length; i++) if (input.hit(`Digit${i + 1}`, `Numpad${i + 1}`)) chosen = i;
+    if (input.mouse.pressed && this.audHover >= 0) chosen = this.audHover;
+    input.mouse.pressed = false; // a click in the picker never snaps
+    if (input.hit('KeyF')) {
+      this.audibleOpen = false;
+      this.audible(v.now, !this.snapFlip); // the same play to the other side: a shift
+      return true;
+    }
+    if (chosen < 0) return false;
+    this.audibleOpen = false;
+    const p = cards[chosen];
+    if (p === v.now) return false;
+    // Keep the strength where it is (a play's own flip rule would mirror it: that's for F).
+    this.audible(p, resolvePlay(p, this.drive.ballY, false).mirrored !== this.play!.resolved.mirrored);
+    return true;
   }
 
   /** The CPU defenders' play recognition, by slot, for their leans. */
@@ -2656,6 +2768,7 @@ export class Game {
       handedOff: play.handedOff, lane: laneOf(play), tags: play.tags, target: play.thrown ? play.intended?.slot ?? null : null,
       lost: turnover || o.type === 'sack',
       throw: play.throwRecord(gain), antic: Object.fromEntries([...play.anticLog].map(([d, r]) => [d.slot, r])),
+      ...(this.snapShifted ? { shifted: true } : {}),
     });
   }
 
@@ -2752,14 +2865,17 @@ export class Game {
     const play = this.play!;
     if (play.phase === 'presnap') {
       if (this.tickBetweenPlays(dt)) return;
+      // Esc: the audible picker over the field, within the personnel on it; the play clock keeps running.
       if (input.hit('Escape', 'Backspace')) {
-        this.screen = 'call'; // audible: same defense, pick a new play; the play clock keeps running
-        this.play = null;
-        return;
+        this.audibleOpen = !this.audibleOpen;
+        this.audPage = 0;
+        this.audHover = -1;
       }
       play.clockLeft = this.clock.play;
-      if (input.hit('KeyM')) play.startMotion();
-      if (input.hit('KeyH') && this.hardCountsLeft > 0 && !this.drive.try && play.canSnap()) {
+      if (this.audibleOpen) {
+        if (this.updateAudible(input)) return;
+      } else if (input.hit('KeyM') && !play.shifting()) play.startMotion();
+      if (!this.audibleOpen && input.hit('KeyH') && this.hardCountsLeft > 0 && !this.drive.try && play.canSnap()) {
         this.hardCountsLeft--;
         this.clock.play = Math.max(0.1, this.clock.play - HARD_COUNT.clock);
         if (play.hardCount()) {
@@ -2767,7 +2883,7 @@ export class Game {
           return;
         }
       }
-      if ((input.hit('Space') || input.mouse.pressed) && play.canSnap()) {
+      if (!this.audibleOpen && (input.hit('Space') || input.mouse.pressed) && play.canSnap()) {
         play.snap();
         if (!this.drive.try) {
           runoffAtSnap(this.clock, this.tempo); // tries are untimed
@@ -3153,9 +3269,12 @@ export class Game {
    * ROBBER, KEYING J. SMITH"), or the user's OC's play and what it met on the user's ("YOUR O: MESH VS COVER 3").
    */
   private snapNote(s: EngineSnap, userBall: boolean): string {
-    if (userBall) return `YOUR O: ${s.play.name.toUpperCase()} VS ${s.call.name.toUpperCase()}${s.disguised ? ', DISGUISED' : ''}`;
+    // An audible at the line: a check, or a shift the defense saw (and maybe checked on).
+    const aud = s.shifted ? (s.rechecked ? ', SHIFTED, THE D CHECKED' : ', SHIFTED') : s.checked ? ', CHECKED' : '';
+    if (userBall) return `YOUR O: ${s.play.name.toUpperCase()}${aud} VS ${s.call.name.toUpperCase()}${s.disguised ? ', DISGUISED' : ''}`;
     const t = s.tags;
     const bits = [s.call.name.toUpperCase()];
+    if (s.shifted) bits.push(s.rechecked ? 'CHECKED ON THEIR SHIFT' : 'THEY SHIFTED');
     if (s.disguised) bits.push('DISGUISED');
     if (t.prevent) bits.push('PREVENT');
     if (t.key) bits.push(`KEYING ${(this.cpuRoster[t.key]?.name ?? t.key).toUpperCase()}`);
@@ -3722,7 +3841,17 @@ export class Game {
     switch (play.phase) {
       case 'presnap': {
         const hc = this.drive.try ? '' : `H: HARD COUNT (${this.hardCountsLeft})   `;
-        drawHint(g, play.motion ? 'IN MOTION: WATCH WHO GOES WITH HIM   ESC: AUDIBLE' : `SPACE/CLICK: SNAP   M: MOTION   ${hc}ESC: AUDIBLE`);
+        if (this.audibleOpen) {
+          drawAudible(g, this.audView());
+          drawHint(g, '1-4/CLICK: AUDIBLE   CHECK: NOBODY MOVES   SHIFT: THEY SEE IT');
+        } else {
+          drawHint(
+            g,
+            play.shifting() ? 'SHIFTING: EVERYONE SET FOR A SECOND   ESC: AUDIBLE'
+              : play.motion ? 'IN MOTION: WATCH WHO GOES WITH HIM   ESC: AUDIBLE'
+              : `SPACE/CLICK: SNAP   M: MOTION   ${hc}ESC: AUDIBLE`,
+          );
+        }
         if (this.readHelp() !== 'OFF') this.drawShellRead(g);
         if (this.dcNote) this.drawDcNote(g, 34);
         if (this.checkNote) this.drawNote(g, this.checkNote, this.dcNote ? 50 : 34);
