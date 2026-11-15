@@ -18,7 +18,8 @@ import { FIELD_W } from './engine/constants';
 import { rosterRead } from './game/offModel';
 import type { DriveClock } from './game/rules';
 import type { Situation } from './game/situation';
-import { engineDcBrain, engineGame, enginePart, type SnapWatch } from './season/engineGame';
+import { engineDcBrain, engineGame, enginePart, mopupLine, MOPUP, type SnapWatch } from './season/engineGame';
+import { twosSquad } from './data/depth';
 import { newStory } from './season/story';
 import { pickGame } from './game/keyPlays';
 import type { DriveLog } from './season/types';
@@ -247,5 +248,57 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
       expect(r.user).toBe(r.box.home.points);
       expect(r.cpu).toBe(r.box.away.points);
     }
+  });
+});
+
+describe('garbage time (MOPUP)', () => {
+  const team = (id: string) => {
+    const t = teamById(id);
+    const st = buildStaff(t);
+    return { squad: buildSquad(t), oc: st.OC, dc: st.DC, passShare: 0.5 };
+  };
+
+  it('the line falls as the second half runs, and shorter quarters scale it down', () => {
+    let last = Infinity;
+    for (let f = 1; f >= 0; f -= 0.05) {
+      const l = mopupLine(f, 900);
+      expect(l).toBeLessThanOrEqual(last + 1e-9);
+      last = l;
+    }
+    expect(mopupLine(1, 900)).toBe(MOPUP.lead[0][1]);
+    expect(mopupLine(0.5, 480)).toBeLessThan(mopupLine(0.5, 900));
+  });
+
+  it('the twos are everyone but the kicker and punter', () => {
+    const sq = buildSquad(teamById('georgia'));
+    const a = starters(sq);
+    const b = starters(twosSquad(sq));
+    for (const slot of Object.keys(a)) {
+      if (slot === 'K' || slot === 'P') expect(b[slot].id).toBe(a[slot].id);
+      else expect(b[slot].id).not.toBe(a[slot].id);
+    }
+  });
+
+  it('a blowout puts the twos in: they get the stats and the grades, and it draws nothing', async () => {
+    const { gradeGame } = await import('./season/grades');
+    let seen = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const drives: DriveLog[] = [];
+      const plain = engineGame(team('georgia'), team('kentstate'), mulberry32(seed));
+      const r = engineGame(team('georgia'), team('kentstate'), mulberry32(seed), { drives, story: newStory('georgia', 'kentstate'), record: true });
+      expect(JSON.stringify(r)).toBe(JSON.stringify(plain));
+      const mop = drives.filter((d) => d.mop?.includes('georgia'));
+      if (!mop.length) continue;
+      seen++;
+      // Never before the second half: the score at the first twos drive was big.
+      const sq = buildSquad(teamById('georgia'));
+      const first = new Set(Object.values(starters(sq)).map((a) => a.id));
+      const twos = new Set(Object.values(starters(twosSquad(sq))).map((a) => a.id));
+      const lines = r.box.players.filter((l) => l.team === 'georgia');
+      expect(lines.some((l) => twos.has(l.id) && !first.has(l.id) && (l.att + l.rush + l.rec) > 0)).toBe(true);
+      const g = gradeGame(sq, buildSquad(teamById('kentstate')), drives, { georgia: 0.5, kentstate: 0.5 }, mulberry32(9));
+      expect([...g.entries()].some(([id, gr]) => !first.has(id) && gr.snaps > 5)).toBe(true);
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });

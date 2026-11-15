@@ -176,6 +176,21 @@ export function starters(squad: Squad): Record<string, Athlete> {
   return out;
 }
 
+/**
+ * The squad with its twos up (garbage time, `MOPUP` in season/engineGame.ts): every starter but the
+ * kicker and punter moves to the bottom of each slot's list, so `starters` and `onField` give the backups.
+ * Nothing is stored.
+ */
+export function twosSquad(squad: Squad, keep: readonly string[] = ['K', 'P']): Squad {
+  const st = starters(squad);
+  const out = new Set(Object.entries(st).filter(([slot]) => !keep.includes(slot)).map(([, a]) => a.id));
+  const depth: DepthChart = {};
+  for (const [slot, ids] of Object.entries(squad.depth)) {
+    depth[slot] = keep.includes(slot) ? ids : [...ids.filter((id) => !out.has(id)), ...ids.filter((id) => out.has(id))];
+  }
+  return { ...squad, depth };
+}
+
 export function athleteName(a: Athlete): string {
   return `${a.first} ${a.last}`;
 }

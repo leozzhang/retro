@@ -10,6 +10,8 @@ import type { SnapCredit } from './cast';
 /** A player credited with a snap: his slot, name and yards on that carry or catch. */
 export interface Credited {
   slot: string;
+  /** The player's id: the lineup can change during a game (garbage time), so the slot alone may not name him. */
+  id?: string;
   name: string;
   yds: number;
 }

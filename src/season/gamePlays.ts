@@ -25,7 +25,7 @@ export type Against = Map<SimPlay, { pts: number; kind: 'pick6' | 'returnTd' | '
 /** The team a play's points went to. */
 export const scorer = (p: GamePlay): string => p.for ?? p.off;
 
-const idOf = (on: Record<string, Athlete> | undefined, c: Credited | undefined): string | undefined => (c ? on?.[c.slot]?.id : undefined);
+const idOf = (on: Record<string, Athlete> | undefined, c: Credited | undefined): string | undefined => (c ? c.id ?? on?.[c.slot]?.id : undefined);
 
 /** Points a play scored: a touchdown or try carries the drive's points, a field goal 3. */
 function pointsOf(k: KeyPlay): number {

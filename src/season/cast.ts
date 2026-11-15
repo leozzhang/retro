@@ -66,7 +66,7 @@ export interface SnapCredit {
 const fit = (...xs: number[]) => (xs.reduce((s, x) => s + x, 0) / xs.length / 75) ** CAST.sharp;
 
 function credited(on: Record<string, Athlete>, slot: string, yds: number): Credited {
-  return { slot, name: athleteName(on[slot]), yds };
+  return { slot, id: on[slot].id, name: athleteName(on[slot]), yds };
 }
 
 /** The receiver a snap of `yds` went to (or at, for an incompletion). */

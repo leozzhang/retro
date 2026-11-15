@@ -403,6 +403,8 @@ export interface LoggedPlay {
 export interface DriveLog {
   off: string;
   plays: LoggedPlay[];
+  /** Teams playing their twos this drive (garbage time in an engine game, `MOPUP`): their backups get the snaps. */
+  mop?: string[];
 }
 
 /**

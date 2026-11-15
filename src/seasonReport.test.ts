@@ -1296,6 +1296,22 @@ function userGames(): string[] {
     for (const k of ['eng', 'sim'] as const) for (const f of Object.keys(all[k]) as (keyof Acc)[]) all[k][f] += acc[i][k][f];
   });
   rows.push(row('all', 'engine', all.eng), row('', 'sim', all.sim));
+  // The buckets weigh every gap alike, so their "all" is far more lopsided than a season. SCHEDULE draws
+  // the games from real schedules (`newSeason`): the row to hold against FBS.
+  const pairs: [string, string][] = [];
+  for (let y = 1; y <= 3; y++) for (const g of newSeason(defaultConfig('georgia'), y).games) if (g.kind === 'conf' || g.kind === 'nonconf') pairs.push([g.home, g.away]);
+  const sched = { eng: blank(), sim: blank() };
+  const nSched = Number(process.env.USER_SCHED ?? 200);
+  for (let i = 0; i < nSched; i++) {
+    const [a, b] = pairs[Math.floor(rng() * pairs.length)];
+    const [fav, dog] = ovr.get(a)! >= ovr.get(b)! ? [a, b] : [b, a];
+    const st = newStory(fav, dog);
+    add(sched.eng, engineGame(side(fav, dog), side(dog, fav), rng, { story: st }), st.drives.filter((d) => !d.try).length);
+    const ss = newStory(fav, dog);
+    add(sched.sim, simGame(squads.get(fav)!, squads.get(dog)!, rng, { neutral: true, story: ss }), ss.drives.filter((d) => !d.try).length);
+  }
+  rows.push(row('sched', 'engine', sched.eng), row('', 'sim', sched.sim));
+  rows.push(`  sched: ${nSched} games drawn from real schedules (the buckets' "all" weighs every gap alike); real FBS ${REAL.by28}% won by 28+, ${REAL.oneScore}% one-score`);
   rows.push(`  engine game ${(ms / all.eng.n).toFixed(0)} ms; real FBS: ${REAL.ppg} points, ~390 yards, ~44% of yards passing, 62% completions, 2.3 sacks, 1.3 turnovers, ~12 possessions a team`);
   return rows;
 }

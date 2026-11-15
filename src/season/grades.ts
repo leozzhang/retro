@@ -156,6 +156,8 @@ interface Man {
 interface Seat {
   starter: Man;
   subs: [Man, number][];
+  /** The slot's backup, who has the snaps in garbage time (`DriveLog.mop`). */
+  backup?: Man;
 }
 
 interface Cast {
@@ -195,11 +197,13 @@ function cast(squad: Squad, passShare: number): Cast {
     const rot = Math.min(0.5, (ROTATION[slot] ?? 0) + (100 - healthOf(a)) * ROTATION_HURT);
     // The backup is the next healthy man on the slot's list who isn't starting or backing up elsewhere.
     const bid = (squad.depth[slot] ?? []).find((id) => !used.has(id) && byId.get(id) && healthy(byId.get(id)!));
+    let backup: Man | undefined;
     if (bid) {
       used.add(bid);
-      subs.push([man(byId.get(bid)!, slot, unit, 1 - rot - pkg), rot]);
+      backup = man(byId.get(bid)!, slot, unit, 1 - rot - pkg);
+      subs.push([backup, rot]);
     }
-    return { starter: man(a, slot, unit, 1 - rot - pkg), subs };
+    return { starter: man(a, slot, unit, 1 - rot - pkg), subs, ...(backup ? { backup } : {}) };
   };
   return {
     team, passShare, men, gap: 0, conf: NO_CONF,
@@ -224,7 +228,7 @@ function credit(m: Man, win: boolean, expected: number, tags: Tags, lev: number)
 }
 
 /** Who's on the field this snap, into `out`: each seat's starter, or a sub on his share of snaps. */
-function fill(out: (Man | null)[], seats: (Seat | null)[], rng: Rng): void {
+function fill(out: (Man | null)[], seats: (Seat | null)[], rng: Rng, twos = false): void {
   for (let i = 0; i < seats.length; i++) {
     const s = seats[i];
     if (!s) {
@@ -240,7 +244,8 @@ function fill(out: (Man | null)[], seats: (Seat | null)[], rng: Rng): void {
       }
       x -= share;
     }
-    out[i] = m;
+    // Garbage time: the twos have it (the draw is still made, so other snaps grade as before).
+    out[i] = twos && s.backup ? s.backup : m;
   }
 }
 
@@ -273,14 +278,14 @@ const D: (Man | null)[] = new Array(DEF_SLOTS.length).fill(null);
 const RO: (Rep | null)[] = new Array(OFF_SLOTS.length).fill(null);
 const RD: (Rep | null)[] = new Array(DEF_SLOTS.length).fill(null);
 
-function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
+function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): void {
   const pass = p.pass ?? rng() < off.passShare;
   const s = successful(p) ? 1 : -1;
   const lev = p.lev ?? 0;
   // The weekly emphases' edge is expected too, so an emphasis steers XP only through practice (season/emphasis.ts).
   const pSucc = expectedSuccess(off.gap + unitEdge(off.conf.off - def.conf.def, lev) + (p.em ?? 0));
-  fill(O, off.off, rng);
-  fill(D, def.def, rng);
+  fill(O, off.off, rng, !!mop?.includes(off.team));
+  fill(D, def.def, rng, !!mop?.includes(def.team));
   RO.fill(null);
   RD.fill(null);
   off.totals.off++;
@@ -423,7 +428,7 @@ export function gradeGame(
     const def = off === h ? a : h;
     for (const p of dr.plays) {
       if (p.kick) kick(p, off, def, rng);
-      else snap(p, off, def, rng);
+      else snap(p, off, def, rng, dr.mop);
     }
   }
   // Playing time: of a full-time player's snaps at his slot, or of the team's kicks.

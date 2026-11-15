@@ -2,6 +2,31 @@
 
 _Last updated: 2026-11-14_
 
+## Done: engine blowouts, garbage time (2026-11-14)
+ENGINEDRIVES.md "Blowouts" has the tables.
+- **The diagnosis:**
+  - **USER GAMES' 39% won by 28+ was partly the report.** Equal games per gap bucket make half its games 8+ point mismatches. On real schedules the engine was 29.7% and the drive sim 17.7% (FBS 18.9%). So the schedule isn't the cause.
+  - **The rest was the second half:** the engine had no game script. Favorite's margin at an 8+ gap: 17.4 at the half (drive sim 15.1), 35.0 at the final (24.8). Not the brains: off, it's 33.4.
+- **The fix, `MOPUP`** (season/engineGame.ts): in the second half, a side leading by the line puts its twos in, offense and defense. The line is 30 at the start of the 3rd, 24 at the start of the 4th, 18 with 8:00 left, 14 at the end. Its OC also throws 0.2 less.
+  - The backups get the box score, the highlights' names and the grades (`DriveLog.mop`).
+  - It draws no rng. CPU-vs-CPU games and played snaps are untouched.
+- **Measured** (600 schedule games, same seeds, before → after):
+  - won by 28+: 29.7% → 21.7% (FBS 18.9%)
+  - one-score games: 31.0% → 32.3% (38%)
+  - points a team: 23.6 → 23.3
+- **USER GAMES has a `sched` row:** games drawn from real schedules. It's the one to compare with FBS. At 200 games it reads 25.0% (±3).
+- **Tests:** `engineDrive.test.ts` "garbage time" (the line, the twos, the stats and grades, no draws).
+  - `npm test`: portal fails as before.
+  - Four season-length tests (injuries, defBrain, coaching ×2) time out under the full parallel run and pass on their own.
+  - **Note:** run vitest from `C:/Users/leozi/OneDrive/Desktop/retro` with that exact casing. From a lower-cased path (Git Bash's `onedrive/desktop`), every file fails with "reading 'config'".
+
+**Next:**
+1. **The first-half talent slope** (about 15–20% steeper than the drive sim's) and one-score games (32% vs 38%). Find the unit with the `DRIVES_UNITS=1` swap. A squeeze touches played games, so it needs `npm run balance`.
+2. **Live in-game rotations in played games:**
+   - garbage-time twos for the CPU when it's up big on the user, and for the user's DC side, by the same `MOPUP` rules (or the user's call)
+   - routine rotations
+   - **Build it with realistic audibles:** an audible only shifts formation within the called personnel group. Both need who's on the field explicit per snap.
+
 ## Done: defense through the engine, phase 4: every snap of your games, simulated too (2026-11-14)
 ENGINEDRIVES.md "Phase 4" has the details.
 

@@ -614,6 +614,49 @@ The user's games are now engine games from end to end, played or simulated. Only
   - simulated quarters in an exhibition (PLAY GAME's choices are the dynasty's)
   - the drive sim's grades fit (`GRADES` expected success) hasn't been refit on engine snaps
 
+## Blowouts: garbage time (2026-11-14)
+Phase 4 measured 39% of engine games won by 28+ (drive sim 25%, FBS 19%).
+
+**Part of that was the report.** USER GAMES draws 40 games for each gap bucket, so half its games are 8+ point mismatches. Real schedules are 33 / 32 / 26 / 9% across the buckets (0–4 / 4–8 / 8–14 / 14+). Conference games average a 5.5 gap and non-conference 8.5. Drawn from real schedules, the engine was 29.7% won by 28+ and the drive sim 17.7% (600 games, same seeds).
+- **The schedule isn't the cause:** the drive sim on those games lands on FBS.
+- **USER GAMES now has a `sched` row:** games drawn from real `newSeason` schedules (`USER_SCHED`, default 200). That's the row to hold against FBS. The buckets' `all` row isn't.
+
+**The rest was the second half.** Favorite's margin in games with an 8+ gap (150 games):
+
+| | after Q1 | half | after Q3 | final |
+| --- | --- | --- | --- | --- |
+| engine | 10.5 | 17.4 | 29.4 | 35.0 |
+| drive sim | 9.8 | 15.1 | 22.4 | 24.8 |
+
+- Up 21+, the favorite kept scoring 3.20 points a drive and the underdog 0.57 (drive sim 2.88 / 1.12).
+- **It isn't the brains.** With both brains off it's 16.5 at the half and 33.4 at the final.
+- **The cause:** the engine had no game script. A team up 35 played its starters all 60 minutes. The drive sim has `GAME_SIM.script` for this, fit to real scores.
+
+**The fix (`MOPUP`, season/engineGame.ts):** at each regulation drive in the second half, a side whose lead reaches the line puts its twos in, on offense and defense. K and P stay.
+- **The line falls with the clock:** 30 at the start of the 3rd quarter, 24 at the start of the 4th, 18 with 8:00 left, 14 at the end. It's scaled down for quarters shorter than 15:00.
+- **Hysteresis:** the twos stay in until the lead falls 10 under the line.
+- **The leader's OC throws less** (pass share −0.2). The milk tempo was already there.
+- **The twos come from `twosSquad`** (data/depth.ts): each starter goes to the bottom of his slot lists.
+- **The box score credits the backups,** and a highlight names them (`Credited.id`). The drive log marks the drive (`DriveLog.mop`), and `gradeGame` gives those snaps to each seat's backup. It still makes the same draws, so untagged games grade as before.
+- **It draws no random numbers.** The trailing team keeps its starters, and overtime puts the starters back.
+- CPU-vs-CPU games and played snaps are untouched.
+
+**Measured (600 schedule games, same seeds):**
+
+| | engine before | engine after | drive sim | FBS |
+| --- | --- | --- | --- | --- |
+| Won by 28+ | 29.7% | 21.7% | 17.7% | 18.9% |
+| One-score | 31.0% | 32.3% | 37.7% | 38% |
+| Favorite's mean margin | 17.9 | 15.3 | 12.9 | |
+| Points a team | 23.6 | 23.3 | 25.9 | 26.5 |
+
+A line of 35 / 28 / 21 / 17 gave 24.7%. `npm run season`'s `sched` row (200 games, about ±3 points) reads 25.0% against the drive sim's 19.5%.
+
+**Still open:**
+- **The first-half talent slope.** It's about 15–20% steeper than the drive sim's: halftime margin 17.4 vs 15.1, and at a 4–8 gap the 28+ share is about twice the drive sim's. A `DRIVES_UNITS=1` unit swap would find the unit that carries it. Squeezing that unit, as `SPEED.squeeze` does, would reach the user's played games, so it needs `npm run balance`.
+- **One-score games** (32% vs 38%), even at a 0–4 gap (about 50% vs 62%).
+
 ## Not built yet (later phases)
+- Live substitutions in played games: garbage-time twos on the field, and rotations. Build them with realistic audibles (a formation shift within the called personnel group only). Both need who is on the field to be explicit per snap.
 - Kicks through `KickPlay`.
 - The fitted DC table for CPU-vs-CPU sims (phase 5).

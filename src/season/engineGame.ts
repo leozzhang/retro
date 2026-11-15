@@ -1,7 +1,8 @@
 import type { Coach } from '../data/coaches';
 import { dcAdjust, ocAdjust } from '../data/coaches';
 import { lateAndClose, leverage, unitEdge, type UnitConf } from '../data/confidence';
-import { onField, starters, teamConf, type Squad } from '../data/depth';
+import { onField, starters, teamConf, twosSquad, type Squad } from '../data/depth';
+import type { Athlete } from '../data/athletes';
 import { defIdentity } from '../data/identity';
 import { offIdentity } from '../data/offIdentity';
 import { ocBook, ocStyle } from '../data/offStyles';
@@ -32,6 +33,41 @@ import type { DriveLog, GameResult } from './types';
  * is a played game's: the try after a touchdown (the two-point chart, or the kick by the kicker), the
  * defense's scores, FBS overtime. There's no home edge, as on the field.
  */
+
+/**
+ * Garbage time: a side that leads by enough for the clock left puts its twos in, offense and defense (K
+ * and P stay), and calls a safer game. Real FBS teams empty the bench in a blowout, which is most of why
+ * real margins stop growing; the drive sim's `GAME_SIM.script` stands in for it. Decided at each
+ * regulation drive's start from the score and clock alone, so it draws no random numbers.
+ * - `lead`: the lead that brings the twos in, by the second half's fraction left (1 at the start of the
+ *   3rd quarter), linear between points. Never in the first half or in overtime.
+ * - `back`: once in, the twos stay until the lead falls this far under the line.
+ * - `scale`: the lines scale with the quarter length over 15:00 (shorter games score less), at least `minScale`.
+ * - `pass`: the pass share the leader's OC gives up with the twos in.
+ */
+export const MOPUP = {
+  lead: [[1, 30], [0.5, 24], [0.27, 18], [0, 14]] as [number, number][],
+  back: 10,
+  scale: 900,
+  minScale: 0.5,
+  pass: 0.2,
+};
+
+/** The lead that brings the twos in with `frac` of the second half left, for quarters of `qSecs`. */
+export function mopupLine(frac: number, qSecs: number): number {
+  const pts = MOPUP.lead;
+  let line = pts[pts.length - 1][1];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [f0, l0] = pts[i];
+    const [f1, l1] = pts[i + 1];
+    if (frac <= f0 && frac >= f1) {
+      line = l1 + ((frac - f1) / (f0 - f1)) * (l0 - l1);
+      break;
+    }
+  }
+  if (frac > pts[0][0]) line = pts[0][1];
+  return line * Math.max(MOPUP.minScale, Math.min(1, qSecs / MOPUP.scale));
+}
 
 /** One team as the engine game needs it. */
 export interface EngineTeamIn {
@@ -66,11 +102,23 @@ export interface EngineGameOpts {
   qMin?: number;
 }
 
-interface ESide extends BoxSide {
-  squad: Squad;
+/** Who a side has on the field: its starters, or its twos in garbage time. */
+interface Lineup {
   roster: Record<string, RosterPlayer>;
+  on: Record<string, Athlete>;
   side: EngineSide;
   conf: UnitConf;
+}
+
+interface ESide extends BoxSide, Lineup {
+  squad: Squad;
+  /** The starters, and the twos (built the first time they're needed). */
+  full: Lineup;
+  twos: Lineup | null;
+  /** The twos are in. */
+  mop: boolean;
+  /** For building the twos. */
+  input: EngineTeamIn;
   /** This team's DC (defending) and OC (on offense) brains. */
   dcBrain: DefBrain | null;
   ocBrain: OcBrain | null;
@@ -79,17 +127,39 @@ interface ESide extends BoxSide {
 
 const seedOf = (rng: Rng) => (rng() * 2 ** 31) >>> 0;
 
-function sideOf(t: EngineTeamIn): Omit<ESide, 'dcBrain' | 'ocBrain'> {
-  const roster = onField(t.squad);
+/** `t`'s lineup from `squad` (its own, or its twos), with the OC's pass share moved by `passShift`. */
+function lineupOf(t: EngineTeamIn, squad: Squad, passShift = 0): Lineup {
+  const roster = onField(squad);
   const team = t.squad.team;
+  const conf = teamConf(squad);
   return {
-    id: team.id, squad: t.squad, roster, on: starters(t.squad), cast: mulberry32(0), tl: blankTeamLine(), lines: new Map(), conf: teamConf(t.squad),
-    noDisguise: t.disguises === false,
+    roster, on: starters(squad), conf,
     side: {
-      team, roster, conf: teamConf(t.squad), ident: defIdentity(team, t.dc),
-      oc: { book: ocBook(t.oc), style: ocStyle(t.oc), passShare: t.passShare, id: offIdentity(t.oc, roster) },
+      team, roster, conf, ident: defIdentity(team, t.dc),
+      oc: { book: ocBook(t.oc), style: ocStyle(t.oc), passShare: passShift ? clamp(t.passShare + passShift, 0.2, 0.8) : t.passShare, id: offIdentity(t.oc, roster) },
     },
   };
+}
+
+function sideOf(t: EngineTeamIn): Omit<ESide, 'dcBrain' | 'ocBrain'> {
+  const full = lineupOf(t, t.squad);
+  return {
+    id: t.squad.team.id, squad: t.squad, ...full, full, twos: null, mop: false, input: t,
+    cast: mulberry32(0), tl: blankTeamLine(), lines: new Map(),
+    noDisguise: t.disguises === false,
+  };
+}
+
+/** Put `s`'s twos in (`on`) or its starters back. */
+function setTwos(s: ESide, on: boolean): void {
+  if (s.mop === on) return;
+  s.mop = on;
+  if (on && !s.twos) s.twos = lineupOf(s.input, twosSquad(s.squad), -MOPUP.pass);
+  const l = on ? s.twos! : s.full;
+  s.roster = l.roster;
+  s.on = l.on;
+  s.side = l.side;
+  s.conf = l.conf;
 }
 
 /** `t`'s DC brain against `opp`'s offense: what he knows at kickoff (as `Game` builds the CPU's), on the engine's payoff table. */
@@ -154,6 +224,8 @@ class Run {
     this.story.drives.push(told);
     creditSnaps(o, { ...e, points }, plays, credit.snaps, d, true);
     const log = driveLog(o.id, plays, e, ot, credit.snaps);
+    const mop = [o, d].filter((s) => s.mop).map((s) => s.id);
+    if (mop.length) log.mop = mop;
     this.opts.drives?.push(log);
     this.watch(plays, snaps);
     return { e, told, log };
@@ -212,6 +284,15 @@ class Run {
     }
   }
 
+  /** Garbage time (`MOPUP`): the leader's twos in when the lead is big enough for the clock left, its starters back when it isn't. */
+  garbage(a: ESide, b: ESide, half: number, left: number): void {
+    const line = half === 1 ? mopupLine(left / (2 * this.qSecs), this.qSecs) : Infinity;
+    for (const [s, o] of [[a, b], [b, a]] as const) {
+      const lead = s.tl.points - o.tl.points;
+      setTwos(s, s.mop ? lead >= line - MOPUP.back : lead >= line);
+    }
+  }
+
   /** Halftime: every brain adjusts. */
   halftime(): void {
     for (const s of [this.home, this.away]) {
@@ -245,6 +326,7 @@ class Run {
       const half = q <= 2 ? 0 : 1;
       const lead = off.tl.points - dfn.tl.points;
       const cut = part && (toQuarter === 2 || toQuarter === 4) && q === toQuarter - 1;
+      this.garbage(off, dfn, half, left);
       const dc: DriveClock = {
         timeLeft: cut ? clock.time : left, hurry: false, milk: false, pace, quarterBreak: cut, pastBreak: cut ? left - clock.time : 0, lead, finalHalf: q >= 3, qSecs: clock.qSecs,
       };
@@ -292,6 +374,8 @@ class Run {
   /** FBS overtime (`OVERTIME`) until a side leads after a period; `first` has the ball first in odd periods. */
   overtime(first: ESide, second: ESide): number {
     const O = OVERTIME;
+    setTwos(first, false);
+    setTwos(second, false);
     let period = 0;
     while (first.tl.points === second.tl.points) {
       period++;
