@@ -64,6 +64,8 @@ export interface PlaySetup {
   disguise?: Disguise | null;
   /** Extra aim lag (s) from a shaken QB on this snap (data/confidence.ts `shakenAimLag`). */
   aimNerves?: number;
+  /** The two-minute drill (`clockOut`): an auto-run carrier gets out of bounds (`OOB_RUN`, sim/ai.ts). */
+  clockOut?: boolean;
   /** The user's snap: a called give (`read: 'handoff'` or `'pitch'`) hands off on its own at the mesh (`giveDue`). Reads stay his. */
   autoGive?: boolean;
   /**
@@ -275,6 +277,8 @@ export class Play {
   readonly qb: Player;
   /** Extra aim lag (s) from the QB's nerves this snap. */
   readonly aimNerves: number;
+  /** The two-minute drill: an auto-run carrier gets out of bounds. */
+  readonly clockOut: boolean;
   readonly autoGive: boolean;
   readonly center: Player;
   readonly rb: Player;
@@ -402,6 +406,7 @@ export class Play {
     this.defCall = s.defCall;
     this.rng = s.rng;
     this.aimNerves = s.aimNerves ?? 0;
+    this.clockOut = s.clockOut ?? false;
     this.autoGive = s.autoGive ?? false;
 
     const offHome = s.homeId === undefined || s.homeId === s.offTeam.id;

@@ -77,7 +77,7 @@ function withFourthDowns(d: StoryDrive): [SimPlay, SnapCredit | undefined][] {
     const a = snaps[i];
     out.push([a, d.credit.snaps[i] ?? undefined]);
     // A logged 4th-down snap (a coach going for it) needs no rebuilding, nor does a played drive.
-    if (d.live || isKick(a) || a.turnover || a.down === 4 || a.kneel) continue;
+    if (d.live || isKick(a) || a.turnover || a.down === 4 || a.kneel || a.spike) continue;
     const at = a.yard + a.gain;
     const toGo = a.toGo - a.gain;
     const b = snaps[i + 1];
@@ -96,7 +96,7 @@ function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last:
   if (d.try) return { kind: d.points ? 'twoPt' : 'twoPtStop', priority: 3 };
   // Field goals are scoring plays, made or missed: always shown.
   if (p.fg) return { kind: p.fg.made ? 'fg' : 'missedFg', priority: 3 };
-  if (p.punt || p.kneel) return null;
+  if (p.punt || p.kneel || p.spike) return null;
   if (p.heave && !p.turnover && p.gain < 100 - p.yard) return null;
   if (p.turnover) return { kind: snap?.kind === 'fumble' ? 'fumble' : 'int', priority: 3 };
   if (p.yard + p.gain >= 100) return { kind: 'td', priority: 3 };
@@ -114,7 +114,7 @@ function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last:
   return null;
 }
 
-/** Every snap of a drive worth showing at some level, in order; with `every`, the rest too (as `snap`, priority 0), but never a punt or a kneel. */
+/** Every snap of a drive worth showing at some level, in order; with `every`, the rest too (as `snap`, priority 0), but never a punt, a kneel or a spike. */
 export function driveEvents(d: StoryDrive, view: KeyView, every = false): KeyPlay[] {
   const plays = withFourthDowns(d);
   // The last snap before the drive's kick or end, for red-zone stops.
@@ -124,7 +124,7 @@ export function driveEvents(d: StoryDrive, view: KeyView, every = false): KeyPla
   });
   const out: KeyPlay[] = [];
   plays.forEach(([p, snap], i) => {
-    const c = classify(d, p, snap, i === lastSnap, view) ?? (every && !p.punt && !p.kneel ? { kind: 'snap' as const, priority: 0 } : null);
+    const c = classify(d, p, snap, i === lastSnap, view) ?? (every && !p.punt && !p.kneel && !p.spike ? { kind: 'snap' as const, priority: 0 } : null);
     if (c) out.push({ drive: d, play: p, ...(snap ? { snap } : {}), ...c });
   });
   return out;

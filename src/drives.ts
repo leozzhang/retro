@@ -244,7 +244,7 @@ function add(a: Agg, d: DriveRec): void {
   else if (r === 'TURNOVER') a.to++;
   else if (r === 'DOWNS') a.downs++;
   for (const p of d.plays) {
-    if (p.kneel || p.fg || p.punt) continue;
+    if (p.kneel || p.spike || p.fg || p.punt) continue;
     a.plays++;
     a.yards += p.gain;
     if (p.gain >= 20) a.big20++;
@@ -511,7 +511,7 @@ export function drivesReport(): string[] {
     out.push(`  presnap checks ${f1(pct(ck.length, snaps.length))}% of snaps, success ${f1(pct(ck.filter(ok).length, ck.length))}%, ypp ${f1(ck.reduce((a, x) => a + x.gain, 0) / (ck.length || 1))}`);
     out.push(`  ALL success ${f1(pct(all, snaps.length))}%  runs ${f1(pct(runs.filter(ok).length, runs.length))}%  dropbacks ${f1(pct(passes.filter(ok).length, passes.length))}%   (FBS about 42 / 42 / 42)`);
     // The drive sim's success rate, for scale.
-    const simPlays = recs.sim.flatMap((g) => g.drives.flatMap((d) => d.plays.filter((p) => !p.kneel && !p.fg && !p.punt)));
+    const simPlays = recs.sim.flatMap((g) => g.drives.flatMap((d) => d.plays.filter((p) => !p.kneel && !p.spike && !p.fg && !p.punt)));
     out.push(`  SIM success ${f1(pct(simPlays.filter((p) => successful({ gain: p.gain, down: p.down, toGo: p.toGo, pass: false, ...(p.turnover ? { turnover: true } : {}) })).length, simPlays.length))}%`);
     // By down: success, the average gain, and how far 3rd downs are.
     for (const dn of [1, 2, 3]) {

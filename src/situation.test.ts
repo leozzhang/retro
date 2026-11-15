@@ -4,7 +4,7 @@ import { defIdentity, preventLevel, situationDials, situationMix, shellShares, p
 import { teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
 import { PAT, simulateDrive, xpOdds, type SimPlay } from './game/rules';
-import { desperate, fourthDown, goForTwo, kickNow, passOdds, tempo, type Situation } from './game/situation';
+import { clockOut, desperate, fourthDown, goForTwo, kickNow, passOdds, spikeNow, tempo, type Situation } from './game/situation';
 import { castSnap, type Lineup } from './season/cast';
 import { lineupOf } from './season/simGame';
 import { autoGamePlan } from './season/staff';
@@ -62,6 +62,46 @@ describe('situation: the CPU offense', () => {
     }
     expect(fgs).toBe(0);
     expect(goes).toBeGreaterThan(20);
+  });
+
+  it('the clock: get out of bounds and spike it when behind late, never when ahead', () => {
+    expect(clockOut(sit({ secsLeft: 90, lead: -4 }))).toBe(true);
+    expect(clockOut(sit({ secsLeft: 90, lead: 4 }))).toBe(false);
+    expect(clockOut(sit({ secsLeft: 600, lead: -4 }))).toBe(false);
+    // Spike to save time: 1st or 2nd down in the hurry-up.
+    expect(spikeNow(sit({ down: 1, secsLeft: 40, lead: -4, yardsToGoal: 50 }))).toBe(true);
+    expect(spikeNow(sit({ down: 3, secsLeft: 40, lead: -4, yardsToGoal: 50 }))).toBe(false);
+    expect(spikeNow(sit({ down: 1, secsLeft: 90, lead: -4, yardsToGoal: 50 }))).toBe(false);
+    // Spike to kick a field goal that helps, through 3rd down, even tied or at the end of the 1st half.
+    expect(spikeNow(sit({ down: 3, secsLeft: 20, lead: -2, yardsToGoal: 20 }))).toBe(true);
+    expect(spikeNow(sit({ down: 2, secsLeft: 20, lead: 0, yardsToGoal: 20 }))).toBe(true);
+    expect(spikeNow(sit({ down: 2, secsLeft: 20, lead: 10, yardsToGoal: 20, finalHalf: false }))).toBe(true);
+    // Never on 4th down, ahead late in the game, in overtime, or with one snap left.
+    expect(spikeNow(sit({ down: 4, secsLeft: 20, lead: -2, yardsToGoal: 20 }))).toBe(false);
+    expect(spikeNow(sit({ down: 1, secsLeft: 40, lead: 3, yardsToGoal: 20 }))).toBe(false);
+    expect(spikeNow(sit({ down: 1, secsLeft: Infinity, lead: -3, yardsToGoal: 20, ot: 'second' }))).toBe(false);
+    expect(spikeNow(sit({ down: 1, secsLeft: 3, lead: -2, yardsToGoal: 20 }))).toBe(false);
+  });
+
+  it('a drive behind late spikes after in-bounds snaps, and only when the clock has to stop', () => {
+    let spikes = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const plays: SimPlay[] = [];
+      simulateDrive(80, 80, 40, mulberry32(seed), { timeLeft: 70, hurry: false, milk: false, lead: -3, qSecs: 900 }, (p) => plays.push(p));
+      for (const p of plays) {
+        if (!p.spike) continue;
+        spikes++;
+        expect(p.down).toBeLessThan(4);
+        expect(p.gain).toBe(0);
+      }
+    }
+    expect(spikes).toBeGreaterThan(30);
+    // Ahead, nobody spikes.
+    for (let seed = 1; seed <= 100; seed++) {
+      const plays: SimPlay[] = [];
+      simulateDrive(80, 80, 40, mulberry32(seed), { timeLeft: 200, hurry: false, milk: false, lead: 3, qSecs: 900 }, (p) => plays.push(p));
+      expect(plays.some((p) => p.spike)).toBe(false);
+    }
   });
 
   it('a drive with a 4-point lead and a minute left kneels it out', () => {

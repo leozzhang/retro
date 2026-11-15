@@ -948,11 +948,30 @@ export function autoRun(play: Play, c: Player): void {
       dir.y += away.y * ((5 - dd) / 5) * (d.engagedBy.length ? 0.6 : 1.1); // blocked defenders still grab
     }
   }
+  if (play.clockOut && c.side === 'off' && c.pos.x > play.los) {
+    // The two-minute drill: get out of bounds once the sideline's near or someone's closing (`OOB_RUN`).
+    const side = c.pos.y < FIELD_W / 2 ? -1 : 1;
+    const toLine = side < 0 ? c.pos.y : FIELD_W - c.pos.y;
+    const closing = play.def.some((d) => !d.down && !d.engagedBy.length && d.pos.x > c.pos.x - 1 && dist(d.pos, c.pos) < OOB_RUN.threat);
+    if (toLine < OOB_RUN.near || closing) {
+      dir.y += side * OOB_RUN.pull;
+      dir.x = Math.max(dir.x, OOB_RUN.upfield);
+      c.want = scale(norm(dir), maxSpeed(c) * 0.95);
+      return;
+    }
+  }
   if (c.pos.y < 3) dir.y += 0.6;
   if (c.pos.y > FIELD_W - 3) dir.y -= 0.6;
   dir.x = Math.max(dir.x, 0.3);
   c.want = scale(norm(dir), maxSpeed(c) * 0.95);
 }
+
+/**
+ * The auto-runner in the two-minute drill (`Play.clockOut`): past the line, within `near` yd of the nearer
+ * sideline or with a free defender closing inside `threat` yd, he turns for it (`pull` across, at least
+ * `upfield` of his heading still upfield) instead of shying away from it.
+ */
+export const OOB_RUN = { near: 14, threat: 5, pull: 1.6, upfield: 0.5 };
 
 /** Returner (interceptions and kick returns): run for the user's end zone, slipping away from nearby tacklers. */
 export function returnerAI(play: { off: Player[]; phase: string }, c: Player): void {

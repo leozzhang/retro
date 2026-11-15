@@ -26,6 +26,14 @@ None of these draw random numbers. Replays run the real play engine on their own
   - kneel out the 1st half from inside its own 30 with 0:40 left
   
   Kneels and incomplete heaves are never key plays.
+- **The two-minute drill** (`clockOut`, `spikeNow`):
+  - The hurry-up's snaps split: half stop the clock (an incompletion or out of bounds, `DRIVE_SIM.hurryStop`, about 7 s) and half run it (about 22 s with the no-huddle line-up). The mean is near the old flat 15 s.
+  - After an in-bounds snap with the clock running, the offense **spikes** the next snap:
+    - to kick a field goal that helps, through 3rd down, inside 0:30 (`spikeKickSecs`; tied, ahead, or at the end of the 1st half too);
+    - in the hurry-up on 1st or 2nd down inside 0:45 (`spikeSecs`).
+  - The snap before a spike costs `spikeRunSecs` (about 10 s: the play and lining up to spike it) in place of the no-huddle call, and the spike is a down. Never on 4th down, in overtime, when kneeling or milking, or inside 0:04.
+  - The decision is read on the mean line-up, so only a spike draws a random number.
+  - A spike is the QB's incompletion in the box score (NCAA). It isn't graded (no hits, no XP) and is never a key play.
 - **Pass or run** (`passOdds`): the plan's share, +0.25 on 3rd and 7+, -0.25 on 3rd and 2 or less, +0.25 in the hurry-up, -0.3 when milking. Casting and the replays read it.
 
 ## Casting: who made each snap (`season/cast.ts`)
@@ -37,7 +45,7 @@ The drive sim decides each snap's yards from team ratings. `castSnap` then gives
 
 **The box score** (`credit`, simGame.ts) is the sum of the cast snaps:
 - Catches and runs carry their real yards.
-- Sacks and kneels are rushes (NCAA).
+- Sacks and kneels are rushes, and a spike is an incomplete pass (NCAA).
 - Each catch carries 0.61 hidden incompletions on average, for a 62% completion rate, because the drive sim logs only snaps with yards.
 - The casting stream is forked once per game from the game's stream, so a story never changes the result.
 

@@ -2,6 +2,29 @@
 
 _Last updated: 2026-11-14_
 
+## Done: clock management: kneel, spike, out of bounds (2026-11-14)
+- **You can kneel and spike** (game.ts `startClockPlay`):
+  - K or the KNEEL card on the ST tab: the play clock runs to :01 (`KNEEL_AT`), then -1 yd, 2 s, and the clock keeps running.
+  - X or the SPIKE card: snaps at :36 (`SPIKE_AT`), 1 s, the clock stops, and it costs a down.
+  - Neither runs the engine, and the DC doesn't learn from them. A kneel is the QB's rush and a spike his incompletion (NCAA).
+  - The call screen's line says "VICTORY FORMATION: K TO KNEEL IT OUT" or "CLOCK RUNNING: X TO SPIKE IT" when they apply.
+- **The CPU and every sim spike** (`spikeNow`, game/situation.ts), after an in-bounds snap with the clock running:
+  - to kick a field goal that helps, inside 0:30 through 3rd down;
+  - in the hurry-up on 1st or 2nd down inside 0:45.
+  
+  Engine drives and the drive sim both do it. Spikes aren't graded and are never key plays.
+- **The two-minute drill plays to stop the clock** (`clockOut`, the hurry-up inside 2:00):
+  - **Engine snaps:** the carrier turns for the sideline (`OOB_RUN`), and the CPU QB favors sideline catches and throws it away instead of taking sacks (`CLOCK_OUT`).
+  - **The drive sim:** its hurry-up snaps split into clock-stopped and clock-running (`DRIVE_SIM.hurryStop`).
+  - All of it is off elsewhere: `npm run balance` is byte-identical.
+- **Out of bounds in engine drives** stopped the clock all game. It now does that only inside 2:00, as in a played game (`SNAP_SECS.oobReady`). The played game was already right (`afterPlay`).
+- **Measured:**
+  - **Drives (60 games):** engine 1.64 → 1.66 points a drive. Throwaways 0.7% → 1.0%. Turnovers on downs 1.5% → 1.9%, since spikes spend downs.
+  - **Season (5 seasons):** the score rows are in their bands (one-score 37.4%, 28+ 17.9%). The flags are the old ones, plus assistant turnover at 19.1%, just under its 20% line (it was 20.3%; the carousel doesn't touch the clock).
+  - **USER GAMES `sched` engine:** 23.0 → 21.5 points, one-score games 32.5% → 26.5%. That's within about 1.3 SE at 200 games, but it's the wrong direction. Recheck it with more games.
+- **Tests:** situation (`clockOut`, `spikeNow`, drive-sim spikes), clock (the kneel and spike runoffs), engine credit (a spike is the QB's incompletion). The same 5 season-length tests fail as before.
+- **Not yet:** timeouts (for either side). Watching a CPU spike or kneel on tape (they have no `EngineSnap`). An in-app playtest of the live kneel and spike.
+
 ## Done: engine blowouts, garbage time (2026-11-14)
 ENGINEDRIVES.md "Blowouts" has the tables.
 - **The diagnosis:**

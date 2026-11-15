@@ -13,13 +13,14 @@ import { defPull, ocObserve, targetPull, type OcBrain } from './ocBrain';
 import { Play } from './playState';
 import { newRecorder, recordFrame, TAPE, type Tape } from './tape';
 import { applyOutcome, fgOdds, snapSituation, type Drive, type DriveClock, type DriveSim, type PlayOutcome, type SimPlay } from './rules';
-import { desperate, fourthDown, kickNow, SITUATION, tempo, type Situation } from './situation';
+import { clockOut, desperate, fourthDown, kickNow, SITUATION, spikeNow, tempo, type Situation } from './situation';
+import { TWO_MIN } from './clock';
 
 /**
  * One possession played through the engine, snap by snap (docs/ENGINEDRIVES.md): the offense's OC
  * calls (`ocCall`), the CPU QB runs it (`CpuQb`), the defense calls from its identity and, with a
  * brain, what it's learned (`callFor`, the check, the leans), and the brain watches every snap. The
- * coaching around the snaps (4th down, tempo, the last-second kick, kneeling) is the drive sim's
+ * coaching around the snaps (4th down, tempo, the last-second kick, kneeling, spiking) is the drive sim's
  * (`simulateDrive`, game/rules.ts), so the two can be compared drive for drive. Kicks are still
  * the drive sim's: field goals by `fgOdds`, punts by the caller's net.
  */
@@ -44,9 +45,12 @@ export const FUMBLE = { carry: 0.007, sack: 0.05, perPoint: 0.012, range: [0.5, 
 
 /**
  * Game-clock seconds a snap takes, by how it ended and the tempo, on the drive sim's scale
- * (`simPlaySecs`): a stopped clock (`stop`) is the snap alone; a running clock adds the huddle.
+ * (`simPlayClock`): a stopped clock (`stop`) is the snap alone; a running clock adds the huddle.
+ * Out of bounds stops it only inside two minutes of a half (NCAA); before that the clock starts again on
+ * the ready signal, `oobReady` s short of a running snap. `spikeRun`: a running snap with a spike next
+ * (the snap and lining up to spike it), and `spike` the spike itself.
  */
-export const SNAP_SECS = { stop: [7, 2, 4, 12], run: [32, 6, 14, 45], milk: 38, hurry: [15, 4, 7, 25] };
+export const SNAP_SECS = { stop: [7, 2, 4, 12], run: [32, 6, 14, 45], milk: 38, hurry: [15, 4, 7, 25], oobReady: 7, spikeRun: [10, 2, 7, 14], spike: 1 };
 
 export interface EngineSnap {
   play: PlayDef;
@@ -98,7 +102,7 @@ export interface EngineOpts {
   brain: DefBrain | null;
   /** The offense's learning OC (kept across its drives); missing or null calls his book as it is. */
   ocBrain?: OcBrain | null;
-  /** Called for each snap as the drive sim calls `onPlay`, for the logs the season reads; `snap` is the engine's (none on a kick, punt or kneel). */
+  /** Called for each snap as the drive sim calls `onPlay`, for the logs the season reads; `snap` is the engine's (none on a kick, punt, kneel or spike). */
   onPlay?: (p: SimPlay, snap?: EngineSnap) => void;
   /** Keep each snap on tape (`EngineSnap.tape`). Watching draws nothing from the drive's stream. */
   record?: boolean;
@@ -116,14 +120,18 @@ const cam = new Camera();
 const MAX_SECS = 15;
 
 /** Seconds off the game clock for a snap that ended this way (`SNAP_SECS`). */
-function snapSecs(o: PlayOutcome, tmp: string | null, pace: number, rng: Rng): number {
+function snapSecs(o: PlayOutcome, tmp: string | null, pace: number, rng: Rng, twoMin: boolean): number {
   const S = SNAP_SECS;
   const draw = ([m, sd, lo, hi]: number[], k = 1) => clamp((m + gauss(rng) * sd) * k, lo, hi);
-  const stopped = o.type === 'incomplete' || o.type === 'oob' || o.type === 'td' || o.type === 'int' || o.type === 'pick6';
-  if (stopped) return draw(S.stop);
+  if (clockStopped(o, twoMin)) return draw(S.stop);
   if (tmp === 'hurry') return draw(S.hurry);
-  return draw([tmp === 'milk' ? S.milk : S.run[0], S.run[1], S.run[2], S.run[3]], pace);
+  const run = draw([tmp === 'milk' ? S.milk : S.run[0], S.run[1], S.run[2], S.run[3]], pace);
+  return o.type === 'oob' ? Math.max(S.stop[2], run - S.oobReady) : run;
 }
+
+/** The clock stays stopped after this snap until the next one (out of bounds only inside two minutes of a half). */
+const clockStopped = (o: PlayOutcome, twoMin: boolean): boolean =>
+  o.type === 'incomplete' || o.type === 'td' || o.type === 'int' || o.type === 'pick6' || (o.type === 'oob' && twoMin);
 
 /** The defense's call for a snap, as the CPU defense calls it on the user (`Game.toCall`): brain or identity, a line game, press, a disguise. */
 function defCall(def: EngineSide, brain: DefBrain | null, sit: Situation, rng: Rng, noDisguise: boolean) {
@@ -184,6 +192,7 @@ export function engineSnap(
     antic: brain ? anticFor(brain, prc) : undefined,
     reads: brain ? leansFor(brain, prc, call, playDef, { down: sit.down, toGo: sit.toGo, yardsToGoal: sit.yardsToGoal }) : undefined,
     los: drive.los, ballY: drive.ballY, flip: rng() < 0.5, disguise, rng, ...(opts.homeId ? { homeId: opts.homeId } : {}),
+    ...(clockOut(sit) ? { clockOut: true } : {}),
   });
   const qb = new CpuQb(play, (rng() * 2 ** 31) >>> 0, { ...qbCtx(off, sit, ob), defPull: off.oc.id ? (d, rt) => defPull(ob, d, rt) : null });
   const rec = opts.record ? newRecorder(play) : null;
@@ -328,7 +337,9 @@ export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng
     const { play, o, qb, checked, shown, soft, tape: tapeOf } = engineSnap(off, def, drive, sit, rng, brain, {
       noDisguise: opts.noDisguise, heave, noCheck: opts.noCheck, lev, ocBrain: opts.ocBrain, record: opts.record, homeId: opts.homeId,
     });
-    secs += heave ? 8 : snapSecs(o, tmp, pace, rng);
+    const twoMin = sit.secsLeft <= TWO_MIN;
+    const cost = heave ? 8 : snapSecs(o, tmp, pace, rng, twoMin);
+    secs += cost;
     const fumbled = lostFumble(play, o, rng);
     const snap = readSnap(play, o, drive, sit, { qb, checked, shown, soft, secs, lev, fumbled });
     const { gain } = snap;
@@ -373,6 +384,19 @@ export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng
         break;
     }
     drive = ap.drive;
+    // In bounds with the clock running: spike the next snap if the clock has to stop (`spikeNow`), lining up to
+    // spike in place of the no-huddle call (decided on the mean line-up, so only a spike draws).
+    if (!heave && !clockStopped(o, twoMin) && !clock.quarterBreak) {
+      const S = SNAP_SECS.spikeRun;
+      const after = sitNow();
+      if (spikeNow({ ...after, secsLeft: after.secsLeft + cost - S[0] })) {
+        secs += clamp(S[0] + gauss(rng) * S[1], S[2], S[3]) - cost;
+        plays++;
+        opts.onPlay?.({ gain: 0, explosive: false, turnover: false, down: drive.down, toGo: after.toGo, yard: yardOf(drive), t: secs, lev: 0, spike: true });
+        secs += SNAP_SECS.spike;
+        drive = { ...drive, down: drive.down + 1 };
+      }
+    }
     if (drive.down === 1) continue;
     // The coach reads the situation: 4th down, or out of time before it (the drive sim's rules).
     const next = sitNow();

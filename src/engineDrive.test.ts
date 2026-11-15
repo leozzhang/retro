@@ -97,6 +97,7 @@ describe('engine drives in a played game (Phase 3)', () => {
         const s = snaps[i];
         const c = engineCredit(p, s, offOn, defOn);
         if (p.fg || p.punt) return expect(c).toBeNull();
+        if (p.spike) return expect([c?.kind, c?.pass, c?.who?.slot]).toEqual(['spike', true, 'QB']);
         if (!s) return expect(c?.kind).toBe('kneel');
         if (s.type === 'int' || s.type === 'pick6') expect(c?.kind).toBe('int');
         else if (s.lostFumble) expect(c?.kind).toBe('fumble');
@@ -215,20 +216,20 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
       expect(r.away).toBe(r.box.away.points);
       expect(r.home).not.toBe(r.away);
       // Every snap the story tells is the engine's, on tape.
-      const snaps = story.drives.flatMap((d) => d.plays.filter((p) => !p.fg && !p.punt && !p.kneel));
+      const snaps = story.drives.flatMap((d) => d.plays.filter((p) => !p.fg && !p.punt && !p.kneel && !p.spike));
       expect(snaps.every((p) => watch.get(p)?.tape)).toBe(true);
       // The game page's scoring plays add up to the final, the last one's score is it, and only a score reaches the goal.
       const last = r.plays!.filter((p) => p.pts).at(-1)!;
       expect(last.score).toEqual([r.home, r.away]);
       expect(r.plays!.reduce((t, p) => t + p.pts, 0)).toBe(r.home + r.away);
       for (const d of story.drives) d.plays.forEach((p, i) => p.yard + p.gain >= 100 && !d.try && expect((i === d.plays.length - 1 && d.result === 'TOUCHDOWN') || p.turnover).toBe(true));
-      // Every pass is a real snap: attempts are the passes the story logs (a try is no stat).
+      // Every pass is a real snap: attempts are the passes the story logs, spikes included (a try is no stat).
       const att = r.box.players.reduce((n, l) => n + l.att, 0);
-      const thrown = story.drives.filter((d) => !d.try).reduce((n, d) => n + d.credit.snaps.filter((c) => c && (c.kind === 'catch' || c.kind === 'inc' || c.kind === 'int')).length, 0);
+      const thrown = story.drives.filter((d) => !d.try).reduce((n, d) => n + d.credit.snaps.filter((c) => c && (c.kind === 'catch' || c.kind === 'inc' || c.kind === 'int' || c.kind === 'spike')).length, 0);
       expect(att).toBe(thrown);
       expect(drives.length).toBeGreaterThan(15);
       // EVERY SNAP picks them all.
-      expect(pickGame(story, 'all').length).toBe(story.drives.reduce((n, d) => n + d.plays.filter((p) => !p.punt && !p.kneel).length, 0));
+      expect(pickGame(story, 'all').length).toBe(story.drives.reduce((n, d) => n + d.plays.filter((p) => !p.punt && !p.kneel && !p.spike).length, 0));
     }
   });
 

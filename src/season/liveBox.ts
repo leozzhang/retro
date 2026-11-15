@@ -28,7 +28,7 @@ export interface LiveBox {
 
 /** What one of the user's snaps was, for the box score. NCAA: sacks are rushes. */
 export interface UserSnap {
-  kind: 'catch' | 'inc' | 'int' | 'run' | 'sack';
+  kind: 'catch' | 'inc' | 'int' | 'run' | 'sack' | 'kneel' | 'spike';
   qb?: Athlete;
   /** The receiver on a catch, the ball carrier on a run or sack. */
   who?: Athlete;
@@ -98,6 +98,8 @@ export function creditUserSnap(box: LiveBox, s: UserSnap): void {
       break;
     case 'inc':
     case 'int':
+    case 'spike':
+      // NCAA: a spike is an incomplete pass.
       if (q) {
         q.att++;
         if (s.kind === 'int') q.int++;
@@ -105,6 +107,7 @@ export function creditUserSnap(box: LiveBox, s: UserSnap): void {
       break;
     case 'run':
     case 'sack':
+    case 'kneel':
       tl.rushYds += s.yds;
       if (w) {
         w.rush++;
@@ -141,7 +144,7 @@ export function userCredit(s: UserSnap, slotOf: (a: Athlete) => string | undefin
     const slot = a && slotOf(a);
     return slot ? { slot, name: athleteName(a), yds } : undefined;
   };
-  const who = cred(s.kind === 'catch' || s.kind === 'run' || s.kind === 'sack' ? s.who : undefined, s.yds);
+  const who = cred(s.kind === 'catch' || s.kind === 'run' || s.kind === 'sack' || s.kind === 'kneel' ? s.who : s.kind === 'spike' ? s.qb : undefined, s.yds);
   const by = cred(s.by, 0);
   return { kind: s.kind, pass, ...(who ? { who } : {}), ...(by ? { by } : {}) };
 }

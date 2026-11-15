@@ -1,5 +1,5 @@
 import { disguiseName, pickDefCall, pickDisguise, rushers, type DefCall, type DefTags, type Disguise } from '../data/defenses';
-import { goForTwo, type Situation } from './situation';
+import { clockOut, goForTwo, tempo as situationTempo, type Situation } from './situation';
 import { defIdentity, pickLineGame, preventLevel, situationMix } from '../data/identity';
 import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type PlayDef } from '../data/plays';
 import { ocBook, ocStyle, STYLES } from '../data/offStyles';
@@ -95,7 +95,7 @@ import { text, textWidth } from '../render/text';
 import {
   adminStop, advanceSim, afterPlay, clockText, inOvertime, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
   DEFAULT_QUARTER, QUARTER_DRIVES, QUARTER_LABELS, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap, snapClock, tickBetween, tickLive,
-  timeLeftInHalf, type Clock, type Tempo,
+  timeLeftInHalf, KNEEL_SECS, SPIKE_SECS, type Clock, type Tempo,
 } from './clock';
 import { KickPlay } from './kickPlay';
 import { HARD_COUNT, Play } from './playState';
@@ -114,7 +114,10 @@ type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'se
  */
 type CallMode = 'normal' | 'pat' | 'try' | 'kickoff';
 
-type Card = { kind: 'play'; def: PlayDef } | { kind: 'kick'; def: KickDef } | { kind: 'twoPt' };
+type Card = { kind: 'play'; def: PlayDef } | { kind: 'kick'; def: KickDef } | { kind: 'twoPt' } | { kind: 'kneel' } | { kind: 'spike' };
+
+/** The clock plays' tips on the call screen. */
+const CLOCK_TIP = { kneel: 'Victory formation: take a knee. The clock keeps running.', spike: 'Spike it: stops the clock, costs a down.' };
 
 /** NCAA kickoffs are from the kicking team's 35. */
 const KICKOFF_LINE = OWN_GOAL + 35;
@@ -2423,7 +2426,11 @@ export class Game {
       default: {
         const tab = this.tabs()[this.tab];
         // Overtime has no punts: kick a field goal or go for it.
-        if (tab.kind === 'st') return ST_TAB.filter((def) => !this.ot || def.unit === 'fg').map((def) => ({ kind: 'kick', def }));
+        if (tab.kind === 'st') {
+          const kicks: Card[] = ST_TAB.filter((def) => !this.ot || def.unit === 'fg').map((def) => ({ kind: 'kick', def }));
+          // The clock plays, in regulation (overtime is untimed).
+          return this.ot ? kicks : [...kicks, { kind: 'kneel' }, { kind: 'spike' }];
+        }
         const list = this.chipPlays();
         const page = Math.min(this.page, this.pageCount() - 1);
         return list.slice(page * PAGE, page * PAGE + PAGE).map((def) => ({ kind: 'play', def }));
@@ -2508,6 +2515,14 @@ export class Game {
       this.callMode = 'pat';
       return;
     }
+    // K: victory formation. X: spike it. Regulation snaps only.
+    if (this.callMode === 'normal' && !this.ot && !this.drive.try) {
+      const clockPlay = input.hit('KeyK') ? 'kneel' : input.hit('KeyX') ? 'spike' : null;
+      if (clockPlay) {
+        this.startClockPlay(clockPlay);
+        return;
+      }
+    }
     const { x, y } = input.mouse;
     this.callMouse = { x, y };
     if (input.mouse.pressed) {
@@ -2540,6 +2555,7 @@ export class Game {
       const c = cards[chosen];
       if (c.kind === 'play') this.startPlay(c.def);
       else if (c.kind === 'kick') this.startKick(c.def);
+      else if (c.kind === 'kneel' || c.kind === 'spike') this.startClockPlay(c.kind);
       else {
         this.callMode = 'try';
         this.tab = 0;
@@ -2641,6 +2657,43 @@ export class Game {
       lost: turnover || o.type === 'sack',
       throw: play.throwRecord(gain), antic: Object.fromEntries([...play.anticLog].map(([d, r]) => [d.slot, r])),
     });
+  }
+
+  /**
+   * A kneel or a spike: no snap on the field, just the clock and the down. A kneel snaps with the play clock run
+   * down (`KNEEL_AT`) and loses a yard with the clock running; a spike snaps as soon as the line is set
+   * (`SPIKE_AT`) and stops it. The DC doesn't learn from either.
+   */
+  private startClockPlay(kind: 'kneel' | 'spike'): void {
+    const d = this.drive;
+    const kneel = kind === 'kneel';
+    this.play = null;
+    this.snapLev = 0;
+    runoffAtSnap(this.clock, kind);
+    snapClock(this.clock);
+    this.snapAt = this.atNow();
+    this.clock.time = Math.max(0, this.clock.time - (kneel ? KNEEL_SECS : SPIKE_SECS));
+    const o: PlayOutcome = kneel
+      ? { type: 'tackle', spot: Math.max(d.los - 1, OWN_GOAL + 0.5), spotY: d.ballY, text: 'KNEEL', sub: 'Victory formation', color: '#ffffff' }
+      : { type: 'incomplete', spot: d.los, spotY: d.ballY, text: 'SPIKE', sub: 'Clock stopped', color: '#ffffff' };
+    // A kneel is graded as the sims grade it; a spike is no football rep (as `driveLog` drops it).
+    if (kneel) this.logSnap(false, o);
+    this.creditClockSnap(kind, o);
+    const a = applyOutcome(d, o);
+    afterPlay(this.clock, o.type, false);
+    this.storySnapResult(a);
+    this.applied = a;
+    this.notify({
+      title: kneel ? 'KNEEL DOWN' : 'SPIKE', sub: kneel ? 'Victory formation. The clock keeps running' : 'Ball spiked. The clock is stopped',
+      extra: a.change.kind === 'none' ? downDistance(a.drive) : '', color: '#9ad7ff',
+    });
+    if (a.change.kind !== 'none') {
+      this.handleChange(a);
+      return;
+    }
+    this.drive = a.drive;
+    if (this.clock.time <= 0) this.periodOver();
+    else this.showNotices('call');
   }
 
   private startKick(def: KickDef): void {
@@ -3294,6 +3347,24 @@ export class Game {
   }
 
   /** A snap's result in the story: the user's points, the CPU's (a pick six, a safety), or the drive over. */
+  /** A kneel (the QB's rush) or a spike (his incompletion) in the box score and the story. No tape. */
+  private creditClockSnap(kind: 'kneel' | 'spike', o: PlayOutcome): void {
+    if (!this.liveBox) return;
+    const on = this.liveBox.user.on;
+    const qb = on.QB;
+    const d = this.drive;
+    const gain = Math.round(o.spot - d.los);
+    const snap: UserSnap = kind === 'kneel' ? { kind, qb, who: qb, yds: gain, td: false } : { kind, qb, yds: 0, td: false };
+    creditUserSnap(this.liveBox, snap);
+    const p: LiveSimPlay = {
+      gain, explosive: false, turnover: false, down: d.down, toGo: Math.round(d.firstDownX - d.los), yard: Math.round(d.los - OWN_GOAL), t: 0, lev: 0,
+      ...(kind === 'kneel' ? { kneel: true } : { spike: true }),
+    };
+    const slotOf = (a: Athlete) => Object.entries(on).find(([, x]) => x === a)?.[0];
+    storyUserSnap(this.liveBox, this.snapAt ?? this.atNow(), p, userCredit(snap, slotOf, kind === 'spike'));
+    this.lastSnap = p;
+  }
+
   private storySnapResult(a: Applied): void {
     const box = this.liveBox;
     if (!box || !this.lastSnap) return;
@@ -3735,7 +3806,9 @@ export class Game {
       : this.callMode === 'kickoff' ? 'KICKOFF: CHOOSE A KICK'
       : this.callMode === 'try' ? (this.mustGoForTwo() ? 'OVERTIME: TWO-POINT TRY FROM THE 3' : 'TWO-POINT TRY FROM THE 3   ESC: BACK')
       : 'CHOOSE A PLAY';
-    const tip = hc ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.def.tip).toUpperCase() : fallback;
+    const tip = hc
+      ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.kind === 'kneel' || hc.kind === 'spike' ? CLOCK_TIP[hc.kind] : hc.def.tip).toUpperCase()
+      : this.clockHint() ?? fallback;
     text(g, tip, VIEW_W / 2, CALL_Y + 6, { size: 8, align: 'center', color: '#ffd23f' });
     if (this.dcNote && this.callMode === 'normal') this.drawDcNote(g, CALL_Y - 16);
     if (!tabs.length) {
@@ -3795,6 +3868,15 @@ export class Game {
     );
   }
 
+  /** The call screen's line when the clock matters: kneel out a win, spike a running clock in the two-minute drill. */
+  private clockHint(): string | null {
+    if (this.callMode !== 'normal' || this.ot || this.drive.try) return null;
+    const s = this.userSituation();
+    if (situationTempo(s) === 'kneel') return 'VICTORY FORMATION: K TO KNEEL IT OUT';
+    if (this.clock.mode === 'run' && s.down < 4 && clockOut(s)) return 'CLOCK RUNNING: X TO SPIKE IT';
+    return null;
+  }
+
   private cardFrame(g: CanvasRenderingContext2D, i: number, title: string, sub: string, subColor = '#8fa0b8') {
     const r = cardRect(i);
     const hot = this.hover === i;
@@ -3816,6 +3898,12 @@ export class Game {
       g.fillStyle = this.cpu.colors.primary;
       g.fillRect(r.x + r.w - 70, r.y + 34, 30, 40);
       text(g, '+2', r.x + r.w / 2 - 14, r.y + 46, { size: 16, align: 'center', color: '#ffd23f' });
+      return;
+    }
+    if (c.kind === 'kneel' || c.kind === 'spike') {
+      const kneel = c.kind === 'kneel';
+      const r = this.cardFrame(g, i, kneel ? 'Kneel' : 'Spike', kneel ? 'VICTORY FORMATION  (K)' : 'STOP THE CLOCK  (X)');
+      text(g, kneel ? '-1 YD, CLOCK RUNS' : 'A DOWN FOR THE CLOCK', r.x + r.w / 2, r.y + r.h - 22, { align: 'center', color: kneel ? '#5ce1ff' : '#ffd23f', shadow: false });
       return;
     }
     const d = c.def;

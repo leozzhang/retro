@@ -19,6 +19,14 @@ export const DEFAULT_QUARTER = 8;
 /** Play clock left at the snap when the clock was running: normal tempo huddles, hurry-up only lines up. */
 export const SNAP_AT = 14;
 export const HURRY_AT = 28;
+/**
+ * The user's clock plays: a kneel snaps with the play clock run down to `KNEEL_AT` and takes `KNEEL_SECS` off the
+ * game clock; a spike snaps as soon as the line is set (`SPIKE_AT` on the play clock) and takes `SPIKE_SECS`.
+ */
+export const KNEEL_AT = 1;
+export const KNEEL_SECS = 2;
+export const SPIKE_AT = 36;
+export const SPIKE_SECS = 1;
 
 export type Tempo = 'normal' | 'hurry';
 
@@ -47,13 +55,14 @@ export function tickBetween(c: Clock, dt: number): void {
 
 /**
  * Accelerated clock, just before the snap: with the clock running, the play clock (and the game
- * clock with it) runs down to the tempo's snap mark. A stopped clock costs nothing. It always
- * leaves a second, so it never takes away a snap (there are no timeouts or spikes yet); running the
- * clock out still works by waiting. Returns the seconds burned.
+ * clock with it) runs down to the tempo's snap mark (or a clock play's, `KNEEL_AT`, `SPIKE_AT`). A
+ * stopped clock costs nothing. It always leaves a second, so it never takes away a snap (there are no
+ * timeouts yet); a kneel then runs out the rest. Returns the seconds burned.
  */
-export function runoffAtSnap(c: Clock, tempo: Tempo): number {
+export function runoffAtSnap(c: Clock, tempo: Tempo | 'kneel' | 'spike'): number {
   if (c.mode !== 'run' || inOvertime(c)) return 0;
-  const burn = Math.max(0, Math.min(c.play - (tempo === 'hurry' ? HURRY_AT : SNAP_AT), c.time - 1));
+  const mark = tempo === 'hurry' ? HURRY_AT : tempo === 'kneel' ? KNEEL_AT : tempo === 'spike' ? SPIKE_AT : SNAP_AT;
+  const burn = Math.max(0, Math.min(c.play - mark, c.time - 1));
   c.play -= burn;
   c.time -= burn;
   return burn;

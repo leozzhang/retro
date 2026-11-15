@@ -53,7 +53,8 @@ export interface Lineup {
   qbRun: number;
 }
 
-export type SnapKind = 'catch' | 'inc' | 'run' | 'sack' | 'int' | 'fumble' | 'kneel';
+/** A spike is a QB's incompletion (NCAA); a kneel is his rush. */
+export type SnapKind = 'catch' | 'inc' | 'run' | 'sack' | 'int' | 'fumble' | 'kneel' | 'spike';
 
 /** Who made one snap: the carrier or target (`who`), and the defender who made the play (`by`: the interception or sack). */
 export interface SnapCredit {
@@ -106,6 +107,7 @@ export function castSnap(p: SimPlay, off: Lineup, def: Lineup, sitPass: number, 
   if (p.fg || p.punt) return null;
   const yds = Math.min(p.gain, 100 - p.yard);
   if (p.kneel) return { kind: 'kneel', pass: false, ...(off.on.QB ? { who: credited(off.on, 'QB', yds) } : {}) };
+  if (p.spike) return { kind: 'spike', pass: true, ...(off.on.QB ? { who: credited(off.on, 'QB', 0) } : {}) };
   if (p.turnover) {
     if (p.heave || rng() < INT_SHARE) {
       const by = defenderFor(def, CAST.backs, (a) => fit(a.r.cth, Math.max(a.r.mcv, a.r.zcv)), rng);
@@ -139,12 +141,13 @@ export function castDrive(plays: SimPlay[], off: Lineup, def: Lineup, clock: Dri
 /**
  * Who made a snap played through the engine (game/engineDrive.ts): no casting, the players who did it.
  * The thrower's target on a pass, the carrier on a run or scramble, the sacker and the picker. Kicks and
- * punts have none (null); a kneel is the QB's.
+ * punts have none (null); a kneel or a spike is the QB's.
  */
 export function engineCredit(p: SimPlay, s: EngineSnap | undefined, off: Record<string, Athlete>, def: Record<string, Athlete>): SnapCredit | null {
   if (p.fg || p.punt) return null;
   const who = (slot: string | null, yds: number) => (slot && off[slot] ? { who: credited(off, slot, yds) } : {});
   const by = (slot: string | null) => (slot && def[slot] ? { by: credited(def, slot, 0) } : {});
+  if (p.spike) return { kind: 'spike', pass: true, ...who('QB', 0) };
   if (p.kneel || !s) return { kind: 'kneel', pass: false, ...who('QB', p.gain) };
   const yds = Math.min(s.gain, 100 - s.yard);
   if (s.type === 'int' || s.type === 'pick6') return { kind: 'int', pass: true, ...by(s.takeaway) };

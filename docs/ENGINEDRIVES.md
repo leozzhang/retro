@@ -36,6 +36,12 @@ CPU-vs-CPU games stay on the drive sim, with a DC and scheme edge fitted from th
   - a `Play` stepped with the `CpuQb` to the end
 - **`engineDrive`:** a possession on the drive sim's coaching (`tempo`, `fourthDown`, `kickNow`, `desperate`, kneels).
   - Downs and spots come from `applyOutcome`. The clock comes from `SNAP_SECS` (the drive sim's scale: a stopped clock, a running one, hurry, milk).
+  - **Out of bounds** stops the clock only inside 2:00 of a half (NCAA). Before that, the clock starts again on the ready signal, so the snap costs a running snap less `SNAP_SECS.oobReady` (7 s). It used to be a full stop all game.
+  - **Spikes:** after an in-bounds snap with the clock running, `spikeNow` (game/situation.ts, the drive sim's rule, see SIMULATION.md) may spike the next one. The snap costs `SNAP_SECS.spikeRun` (the play and lining up to spike) in place of its draw, and the spike costs `SNAP_SECS.spike`. It's logged as a play with `spike` and no `EngineSnap`, then the usual `kickNow` and 4th-down checks run. That also lets a 1st-down gain set up the last-second kick.
+  - **The two-minute drill** (`clockOut`: the hurry-up inside 2:00) plays to stop the clock:
+    - The `Play` gets `clockOut`. Past the line, the auto-runner (a receiver after the catch, a back, a scrambling QB) turns for the nearer sideline once he's within 14 yd of it or someone's closing (`OOB_RUN`, sim/ai.ts).
+    - The CPU QB scores a catch spot within 9 yd of a sideline 3 yd better, and throws it away 3× as readily rather than take a sack (`CLOCK_OUT`, game/cpuOffense.ts).
+    - It's off everywhere else, so the film room, the balance report and the user's snaps are untouched.
   - The defense's brain watches every snap (`observe`).
   - It returns the `DriveSim` shape, plus `defPoints` (pick sixes, safeties) and an `EngineSnap` per snap: the play, call, tags, gain, outcome, target, carrier, tackler, takeaway, and the QB's log.
 - **Kicks are still the drive sim's:** field goals by `fgOdds`, punts by the caller's net.

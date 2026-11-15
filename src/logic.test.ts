@@ -298,6 +298,18 @@ describe('clock', () => {
     afterPlay(q4, 'oob', false);
     expect(q4.mode).toBe('untilSnap');
   });
+  it('a kneel runs the play clock down to the last second; a spike goes as soon as the line is set', () => {
+    const k: Clock = { ...at(4, 60), mode: 'run', play: 40 };
+    expect(runoffAtSnap(k, 'kneel')).toBe(39);
+    expect(k.time).toBe(21);
+    const short: Clock = { ...at(4, 10), mode: 'run', play: 40 };
+    runoffAtSnap(short, 'kneel');
+    expect(short.time).toBe(1); // never past the last second: the kneel runs that out
+    const sp: Clock = { ...at(4, 60), mode: 'run', play: 40 };
+    expect(runoffAtSnap(sp, 'spike')).toBe(4);
+    const stopped: Clock = { ...at(4, 60), mode: 'untilSnap', play: 40 };
+    expect(runoffAtSnap(stopped, 'kneel')).toBe(0);
+  });
   it('overtime is untimed and named by period', () => {
     const c: Clock = { ...at(5, 300, 5), mode: 'run', play: 40 };
     tickBetween(c, 1);

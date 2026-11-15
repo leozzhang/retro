@@ -2,7 +2,7 @@ import { FIELD_W, HASH_BOT, HASH_TOP, OPP_GOAL, OWN_GOAL } from '../engine/const
 import { CONF, leverage, unitEdge, type UnitConf } from '../data/confidence';
 import { clamp, gauss, type Rng } from '../engine/math';
 import { explosiveFactor, kickEdge, snapEdge, turnoverFactor, type DriveMods } from '../season/emphasis';
-import { desperate, fourthDown, kickNow, SITUATION, tempo, type Situation } from './situation';
+import { desperate, fourthDown, kickNow, SITUATION, spikeNow, tempo, type Situation } from './situation';
 
 /** 'fumble' = botched exchange or pitch, recovered by the offense (spotted like a tackle). */
 export type OutcomeType = 'tackle' | 'oob' | 'incomplete' | 'td' | 'int' | 'pick6' | 'sack' | 'safety' | 'fumble';
@@ -258,6 +258,8 @@ export interface SimPlay {
   kneel?: boolean;
   /** A last-snap throw to the end zone (`desperate`). */
   heave?: boolean;
+  /** A spike to stop the clock (`spikeNow`): a down for the time. */
+  spike?: boolean;
 }
 
 /** Confidence for one drive: the offense's and defense's units and the kicker (`teamConf`), and whether it's late and close. */
@@ -270,11 +272,21 @@ export function fgOdds(dist: number, kEdge = 0): number {
   return clamp(0.97 - (dist - 20) * 0.017 + kEdge * CONF.fgPerPoint, 0.3, 0.97);
 }
 
-/** Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap. */
-function simPlaySecs(hurry: boolean, milk: boolean, pace: number, rng: Rng): number {
-  if (hurry) return clamp(15 + gauss(rng) * 4, 7, 25);
-  if (rng() < 0.3) return clamp(7 + gauss(rng) * 2, 4, 12); // incompletion / out of bounds
-  return clamp(((milk ? 38 : 32) + gauss(rng) * 6) * pace, 14, 45);
+/**
+ * Game-clock cost of one simulated play, whistle to whistle plus the runoff before the next snap, and whether the clock was stopped at the whistle. With `split` (the situation path), the hurry-up's
+ * snaps are an incompletion or out of bounds (`hurryStop` of them: the two-minute drill plays to stop the clock)
+ * or in bounds with the clock running; without it the hurry-up is one draw as it always was.
+ */
+function simPlayClock(hurry: boolean, milk: boolean, pace: number, rng: Rng, split: boolean): { secs: number; stopped: boolean } {
+  const D = DRIVE_SIM;
+  const draw = ([m, sd, lo, hi]: number[]) => clamp(m + gauss(rng) * sd, lo, hi);
+  if (hurry && split) {
+    const stopped = rng() < D.hurryStop;
+    return { secs: draw(stopped ? D.hurryStopSecs : D.hurryRunSecs), stopped };
+  }
+  if (hurry) return { secs: clamp(15 + gauss(rng) * 4, 7, 25), stopped: false };
+  if (rng() < 0.3) return { secs: clamp(7 + gauss(rng) * 2, 4, 12), stopped: true }; // incompletion / out of bounds
+  return { secs: clamp(((milk ? 38 : 32) + gauss(rng) * 6) * pace, 14, 45), stopped: false };
 }
 
 /**
@@ -301,6 +313,15 @@ export const DRIVE_SIM = {
   heaveTdRange: [0.02, 0.15],
   heaveInt: 0.15,
   heaveSecs: 8,
+  /**
+   * The hurry-up on the situation path: `hurryStop` of its snaps stop the clock (an incompletion, out of
+   * bounds), costing `hurryStopSecs`; the rest run it, costing `hurryRunSecs` (the snap and the no-huddle
+   * line-up), or `spikeRunSecs` when the next snap is a spike (the snap and lining up to spike it). [mean, sd, lo, hi]
+   */
+  hurryStop: 0.5,
+  hurryStopSecs: [7, 2, 4, 12],
+  hurryRunSecs: [22, 5, 12, 32],
+  spikeRunSecs: [10, 2, 7, 14],
 };
 
 /** Yards on one simulated play; `xf` scales the big-play odds (weekly emphases). */
@@ -372,7 +393,21 @@ export function simulateDrive(
     }
     plays++;
     const at = { yard, t: secs };
-    secs += sit ? simPlaySecs(tmp === 'hurry', tmp === 'milk', pace, rng) : simPlaySecs(clock.hurry, clock.milk, pace, rng);
+    const cost = sit ? simPlayClock(tmp === 'hurry', tmp === 'milk', pace, rng, true) : simPlayClock(clock.hurry, clock.milk, pace, rng, false);
+    secs += cost.secs;
+    // In bounds with the clock running: spike the next snap if the clock has to stop (`spikeNow`), lining up
+    // to spike in place of a no-huddle call. Decided on the mean line-up, so only a spike draws.
+    const spike = (): void => {
+      if (!sit || cost.stopped || clock.quarterBreak || plays >= 25) return;
+      const S = DRIVE_SIM.spikeRunSecs;
+      const after = sitNow()!;
+      if (!spikeNow({ ...after, secsLeft: after.secsLeft + cost.secs - S[0] })) return;
+      secs += clamp(S[0] + gauss(rng) * S[1], S[2], S[3]) - cost.secs;
+      plays++;
+      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, lev: 0, spike: true });
+      secs += 1;
+      down++;
+    };
     const lev = leverage(down, 100 - yard, conf?.late ?? false);
     const em = mods ? snapEdge(mods, down, toGo, yard) : 0;
     const emp = em ? { em } : {};
@@ -388,9 +423,12 @@ export function simulateDrive(
     if (toGo <= 0) {
       down = 1;
       toGo = Math.min(10, 100 - yard);
-      continue;
+      spike();
+      if (down === 1) continue;
+    } else {
+      down++;
+      spike();
     }
-    down++;
     const fgDist = 100 - yard + 17;
     const kick = (): DriveSim => {
       const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);

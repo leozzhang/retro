@@ -36,6 +36,10 @@ export interface Situation {
  * - `despSecs`, `despFar`: time for one last snap, beyond field goal range: throw it to the end zone.
  * - `passLong`, `passShort`, `passBehind`, `passAhead`: pass share added on 3rd and long, short
  *   yardage, trailing with the hurry-up on, and milking a lead.
+ * - `clockOutSecs`: the hurry-up inside this plays to stop the clock (`clockOut`): sideline throws, out of
+ *   bounds, throw it away. `spikeSecs`: with the clock running and `clockOut` on, spike it on 1st or 2nd
+ *   down inside this; `spikeKickSecs`: spike to kick a field goal that helps inside this, through 3rd
+ *   down. `spikeMin`: no spike with less than this left (one snap is all there is).
  */
 export const SITUATION = {
   fgMax: 52,
@@ -55,6 +59,10 @@ export const SITUATION = {
   passShort: -0.25,
   passBehind: 0.25,
   passAhead: -0.3,
+  clockOutSecs: 120,
+  spikeSecs: 45,
+  spikeKickSecs: 30,
+  spikeMin: 4,
 };
 
 /** Field goal distance from the line of scrimmage. */
@@ -150,4 +158,23 @@ export function passOdds(base: number, s: Situation): number {
   if (t === 'hurry') p += S.passBehind;
   else if (t === 'milk') p += S.passAhead;
   return clamp(p, 0.05, 0.95);
+}
+
+/** The hurry-up late in a half: the offense plays to stop the clock (sideline throws, out of bounds, throw it away). */
+export function clockOut(s: Situation): boolean {
+  return tempo(s) === 'hurry' && s.secsLeft <= SITUATION.clockOutSecs;
+}
+
+/**
+ * With the clock running after an in-bounds snap (`s` is the situation after it): spike it? To kick a field
+ * goal that helps through 3rd down, or in the hurry-up on 1st or 2nd down to save the time a no-huddle
+ * call takes. Never on 4th down, in overtime, when kneeling or milking, or with one snap left.
+ */
+export function spikeNow(s: Situation): boolean {
+  const S = SITUATION;
+  if (s.ot || s.down >= 4 || s.secsLeft <= S.spikeMin) return false;
+  const t = tempo(s);
+  if (t === 'kneel' || t === 'milk') return false;
+  if (s.down <= 3 && s.secsLeft <= S.spikeKickSecs && fgDistance(s) <= S.fgMax && fieldGoalHelps(s)) return true;
+  return s.down <= 2 && s.secsLeft <= S.spikeSecs && clockOut(s);
 }

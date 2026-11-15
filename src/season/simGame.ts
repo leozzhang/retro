@@ -136,6 +136,8 @@ export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: Dr
         }
         break;
       case 'inc':
+      case 'spike':
+        // NCAA: a spike is an incomplete pass.
         if (ql) ql.att++;
         break;
       case 'int':
@@ -186,7 +188,7 @@ export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false,
     if (p.fg) l.kick = { unit: 'fg', good: p.fg.made, dist: p.fg.dist };
     if (p.punt) l.kick = { unit: 'punt', good: true };
     return l;
-  });
+  }).filter((_, i) => !plays[i].spike); // a spike is no football rep: no grade, no hits
   // Overtime has no kickoffs.
   if (d.result === 'TOUCHDOWN') out.push({ gain: 0, down: 0, toGo: 0, kick: { unit: 'xp', good: true } });
   if (!ot && (d.result === 'TOUCHDOWN' || d.result === 'FIELD GOAL')) out.push({ gain: 0, down: 0, toGo: 0, kick: { unit: 'kickoff', good: true } });

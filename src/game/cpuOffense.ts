@@ -307,6 +307,13 @@ export const CPU_QB = {
   aggr: 0.25,
 };
 
+/**
+ * The two-minute drill (`Play.clockOut`): a catch spot within `edge` yd of a sideline scores `sideline` yd more
+ * in his read (the out, the comeback, the corner: the catch that gets out of bounds), and his odds of throwing it
+ * away on each look are `away` x (at most certain), rather than take a sack with the clock running.
+ */
+export const CLOCK_OUT = { sideline: 3, edge: 9, away: 3 };
+
 /** What the QB brings to a snap beyond the play: the down, his targets and his leans (`OffIdentity`). */
 export interface QbCtx {
   down: number;
@@ -514,7 +521,7 @@ export class CpuQb {
       const w = at.w + gauss(this.r) * this.noise;
       const pull = this.pull[o.slot] ?? 0;
       const need = this.openAt(at.depth) - CPU_QB.favor.trust * pull;
-      const sc = Math.min(d, reach) + CPU_QB.preferOpen * Math.min(w - need, CPU_QB.openCap) + CPU_QB.favor.score * pull;
+      const sc = Math.min(d, reach) + CPU_QB.preferOpen * Math.min(w - need, CPU_QB.openCap) + CPU_QB.favor.score * pull + this.sidelineBonus(o);
       if (w >= need && sc > score) {
         best = o;
         score = sc;
@@ -538,17 +545,18 @@ export class CpuQb {
       return;
     }
     const awayOdds = lerpAwr(CPU_QB.awayAwr, qb.r.prc);
+    const k = play.clockOut ? CLOCK_OUT.away : 1;
     if (this.escapeAt !== null) {
       // Out of the pocket: once he's bought what time there is, he runs if he can, else throws it away.
       if (since - this.escapeAt < CPU_QB.escape.extend) return;
       if (this.tryScramble(pressure, true)) return;
-      if (this.r() < awayOdds * CPU_QB.escape.away) this.throwAway();
+      if (this.r() < Math.min(1, awayOdds * CPU_QB.escape.away * k)) this.throwAway();
       return;
     }
     if (this.tryScramble(pressure)) return;
     if (pressure >= CPU_QB.escape.at && this.startEscape()) return;
     const out = since >= this.window + this.hold + CPU_QB.away;
-    if ((pressure >= CPU_QB.scramble.forced || out) && this.r() < awayOdds * CPU_QB.awayPerScan) this.throwAway();
+    if ((pressure >= CPU_QB.scramble.forced || out) && this.r() < Math.min(1, awayOdds * CPU_QB.awayPerScan * k)) this.throwAway();
   }
 
   /**
@@ -558,6 +566,13 @@ export class CpuQb {
    */
   private seen(o: Player): number {
     return this.windowAt(o).w + gauss(this.r) * this.noise;
+  }
+
+  /** In the two-minute drill, a catch near a sideline (`CLOCK_OUT`): yards of read score. */
+  private sidelineBonus(o: Player): number {
+    if (!this.play.clockOut) return 0;
+    const y = this.play.cpuAim(o).aim.y;
+    return Math.min(y, FIELD_W - y) <= CLOCK_OUT.edge ? CLOCK_OUT.sideline : 0;
   }
 
   /** The true window on a throw to `o` now (`seen` without the misread), and how deep past the line the ball would meet him. */
