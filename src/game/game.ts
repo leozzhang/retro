@@ -102,7 +102,7 @@ import { KickPlay } from './kickPlay';
 import { HARD_COUNT, Play } from './playState';
 import { personnelOf, resolvePlay } from './resolvePlay';
 import {
-  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, OVERTIME, PAT, xpOdds, startDrive, userStartAfter,
+  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, movesChains, OVERTIME, PAT, xpOdds, startDrive, userStartAfter,
   type Applied, type Drive, type DriveClock, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
@@ -3434,7 +3434,7 @@ export class Game {
     const turnover = snap.kind === 'int';
     const p: LiveSimPlay = {
       gain: turnover ? 0 : gain, explosive: gain >= 20, turnover, down: d.down, toGo: Math.round(d.firstDownX - d.los), yard: Math.round(d.los - OWN_GOAL), t: 0,
-      lev: this.snapLev,
+      lev: this.snapLev, first: movesChains(d, o),
     };
     const slotOf = (a: Athlete) => [...Object.entries(on), ...Object.entries(dOn)].find(([, x]) => x === a)?.[0];
     storyUserSnap(this.liveBox, this.snapAt ?? this.atNow(), p, userCredit(snap, slotOf, play.playDef.kind !== 'run'));

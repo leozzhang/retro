@@ -29,7 +29,7 @@ import { alignY, personnelOf, resolvePlay } from './game/resolvePlay';
 import { jobOf, schemeText } from './render/playbookScreen';
 import { parseStarred, toggleStar } from './game/starred';
 import {
-  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, simulateDrive, startDrive, type KickOutcome, type PlayOutcome,
+  applyKick, applyOutcome, applyTry, converted, downDistance, fieldLabel, movesChains, simulateDrive, startDrive, type KickOutcome, type PlayOutcome,
 } from './game/rules';
 import {
   CALM, fgCheck, fgDistance, METER_HALF, mistimeAngle, POSTS_X, POSTS_Y, predictKick, timingGreen, UPRIGHT_HALF, type BounceProfile,
@@ -237,6 +237,18 @@ describe('rules', () => {
     const a = applyOutcome(startDrive(25), out('tackle', 39));
     expect(a.drive.down).toBe(2);
     expect(downDistance(a.drive)).toBe('2ND & 6');
+  });
+  it('a logged snap converts only where the chains moved, not on its rounded yards', () => {
+    // 3rd and 9.4 (logged 9), a 9.3-yard gain (logged 9): a fraction short, so 4th and 1.
+    const d = { los: 50, ballY: 26.6, down: 3, firstDownX: 59.4 };
+    const o = out('tackle', 59.3);
+    expect(applyOutcome(d, o).drive.down).toBe(4);
+    expect(movesChains(d, o)).toBe(false);
+    const logged = { gain: Math.round(o.spot - d.los), toGo: Math.round(d.firstDownX - d.los), first: movesChains(d, o) };
+    expect(logged.gain >= logged.toGo).toBe(true);
+    expect(converted(logged)).toBe(false);
+    // The drive sim's whole yards fall back to gain against distance.
+    expect(converted({ gain: 9, toGo: 9 })).toBe(true);
   });
   it('incomplete keeps the spot', () => {
     const a = applyOutcome(startDrive(25), out('incomplete', 35));

@@ -51,6 +51,19 @@ export function startDrive(yards: number): Drive {
   return { los, ballY: FIELD_W / 2, down: 1, firstDownX: Math.min(OPP_GOAL, los + 10) };
 }
 
+/**
+ * Whether a snap moves the chains, on the exact spot (as `applyOutcome` reads it). Logs round the gain and
+ * the distance apart, so they can't tell a 9.3-yard gain on 3rd and 9.4 from a conversion: they keep this.
+ */
+export function movesChains(drive: Drive, out: PlayOutcome): boolean {
+  if (out.type === 'td') return true;
+  if (out.type === 'incomplete' || out.type === 'int' || out.type === 'pick6' || out.type === 'safety') return false;
+  return out.spot >= drive.firstDownX;
+}
+
+/** A logged snap moved the chains: its `first` where it was played on the field, else gain against distance (the drive sim's whole yards). */
+export const converted = (p: { gain: number; toGo: number; first?: boolean }): boolean => p.first ?? p.gain >= p.toGo;
+
 export function applyOutcome(drive: Drive, out: PlayOutcome): Applied {
   const base = { drive, userPoints: 0, cpuPoints: 0 };
   switch (out.type) {
@@ -73,7 +86,7 @@ export function applyOutcome(drive: Drive, out: PlayOutcome): Applied {
   } else {
     const los = clamp(out.spot, OWN_GOAL + 0.5, OPP_GOAL - 0.5);
     const ballY = clamp(out.spotY, HASH_TOP, HASH_BOT);
-    if (out.spot >= drive.firstDownX) {
+    if (movesChains(drive, out)) {
       next = { los, ballY, down: 1, firstDownX: Math.min(OPP_GOAL, los + 10) };
       headline = 'FIRST DOWN';
     } else {
@@ -260,6 +273,11 @@ export interface SimPlay {
   heave?: boolean;
   /** A spike to stop the clock (`spikeNow`): a down for the time. */
   spike?: boolean;
+  /**
+   * The snap moved the chains (`movesChains`), set where it was played on the field: its gain and distance
+   * are rounded apart, so `gain >= toGo` can be wrong by a fraction of a yard. Read it with `converted`.
+   */
+  first?: boolean;
 }
 
 /** Confidence for one drive: the offense's and defense's units and the kicker (`teamConf`), and whether it's late and close. */

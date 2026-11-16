@@ -14,7 +14,7 @@ import { defPull, ocObserve, targetPull, type OcBrain } from './ocBrain';
 import { Play } from './playState';
 import { personnelOf, resolvePlay } from './resolvePlay';
 import { newRecorder, recordFrame, TAPE, type Tape } from './tape';
-import { applyOutcome, fgOdds, snapSituation, type Drive, type DriveClock, type DriveSim, type PlayOutcome, type SimPlay } from './rules';
+import { applyOutcome, fgOdds, movesChains, snapSituation, type Drive, type DriveClock, type DriveSim, type PlayOutcome, type SimPlay } from './rules';
 import { clockOut, desperate, fourthDown, kickNow, SITUATION, spikeNow, tempo, type Situation } from './situation';
 import { TWO_MIN } from './clock';
 
@@ -69,6 +69,8 @@ export interface EngineSnap {
   /** Yards from the offense's own goal before the snap. */
   yard: number;
   gain: number;
+  /** It moved the chains, on the exact spot (`movesChains`): the rounded gain and distance can't say. */
+  first: boolean;
   type: PlayOutcome['type'];
   pass: boolean;
   /** A throw left his hand (a throwaway too). */
@@ -329,7 +331,7 @@ function readSnap(
   const pass = isPassCall(play.playDef) && !play.handedOff && !(play.kept && play.playDef.kind === 'run');
   const takeaway = o.type === 'int' || o.type === 'pick6' ? play.carrier?.slot ?? null : r.fumbled ? play.tackler?.slot ?? null : null;
   return {
-    play: play.playDef, call: play.defCall, tags: play.tags ?? {}, down: drive.down, toGo: sit.toGo, yard, gain, type: o.type, pass,
+    play: play.playDef, call: play.defCall, tags: play.tags ?? {}, down: drive.down, toGo: sit.toGo, yard, gain, first: !r.fumbled && movesChains(drive, o), type: o.type, pass,
     thrown: play.thrown, complete: play.thrown && !!play.ballMan && play.ballMan !== play.qb && o.type !== 'incomplete' && o.type !== 'int' && o.type !== 'pick6',
     air: play.thrown && play.ballTarget ? Math.round(play.ballTarget.x - drive.los) : 0, target: play.thrown ? play.intended?.slot ?? null : null,
     carrier: play.ballMan?.slot ?? null, tackler: play.tackler?.slot ?? null, takeaway, lostFumble: r.fumbled, qb: r.qb, secs: r.secs, checked: r.checked, shifted: !!r.shifted, rechecked: !!r.rechecked, lev: r.lev,
@@ -423,7 +425,7 @@ export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng
     const { gain } = snap;
     snaps.push(snap);
     const turnover = o.type === 'int' || o.type === 'pick6' || fumbled;
-    opts.onPlay?.({ gain: turnover ? 0 : gain, explosive: gain >= 15 && !turnover, turnover, down: drive.down, toGo: sit.toGo, ...at, lev, ...(heave ? { heave: true } : {}) }, snap);
+    opts.onPlay?.({ gain: turnover ? 0 : gain, explosive: gain >= 15 && !turnover, turnover, down: drive.down, toGo: sit.toGo, ...at, lev, first: snap.first, ...(heave ? { heave: true } : {}) }, snap);
     if (brain) {
       const success = successful({ gain, pass: play.playDef.kind !== 'run', down: drive.down, toGo: sit.toGo, ...(o.type === 'sack' ? { sack: true } : {}), ...(turnover ? { turnover: true } : {}) });
       observe(brain, {

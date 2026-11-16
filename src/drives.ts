@@ -16,7 +16,7 @@ import { clamp, gauss, mulberry32, type Rng } from './engine/math';
 import { halftime, newBrain, newDrive, teamSmarts, type DefBrain } from './game/defBrain';
 import { driveStream, engineDrive, type EngineSide, type EngineSnap } from './game/engineDrive';
 import { rosterRead } from './game/offModel';
-import { simulateDrive, userStartAfter, type DriveClock, type DriveSim, type SimPlay } from './game/rules';
+import { converted, simulateDrive, userStartAfter, type DriveClock, type DriveSim, type SimPlay } from './game/rules';
 import { GAME_SIM } from './season/simGame';
 import { autoGamePlan } from './season/staff';
 import { successful } from './season/grades';
@@ -252,7 +252,7 @@ function add(a: Agg, d: DriveRec): void {
     if (p.gain >= 20) a.big20++;
     if (p.down === 3) {
       a.third++;
-      if (!p.turnover && p.gain >= p.toGo) a.thirdConv++;
+      if (!p.turnover && converted(p)) a.thirdConv++;
     }
   }
   for (const s of d.snaps) {
@@ -525,13 +525,13 @@ export function drivesReport(): string[] {
       out.push(`  down ${dn}: ENG success ${pad(f1(pct(ss.filter(ok).length, ss.length)), 5)}%  gain ${pad(f1(ss.reduce((a, x) => a + x.gain, 0) / ss.length), 4)}  to go ${pad(f1(ss.reduce((a, x) => a + x.toGo, 0) / ss.length), 4)}   SIM gain ${pad(f1(sp.reduce((a, p) => a + p.gain, 0) / sp.length), 4)}  to go ${pad(f1(sp.reduce((a, p) => a + p.toGo, 0) / sp.length), 4)}`);
     }
     // 3rd down by distance: conversion and what was called (FBS about 1-2: 65-70%, 3-5: 50%, 6-9: 35%, 10+: 20-25%).
-    const conv = (x: EngineSnap) => !x.lostFumble && x.type !== 'int' && x.type !== 'pick6' && x.gain >= x.toGo;
+    const conv = (x: EngineSnap) => !x.lostFumble && x.type !== 'int' && x.type !== 'pick6' && x.first;
     const thirds = snaps.filter((x) => x.down === 3);
     const simThirds = simPlays.filter((p) => p.down === 3);
     out.push('  3rd down by distance:' + [[1, 2], [3, 5], [6, 9], [10, 99]].map(([lo, hi]) => {
       const t = thirds.filter((x) => x.toGo >= lo && x.toGo <= hi);
       const st = simThirds.filter((p) => p.toGo >= lo && p.toGo <= hi);
-      return `  ${lo}-${hi === 99 ? '' : hi}: ENG ${f1(pct(t.filter(conv).length, t.length))}% (run ${f1(pct(t.filter((x) => !x.pass).length, t.length))}%, n ${t.length}) SIM ${f1(pct(st.filter((p) => !p.turnover && p.gain >= p.toGo).length, st.length))}%`;
+      return `  ${lo}-${hi === 99 ? '' : hi}: ENG ${f1(pct(t.filter(conv).length, t.length))}% (run ${f1(pct(t.filter((x) => !x.pass).length, t.length))}%, n ${t.length}) SIM ${f1(pct(st.filter((p) => !p.turnover && converted(p)).length, st.length))}%`;
     }).join(''));
     {
       const t = thirds.filter((x) => x.toGo <= 2);

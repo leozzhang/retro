@@ -16,6 +16,7 @@ import { frameAt, shiftAt, shiftLength, tapeLength, type Tape } from './tape';
 import {
   FgSearch, fgTargetFor, makeFg, makeReplay, ReplaySearch, stepFg, stepReplay, targetFor, type FgSetup, type ReplaySetup, type ReplaySide, type ReplayTarget,
 } from './replay';
+import { converted } from './rules';
 
 /**
  * One key play on screen: it finds its replay (a few milliseconds a frame), shows the lineup,
@@ -287,7 +288,7 @@ export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx,
   if (sh.note) text(g, sh.note, 8, 52, { size: 8, color: '#9ad7ff' });
   if (captioned) {
     const k = sh.k;
-    const stop = k.kind === 'snap' && k.play.gain < k.play.toGo && !k.play.turnover;
+    const stop = k.kind === 'snap' && !converted(k.play) && !k.play.turnover;
     // A kick's caption is its own, and it went the kicking team's way or not.
     if (k.kick && KICKS.has(k.kind)) {
       drawBanner(g, k.kick.title, k.kick.line, k.kick.good === sh.userBall ? '#ffd23f' : '#ff5a5a', situation);
@@ -295,7 +296,7 @@ export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx,
       return;
     }
     const good = (DEFENSIVE.has(k.kind) || stop) !== sh.userBall;
-    const title = k.kind !== 'snap' ? KEY_TITLE[k.kind] : k.play.gain >= k.play.toGo ? 'FIRST DOWN' : `${downText({ ...k.play, yard: k.play.yard + k.play.gain, down: Math.min(4, k.play.down + 1), toGo: k.play.toGo - k.play.gain })} NEXT`;
+    const title = k.kind !== 'snap' ? KEY_TITLE[k.kind] : converted(k.play) ? 'FIRST DOWN' : `${downText({ ...k.play, yard: k.play.yard + k.play.gain, down: Math.min(4, k.play.down + 1), toGo: k.play.toGo - k.play.gain })} NEXT`;
     drawBanner(g, title, playLine(sh), good ? '#ffd23f' : '#ff5a5a', situation);
   }
   drawHint(g, sh.label === 'HIGHLIGHT' ? 'SPACE: NEXT   ESC: BACK TO THE GAME' : 'SPACE: NEXT   ESC: SKIP THE KEY PLAYS');

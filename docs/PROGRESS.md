@@ -2,6 +2,11 @@
 
 _Last updated: 2026-11-15_
 
+## Fixed: "3rd down conversion" that wasn't (2026-11-15)
+- **The bug:** key plays, highlight banners and the game page said a snap converted when `gain >= toGo`, but the snap log rounds the gain and the distance separately, while the chains move on the exact spot. On 3rd and 9.4 (logged 9), a 9.3-yard gain (logged 9) was titled 3RD DOWN CONVERSION, and the next snap was 4th and 1. It went wrong the other way too: 3rd and 0.4 with a 0.45-yard gain showed STOPPED ON 3RD DOWN but was a first down.
+- **The fix:** `movesChains` (`game/rules.ts`) is the one rule, used by `applyOutcome`. Snaps played on the field, which are the engine's CPU drives and simulated games (`EngineSnap.first`) and the user's own snaps (`creditSnap`), log it as `SimPlay.first`. `converted(p)` reads it and falls back to `gain >= toGo` for the drive sim's whole yards and old saves. Readers: `classify`, the highlight banner, and `drives.ts`'s 3rd-down rows, which may move a little because they're now exact. `withFourthDowns` no longer rebuilds a 4th down after a snap played on the field, because those drives log their own 4th downs.
+- **Tests:** a rules test in `logic.test.ts`. `npm test` in PowerShell: 5 long season tests time out under the full parallel run (`coaching` ×2, `confidence`, `injuries`, `defBrain`), and all pass when run alone. Run from Git Bash, every suite fails to load (vitest "failed to find the current suite"), on the clean tree too.
+
 ## Done: kicks in simulated games (2026-11-15)
 ENGINEDRIVES.md "Kicks in engine games" has the details and numbers.
 - **The user's simulated games** (SIM GAME, the simulated quarters, the exhibition's SIM GAME) play their kickoffs and punts through `KickPlay` with the CPU on both sides (`game/engineKick.ts`, `CPU_KICK`). The kick decides the field position, fair catches, muffs and return touchdowns. A safety is followed by a free kick from the 20.

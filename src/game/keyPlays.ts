@@ -1,4 +1,4 @@
-import type { SimPlay } from './rules';
+import { converted, type SimPlay } from './rules';
 import type { SnapCredit } from '../season/cast';
 import { storyClock, type GameStory, type StoryDrive, type StoryKick } from '../season/story';
 import type { KeyLevel } from '../season/types';
@@ -85,7 +85,7 @@ function withFourthDowns(d: StoryDrive): [SimPlay, SnapCredit | undefined][] {
     const a = snaps[i];
     out.push([a, d.credit.snaps[i] ?? undefined]);
     // A logged 4th-down snap (a coach going for it) needs no rebuilding, nor does a played drive.
-    if (d.live || isKick(a) || a.turnover || a.down === 4 || a.kneel || a.spike) continue;
+    if (d.live || isKick(a) || a.turnover || a.down === 4 || a.kneel || a.spike || a.first !== undefined) continue;
     const at = a.yard + a.gain;
     const toGo = a.toGo - a.gain;
     const b = snaps[i + 1];
@@ -108,7 +108,7 @@ function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last:
   if (p.heave && !p.turnover && p.gain < 100 - p.yard) return null;
   if (p.turnover) return { kind: snap?.kind === 'fumble' ? 'fumble' : 'int', priority: 3 };
   if (p.yard + p.gain >= 100) return { kind: 'td', priority: 3 };
-  const conv = p.gain >= p.toGo;
+  const conv = converted(p);
   if (p.down === 4) return conv ? { kind: 'fourthConv', priority: 2 } : { kind: 'fourthStop', priority: 3 };
   if (p.explosive || p.gain >= T.explosive) return { kind: 'explosive', priority: 2 };
   if (p.gain <= T.sack) return { kind: 'sack', priority: dfn ? 2 : 1 };
