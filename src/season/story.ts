@@ -43,10 +43,44 @@ export interface StoryDrive {
   live?: boolean;
 }
 
+/**
+ * A kick between the drives of an engine game (season/engineGame.ts): a kickoff, a punt or an extra
+ * point, for watching and the game page. A punt's snap is on its drive too (`SimPlay.punt`).
+ */
+export interface StoryKick {
+  unit: 'kickoff' | 'punt' | 'xp';
+  /** The kicking team, and how many drives were told before it (it comes after `drives[at - 1]`). */
+  team: string;
+  at: number;
+  /** The kick as a snap for the captions and clock: its spot (`yard`, from the kicker's own goal), down, distance and leverage; `t` is 0. */
+  play: SimPlay;
+  half: number;
+  left: number;
+  qSecs: number;
+  /** Points by team id before the kick. */
+  score: Record<string, number>;
+  /** How it ended (an extra point: 'xpGood' or 'xpMiss'). */
+  result: string;
+  /** Points it scored by team id: a return touchdown with its try, an extra point. */
+  pts?: Record<string, number>;
+  /** It went the kicking team's way. */
+  good: boolean;
+  /** The caption. */
+  title: string;
+  line: string;
+  /** The returner (a return touchdown's star) and the player who fell on a muff. */
+  returner?: Credited;
+  recoverer?: Credited;
+  /** Yards it was run back. */
+  ret?: number;
+}
+
 export interface GameStory {
   home: string;
   away: string;
   drives: StoryDrive[];
+  /** The engine game's kicks (missing elsewhere). */
+  kicks?: StoryKick[];
 }
 
 export const newStory = (home: string, away: string): GameStory => ({ home, away, drives: [] });

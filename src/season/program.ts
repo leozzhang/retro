@@ -1,4 +1,5 @@
 import { CALENDAR } from '../data/season/calendar';
+import { clamp, gauss, hashString, mulberry32 } from '../engine/math';
 import { RIVALRIES } from '../data/season/rivalries';
 import { TEAM_HISTORY } from '../data/fbs/history';
 import type { PastSeason, ProgramHistory } from '../data/fbs/programHistory';
@@ -194,7 +195,7 @@ export interface Tenure {
   year: number;
   /** The user's program: the user is its head coach. */
   user: boolean;
-  /** His record here in the seasons the game has seen (the dynasty's, this one's included). */
+  /** His record here: the dynasty's seasons (this one's included), plus his seasons before it with the real history (`priorRecord`). */
   w: number;
   l: number;
 }
@@ -222,13 +223,51 @@ export function coachTenure(state: SeasonState, id: string): Tenure {
     w += rows[i].w;
     l += rows[i].l;
   }
-  // The generated head coach was already there when the game began.
+  // The generated head coach was already there when the game began (with the real history only:
+  // a fresh start opens every coach at his first year, 0-0).
   let before = 0;
-  if (c.id === `${id}-hc` && here === rows.length) {
+  if (c.id === `${id}-hc` && here === rows.length && state.config.history !== 'fresh') {
     const b = baseline(state, id);
     before = b ? Math.max(0, CALENDAR.year - b.coachSince) : coachTraits(c.id).tenure;
+    const pre = priorRecord(id, c.id, before, b);
+    w += pre.w;
+    l += pre.l;
   }
   return { name: `${c.first[0]}. ${c.last}`.toUpperCase(), year: before + here + live, user: false, w: w + (live ? rec.w : 0), l: l + (live ? rec.l : 0) };
+}
+
+/**
+ * The opening head coach's record in his seasons before the dynasty: the real seasons where the
+ * history has them (the last five), and seeded ones before that, around his real recent win rate
+ * blended with the program's all-time rate. Stable per coach; display only.
+ */
+function priorRecord(id: string, coachId: string, years: number, b: ProgramHistory | undefined): { w: number; l: number } {
+  let w = 0;
+  let l = 0;
+  const real = new Map((b?.recent ?? []).map((r) => [r.year, r]));
+  const mine = [...real.values()].filter((r) => r.year >= CALENDAR.year - years);
+  const pct = (x: { w: number; l: number }) => (x.w + x.l ? x.w / (x.w + x.l) : 0.5);
+  const recentW = mine.reduce((n, r) => n + r.w, 0);
+  const recentL = mine.reduce((n, r) => n + r.l, 0);
+  const all = b ? pct(b.allTime) : 0.5;
+  const base = recentW + recentL ? 0.6 * pct({ w: recentW, l: recentL }) + 0.4 * all : all;
+  const rng = mulberry32(hashString(`${id}:${coachId}:prior`));
+  for (let y = CALENDAR.year - years; y < CALENDAR.year; y++) {
+    const r = real.get(y);
+    if (r) {
+      w += r.w;
+      l += r.l;
+      continue;
+    }
+    const reg = y < 2006 ? 11 : 12;
+    const wins = Math.round(clamp(base + gauss(rng) * 0.14, 0.08, 0.95) * reg);
+    // Six wins goes bowling, a coin flip either way; a good year sometimes adds a title game.
+    const post = (wins >= 6 ? 1 : 0) + (wins >= 10 && rng() < 0.4 ? 1 : 0);
+    const postW = Array.from({ length: post }, () => rng() < 0.35 + 0.3 * base).filter(Boolean).length;
+    w += wins + postW;
+    l += reg - wins + post - postW;
+  }
+  return { w, l };
 }
 
 /** The season the head coach's run began (next season for a coach hired this offseason). */

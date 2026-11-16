@@ -7,6 +7,7 @@ import { poseOf } from '../sim/player';
 import type { Look, Pose, Uniform } from '../render/sprites';
 import { lookOf } from '../render/renderer';
 import type { Play } from './playState';
+import type { KickPlay } from './kickPlay';
 
 /**
  * A tape of a snap the user played: what the field showed, frame by frame, so a postgame highlight
@@ -144,6 +145,48 @@ export function recordFrame(r: TapeRecorder, dt: number): void {
   if (r.t < r.next) return;
   r.next += 1 / TAPE.fps;
   r.tape.frames.push(frame(play, r.t));
+}
+
+/** A kick on tape (a simulated game's kickoffs and punts): every 1/fps of play time from the first step. */
+export interface KickRecorder {
+  kp: KickPlay;
+  tape: Tape;
+  t: number;
+  next: number;
+}
+
+export function newKickRecorder(kp: KickPlay): KickRecorder {
+  const r: KickRecorder = { kp, tape: { cast: kp.players.map((p) => ({ uniform: p.uniform, skin: p.skin })), frames: [] }, t: 0, next: 1 / TAPE.fps };
+  r.tape.frames.push(kickFrame(kp, 0));
+  return r;
+}
+
+function kickFrame(kp: KickPlay, t: number): TapeFrame {
+  const presnap = kp.phase === 'presnap';
+  const b = kp.ball;
+  const carrier = b.carrier ? kp.players.indexOf(b.carrier) : -1;
+  // A ball on the tee or in the hold, or loose in no one's hands, is drawn where it lies.
+  const state = b.state === 'held' && carrier < 0 ? 'dead' : b.state;
+  const f = kp.focus();
+  return {
+    t,
+    men: kp.players.map((p) => ({
+      x: p.pos.x, y: p.pos.y, vx: p.vel.x, vy: p.vel.y, facing: p.facing, pose: poseOf(p, presnap),
+      look: p === kp.catcher && kp.phase === 'flight' ? 'hands' : 'fwd', juke: p.juke,
+    })),
+    ball: { state, x: b.pos.x, y: b.pos.y, z: b.pos.z, carrier, spin: b.spin },
+    focus: f.x,
+    lead: f.lead,
+  };
+}
+
+/** One step of the kick (`dt` seconds): a frame every 1/fps. */
+export function recordKickFrame(r: KickRecorder, dt: number): void {
+  if (r.t > TAPE.maxSecs) return;
+  r.t += dt;
+  if (r.t < r.next) return;
+  r.next += 1 / TAPE.fps;
+  r.tape.frames.push(kickFrame(r.kp, r.t));
 }
 
 /** The frame on at `t` seconds of the tape. */

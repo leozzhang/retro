@@ -107,7 +107,7 @@ Fourth-down tries are logged when the drive sim knows the score, which every cal
 | FULL | 4 | 3 | 7 |
 | EVERY SNAP | all | all | all |
 
-Priority-3 plays ignore the quarter cap. EVERY SNAP (`all`, `WATCH_LEVELS`) shows every snap but punts and kneels, in order.
+Priority-3 plays ignore the quarter cap. EVERY SNAP (`all`, `WATCH_LEVELS`) shows every snap but kneels and spikes, in order. In engine games that includes every kickoff, punt, extra point and two-point try (`kickEvents`, the story's `kicks`).
 
 The settings are `SeasonConfig.keyPlays`, shown as two rows on the new-dynasty screen and on the hub's SETTINGS page:
 - **SIM GAMES:** RESULT ONLY / LEAN / NORMAL / FULL / EVERY SNAP. Missing means RESULT ONLY.
@@ -147,5 +147,6 @@ As tries run out the match loosens (`REPLAY.relaxAt`): after 45% of them, anyone
 ## Not done
 - No mid-game "sim the rest".
 - A drive continued at the quarter break starts a new set of downs.
-- Punts never show. Extra points aren't picked as key plays. In a played game, the CPU's try after a touchdown is shown on its own (`cpuTry`, game.ts).
+- **Kicks in the user's simulated games** (engine games) are played and shown: EVERY SNAP shows every kickoff, punt and extra point; the lower levels show return touchdowns, muffs and blocks (priority 3) and 30+ yard returns (priority 2). See ENGINEDRIVES.md, "Kicks in engine games".
+- **In a played game,** the CPU's punts never show (you take over at the drive sim's net), its kickoffs are touchbacks, and its try after a touchdown is shown on its own (`cpuTry`, game.ts).
 - The longest plays (40+ yards) sometimes find no replay and show as cards.

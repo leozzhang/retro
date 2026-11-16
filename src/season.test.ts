@@ -233,7 +233,10 @@ describe('season', () => {
     expect(starters(squadFor(back, 'georgia')).QB.id).toBe(qbs[qbs.length - 1].id);
     useStaffDepth(s);
     expect(s.config.delegate.depthChart).toBe(true);
-    expect(starters(squadFor(s, 'georgia')).QB.id).toBe(qbs[0].id);
+    // The staff's chart is back. Its starter may not be the one from before the week: the staff's chart
+    // reads health, and the game may have knocked him.
+    expect(s.teamState.georgia?.depth).toBeUndefined();
+    expect(starters(squadFor(s, 'georgia')).QB.id).not.toBe(qbs[qbs.length - 1].id);
   });
 
   it('saves drop zero stats and restore them', () => {

@@ -25,8 +25,8 @@ Everything here is **display only**. The sim never reads the history, the chroni
   - the 2026 head coach's first season (`coachSince`)
   - the 2021–2025 seasons: conference that year, W-L, conference W-L, final AP rank and the postseason in a few words
 - **Weakest numbers.** All-time records are the least reliable: sources disagree by a few games, and some schools count vacated wins and some don't. Bowl records differ by how a school counts CFP first-round games. Fix a team in its JSON and rerun the script.
-- **Head coaches.** The game's coaches are fictional, so real seasons show no coach. `coachSince` gives the generated head coach his real tenure (a coach hired for 2026 is in year one). Once the carousel replaces him, tenure comes from `coachCareers`.
-- **HISTORY setting.** It's a new-dynasty-only setting, REAL or FRESH START (`SeasonConfig.history`). FRESH ignores `TEAM_HISTORY`, so every page starts empty. Tenure then falls back to the coach's seeded `coachTraits(id).tenure`.
+- **Head coaches.** The game's coaches are fictional, so real seasons show no coach. `coachSince` gives the generated head coach his real tenure (a coach hired for 2026 is in year one), and his record there counts those seasons too (`priorRecord`): the real ones from `recent`, and before 2021 seeded ones around his recent win rate blended with the program's all-time rate. Once the carousel replaces him, tenure comes from `coachCareers`.
+- **HISTORY setting.** It's a new-dynasty-only setting, REAL or FRESH START (`SeasonConfig.history`). FRESH ignores `TEAM_HISTORY`, so every page starts empty. Every head coach then starts in his first year at 0-0.
 
 ## The dynasty's history
 - **Each season.** When a season completes, `seasonRows` records each team's:

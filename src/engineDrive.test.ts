@@ -22,6 +22,8 @@ import { engineDcBrain, engineGame, enginePart, mopupLine, MOPUP, type SnapWatch
 import { twosSquad } from './data/depth';
 import { newStory } from './season/story';
 import { pickGame } from './game/keyPlays';
+import { keyShow, updateShow } from './game/highlights';
+import { STEP } from './engine/constants';
 import type { DriveLog } from './season/types';
 
 function side(t: Team): EngineSide {
@@ -228,10 +230,69 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
       const thrown = story.drives.filter((d) => !d.try).reduce((n, d) => n + d.credit.snaps.filter((c) => c && (c.kind === 'catch' || c.kind === 'inc' || c.kind === 'int' || c.kind === 'spike')).length, 0);
       expect(att).toBe(thrown);
       expect(drives.length).toBeGreaterThan(15);
-      // EVERY SNAP picks them all.
-      expect(pickGame(story, 'all').length).toBe(story.drives.reduce((n, d) => n + d.plays.filter((p) => !p.punt && !p.kneel && !p.spike).length, 0));
+      // EVERY SNAP picks them all, and every kick: the kickoffs and punts on tape, the extra points.
+      const kicks = story.kicks ?? [];
+      expect(pickGame(story, 'all').length).toBe(story.drives.reduce((n, d) => n + d.plays.filter((p) => !p.punt && !p.kneel && !p.spike).length, 0) + kicks.length);
+      expect(kicks.filter((k) => k.unit !== 'xp').every((k) => watch.get(k.play)?.tape)).toBe(true);
     }
   });
+
+  it('kicks are played: kickoffs and punts move the ball, in order between the drives, and a return touchdown is a score', () => {
+    let tds = 0;
+    let muffs = 0;
+    // Seeds 20 and 35 have a kickoff run back for a touchdown, 24 a muffed punt.
+    for (const seed of [1, 2, 3, 20, 24, 35]) {
+      const story = newStory('georgia', 'alabama');
+      const r = engineGame(team('georgia'), team('alabama'), mulberry32(seed), { story });
+      const kicks = story.kicks ?? [];
+      // Every regulation half opens with a kickoff, every touchdown has a try, and the punts are the drives'.
+      expect(kicks.filter((k) => k.unit === 'kickoff').length).toBeGreaterThanOrEqual(2);
+      expect(kicks.filter((k) => k.unit === 'punt').length).toBe(story.drives.filter((d) => d.result === 'PUNT').length);
+      for (const k of kicks) {
+        const next = story.drives[k.at];
+        if (k.unit === 'punt') expect(story.drives[k.at - 1].plays.at(-1)).toBe(k.play);
+        // The ball after a kickoff or punt: the receivers' drive starts where the kick left it, or the kickers keep it on a muff.
+        if (k.unit !== 'xp' && next && !next.try && k.result !== 'returnTd' && next.half === k.half) {
+          expect(next.off === k.team).toBe(k.result === 'recovered');
+          if (k.result === 'touchback') expect(next.start).toBe(k.unit === 'kickoff' ? 25 : 20);
+        }
+        if (k.result === 'recovered') muffs++;
+        if (k.result === 'returnTd') {
+          tds++;
+          expect(r.plays!.some((p) => p.kind === 'returnTd' && p.for !== k.team)).toBe(true);
+        }
+      }
+      expect(r.plays!.reduce((t, p) => t + p.pts, 0)).toBe(r.home + r.away);
+    }
+    expect(tds).toBeGreaterThanOrEqual(2);
+    expect(muffs).toBeGreaterThanOrEqual(1);
+  });
+
+  it('EVERY SNAP plays every snap and kick of a game to its end: kicks and snaps on tape, extra points as kicks', () => {
+    const [h, a] = [team('georgia'), team('alabama')];
+    const story = newStory('georgia', 'alabama');
+    const watch: SnapWatch = new Map();
+    engineGame(h, a, mulberry32(20), { story, watch, record: true });
+    const side = (t: typeof h, home: boolean) => ({ team: t.squad.team, roster: onField(t.squad), home, dc: t.dc });
+    const ctx = { user: h.squad.team, cpu: a.squad.team, userSide: side(h, true), cpuSide: side(a, false), userPass: 0.5, cpuPass: 0.5 };
+    const picks = pickGame(story, 'all');
+    const kinds = new Set(picks.map((k) => k.kind));
+    for (const k of ['kickoff', 'punt', 'xp', 'snap']) expect(kinds.has(k as never)).toBe(true);
+    let scored = 0;
+    for (const k of picks) {
+      const s = watch.get(k.play);
+      const sh = keyShow(k, ctx, 7, s?.tape ? { tape: s.tape } : {});
+      if (k.kind === 'kickoff' || k.kind === 'punt') expect(sh.tape).not.toBeNull();
+      if (k.kick?.result === 'returnTd') {
+        scored++;
+        expect(sh.after.cpu + sh.after.user - sh.before.cpu - sh.before.user).toBe(6);
+      }
+      let done = false;
+      for (let i = 0; i < 60 / STEP && !done; i++) done = updateShow(sh, STEP);
+      expect(done).toBe(true);
+    }
+    expect(scored).toBe(1);
+  }, 120_000);
 
   it('a part hands the field the right quarter, and the brains it was given go on learning', () => {
     for (const to of [2, 3, 4]) {

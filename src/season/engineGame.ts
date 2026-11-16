@@ -11,6 +11,8 @@ import { clamp, gauss, mulberry32, type Rng } from '../engine/math';
 import { advanceSim, newClock, nextQuarter, timeLeftInHalf } from '../game/clock';
 import { halftime, newBrain, newDrive, teamSmarts, type DefBrain, type DefenseIq } from '../game/defBrain';
 import { driveStream, engineDrive, engineTry, type EngineDrive, type EngineSide, type EngineSnap } from '../game/engineDrive';
+import { engineKickoff, enginePunt, kickCaption, KICKOFF_FROM, SAFETY_KICK_FROM, type EngineKick } from '../game/engineKick';
+import type { Tape } from '../game/tape';
 import { newOcBrain, ocHalftime, type OcBrain } from '../game/ocBrain';
 import { rosterRead, type FilmBook } from '../game/offModel';
 import { OVERTIME, PAT, userStartAfter, xpOdds, type DriveClock, type SimPlay } from '../game/rules';
@@ -18,7 +20,7 @@ import { goForTwo, type Situation } from '../game/situation';
 import { engineCredit } from './cast';
 import { gamePlays, type Against } from './gamePlays';
 import { blankTeamLine, creditSnaps, driveLog, GAME_SIM, type BoxSide, type LiveNext, type PartResult } from './simGame';
-import { newStory, type DriveCredit, type GameStory, type StoryDrive } from './story';
+import { newStory, type Credited, type DriveCredit, type GameStory, type StoryDrive, type StoryKick } from './story';
 import type { DriveLog, GameResult } from './types';
 
 /**
@@ -87,8 +89,17 @@ export interface EngineTeamIn {
   ocBrain?: OcBrain | null;
 }
 
-/** Each snap the engine played, by the story's play, with its tape when recording: for watching a simulated game. */
-export type SnapWatch = Map<SimPlay, EngineSnap>;
+/** A kickoff or punt on tape, by its story kick's play (`StoryKick.play`). */
+export interface KickSnap {
+  kick: true;
+  tape?: Tape;
+}
+
+/** Each snap the engine played, by the story's play, with its tape when recording, and each kick's: for watching a simulated game. */
+export type SnapWatch = Map<SimPlay, EngineSnap | KickSnap>;
+
+/** The watched snap is a snap from scrimmage, not a kick. */
+export const isEngineSnap = (s: EngineSnap | KickSnap | undefined): s is EngineSnap => !!s && !('kick' in s);
 
 export interface EngineGameOpts {
   /** Collects every drive for the progression grades. */
@@ -245,6 +256,85 @@ class Run {
     return r.good;
   }
 
+  /** `s`'s kick units: the lineup on the field (its twos in garbage time; the K and P stay). */
+  private kickSide(s: ESide) {
+    return { team: s.side.team, roster: s.roster };
+  }
+
+  /** A player on a kick as the story credits him: his slot, athlete id and name. */
+  private credited(s: ESide, p: { slot: string; name: string } | null, yds: number): Credited | undefined {
+    if (!p) return undefined;
+    const id = s.on[p.slot]?.id;
+    return { slot: p.slot, ...(id ? { id } : {}), name: p.name, yds };
+  }
+
+  /** Tell a kickoff or a punt, and keep its tape for watching. */
+  private tellKick(k: ESide, r: ESide, ek: EngineKick, unit: 'kickoff' | 'punt', play: SimPlay, half: number, left: number): StoryKick {
+    const o = ek.outcome;
+    const cap = kickCaption(ek, unit, play.yard);
+    const good = o.result === 'recovered' || (!ek.recvTd && o.result !== 'blocked' && ek.ret < 25);
+    const returner = this.credited(r, ek.returner, ek.ret);
+    const recoverer = this.credited(k, ek.recoverer, 0);
+    const sk: StoryKick = {
+      unit, team: k.id, at: this.story.drives.length, play, half, left, qSecs: this.qSecs, score: this.score(k, r),
+      result: o.result, good, title: cap.title, line: cap.line, ret: ek.ret,
+      ...(returner ? { returner } : {}), ...(recoverer ? { recoverer } : {}),
+    };
+    (this.story.kicks ??= []).push(sk);
+    this.opts.watch?.set(play, { kick: true, ...(ek.tape ? { tape: ek.tape } : {}) });
+    return sk;
+  }
+
+  /**
+   * `r` ran `k`'s kick back for a touchdown: its six and its try. `p` is the kick's snap in the story, which
+   * the game page reads the score off (`Against`, as a pick six's).
+   */
+  private kickTd(r: ESide, k: ESide, p: SimPlay, sk: StoryKick, half: number, left: number): void {
+    r.tl.points += 6;
+    sk.pts = { [r.id]: 6 };
+    const kick = this.tryAfter(r, k, null, null, half, left);
+    this.against.set(p, { pts: 6 + kick, kind: 'returnTd' });
+  }
+
+  /**
+   * `k` kicks off to `r` from `from` yards: where `r` gets the ball, or `k` keeps it (a muff), or `r`
+   * scores. Told as a kick of its own; a return touchdown gets a drive of the kicking team's in the story,
+   * holding the kick's snap the game page reads the score off.
+   */
+  kickoff(k: ESide, r: ESide, from: number, half: number, left: number): EngineKick {
+    const ek = engineKickoff(this.kickSide(k), this.kickSide(r), driveStream(this.rng), { from, record: this.opts.record, homeId: this.home.id });
+    const play: SimPlay = { gain: 0, explosive: false, turnover: ek.kickStart !== null, down: 1, toGo: 0, yard: from, t: 0, lev: 0, punt: true };
+    const sk = this.tellKick(k, r, ek, 'kickoff', play, half, left);
+    if (ek.recvTd) {
+      this.story.drives.push({
+        off: k.id, half, left, qSecs: this.qSecs, score: this.score(k, r), start: from, result: 'TURNOVER', points: 0, plays: [play], credit: { snaps: [null] }, live: true,
+      });
+      this.kickTd(r, k, play, sk, half, Math.max(0, left - ek.secs));
+    }
+    return ek;
+  }
+
+  /** `o` punts to `d` from where its drive (`told`) ended: as `kickoff`, on the punt's snap. */
+  punt(o: ESide, d: ESide, e: EngineDrive, told: StoryDrive, half: number, left: number): EngineKick {
+    const ek = enginePunt(this.kickSide(o), this.kickSide(d), e.endYard, driveStream(this.rng), { record: this.opts.record, homeId: this.home.id });
+    const last = told.plays.at(-1);
+    const play: SimPlay = last?.punt ? last : { gain: 0, explosive: false, turnover: false, down: 4, toGo: 1, yard: e.endYard, t: e.secs, lev: 0, punt: true };
+    if (play !== last) told.plays.push(play);
+    const sk = this.tellKick(o, d, ek, 'punt', play, half, left);
+    if (ek.recvTd) this.kickTd(d, o, play, sk, half, Math.max(0, left - ek.secs));
+    return ek;
+  }
+
+  /** Tell an extra point (it's shown as a replay of the kick, by `made`). */
+  private tellXp(o: ESide, d: ESide, made: boolean, lev: number, half: number, left: number): void {
+    const play: SimPlay = { gain: 0, explosive: false, turnover: false, down: 1, toGo: 3, yard: 97, t: 0, lev, fg: { dist: PAT.dist, made } };
+    (this.story.kicks ??= []).push({
+      unit: 'xp', team: o.id, at: this.story.drives.length, play, half, left, qSecs: this.qSecs, score: this.score(o, d),
+      result: made ? 'xpGood' : 'xpMiss', good: made, title: made ? 'EXTRA POINT' : 'EXTRA POINT NO GOOD', line: made ? 'THE EXTRA POINT IS GOOD' : 'THE EXTRA POINT IS NO GOOD',
+      ...(made ? { pts: { [o.id]: 1 } } : {}),
+    });
+  }
+
   /**
    * The try after `o`'s regulation touchdown (`told`, already counting six): the two-point chart, or the
    * kick by the kicker's accuracy and confidence. `log` is the drive's log, whose kick it settles.
@@ -260,8 +350,10 @@ class Run {
       return 0;
     }
     const late = half === 1 && left <= this.qSecs && lateAndClose(4, lead);
-    const made = this.rng() < xpOdds(o.on.K?.r.kac ?? PAT.mid, unitEdge(o.conf.k, leverage(1, 3, late, PAT.dist)));
+    const lev = leverage(1, 3, late, PAT.dist);
+    const made = this.rng() < xpOdds(o.on.K?.r.kac ?? PAT.mid, unitEdge(o.conf.k, lev));
     if (xpAt >= 0) log!.plays[xpAt].kick!.good = made;
+    this.tellXp(o, d, made, lev, half, left);
     if (made) {
       o.tl.points += 1;
       if (told) told.points += 1;
@@ -313,17 +405,56 @@ class Run {
     let off = first;
     let start = 25;
     let kickedBy: ESide | null = other(first);
+    /** The kickoff's line: the 35, or the 20 for the free kick after a safety. */
+    let kickFrom = KICKOFF_FROM;
     let next: LiveNext | null = null;
     const part = toQuarter <= 4;
+    /** The half ran out: the final, the hand-off at halftime, or on to the second half's kickoff. True to stop. */
+    const halfDone = (): boolean => {
+      if (clock.quarter >= 4) {
+        next = { kind: 'final' };
+        return true;
+      }
+      if (toQuarter <= 3) {
+        next = { kind: 'halftime' };
+        return true;
+      }
+      this.halftime();
+      nextQuarter(clock);
+      off = other(first);
+      start = 25;
+      kickedBy = first;
+      kickFrom = KICKOFF_FROM;
+      return false;
+    };
     while (!next) {
       if (clock.quarter >= toQuarter) {
         next = { kind: 'cpu', start }; // the caller reads `off` and `kickedBy`
         break;
       }
-      const dfn = other(off);
       const q = clock.quarter;
-      const left = timeLeftInHalf(clock);
       const half = q <= 2 ? 0 : 1;
+      if (kickedBy) {
+        // The kickoff, played: where the receivers start, a muff the kickers keep, or a return touchdown.
+        const k: ESide = kickedBy;
+        const ek = this.kickoff(k, off, kickFrom, half, timeLeftInHalf(clock));
+        kickedBy = null;
+        kickFrom = KICKOFF_FROM;
+        const { halfOver } = advanceSim(clock, ek.secs);
+        if (ek.recvTd) {
+          // The returners kick off back to the kickers.
+          kickedBy = off;
+          off = k;
+          start = 25;
+        } else if (ek.kickStart !== null) {
+          off = k;
+          start = ek.kickStart;
+        } else start = ek.recvStart ?? 25;
+        if (halfOver && halfDone()) break;
+        continue;
+      }
+      const dfn = other(off);
+      const left = timeLeftInHalf(clock);
       const lead = off.tl.points - dfn.tl.points;
       const cut = part && (toQuarter === 2 || toQuarter === 4) && q === toQuarter - 1;
       this.garbage(off, dfn, half, left);
@@ -343,19 +474,7 @@ class Run {
       if (e.result === 'TOUCHDOWN' && !(halfOver && clock.quarter >= 4 && off.tl.points > dfn.tl.points)) this.tryAfter(off, dfn, told, log, half, leftAfter);
       if (e.defPoints) this.defScore(off, dfn, e, half, leftAfter);
       if (halfOver) {
-        if (clock.quarter >= 4) {
-          next = { kind: 'final' };
-          break;
-        }
-        if (toQuarter <= 3) {
-          next = { kind: 'halftime' };
-          break;
-        }
-        this.halftime();
-        nextQuarter(clock);
-        off = other(first);
-        start = 25;
-        kickedBy = first;
+        if (halfDone()) break;
         continue;
       }
       if (e.defPoints === 7) {
@@ -364,11 +483,34 @@ class Run {
         kickedBy = dfn;
         continue;
       }
-      start = e.defPoints === 2 ? 40 : userStartAfter(e, this.rng);
-      kickedBy = e.result === 'TOUCHDOWN' || e.result === 'FIELD GOAL' || e.defPoints === 2 ? off : null;
+      if (e.result === 'PUNT') {
+        // The punt, played: the return, a muff the punting team keeps, or a return touchdown.
+        const ek = this.punt(off, dfn, e, told, half, leftAfter);
+        const after = advanceSim(clock, ek.secs);
+        if (ek.recvTd) {
+          // The returners kick off to the punting team.
+          kickedBy = dfn;
+          start = 25;
+        } else if (ek.kickStart !== null) start = ek.kickStart;
+        else {
+          start = ek.recvStart ?? 20;
+          off = dfn;
+        }
+        if (after.halfOver && halfDone()) break;
+        continue;
+      }
+      if (e.result === 'TOUCHDOWN' || e.result === 'FIELD GOAL' || e.defPoints === 2) {
+        // The scorers kick off; after a safety, the team that gave it up free-kicks from its 20.
+        kickedBy = off;
+        kickFrom = e.defPoints === 2 ? SAFETY_KICK_FROM : KICKOFF_FROM;
+        start = 25;
+        off = dfn;
+        continue;
+      }
+      start = userStartAfter(e, this.rng);
       off = dfn;
     }
-    return { next, quarter: clock.quarter, time: clock.time, off, kickedBy };
+    return { next: next!, quarter: clock.quarter, time: clock.time, off, kickedBy };
   }
 
   /** FBS overtime (`OVERTIME`) until a side leads after a period; `first` has the ball first in odd periods. */
@@ -403,6 +545,7 @@ class Run {
         const walkOff = td && i === 1 && six > d.tl.points;
         const kick = td && !walkOff && period < O.mustGoForTwo && !(i === 1 && d.tl.points - six === 2);
         if (kick) {
+          this.tellXp(o, d, true, 1, half, 0);
           o.tl.points += 1;
           told.points += 1;
         }

@@ -44,7 +44,7 @@ CPU-vs-CPU games stay on the drive sim, with a DC and scheme edge fitted from th
     - It's off everywhere else, so the film room, the balance report and the user's snaps are untouched.
   - The defense's brain watches every snap (`observe`).
   - It returns the `DriveSim` shape, plus `defPoints` (pick sixes, safeties) and an `EngineSnap` per snap: the play, call, tags, gain, outcome, target, carrier, tackler, takeaway, and the QB's log.
-- **Kicks are still the drive sim's:** field goals by `fgOdds`, punts by the caller's net.
+- **Kicks are still the drive sim's:** field goals by `fgOdds`, punts by the caller's net. (Engine games play their kickoffs and punts since 2026-11-15: "Kicks in engine games".)
 - **Lost fumbles (`FUMBLE`):** the engine never loses a fumble, so one is rolled per tackle (more on sacks), by the tackler's `tkl` against the carrier's `str`. It's a placeholder until there's a mechanic.
 
 **`npm run drives` → `drives.txt`** (`src/drives.ts`, about 15 s for 60 games; `DRIVES_GAMES=n`):
@@ -701,7 +701,47 @@ The CPU QB's presnap check (`ocCheck`) picks from his whole personnel group, as 
   A shift is a small edge (the defenders re-read late, by `prc`), not an exploit. Before them a played game showed about one shift at the normal key-play level; now about three (Georgia–Alabama, both shifting teams: 22% of snaps).
 - **Flag: the DC hardly re-checks on a CPU shift.** `checkFor` needs the new look to move his mix by `CHECK.from`, and a CPU OC's looks rarely do. Against the scripted user offenses (ADAPT) it's 4–19%. Shown, not tuned.
 
+## Kicks in engine games (2026-11-15)
+The user's simulated games (SIM GAME, the simulated quarters, the exhibition's SIM GAME) play their kickoffs and punts through `KickPlay`, with the CPU on both sides (`game/engineKick.ts`). Before, a kickoff was a touchback at the 25 and a punt a 40-yard net, and EVERY SNAP skipped them.
+
+- **The CPU kicker** (`CPU_KICK`):
+  - **Kickoffs:** deep, or 12% of the time angled at a corner, from the 35. After a safety, a free kick from the 20 (it used to be the ball at the 40).
+  - **Punts:** a full punt, or a pooch from 52 yards out or closer (power by the distance).
+  - He stops the timing meter near the middle of the green (`timingSd`). His intent has a small spread on top of the kick's own error by accuracy.
+  - The air is calm, as the engine game's field goals are.
+- **The return team** is the kick play's AI: the returner, his blockers, fair catches, muffs.
+- **What the kick decides:**
+  - where the receivers start
+  - a muff the kickers fall on (their ball)
+  - a return touchdown: six and the returners' try, then they kick off
+- **Its clock:** a kickoff runs from the receivers' touch, a punt from the snap. It can end a half.
+- **The story:** each kick is a `StoryKick` (`GameStory.kicks`, with `at`: how many drives came before it): its result, its caption, the returner. Extra points are told too (`tellXp`).
+  - A return touchdown is a score on the game page (`Against` `returnTd`, on the punt's snap or on a one-play drive of the kicking team's holding the kickoff).
+- **Watching** (`kickEvents`, `pickGame`):
+  - **EVERY SNAP** shows every kickoff and punt on tape (`newKickRecorder`, `SnapWatch` holding a `KickSnap`), and every extra point as a kick replay (`FgSearch`), in order between the drives.
+  - **The lower levels** show return touchdowns, muffs and blocks (priority 3) and 30+ yard returns (priority 2).
+  - The caption is the kick's ("FAIR CATCH", "J. SMITH CALLS FOR IT ON A 44-YARD PUNT"), in gold when it went your way.
+  - Recording draws nothing: the kick plays on a stream of its own (one draw from the drive's), and its tape's tail past the whistle on that same stream.
+- **Two-point tries** were already engine snaps on tape (`twoPoint`), shown at every level.
+- **Measured** (30 engine games, 5 matchups, the same seeds; per game, both teams):
+
+  | | before | kicks played | real FBS |
+  | --- | --- | --- | --- |
+  | points | 42.0 | 44.4 | ~53 |
+  | possessions | 27.4 | 25.4 | ~24 |
+  | ms a game (Node) | 580 | 630 | |
+
+  - **`npm run season`'s USER GAMES `sched` row** (200 games, per team, before → after): points 23.0 → 23.4, yards 382 → 373, plays 68.2 → 66.6, possessions 13.2 → 13.0, won by 28+ 27.5% → 28.0%, one-score 28.0% → 22.0% (the drive sim's row moved 37.5% → 35.0% on the same draws, so part of it is noise). The league's rows didn't move beyond noise, and no game page's scoring plays are off its final (0 of 4,404).
+  - **Kickoffs:** 9.7 a game, 53% touchbacks, returns 17.4 yd, the receivers' start 22.5.
+  - **Punts:** 11.7 a game, net 36.1 (it was 40), 79% fair caught, returns 4.3 yd.
+  - **Over 80 games** between Georgia and Alabama: 4 kickoff return touchdowns, 7 muffed punts recovered by the punting team, no punt return touchdowns.
+- **Flags, shown, not tuned** (they're the played game's kick play, so tuning them reaches your own kicks; check `npm run balance`'s PUNT and KO rows):
+  - **Too many fair catches** and too few punt returns (FBS: about 40% fair caught, 8–9 yd a return).
+  - **Kickoff returns are a little short** (FBS about 21 yd).
+- **Tests** (`src/engineDrive.test.ts`): kicks are in order between the drives, a muff keeps the ball, touchbacks land at the 25 and the 20, return touchdowns add up on the game page, EVERY SNAP picks every kick, and every show of a game plays to its end.
+- **Not built:** played games still skip the CPU's kicks (you take over at the old net, or the 25). Return yards aren't in the box score.
+
 ## Not built yet (later phases)
 - Live substitutions in played games: garbage-time twos on the field, and rotations. Audibles already keep the called personnel ("Audibles" above); substitutions need who is on the field to be explicit per snap.
-- Kicks through `KickPlay`.
+- Kicks through `KickPlay` in played games (the CPU's punts and kickoffs to you). Simulated games have them ("Kicks in engine games").
 - The fitted DC table for CPU-vs-CPU sims (phase 5).

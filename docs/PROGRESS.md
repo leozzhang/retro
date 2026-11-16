@@ -2,6 +2,19 @@
 
 _Last updated: 2026-11-15_
 
+## Done: kicks in simulated games (2026-11-15)
+ENGINEDRIVES.md "Kicks in engine games" has the details and numbers.
+- **The user's simulated games** (SIM GAME, the simulated quarters, the exhibition's SIM GAME) play their kickoffs and punts through `KickPlay` with the CPU on both sides (`game/engineKick.ts`, `CPU_KICK`). The kick decides the field position, fair catches, muffs and return touchdowns. A safety is followed by a free kick from the 20.
+- **EVERY SNAP shows them all, in order:** every kickoff and punt on tape with its own caption, every extra point as a kick replay, and the two-point tries (already engine snaps). The lower levels show return touchdowns, muffs and blocks, and 30+ yard returns.
+- **The story:** `GameStory.kicks` (`StoryKick`). A return touchdown is a score on the game page (`Against` `returnTd`).
+- **Measured** (`npm run season`, USER GAMES `sched`): points a team 23.0 → 23.4, possessions 13.2 → 13.0. Punt net 36 (it was a flat 40), kickoff start 22.5. The league's rows are unchanged within noise.
+- **Flags, not tuned:** punts are fair caught 79% of the time and returned only 4 yd (FBS about 40%, 8–9 yd), and kickoff returns run 17 yd (FBS about 21). That's `KickPlay`'s fair-catch rule, which is shared with your own kicks in played games, so tuning it needs `npm run balance`.
+- **Tests:** `src/engineDrive.test.ts` covers kick order, muffs, touchbacks, return TDs on the game page, and every show of a game playing to its end. `season.test.ts`'s depth-chart test no longer assumes the staff's QB1 is healthy after the week. `npm test`: everything passes except `defBrain`'s budget test, which times out under the full parallel run and passes alone.
+- **Not built:** in played games the CPU's punts and kickoffs to you are still abstract. Return yards aren't in the box score. **Not checked in the browser:** the kick tapes were only run headlessly through the show logic.
+
+## Done: head coach records before the dynasty (2026-11-15)
+- The team page's head coach line counted his years before the dynasty but only the dynasty's games, so an 8th-year coach showed 15-2. `coachTenure` now adds `priorRecord` (`season/program.ts`): with REAL history, the real 2021–2025 seasons in his tenure plus seeded seasons before that (11 games before 2006, a bowl at six wins, sometimes a title game), around his recent win rate blended with the program's all-time rate. FRESH START opens every head coach at year 1, 0-0. Display only (fan pulse and stories read the year, so in FRESH every coach is new). `src/program.test.ts` passes.
+
 ## In progress: realistic audibles, phases 1 and 2 (2026-11-15)
 DEFENSE.md "The presnap" has the design. Personnel is fixed once the huddle breaks, so the offense can't sub and neither can the defense.
 - **Esc before the snap** opens a strip over the live field (`render/audibleOverlay.ts`). It holds only your book's plays in the personnel on the field, the formation you're in first. Q/E tabs, W/S pages, 1-4 or a click picks, F flips the play. There's no limit but the play clock.

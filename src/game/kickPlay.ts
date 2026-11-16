@@ -1077,6 +1077,11 @@ export class KickPlay {
     this.popups.push({ text, x: at.x, y: at.y, t: 0, color });
   }
 
+  /** Where the returner fielded it (world x) when it was run back, else null. */
+  returnFrom(): number | null {
+    return this.catchX ? this.catchX : null;
+  }
+
   /** The clock runs on FGs and punts from the snap; on kickoffs only once the receivers touch it. Tries are untimed. */
   clockRunning(): boolean {
     if (this.unit === 'xp' || this.phase === 'presnap' || this.phase === 'over') return false;

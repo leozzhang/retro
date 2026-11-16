@@ -1,6 +1,6 @@
 import type { SimPlay } from './rules';
 import type { SnapCredit } from '../season/cast';
-import { storyClock, type GameStory, type StoryDrive } from '../season/story';
+import { storyClock, type GameStory, type StoryDrive, type StoryKick } from '../season/story';
 import type { KeyLevel } from '../season/types';
 
 /**
@@ -31,7 +31,9 @@ export type KeyKind =
   /** A CPU extra point in a played game: shown on its own, never picked from a drive. */
   | 'xp' | 'xpMiss'
   /** Any other snap, shown when every snap of a CPU drive is (`all`). */
-  | 'snap';
+  | 'snap'
+  /** An engine game's kickoffs and punts (`GameStory.kicks`). */
+  | 'kickoff' | 'punt';
 
 export interface KeyPlay {
   drive: StoryDrive;
@@ -42,6 +44,10 @@ export interface KeyPlay {
   kind: KeyKind;
   /** 3 always shows, 2 from NORMAL, 1 only on FULL. */
   priority: number;
+  /** A kick between the drives (an engine game's kickoff, punt or extra point), with its caption. */
+  kick?: StoryKick;
+  /** Where it falls among the story's drives: a drive's plays are its index, a kick half a drive before the next. */
+  order?: number;
 }
 
 /**
@@ -65,6 +71,8 @@ export const KEY_PLAYS = {
   redZone: 20,
   /** A third down converted from this far out is a priority play. */
   longThird: 7,
+  /** A kick run back this far is a big play. */
+  longReturn: 30,
 };
 
 const isKick = (p: SimPlay) => !!(p.fg || p.punt);
@@ -130,6 +138,33 @@ export function driveEvents(d: StoryDrive, view: KeyView, every = false): KeyPla
   return out;
 }
 
+/**
+ * A story kick as a key play, on a one-snap drive of the kicking team's for the show's clock, score and
+ * side. Return touchdowns, muffs and blocks always show; long returns from NORMAL; the rest only with
+ * every snap.
+ */
+export function kickEvent(sk: StoryKick, i = 0): KeyPlay {
+  const xp = sk.unit === 'xp';
+  const made = sk.result === 'xpGood';
+  const drive: StoryDrive = {
+    off: sk.team, half: sk.half, left: sk.left + sk.play.t, qSecs: sk.qSecs, score: sk.score, start: sk.play.yard,
+    result: 'PUNT', points: xp && made ? 1 : 0, plays: [sk.play], credit: { snaps: [] }, live: true,
+  };
+  const kind: KeyKind = xp ? (made ? 'xp' : 'xpMiss') : sk.unit;
+  const big = sk.result === 'returnTd' || sk.result === 'recovered' || sk.result === 'blocked';
+  const priority = xp ? 0 : big ? 3 : (sk.ret ?? 0) >= KEY_PLAYS.longReturn ? 2 : 0;
+  return { drive, play: sk.play, kind, priority, kick: sk, order: sk.at - 0.5 + i * 1e-4 };
+}
+
+/** The story's kicks as key plays, in order. */
+export const kickEvents = (story: GameStory): KeyPlay[] => (story.kicks ?? []).map((k, i) => kickEvent(k, i));
+
+/** Each pick's place in the story: its drive's index, or a kick's `order`. */
+const placeIn = (story: GameStory) => {
+  const at = new Map(story.drives.map((d, i) => [d, i]));
+  return (k: KeyPlay) => k.order ?? at.get(k.drive) ?? 0;
+};
+
 export const byImportance = (a: KeyPlay, b: KeyPlay) => b.priority - a.priority || Math.abs(b.play.gain) - Math.abs(a.play.gain);
 const inOrder = (a: KeyPlay, b: KeyPlay) => a.play.t - b.play.t;
 
@@ -143,24 +178,26 @@ export function pickDrive(d: StoryDrive, level: KeyLevel, view: KeyView): KeyPla
 
 /** A simulated stretch's key plays at `level`, in order: each drive's picks, then each quarter's cap. */
 export function pickGame(story: GameStory, level: KeyLevel): KeyPlay[] {
-  // Every snap, in order: no caps.
-  if (level === 'all') return story.drives.flatMap((d) => pickDrive(d, level, 'sim'));
+  const place = placeIn(story);
+  const kicks = kickEvents(story).filter((k) => k.priority >= KEY_PLAYS.minPriority[level]);
+  // Every snap and kick, in order: no caps.
+  if (level === 'all') return [...story.drives.flatMap((d) => pickDrive(d, level, 'sim')), ...kicks].sort((a, b) => place(a) - place(b));
   const cap = KEY_PLAYS.perQuarter[level];
   const byQuarter = new Map<number, KeyPlay[]>();
-  for (const d of story.drives) {
-    for (const k of pickDrive(d, level, 'sim')) {
-      const q = storyClock(d, k.play.t).quarter;
-      const list = byQuarter.get(q) ?? [];
-      list.push(k);
-      byQuarter.set(q, list);
-    }
-  }
+  const add = (k: KeyPlay) => {
+    const q = storyClock(k.drive, k.play.t).quarter;
+    const list = byQuarter.get(q) ?? [];
+    list.push(k);
+    byQuarter.set(q, list);
+  };
+  for (const d of story.drives) pickDrive(d, level, 'sim').forEach(add);
+  kicks.forEach(add);
   const out: KeyPlay[] = [];
   for (const q of [...byQuarter.keys()].sort((a, b) => a - b)) {
     const list = byQuarter.get(q)!.sort(byImportance);
     const must = list.filter((k) => k.priority >= 3);
     const rest = list.filter((k) => k.priority < 3).slice(0, Math.max(0, cap - must.length));
-    out.push(...[...must, ...rest].sort((a, b) => story.drives.indexOf(a.drive) - story.drives.indexOf(b.drive) || inOrder(a, b)));
+    out.push(...[...must, ...rest].sort((a, b) => place(a) - place(b) || inOrder(a, b)));
   }
   return out;
 }
@@ -171,7 +208,7 @@ export const KEY_TITLE: Record<KeyKind, string> = {
   td: 'TOUCHDOWN', int: 'INTERCEPTION', fumble: 'FUMBLE', fourthConv: '4TH DOWN CONVERSION', fourthStop: 'STOPPED ON 4TH DOWN',
   explosive: 'BIG PLAY', thirdConv: '3RD DOWN CONVERSION', thirdStop: 'STOPPED ON 3RD DOWN', redZoneStop: 'RED ZONE STOP',
   sack: 'SACK', fg: 'FIELD GOAL', missedFg: 'FIELD GOAL NO GOOD', gain: 'NICE GAIN', twoPt: 'TWO-POINT TRY GOOD', twoPtStop: 'TWO-POINT TRY STOPPED',
-  xp: 'EXTRA POINT', xpMiss: 'EXTRA POINT NO GOOD', snap: 'THE SNAP',
+  xp: 'EXTRA POINT', xpMiss: 'EXTRA POINT NO GOOD', snap: 'THE SNAP', kickoff: 'KICKOFF', punt: 'PUNT',
 };
 
 const ORD = ['1ST', '2ND', '3RD', '4TH'];

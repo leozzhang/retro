@@ -342,7 +342,7 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
     drawShadow(g, s.x, s.y, 6);
   }
   const b = f.ball;
-  const airborne = b.state === 'air' || b.state === 'snap' || b.state === 'bounce';
+  const airborne = b.state === 'air' || b.state === 'snap' || b.state === 'bounce' || b.state === 'kick';
   if (airborne) {
     const s = cam.toScreen(b.x, b.y);
     drawShadow(g, s.x, s.y, 2.5);

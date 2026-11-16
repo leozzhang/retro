@@ -56,7 +56,7 @@ import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
 import { advanceWeek, defaultConfig, engineTeam, newSeason, seasonOver, userGameThisWeek } from '../season/season';
-import { engineGame, enginePart, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
+import { engineGame, enginePart, isEngineSnap, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
 import { advanceOffseason, startOffseason } from '../season/offseason';
 import { actOnLeaving, offer, pursue, setTarget, withdraw } from '../season/portal';
@@ -941,7 +941,7 @@ export class Game {
   private queueShows(picks: KeyPlay[], watch?: SnapWatch): void {
     for (const k of picks) {
       const s = watch?.get(k.play);
-      const opts = s?.tape ? { tape: s.tape, note: this.snapNote(s, k.drive.off === this.user.id) } : {};
+      const opts = s?.tape ? { tape: s.tape, ...(isEngineSnap(s) ? { note: this.snapNote(s, k.drive.off === this.user.id) } : {}) } : {};
       this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0, opts) });
     }
   }
