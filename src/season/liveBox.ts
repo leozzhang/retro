@@ -142,7 +142,7 @@ export function storyCpuDrive(box: LiveBox, d: StoryDrive): void {
 export function userCredit(s: UserSnap, slotOf: (a: Athlete) => string | undefined, pass: boolean): SnapCredit {
   const cred = (a: Athlete | undefined, yds: number) => {
     const slot = a && slotOf(a);
-    return slot ? { slot, name: athleteName(a), yds } : undefined;
+    return slot ? { slot, id: a.id, name: athleteName(a), yds } : undefined;
   };
   const who = cred(s.kind === 'catch' || s.kind === 'run' || s.kind === 'sack' || s.kind === 'kneel' ? s.who : s.kind === 'spike' ? s.qb : undefined, s.yds);
   const by = cred(s.by, 0);

@@ -81,6 +81,7 @@ export const IDENTITY = {
   cbPress: 0.06,
   longToGo: 7,
   longTwoHigh: 0.3,
+  sticks: { from: 10, full: 15, twoHigh: 0.4 },
   shortToGo: 2,
   shortBox: 0.6,
   goalLine: 3,
@@ -217,7 +218,10 @@ export function lateDials(s: Situation): Partial<Dials> {
 /** The situation's dials for this snap; `late`, the offense's whole situation, adds the clock and score. */
 export function situationDials(id: DefIdentity, down: number, toGo: number, yardsToGoal = 99, late?: Situation): Dials {
   let d = id.dials;
-  if (longYardage(down, toGo)) d = addDials(d, { blitz: Math.log(id.longBlitz), twoHigh: IDENTITY.longTwoHigh });
+  // Third and long brings pressure; past the sticks' range it fades into rushing four and keeping it in front.
+  const s = sticks(toGo);
+  if (longYardage(down, toGo)) d = addDials(d, { blitz: Math.log(id.longBlitz) * (1 - s), twoHigh: IDENTITY.longTwoHigh });
+  if (s) d = addDials(d, { twoHigh: IDENTITY.sticks.twoHigh * s });
   if (shortYardage(down, toGo, yardsToGoal)) d = addDials(d, { box: IDENTITY.shortBox });
   if ((down >= 3 && toGo < 1) || yardsToGoal <= 1) d = addDials(d, { box: IDENTITY.inchesBox });
   if (yardsToGoal <= IDENTITY.redZone) d = addDials(d, { man: IDENTITY.redMan, twoHigh: IDENTITY.redTwoHigh });
@@ -237,8 +241,30 @@ export function situationMix(
   id: DefIdentity, down: number, toGo: number, yardsToGoal = 99, shift?: Partial<Dials>, heavy = false, late?: Situation,
 ): Record<string, number> {
   const d = situationDials(id, down, toGo, yardsToGoal, late);
-  if (d === id.dials && !shift && !heavy) return id.mix;
-  return mixFor(shift ? addDials(d, shift) : d, heavy || shortYardage(down, toGo, yardsToGoal));
+  const open = heavy && sticks(toGo) === 0;
+  const mix = d === id.dials && !shift && !open ? id.mix : mixFor(shift ? addDials(d, shift) : d, open || shortYardage(down, toGo, yardsToGoal));
+  return keepADeepSafety(mix, toGo);
+}
+
+/**
+ * How far past normal distance the offense needs (0 to 1): 0 inside `IDENTITY.sticks.from` yards to go,
+ * 1 at `full` and beyond. On any down the defense plays the sticks: the long-yardage blitz fades, the
+ * shell rises, and the no-deep-safety calls (Cover 0, goal line) fade out to none.
+ */
+export function sticks(toGo: number): number {
+  const S = IDENTITY.sticks;
+  return clamp((toGo - S.from) / (S.full - S.from), 0, 1);
+}
+
+const SHELL_OF = new Map(DEF_CALLS.map((c) => [c.id, c.shell]));
+
+/** A mix with its zero-shell calls scaled by 1 − `sticks(toGo)`, renormalized. */
+function keepADeepSafety(mix: Record<string, number>, toGo: number): Record<string, number> {
+  const s = sticks(toGo);
+  if (!s) return mix;
+  const out: Record<string, number> = {};
+  for (const [k, w] of Object.entries(mix)) out[k] = SHELL_OF.get(k) === 'zero' ? w * (1 - s) : w;
+  return normalize(out);
 }
 
 /** Share of snaps in each shell, from a mix. */

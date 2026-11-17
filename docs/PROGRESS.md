@@ -1,6 +1,19 @@
 # Progress
 
-_Last updated: 2026-11-15_
+_Last updated: 2026-11-16_
+
+## Fixed: no deep safety on 4th and 20 (2026-11-16)
+- **The bug:** an aggressive DC called Cover 0 on 28% of snaps at 4th and 20, the same as on 3rd and 8. The long-yardage dial (`longBlitz`) only grew with distance, and it favors Cover 0 most. And when the DC expected short-yardage plays (`heavy`: you'd been running sneaks), the Goal Line call opened on any down: up to 49% zero-shell at 4th and 20.
+- **The fix:** `sticks(toGo)` (`data/identity.ts`, `IDENTITY.sticks` from 10 to 15 yards to go, any down). The long-yardage blitz fades out, two-high climbs (+0.4), and zero-shell calls are scaled to none in `situationMix`. Every call path goes through it, and the learning DC leans off it, so he can't bring Cover 0 back. `heavy` never opens from 10 to go on, and disguises don't show a zero look from 15 to go on. 1st and 10 and 3rd and 8 are unchanged. At 4th and 20: aggressive 28% → 0% zero, two-high 25% → 46%.
+- **Tests:** `defBrain.test.ts` (the sneak-fed DC has no zero shell at 4th and 20, and no style has one at 15+ to go). `engineDrive.test.ts`'s muff seed 24 → 10, since the call streams shifted. Full `npm test` passes. `npm run balance`'s ADAPT rows still meet DEFENSE.md: a spammed run loses 40%+, a balanced offense loses little, and the counter pays.
+
+## Done: in-game substitutions (2026-11-16)
+- **What:** in a game played by hand, U (or the U SUBS chip) on the play-call screen opens a lineup panel. It lays out OFFENSE, DEFENSE and SPECIAL like a formation; click a slot, then who goes in. You can swap receivers between X, Z and the slot, bring in a backup with a different style, or play someone out of position (an HB at FB, a receiver in the backfield). Changes last for this game only. See [SUBS.md](SUBS.md).
+- **Realism:** subs happen only in the huddle, and the play clock keeps running, so a slow change can draw a delay of game. An offensive sub ends the hurry-up for that snap. Defensive subs start with the CPU's next drive.
+- **How:** `game/lineup.ts` holds the candidates, swaps and next man up. `withLineup` and `lineupOf` (`data/depth.ts`) lay the lineup over the depth chart. `Game.applyLineup` updates the squad, the roster, the engine's side and the box score. The grades read `DriveLog.subs`, so whoever you put in gets the snaps, grades, XP and hits. A game without subs grades exactly as before. Box-score credits for your snaps now carry the player's id.
+- **Hook for mid-game injuries:** `Game.forceSub(id)` rules the player out and puts the next man up in his slot. Nothing calls it yet.
+- **Tests:** `src/lineup.test.ts` (6). The full `npm test` passes, and so does the typecheck. Checked in headless Chrome: the panel on both sides, an X/SL swap reaching `userRoster`, the play clock running, and hurry-up turned off with H locked.
+- **Next:** timeouts (a free window to sub), mid-game injuries that call `forceSub`, CPU subs, returners as slots, and maybe a SAVE TO DEPTH CHART button.
 
 ## Fixed: "3rd down conversion" that wasn't (2026-11-15)
 - **The bug:** key plays, highlight banners and the game page said a snap converted when `gain >= toGo`, but the snap log rounds the gain and the distance separately, while the chains move on the exact spot. On 3rd and 9.4 (logged 9), a 9.3-yard gain (logged 9) was titled 3RD DOWN CONVERSION, and the next snap was 4th and 1. It went wrong the other way too: 3rd and 0.4 with a 0.45-yard gain showed STOPPED ON 3RD DOWN but was a first down.

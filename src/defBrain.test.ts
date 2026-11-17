@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEF_CALLS, defCallById, taggedAssign } from './data/defenses';
-import { defIdentity } from './data/identity';
+import { defIdentity, IDENTITY, shellShares, situationMix } from './data/identity';
 import { PLAYBOOK } from './data/plays';
 import { DEF_SLOTS, teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
@@ -66,6 +66,18 @@ describe('defensive brain', () => {
     const lean = leansFor(b, prc, DEF_CALLS[0]);
     expect(lean.DT1!.run).toBeGreaterThan(0.4);
     expect(lean.MLB!.run).toBeGreaterThan(0.4);
+    // Still a deep safety on 4th and 20, however many sneaks he's seen: no goal line, no Cover 0.
+    expect(shareOf(b, (c) => c.shell === 'zero', 4, 20)).toBe(0);
+    expect(b.heavy).toBeNull();
+  });
+
+  it('plays the sticks at long distance: no zero-shell call from 15 to go, for any style', () => {
+    for (const style of ['aggressive', 'balanced', 'soft'] as const) {
+      const id = { ...ident, style, dials: IDENTITY.styles[style].dials, longBlitz: IDENTITY.styles[style].longBlitz };
+      for (const [down, toGo] of [[3, 15], [4, 20], [2, 18]]) expect(shellShares(situationMix(id, down, toGo, 60)).zero).toBe(0);
+      // Third and medium-long still brings it.
+      expect(shellShares(situationMix(id, 3, 8, 60)).zero).toBeGreaterThan(0);
+    }
   });
 
   it('a varied offense moves the DC only a little, a spammed play a lot', () => {

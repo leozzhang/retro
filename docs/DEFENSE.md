@@ -99,6 +99,7 @@ A call's weight is its league prior (`IDENTITY.prior`) × exp(Σ dial × trait).
 
 **The situation adds dials:**
 - **Third and 7+:** pressure × the style's `longBlitz`, and +0.3 two-high.
+- **Playing the sticks** (`sticks(toGo)`, `IDENTITY.sticks`; any down): from 10 yards to go up to 15, the `longBlitz` pressure fades out, two-high climbs to +0.4, and the no-deep-safety calls (Cover 0, Goal Line) fade to none. On 4th and 20 nobody plays Cover 0, and no disguise shows a zero look from 15 to go on. This applies to every path that draws a call, the learning DC's included, since his mix leans off this base.
 - **Short yardage** (3rd or 4th and 2 or less, or inside the 3): +0.6 box. Goal Line becomes available.
 - **Red zone:** +0.3 man and -0.3 two-high.
 - **Inches** (3rd or 4th and under a yard, or at the 1): another +0.4 box, so Bear and Goal Line come up against the sneak.
@@ -169,7 +170,7 @@ Built on the run game once it was stable (it would have learned the bugs). The d
 - `w = identity mix × exp(beta × (gain − mean))`, and he hands `lam` of his mix to that lean: `final = (1 − lam) × identity + lam × w`.
 - **A varied offense that looks like the league moves nothing; a habit he can read does.** The identity's floor still holds.
 - He draws each call's residual from its spread at `explore` of it (Thompson sampling), plus a misread for a weak DC: he tries things and isn't perfectly predictable.
-- **Short yardage he expects** (`heavy`: the short-yardage plays pass 35% of what he expects) opens the goal-line call on any down.
+- **Short yardage he expects** (`heavy`: the short-yardage plays pass 35% of what he expects) opens the goal-line call on any down, but never from 10 yards to go on (`sticks`).
 
 **How much is the DC** (`ML_DC`, each pair from ADJUST 40 to 85+, skill 0..1):
 

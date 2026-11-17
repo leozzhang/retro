@@ -196,8 +196,8 @@ export function pickDefCall(rng: () => number, mix?: Record<string, number>): De
 }
 
 /** One of the call's disguises by weight, with one random draw. */
-export function pickDisguise(rng: () => number, call: DefCall): Disguise | null {
-  const ds = call.disguises;
+export function pickDisguise(rng: () => number, call: DefCall, noZero = false): Disguise | null {
+  const ds = noZero ? call.disguises?.filter((d) => d.show !== 'zero') : call.disguises;
   if (!ds?.length) return null;
   let r = rng() * ds.reduce((n, d) => n + d.weight, 0);
   for (const d of ds) if ((r -= d.weight) <= 0) return d;

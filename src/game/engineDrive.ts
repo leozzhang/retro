@@ -1,6 +1,6 @@
 import { clutchRoster, CONF, leverage, shakenAimLag, unitEdge, type UnitConf } from '../data/confidence';
 import { pickDefCall, pickDisguise, rushers, type DefCall, type DefTags } from '../data/defenses';
-import { pickLineGame, preventLevel, situationMix, type DefIdentity } from '../data/identity';
+import { pickLineGame, preventLevel, situationMix, sticks, type DefIdentity } from '../data/identity';
 import type { PlayDef } from '../data/plays';
 import { DEF_SLOTS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
@@ -167,7 +167,7 @@ function defCall(def: EngineSide, brain: DefBrain | null, sit: Situation, rng: R
   }
   const pr = def.ident.press;
   const press = { CB1: rng() < pr.CB1, CB2: rng() < pr.CB2, NB: rng() < pr.NB };
-  const disguise = !noDisguise && !tags.prevent && rng() < def.ident.disguise ? pickDisguise(rng, call) : null;
+  const disguise = !noDisguise && !tags.prevent && rng() < def.ident.disguise ? pickDisguise(rng, call, sticks(sit.toGo) >= 1) : null;
   return { call, tags, press, disguise };
 }
 

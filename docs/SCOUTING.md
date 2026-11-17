@@ -15,7 +15,7 @@ Design goal: scouting should pay off without being mandatory. Identity tilts how
   - The roster shades them: each DL point is −0.15 blitz, each CB point +0.15 man.
 - **Press:** the old 35/35/20% (CB1/CB2/NB), times the style's factor, plus `cbPress` (6 points) per CB point, clamped to 5–70%.
 - **The situation:**
-  - third and 7+ multiplies pressure by the style's `longBlitz` and adds two-high
+  - third and 7+ multiplies pressure by the style's `longBlitz` and adds two-high; from 10 to 15 to go that pressure fades, the shell deepens and the zero-shell calls go away (`sticks`)
   - short yardage loads the box and opens the Goal Line call
   - the red zone plays tighter man
 - **Tested:**

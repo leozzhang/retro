@@ -191,6 +191,29 @@ export function twosSquad(squad: Squad, keep: readonly string[] = ['K', 'P']): S
   return { ...squad, depth };
 }
 
+/** A lineup: who plays each slot, by athlete id (the user's subs in a played game, game/lineup.ts). */
+export type Lineup = Record<string, string>;
+
+/** The lineup the depth chart puts out. */
+export function lineupOf(squad: Squad): Lineup {
+  return Object.fromEntries(Object.entries(starters(squad)).map(([slot, a]) => [slot, a.id]));
+}
+
+/**
+ * The squad with this lineup on the field: each slot's list starts with its lineup player, and nobody
+ * else in the lineup is on another slot's list, so `starters`, `onField` and the engine read it exactly.
+ * Slots the lineup leaves out keep their lists. Nothing is stored (as `twosSquad`).
+ */
+export function withLineup(squad: Squad, lineup: Lineup): Squad {
+  const ids = new Set(Object.values(lineup));
+  const depth: DepthChart = {};
+  for (const slot of new Set([...Object.keys(squad.depth), ...PICK_ORDER])) {
+    const rest = (squad.depth[slot] ?? []).filter((id) => !ids.has(id));
+    depth[slot] = lineup[slot] ? [lineup[slot], ...rest] : rest;
+  }
+  return { ...squad, depth };
+}
+
 export function athleteName(a: Athlete): string {
   return `${a.first} ${a.last}`;
 }

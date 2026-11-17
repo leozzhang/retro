@@ -1,6 +1,6 @@
 import { DEF_CALLS, packageFor, pickDefCall, type DefCall, type DefTags } from '../data/defenses';
 const DEF_CALLS_BY_ID: Record<string, DefCall> = Object.fromEntries(DEF_CALLS.map((c) => [c.id, c]));
-import { callTraits, preventLevel, situationMix, ZERO_DIALS, type DefIdentity, type Dials } from '../data/identity';
+import { callTraits, preventLevel, situationMix, sticks, ZERO_DIALS, type DefIdentity, type Dials } from '../data/identity';
 import type { OffStyle } from '../data/offStyles';
 import type { PlayDef } from '../data/plays';
 import type { DefSlot, OffSlot } from '../data/teams';
@@ -520,7 +520,8 @@ export function dcMix(
   const expect = playDist(b.model, prm, sit, look);
   // A short-yardage play he expects: the goal-line call opens on any down.
   const shortShare = expect.reduce((a, x) => a + (x.p.short ? x.w : 0), 0);
-  const heavyNow = sit !== 'short' && shortShare >= ML_DC.heavy;
+  // Never at long distance: nobody sells out for a sneak on 4th and 20.
+  const heavyNow = sit !== 'short' && sticks(toGo) === 0 && shortShare >= ML_DC.heavy;
   b.heavy = heavyNow ? [...expect].sort((x, y) => (y.p.short ? y.w : 0) - (x.p.short ? x.w : 0))[0].p.id : null;
   const base = situationMix(id, down, toGo, yardsToGoal, undefined, heavyNow, late);
   const give = giveRate(b.model);

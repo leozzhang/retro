@@ -405,6 +405,11 @@ export interface DriveLog {
   plays: LoggedPlay[];
   /** Teams playing their twos this drive (garbage time in an engine game, `MOPUP`): their backups get the snaps. */
   mop?: string[];
+  /**
+   * The user's subs in a played game (game/lineup.ts): from play `from` of this drive on, `team` plays
+   * these slots with these players (only where they differ from its depth chart; empty is back to it).
+   */
+  subs?: { team: string; from: number; lineup: Record<string, string> }[];
 }
 
 /**

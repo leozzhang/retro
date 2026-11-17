@@ -240,8 +240,8 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
   it('kicks are played: kickoffs and punts move the ball, in order between the drives, and a return touchdown is a score', () => {
     let tds = 0;
     let muffs = 0;
-    // Seeds 20 and 35 have a kickoff run back for a touchdown, 24 a muffed punt.
-    for (const seed of [1, 2, 3, 20, 24, 35]) {
+    // Seeds 20 and 35 have a kickoff run back for a touchdown, 10 a muffed punt.
+    for (const seed of [1, 2, 3, 10, 20, 35]) {
       const story = newStory('georgia', 'alabama');
       const r = engineGame(team('georgia'), team('alabama'), mulberry32(seed), { story });
       const kicks = story.kicks ?? [];

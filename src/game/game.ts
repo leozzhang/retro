@@ -1,11 +1,13 @@
 import { disguiseName, pickDefCall, pickDisguise, rushers, type DefCall, type DefTags, type Disguise } from '../data/defenses';
 import { clockOut, goForTwo, tempo as situationTempo, type Situation } from './situation';
-import { defIdentity, pickLineGame, preventLevel, situationMix } from '../data/identity';
+import { defIdentity, pickLineGame, preventLevel, situationMix, sticks } from '../data/identity';
 import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type PlayDef } from '../data/plays';
 import { ocBook, ocStyle, STYLES } from '../data/offStyles';
 import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
-import { athleteName, buildSquad, onField, reorderPosition, starters, teamConf, type Squad } from '../data/depth';
+import { athleteName, buildSquad, lineupOf, onField, reorderPosition, starters, teamConf, withLineup, type Lineup, type Squad } from '../data/depth';
+import { changedSlots, nextManUp, sideOf, subCandidates, substitute, type SubSide } from './lineup';
+import { drawSubs, drawSubsChip, newSubsView, setSubsTab, slotAt, slotLabel, SUB_ROWS, subRowAt, SUBS_CHIP, SUBS_DONE, subsTabRect, type SubsView } from '../render/subsScreen';
 import type { Athlete } from '../data/athletes';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
@@ -339,6 +341,18 @@ export class Game {
   private cpuSquad!: Squad;
   private userRoster!: Record<string, RosterPlayer>;
   private cpuRoster!: Record<string, RosterPlayer>;
+  /** The user's squad as it came into the game; `userSquad` is it with `lineup` laid over (game/lineup.ts, docs/SUBS.md). */
+  private baseUserSquad!: Squad;
+  /** Who the user has in each slot this game, and who's done for the day. */
+  private lineup: Lineup = {};
+  private outForGame = new Set<string>();
+  /** The subs panel on the call screen, while it's open. */
+  private subs: SubsView | null = null;
+  /** The lineup when the huddle formed, for the panel's changed slots, and a line about the last change for the scorebug. */
+  private huddleLineup: Lineup = {};
+  private subNote: string | null = null;
+  /** The offense subbed this snap: the defense gets to match, so no hurry-up until it's snapped. */
+  private subHold = false;
   /** The current snap's leverage (data/confidence.ts), logged with it for the grades. */
   private snapLev = 0;
   private crowd: HTMLCanvasElement | null = null;
@@ -865,7 +879,14 @@ export class Game {
   private setupField(user: Team, cpu: Team, squads?: { user: Squad; cpu: Squad }, homeId = this.seasonGame?.home ?? user.id): void {
     this.user = user;
     this.cpu = cpu;
-    this.userSquad = squads?.user ?? buildSquad(user);
+    this.baseUserSquad = squads?.user ?? buildSquad(user);
+    this.userSquad = this.baseUserSquad;
+    this.lineup = lineupOf(this.baseUserSquad);
+    this.huddleLineup = this.lineup;
+    this.outForGame = new Set();
+    this.subs = null;
+    this.subNote = null;
+    this.subHold = false;
     this.cpuSquad = squads?.cpu ?? buildSquad(cpu);
     this.userRoster = onField(this.userSquad);
     this.cpuRoster = onField(this.cpuSquad);
@@ -1748,6 +1769,106 @@ export class Game {
     });
   }
 
+  // ------------------------------------------------------------ substitutions (docs/SUBS.md)
+
+  /** Where the user's lineup differs from his depth chart's: what the grades need to know (`DriveLog.subs`). */
+  private lineupDiff(): Lineup {
+    const chart = lineupOf(this.baseUserSquad);
+    return Object.fromEntries(Object.entries(this.lineup).filter(([slot, id]) => chart[slot] !== id));
+  }
+
+  /** A CPU drive's log, with the lineup the user's defense played it with. */
+  private withSubs(log: DriveLog): DriveLog {
+    const diff = this.lineupDiff();
+    return Object.keys(diff).length ? { ...log, subs: [{ team: this.user.id, from: 0, lineup: diff }] } : log;
+  }
+
+  /**
+   * Put the lineup on the field: the squad, the snap's roster, the engine's side for the CPU's drives, the
+   * box score's on-field players and the user's drive log (from his next snap). The brains keep what they've
+   * learned and their pregame read of the roster.
+   */
+  private applyLineup(): void {
+    this.userSquad = withLineup(this.baseUserSquad, this.lineup);
+    this.userRoster = onField(this.userSquad);
+    if (this.showCtx) this.showCtx.userSide = { ...this.showCtx.userSide, roster: this.userRoster };
+    if (this.userDef) this.userDef = { ...this.userDef, roster: this.userRoster, conf: teamConf(this.userSquad) };
+    if (this.liveBox) this.liveBox.user.on = starters(this.userSquad);
+    const log = this.liveDrives?.[0];
+    if (log) {
+      const at = { team: this.user.id, from: log.plays.length, lineup: this.lineupDiff() };
+      const subs = (log.subs ?? []).filter((x) => x.from !== at.from);
+      log.subs = [...subs, at];
+    }
+  }
+
+  /** Put `id` in at `slot`, as the user picked in the panel. Offensive subs end the hurry-up for this snap. */
+  private makeSub(slot: string, id: string): void {
+    const next = substitute(this.baseUserSquad, this.lineup, slot, id, this.outForGame);
+    const changed = changedSlots(this.lineup, next);
+    if (!changed.length) return;
+    this.lineup = next;
+    this.applyLineup();
+    const a = this.userSquad.athletes.find((x) => x.id === id);
+    if (a) this.subNote = `${a.last.toUpperCase()} IN AT ${slotLabel(slot)}`;
+    if (changed.some((s) => sideOf(s) === 'off') && this.callMode === 'normal') {
+      if (this.tempo === 'hurry') this.subNote = 'SUBS: NO HURRY-UP, THE DEFENSE MATCHES';
+      this.tempo = 'normal';
+      this.subHold = true;
+    }
+  }
+
+  /**
+   * A player done for the game (an injury, when the game has them mid-game): out of the lineup for good,
+   * the next man up in his slot, and a notice. Nothing calls it yet.
+   */
+  forceSub(id: string, why = 'IS OUT'): void {
+    this.outForGame.add(id);
+    const slot = Object.entries(this.lineup).find(([, x]) => x === id)?.[0];
+    if (!slot) return;
+    const gone = this.baseUserSquad.athletes.find((a) => a.id === id);
+    const up = nextManUp(this.baseUserSquad, this.lineup, slot, this.outForGame);
+    const next = { ...this.lineup };
+    if (up) next[slot] = up.id;
+    else delete next[slot];
+    this.lineup = next;
+    this.applyLineup();
+    const name = (a?: { num: number; last: string }) => (a ? `#${a.num} ${a.last.toUpperCase()}` : 'NOBODY');
+    this.notify({ title: `${name(gone)} ${why}`, sub: `${name(up)} IN AT ${slotLabel(slot)}`, extra: 'U ON THE PLAY CALL: SUBS', color: '#ff5a5a' });
+  }
+
+  private updateSubs(input: Input): void {
+    const v = this.subs!;
+    const { x, y } = input.mouse;
+    v.mx = x;
+    v.my = y;
+    if (input.hit('Escape', 'Backspace', 'KeyU')) {
+      this.subs = null;
+      return;
+    }
+    const tabs: SubSide[] = ['off', 'def', 'st'];
+    const step = (input.hit('KeyE', 'Tab') ? 1 : 0) - (input.hit('KeyQ') ? 1 : 0);
+    if (step) setSubsTab(v, tabs[(tabs.indexOf(v.side) + step + tabs.length) % tabs.length]);
+    const rows = subCandidates(this.baseUserSquad, this.lineup, v.slot, this.outForGame);
+    if (input.mouse.wheel) v.scroll = Math.max(0, Math.min(Math.max(0, rows.length - SUB_ROWS), v.scroll + Math.sign(input.mouse.wheel)));
+    if (!input.mouse.pressed) return;
+    if (inBox(SUBS_DONE, x, y)) {
+      this.subs = null;
+      return;
+    }
+    const tab = tabs.find((_, i) => inBox(subsTabRect(i), x, y));
+    if (tab) return setSubsTab(v, tab);
+    const slot = slotAt(v.side, x, y);
+    if (slot) {
+      v.slot = slot;
+      v.scroll = 0;
+      return;
+    }
+    const r = subRowAt(x, y);
+    const row = r >= 0 ? rows[v.scroll + r] : undefined;
+    if (row) this.makeSub(v.slot, row.a.id);
+  }
+
   // ------------------------------------------------------------ playbook page
 
   private toBook(): void {
@@ -2370,6 +2491,10 @@ export class Game {
     this.screen = 'call';
     this.callMode = mode;
     this.play = null;
+    this.subs = null;
+    this.subNote = null;
+    this.subHold = false;
+    this.huddleLineup = this.lineup;
     this.checkDone = false;
     this.checkNote = null;
     this.kick = null;
@@ -2400,7 +2525,7 @@ export class Game {
     // Some snaps it shows one look and spins to its call at the snap (never in prevent or on a try).
     const disguises = !(this.seasonGame && this.season?.config.disguises === false);
     this.disguise =
-      disguises && mode === 'normal' && !this.defTags.prevent && this.rng() < ident.disguise ? pickDisguise(this.rng, this.defCall) : null;
+      disguises && mode === 'normal' && !this.defTags.prevent && this.rng() < ident.disguise ? pickDisguise(this.rng, this.defCall, sticks(toGo) >= 1) : null;
     if (mode === 'pat' || mode === 'try') this.tab = Math.min(this.tab, 2);
     readyForPlay(this.clock);
     // Inside two minutes of a half and not ahead: go no-huddle, once, so the user can still huddle up.
@@ -2498,8 +2623,21 @@ export class Game {
   }
 
   private updateCall(dt: number, input: Input): void {
-    if (this.tickBetweenPlays(dt)) return;
-    if (input.hit('KeyH')) this.tempo = this.tempo === 'hurry' ? 'normal' : 'hurry';
+    // The clocks run while the user subs: a slow change is a delay of game (docs/SUBS.md).
+    if (this.tickBetweenPlays(dt)) {
+      this.subs = null;
+      return;
+    }
+    if (this.subs) {
+      this.updateSubs(input);
+      return;
+    }
+    if (!this.watchOnly && (input.hit('KeyU') || (input.mouse.pressed && inBox(SUBS_CHIP, input.mouse.x, input.mouse.y)))) {
+      input.mouse.pressed = false;
+      this.subs = newSubsView(this.callMode === 'kickoff' ? 'def' : 'off');
+      return;
+    }
+    if (input.hit('KeyH') && !this.subHold) this.tempo = this.tempo === 'hurry' ? 'normal' : 'hurry';
     const tabs = this.tabs();
     const n = tabs.length;
     if (n) {
@@ -3146,7 +3284,7 @@ export class Game {
     }
     const otClock: DriveClock = { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first' };
     const { sim, plays, credit, snaps } = this.engineCpu(OVERTIME.start, otClock);
-    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, true, credit.snaps));
+    this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, true, credit.snaps)));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
     // otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
     const td = sim.result === 'TOUCHDOWN';
@@ -3558,7 +3696,7 @@ export class Game {
     const diff = this.score.cpu - this.score.user;
     const dc: DriveClock = { timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs };
     const { sim, plays, credit, snaps } = this.engineCpu(start, dc);
-    this.liveDrives?.push(driveLog(this.cpu.id, plays, sim, false, credit.snaps));
+    this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, false, credit.snaps)));
     const told: StoryDrive = {
       off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
       start, result: sim.result, points: sim.points, plays, credit, live: true,
@@ -3743,8 +3881,18 @@ export class Game {
     }
     if (kicking) drawWind(g, this.wind, windLabel(this.wind));
 
-    if (this.screen === 'call') this.renderCall(g);
-    else if (this.screen === 'notice' && this.notices.length) {
+    if (this.screen === 'call') {
+      this.renderCall(g);
+      if (!this.watchOnly) drawSubsChip(g, !this.subs && inBox(SUBS_CHIP, this.menuMouse.x, this.menuMouse.y));
+      if (this.subs) {
+        const kickoff = this.callMode === 'kickoff';
+        drawSubs(g, {
+          v: this.subs, squad: this.baseUserSquad, lineup: this.lineup, huddle: this.huddleLineup, out: this.outForGame, team: this.user,
+          clock: kickoff ? null : { text: playClockText(this.clock), secs: this.clock.play },
+          note: this.subs.side === 'def' ? 'DEFENSE: FROM THEIR NEXT DRIVE.' : this.subs.side === 'off' && this.tempo === 'hurry' ? 'AN OFFENSIVE SUB ENDS THE HURRY-UP.' : '',
+        });
+      }
+    } else if (this.screen === 'notice' && this.notices.length) {
       const n = this.notices[0];
       drawBanner(g, n.title, n.sub, n.color ?? '#ffffff', n.extra);
       if (n.note) {
@@ -3937,7 +4085,7 @@ export class Game {
       : 'CHOOSE A PLAY';
     const tip = hc
       ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.kind === 'kneel' || hc.kind === 'spike' ? CLOCK_TIP[hc.kind] : hc.def.tip).toUpperCase()
-      : this.clockHint() ?? fallback;
+      : this.subNote ?? this.clockHint() ?? fallback;
     text(g, tip, VIEW_W / 2, CALL_Y + 6, { size: 8, align: 'center', color: '#ffd23f' });
     if (this.dcNote && this.callMode === 'normal') this.drawDcNote(g, CALL_Y - 16);
     if (!tabs.length) {

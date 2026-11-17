@@ -1,6 +1,6 @@
 import type { Athlete } from '../data/athletes';
 import { NO_CONF, unitEdge, type UnitConf } from '../data/confidence';
-import { fitRatings, healthOf, healthy, starters, teamConf, teamRatings, type Squad } from '../data/depth';
+import { fitRatings, healthOf, healthy, lineupOf, starters, teamConf, teamRatings, withLineup, type Squad, type TeamRatings } from '../data/depth';
 import { overall, POS_ROLE, SLOT_POS } from '../data/positions';
 import type { RatingKey } from '../data/ratings';
 import type { Role } from '../data/teams';
@@ -413,33 +413,96 @@ function kick(p: LoggedPlay, off: Cast, def: Cast, rng: Rng): void {
 export function gradeGame(
   home: Squad, away: Squad, drives: DriveLog[], passShare: Record<string, number>, rng: Rng, homeEdge = 0,
 ): Map<string, GameGrade> {
-  const h = cast(home, passShare[home.team.id] ?? 0.5);
-  const a = cast(away, passShare[away.team.id] ?? 0.5);
-  const hr = teamRatings(home);
-  const ar = teamRatings(away);
-  h.gap = hr.off + homeEdge - ar.def;
-  a.gap = ar.off - hr.def - homeEdge;
-  h.conf = teamConf(home);
-  a.conf = teamConf(away);
-  const casts = new Map([[h.team, h], [a.team, a]]);
+  // Each team's cast for its depth chart, and one per lineup the user played with (`DriveLog.subs`), made as needed.
+  const sides = new Map<string, Side>();
+  for (const [squad, isHome] of [[home, true], [away, false]] as const) {
+    const c = cast(squad, passShare[squad.team.id] ?? 0.5);
+    c.conf = teamConf(squad);
+    const side: Side = { squad, home: isHome, r: teamRatings(squad), base: c, casts: new Map([['', c]]), rOf: new Map() };
+    side.rOf.set(c, side.r);
+    sides.set(squad.team.id, side);
+  }
+  const castOf = (side: Side, diff: Record<string, string> | undefined): Cast => {
+    const key = diff && Object.keys(diff).length ? JSON.stringify(Object.entries(diff).sort()) : '';
+    let c = side.casts.get(key);
+    if (!c) {
+      // The starters the user benched go to the bottom of every list: they don't rotate back in as backups.
+      const chart = lineupOf(side.squad);
+      const laid = withLineup(side.squad, { ...chart, ...diff });
+      const benched = new Set(Object.values(chart).filter((id) => !Object.values({ ...chart, ...diff }).includes(id)));
+      const depth = Object.fromEntries(Object.entries(laid.depth).map(([slot, ids]) => [slot, [...ids.filter((id) => !benched.has(id)), ...ids.filter((id) => benched.has(id))]]));
+      const sq = { ...laid, depth };
+      c = cast(sq, side.base.passShare);
+      c.conf = teamConf(sq);
+      side.rOf.set(c, teamRatings(sq));
+      side.casts.set(key, c);
+    }
+    return c;
+  };
+  /** The lineup a team plays play `i` of a drive with. */
+  const lineupAt = (dr: DriveLog, team: string, i: number) => dr.subs?.filter((x) => x.team === team && x.from <= i).pop()?.lineup;
   for (const dr of drives) {
-    const off = casts.get(dr.off);
-    if (!off) continue;
-    const def = off === h ? a : h;
-    for (const p of dr.plays) {
+    const offSide = sides.get(dr.off);
+    if (!offSide) continue;
+    const defSide = [...sides.values()].find((x) => x !== offSide)!;
+    dr.plays.forEach((p, i) => {
+      const off = dr.subs ? castOf(offSide, lineupAt(dr, offSide.squad.team.id, i)) : offSide.base;
+      const def = dr.subs ? castOf(defSide, lineupAt(dr, defSide.squad.team.id, i)) : defSide.base;
+      const or = offSide.rOf.get(off)!;
+      const dr2 = defSide.rOf.get(def)!;
+      // This offense's rating minus that defense's, home edge included.
+      off.gap = offSide.home ? or.off + homeEdge - dr2.def : or.off - dr2.def - homeEdge;
       if (p.kick) kick(p, off, def, rng);
       else snap(p, off, def, rng, dr.mop);
-    }
+    });
   }
   // Playing time: of a full-time player's snaps at his slot, or of the team's kicks.
   const out = new Map<string, GameGrade>();
-  for (const c of casts.values()) {
-    for (const m of c.men) {
-      if (!m.g.snaps) continue;
-      const n = c.totals[m.unit] * m.full;
-      m.g.share = n ? Math.min(1, m.g.snaps / n) : 0;
-      out.set(m.a.id, m.g);
+  for (const side of sides.values()) {
+    const casts = [...side.casts.values()];
+    if (casts.length === 1) {
+      const c = casts[0];
+      for (const m of c.men) {
+        if (!m.g.snaps) continue;
+        const n = c.totals[m.unit] * m.full;
+        m.g.share = n ? Math.min(1, m.g.snaps / n) : 0;
+        out.set(m.a.id, m.g);
+      }
+      continue;
+    }
+    // Played under more than one lineup: one grade a player, his share of all the team's snaps at his slot.
+    const byCast = casts.map((c) => new Map(c.men.map((m) => [m.a.id, m] as const)));
+    const ids = new Set(casts.flatMap((c) => c.men.filter((m) => m.g.snaps).map((m) => m.a.id)));
+    for (const id of ids) {
+      const mine = byCast.map((b) => b.get(id));
+      const any = mine.find((m) => m)!;
+      const full = Math.max(...mine.map((m) => m?.full ?? 0));
+      const g: GameGrade = { team: any.g.team, snaps: 0, share: 0, sum: 0, tags: {}, hits: 0, lsum: 0, lw: 0 };
+      let n = 0;
+      casts.forEach((c, i) => {
+        const m = mine[i];
+        n += c.totals[any.unit] * (m?.full ?? full);
+        if (!m) return;
+        g.snaps += m.g.snaps;
+        g.sum += m.g.sum;
+        g.hits += m.g.hits;
+        g.lsum += m.g.lsum;
+        g.lw += m.g.lw;
+        for (const [k, v] of Object.entries(m.g.tags) as [RatingKey, number][]) g.tags[k] = (g.tags[k] ?? 0) + v;
+      });
+      g.share = n ? Math.min(1, g.snaps / n) : 0;
+      out.set(id, g);
     }
   }
   return out;
+}
+
+/** One team in a graded game: its casts by lineup (`''` is its depth chart's) and each cast's team ratings. */
+interface Side {
+  squad: Squad;
+  home: boolean;
+  r: TeamRatings;
+  base: Cast;
+  casts: Map<string, Cast>;
+  rOf: Map<Cast, TeamRatings>;
 }
