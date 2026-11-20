@@ -7,7 +7,7 @@ The sim already makes drama: next men up, breakouts, breakthroughs, injuries, up
 | Moments: what's worth a scene each week (`MOMENTS`) | `src/season/moments.ts` |
 | Storylines: the arcs, their stakes, decisions (`STORY`) | `src/season/storylines.ts` |
 | The Week Wrap's scenes | `src/render/momentScreen.ts`, parts in `src/render/momentArt.ts` |
-| HOME's THE WEEK'S STORY box, the matchup's storylines, the STORYLINES panel | `src/render/seasonScreen.ts` |
+| HOME's THE WEEK'S STORY box, the STORYLINES panel | `src/render/seasonScreen.ts` |
 | The `wrap` screen, its input, HOME's M / Y / Enter | `src/game/game.ts` (`toSeason`, `openWrap`, `updateWrap`, `updateStories`) |
 | Stored | `SeasonState.moments`, `seenMoments`, `buzz`, `stories`; `TeamState.pin`; `SeasonConfig.wrap` |
 | Every scene with sample data (dev builds) | `window.game.momentGallery()` (`src/render/momentGallery.ts`) |
@@ -49,7 +49,12 @@ Tier 3 is the biggest; `w` orders moments within a tier.
 - **Replays:** M on HOME replays the newest week, in full. A storyline on the STORYLINES panel replays its moments.
 
 ## Storylines (`storyStep`)
-Each runs a few weeks with **stakes**: what the next game decides. The stakes show in three places: UP NEXT at the end of the wrap, the matchup card on HOME, and THE WEEK'S STORY box.
+Each runs a few weeks with **stakes**: what the next game decides. The stakes show in UP NEXT at the end of the wrap and on the STORYLINES panel.
+
+**Where they show:**
+- **Names:** every player in a storyline is written with his position ("QB JOHN SMITH", `withPos` in moments.ts), and names on HOME and the STORYLINES panel are links.
+- **HOME's THE WEEK'S STORY:** one line per running storyline: a short name, the player (position and last name), and a word or two of what's on the line (YOUR CALL, 6-0, 2/3, NO. 3, VS MIA). Anything longer lives on the STORYLINES panel.
+- **The STORYLINES panel:** full lines, cut at a word when they don't fit. A finished story's outcome takes both lines when it needs them.
 
 | Kind | Opens | Moves | Closes |
 | --- | --- | --- | --- |

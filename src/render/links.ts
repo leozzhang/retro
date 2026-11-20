@@ -200,6 +200,19 @@ export function newsRich(state: SeasonState, n: Pick<NewsItem, 'text' | 'teams' 
   return lines;
 }
 
+const lineCache = new WeakMap<SeasonState, Map<string, RichLine>>();
+
+/** One line of text, unwrapped, with its teams' and players' names linked (memoized). */
+export function richText(state: SeasonState, t: string, teams: string[]): RichLine {
+  let m = lineCache.get(state);
+  if (!m) lineCache.set(state, (m = new Map()));
+  const up = t.toUpperCase();
+  const key = `${teams.join(',')}|${up}`;
+  let l = m.get(key);
+  if (!l) m.set(key, (l = { t: up, spans: findSpans(state, up, teams) }));
+  return l;
+}
+
 /** A rich line at (x, y): its text, and its links (gold and underlined under the mouse). */
 export function drawRich(g: CanvasRenderingContext2D, l: RichLine, x: number, y: number, o: TextOpts): void {
   text(g, l.t, x, y, o);

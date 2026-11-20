@@ -426,7 +426,7 @@ function drawDecision(g: CanvasRenderingContext2D, m: Moment, team: Team, t: num
     g.fillStyle = chosen || hot ? GOLD : team.colors.primary;
     g.fillRect(r.x, r.y, r.w, 2);
     text(g, `${i + 1}`, r.x + 10, r.y + 10, { color: DIM, shadow: false });
-    text(g, o.label.slice(0, 32), r.x + 26, r.y + 10, { color: chosen || hot ? GOLD : '#ffffff', shadow: false });
+    wrap(o.label, 32).slice(0, 2).forEach((w, j) => text(g, w, r.x + 26, r.y + 10 + j * 11, { color: chosen || hot ? GOLD : '#ffffff', shadow: false }));
     const p = people.find((x) => x?.id === o.id);
     if (p) {
       hero(g, team, p.skin, r.x + 52, r.y + 128, 4, chosen ? 'cheer' : 'stand', 1);

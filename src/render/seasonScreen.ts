@@ -15,7 +15,7 @@ import { headlineMoment, lastWeekMoments } from '../season/moments';
 import { pendingDecisions } from '../season/storylines';
 import { squadFor } from '../season/world';
 import { drawHint } from './hud';
-import { drawRich, gameLink, linkText, newsRich, playerLink, teamLink, type RichLine } from './links';
+import { drawRich, gameLink, linkText, newsRich, playerLink, richText, teamLink, type RichLine } from './links';
 import { getSprite, teamUniform } from './sprites';
 import { text } from './text';
 
@@ -411,16 +411,6 @@ function drawMatchup(g: CanvasRenderingContext2D, s: SeasonState): void {
   text(g, vsText(game, u), PCX, CARD_Y + 44, { size: 16, align: 'center', color: '#ffffff' });
   const where = game.neutral ? 'NEUTRAL SITE' : game.home === u ? 'HOME' : 'AWAY';
   text(g, where, PCX, CARD_Y + 62, { align: 'center', color: SOFT, shadow: false });
-  // What this game decides: the storylines riding on it, this game's own first.
-  const riding = (s.stories ?? [])
-    .filter((st) => st.status === 'open' && st.stakes && (st.game === game.id || !st.game))
-    .sort((a, b) => Number(b.game === game.id) - Number(a.game === game.id))
-    .slice(0, 3);
-  riding.forEach((st, i) => {
-    const who = st.star ? ` ${st.star.name.split(' ').pop()}` : '';
-    const label = st.title.length + who.length <= 24 ? `${st.title}${who}` : who ? `${st.title.split(' ')[0]}${who}` : st.title;
-    text(g, label.slice(0, 24), PCX, CARD_Y + 76 + i * 11, { align: 'center', color: st.game === game.id ? GOLD : ACCENT, shadow: false });
-  });
 }
 
 function drawStages(g: CanvasRenderingContext2D, s: SeasonState): void {
@@ -508,7 +498,8 @@ function drawWeekStory(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVie
     g.fillStyle = GOLD;
     g.fillRect(b.x, b.y, 2, b.h);
     text(g, 'YOUR CALL (ENTER)', b.x + 8, b.y + 4, { color: GOLD, shadow: false });
-    text(g, pend.decision.prompt.slice(0, 27), b.x + 8, b.y + 17, { color: '#ffffff', shadow: false });
+    const about = storyTag(s, pend, 27);
+    text(g, about.t, b.x + 8, b.y + 17, { color: '#ffffff', shadow: false });
     y = b.y + b.h + 6;
   }
   const m = headlineMoment(s);
@@ -518,22 +509,64 @@ function drawWeekStory(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVie
     const tx = m.p ? PX + 54 : PX + 8;
     const n = Math.floor((PX + HALF_W - 8 - tx) / 8);
     text(g, m.title.slice(0, n), tx, y + 2, { color: m.kind === 'injury' ? RED : GOLD, shadow: false });
-    wrapWords(m.sub, n).slice(0, 3).forEach((l, i) => text(g, l, tx, y + 14 + i * 10, { color: '#ffffff', shadow: false }));
+    const teams = [m.team, ...(m.opp ? [m.opp] : [])];
+    newsRich(s, { text: m.sub, teams }, n).slice(0, 3).forEach((l, i) => drawRich(g, l, tx, y + 14 + i * 10, { color: '#ffffff', shadow: false }));
     y += 48;
   }
+  // The storylines running, one line each; their stakes and beats are on the STORYLINES page.
   const open = (s.stories ?? []).filter((st) => st.status === 'open' && st.stakes);
-  const room = Math.floor((REPLAY_BTN.y - 2 - (y + 11)) / 21);
+  const room = Math.floor((REPLAY_BTN.y - 2 - (y + 11)) / 11);
   if (open.length && room > 0) {
     text(g, 'STORYLINES', PX + 8, y, { color: ACCENT, shadow: false });
     y += 11;
-    for (const st of open.slice(0, room)) {
-      text(g, `${st.title}${st.star ? `: ${st.star.name}` : ''}`.slice(0, 27), PX + 8, y, { color: '#ffffff', shadow: false });
-      text(g, st.stakes.slice(0, 27), PX + 8, y + 9, { color: SOFT, shadow: false });
-      y += 21;
+    const shown = open.length > room ? open.slice(0, room - 1) : open;
+    for (const st of shown) {
+      const tail = storyTail(s, st);
+      const row = storyTag(s, st, 27 - (tail ? tail.length + 1 : 0));
+      drawRich(g, row, PX + 8, y, { color: '#ffffff', shadow: false });
+      if (tail) text(g, tail, PX + HALF_W - 8, y, { align: 'right', color: st.decision && !st.decision.chosen ? GOLD : SOFT, shadow: false });
+      y += 11;
     }
+    if (shown.length < open.length) text(g, `+${open.length - shown.length} MORE (Y)`, PX + 8, y, { color: DIM, shadow: false });
   }
   smallBtn(g, REPLAY_BTN, 'M: REPLAY WEEK', v, lastWeekMoments(s).length > 0);
   smallBtn(g, STORIES_BTN, 'Y: STORYLINES', v, (s.stories ?? []).length > 0);
+}
+
+/** A storyline's short name for HOME. */
+const STORY_SHORT: Record<Storyline['kind'], string> = {
+  nextManUp: 'NEXT UP', breakoutWatch: 'BREAKOUT', slump: 'SLUMP', heisman: 'HEISMAN', unbeaten: 'UNBEATEN',
+  bowlChase: 'BOWL CHASE', rivalry: 'RIVALRY', reunion: 'REUNION', homecoming: 'HOMECOMING',
+};
+
+/** "SLUMP QB SMITH": a storyline's short name and its player (position, last name, linked), in `n` characters. */
+function storyTag(s: SeasonState, st: Storyline, n: number): RichLine {
+  const head = STORY_SHORT[st.kind] ?? st.title;
+  if (!st.star) return { t: head.slice(0, n), spans: [] };
+  const pre = `${head} ${st.star.pos} `;
+  const last = (st.star.name.split(' ').pop() ?? st.star.name).slice(0, Math.max(1, n - pre.length));
+  return { t: pre + last, spans: [{ start: pre.length, len: last.length, link: playerLink(st.team, st.star.id) }] };
+}
+
+/** What's on the line, in a word or two: YOUR CALL, a record, starts toward a breakout, the game. */
+function storyTail(s: SeasonState, st: Storyline): string {
+  if (st.decision && !st.decision.chosen) return 'YOUR CALL';
+  const game = st.game ? s.games.find((x) => x.id === st.game) : undefined;
+  if (game) return `VS ${teamById(game.home === st.team ? game.away : game.home).abbr}`;
+  switch (st.kind) {
+    case 'breakoutWatch': return st.meter ? `${st.meter.at}/${st.meter.of}` : '';
+    case 'unbeaten': return recordText(records(s).get(st.team)!);
+    case 'bowlChase': return /NEED \d+/.exec(st.stakes)?.[0] ?? '';
+    case 'heisman': {
+      const at = (s.buzz?.[s.buzz.length - 1]?.top ?? []).findIndex((x) => x.id === st.star?.id);
+      return at >= 0 ? `NO. ${at + 1}` : '';
+    }
+    case 'nextManUp': {
+      const due = (st.k?.due as number | undefined) ?? 0;
+      return due >= 99 ? 'SEASON' : due > s.week ? `${due - s.week} WK` : '';
+    }
+    default: return '';
+  }
 }
 
 function drawConfMini(g: CanvasRenderingContext2D, s: SeasonState): void {
@@ -817,6 +850,14 @@ export function storyAt(s: SeasonState, v: SeasonView, x: number, y: number): St
   return storyRows(s)[v.scroll + Math.floor((y - STORY_TOP) / STORY_ROW)];
 }
 
+/** `t` in `n` characters, cut at a word with ".." when it doesn't fit. */
+function clip(t: string, n: number): string {
+  if (t.length <= n) return t;
+  const cut = t.slice(0, n - 2);
+  const at = cut.lastIndexOf(' ');
+  return `${(at > n / 2 ? cut.slice(0, at) : cut).replace(/[\s,;:.]+$/, '')}..`;
+}
+
 /** Every storyline this season: the running ones first, then how the others ended. A click replays one. */
 function drawStorylines(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): void {
   g.fillStyle = CARD;
@@ -836,12 +877,27 @@ function drawStorylines(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVi
     g.fillRect(PX + 4, y, PW - 8, STORY_ROW - 3);
     g.fillStyle = st.decision && !st.decision.chosen ? GOLD : open ? ACCENT : DIM;
     g.fillRect(PX + 4, y, 2, STORY_ROW - 3);
-    text(g, `${st.title}${st.star ? `: ${st.star.name}` : ''}`.slice(0, 44), PX + 12, y + 4, { color: open ? '#ffffff' : SOFT, shadow: false });
+    const teams = [st.team, ...(st.game ? [s.games.find((x) => x.id === st.game)].flatMap((x) => (x ? [x.home, x.away] : [])) : [])];
+    if (st.star) {
+      const pre = `${st.title}: ${st.star.pos} `;
+      const nm = st.star.name.slice(0, Math.max(1, 44 - pre.length));
+      drawRich(g, { t: pre + nm, spans: [{ start: pre.length, len: nm.length, link: playerLink(st.team, st.star.id) }] }, PX + 12, y + 4, { color: open ? '#ffffff' : SOFT, shadow: false });
+    } else text(g, st.title.slice(0, 44), PX + 12, y + 4, { color: open ? '#ffffff' : SOFT, shadow: false });
     text(g, `WK ${st.opened}${open ? '' : `-${st.beats[st.beats.length - 1]?.week ?? st.opened}`}`, PR - 12, y + 4, { align: 'right', color: DIM, shadow: false });
     const now = open ? st.stakes : st.outcome ?? '';
-    text(g, now.slice(0, 58), PX + 12, y + 15, { color: open ? GOLD : SOFT, shadow: false });
-    const trail = st.beats.slice(-3).map((b) => b.text).join('  /  ');
-    text(g, trail.slice(0, 58), PX + 12, y + 26, { color: DIM, shadow: false });
+    // The newest beats that fit whole, oldest first (not one that says the same as the outcome).
+    const beats: string[] = [];
+    const all = st.beats.map((b) => b.text).filter((b) => b !== now);
+    for (const bt of [...all].reverse()) {
+      if ([bt, ...beats].join('  /  ').length > 58) break;
+      beats.unshift(bt);
+    }
+    const trail = beats.length ? beats.join('  /  ') : clip(all[all.length - 1] ?? '', 58);
+    // How it ended takes both lines when it needs them; the meter sits right of the stakes.
+    const ls = open ? [clip(now, st.meter ? 46 : 58)] : wrapWords(now, 58);
+    const lines = ls.length > 1 ? [ls[0], clip(ls.slice(1).join(' '), 58)] : [ls[0] ?? '', trail];
+    drawRich(g, richText(s, lines[0], teams), PX + 12, y + 15, { color: open ? GOLD : SOFT, shadow: false });
+    drawRich(g, richText(s, lines[1], teams), PX + 12, y + 26, { color: ls.length > 1 ? SOFT : DIM, shadow: false });
     if (st.meter && open) {
       g.fillStyle = '#2a3546';
       g.fillRect(PR - 92, y + 18, 80, 4);

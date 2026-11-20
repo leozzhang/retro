@@ -1220,7 +1220,8 @@ export class Game {
     const at = (b: { x: number; y: number; w: number; h: number }) => m.pressed && inRect(m.x, m.y, b);
     if (v.nav === 'STORYLINES') {
       if (m.wheel) v.scroll = Math.max(0, Math.min(storiesMaxScroll(s), v.scroll + m.wheel));
-      const st = m.pressed ? storyAt(s, v, m.x, m.y) : undefined;
+      // A name on a row is a link; the rest of the row replays the storyline.
+      const st = m.pressed && !linkAt(m.x, m.y) ? storyAt(s, v, m.x, m.y) : undefined;
       if (st) {
         const ms = (s.moments ?? []).filter((x) => x.arc === st.id);
         this.openWrap(ms, true);

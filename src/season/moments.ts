@@ -74,6 +74,9 @@ export function ranked(poll: Poll | undefined, id: string): string {
   return r ? `#${r} ${SCHOOL(id)}` : SCHOOL(id);
 }
 
+/** A player's name in a storyline's text, with his position so he's easy to place: "QB JOHN SMITH". */
+export const withPos = (p: { pos: string; name: string }): string => `${p.pos} ${p.name.toUpperCase()}`;
+
 /** A player as a moment card shows him; `ovr` defaults to his overall now. */
 export function momentPlayer(a: Athlete, team: string, ovr = overall(a.r, a.pos)): MomentPlayer {
   return {
@@ -179,12 +182,12 @@ export function weekMoments(state: SeasonState, week: number, ev: WeekEvents): M
     const lines = [originLine(p)];
     if (spark && rep) {
       const ago = week - spark.week + 1;
-      lines.push(`${ago} WEEKS AGO HE STEPPED IN FOR ${spark.reason === 'injured' ? 'THE INJURED ' : ''}${athleteName(rep).toUpperCase()}.`);
+      lines.push(`${ago} WEEKS AGO HE STEPPED IN FOR ${spark.reason === 'injured' ? 'THE INJURED ' : ''}${withPos({ pos: rep.pos, name: athleteName(rep) })}.`);
     }
     lines.push(`NOW: ${DEV_LABEL[e.to].toUpperCase()} TALENT, ${deltaText(e.d)}`);
     add({
       key: `bo:${e.athlete.id}`, kind: 'breakout', tier: 3, w: 3 + (MOMENTS.posW[p.pos] ?? 0.5), title: 'BREAKOUT',
-      sub: `${p.name} HAS ARRIVED`, lines, p, d: e.d, dev: [e.from, e.to],
+      sub: `${withPos(p)} HAS ARRIVED`, lines, p, d: e.d, dev: [e.from, e.to],
       n: [overall(e.athlete.r, e.athlete.pos), p.ovr],
     });
   }
@@ -206,7 +209,7 @@ export function weekMoments(state: SeasonState, week: number, ev: WeekEvents): M
     const long = e.season || e.weeks >= 2;
     const lines = [`${e.type.toUpperCase()}: ${outText(e).toUpperCase()}`];
     if (p) {
-      lines.push(`NEXT MAN UP: ${p.name}, ${p.cls}, ${p.ovr} OVR`);
+      lines.push(`NEXT MAN UP: ${withPos(p)}, ${p.cls}, ${p.ovr} OVR`);
       const c = state.careers?.[p.id];
       const starts = (c?.seasons ?? []).reduce((t, r) => t + (r.gs ?? 0), 0) + (c?.now?.gs ?? 0);
       lines.push(starts ? `${starts} CAREER START${starts === 1 ? '' : 'S'}` : 'HE HAS NEVER STARTED A GAME');
@@ -214,7 +217,7 @@ export function weekMoments(state: SeasonState, week: number, ev: WeekEvents): M
     }
     add({
       key: `inj:${e.id}`, kind: 'injury', tier: long && (MOMENTS.posW[e.pos] ?? 0) >= MOMENTS.keyW ? 3 : 2, w: 2 + (MOMENTS.posW[e.pos] ?? 0.5) + (e.season ? 1 : 0),
-      title: e.season ? 'SEASON OVER' : 'INJURY', sub: `${q.name} IS ${e.season ? 'DONE FOR THE YEAR' : 'OUT'}`,
+      title: e.season ? 'SEASON OVER' : 'INJURY', sub: `${withPos(q)} IS ${e.season ? 'DONE FOR THE YEAR' : 'OUT'}`,
       lines, p, q,
     });
   }
@@ -236,7 +239,7 @@ export function weekMoments(state: SeasonState, week: number, ev: WeekEvents): M
       const good = l ? impact(l, false) > 0 : won;
       add({
         key: `fs:${id}`, kind: 'firstStart', tier: 2, w: (MOMENTS.posW[p.pos] ?? 0.5) + (good ? 0.5 : 0), title: 'FIRST START',
-        sub: `${p.name}: ${won ? 'A WINNER' : 'A TOUGH DEBUT'}`,
+        sub: `${withPos(p)}: ${won ? 'A WINNER' : 'A TOUGH DEBUT'}`,
         lines: [originLine(p), stat ? `IN HIS FIRST START: ${stat}` : `IN HIS FIRST START: ${won ? 'THE WIN' : 'A LOSS'}`],
         p,
       });
@@ -326,7 +329,7 @@ function finalMoment(state: SeasonState, week: number, g: SeasonGame, before: Po
   let p: MomentPlayer | undefined;
   if (best) {
     p = playerNow(state, u, best.l.id);
-    if (p) lines.push(`GAME BALL: ${p.name} ${statLine(best.l)}`);
+    if (p) lines.push(`GAME BALL: ${withPos(p)} ${statLine(best.l)}`);
   }
   const now = after?.week === week ? rankIn(after, u) : wr;
   const tier = style === 'champion' || style === 'title' || style === 'upset' ? 3 : style === 'stunned' || style === 'rivalry' ? 2 : 1;
@@ -362,7 +365,7 @@ function heismanMoments(state: SeasonState, week: number, ev: WeekEvents, add: A
       if (why) {
         const p = playerNow(state, u, f.id);
         add({
-          key: `hz:${f.id}`, kind: 'heisman', tier: mine === 0 ? 3 : 2, w: 3 - mine / 2, title: 'HEISMAN WATCH', sub: `${f.name.toUpperCase()}: ${why}`,
+          key: `hz:${f.id}`, kind: 'heisman', tier: mine === 0 ? 3 : 2, w: 3 - mine / 2, title: 'HEISMAN WATCH', sub: `${withPos(f)}: ${why}`,
           lines: [p ? originLine(p) : ''].filter(Boolean), p, n: [was < 0 ? 11 : was + 1, mine + 1], rows: ladder(race, prev, u),
         });
       }
@@ -376,7 +379,7 @@ function heismanMoments(state: SeasonState, week: number, ev: WeekEvents, add: A
       const p = playerNow(state, u, f.id);
       add({
         key: `hw:${f.id}`, kind: 'heisman', tier: 3, w: 5 - at, title: at === 0 ? 'HEISMAN TROPHY' : 'HEISMAN FINALIST',
-        sub: at === 0 ? `${f.name.toUpperCase()} WINS THE HEISMAN` : `${f.name.toUpperCase()} FINISHES ${['', '2ND', '3RD', '4TH'][at]}`,
+        sub: at === 0 ? `${withPos(f)} WINS THE HEISMAN` : `${withPos(f)} FINISHES ${['', '2ND', '3RD', '4TH'][at]}`,
         lines: [p ? originLine(p) : ''].filter(Boolean), p, rows: ladder(h.finalists.slice(0, 5), undefined, u),
       });
     }
@@ -405,7 +408,7 @@ function milestoneMoments(state: SeasonState, week: number, _ev: WeekEvents, g: 
       if (!p) continue;
       add({
         key: `ms:${l.id}:${k}`, kind: 'milestone', tier: 2, w: (MOMENTS.posW[p.pos] ?? 0.5) + hit / (marks[0] * 4), title: 'MILESTONE',
-        sub: `${hit.toLocaleString('en-US')} ${STAT_WORDS[k]}`, lines: [`${p.name} THIS SEASON: ${is[k].toLocaleString('en-US')} IN ${is.games} GAMES`, originLine(p)],
+        sub: `${hit.toLocaleString('en-US')} ${STAT_WORDS[k]}`, lines: [`${withPos(p)} THIS SEASON: ${is[k].toLocaleString('en-US')} IN ${is.games} GAMES`, originLine(p)],
         p, n: [from, is[k]],
       });
       break;

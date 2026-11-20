@@ -2,6 +2,21 @@
 
 _Last updated: 2026-11-19_
 
+## Done: storylines easier to read on HOME (2026-11-20)
+- **Positions on names:** every player a storyline or moment names is written with his position: "QB JOHN SMITH" (`withPos`, `season/moments.ts`). Text is written when it happens, so moments from before keep their old wording.
+- **The matchup card** no longer lists storylines under the @. They repeated THE WEEK'S STORY.
+- **THE WEEK'S STORY:**
+  - One line per running storyline: "SLUMP QB SMITH ... YOUR CALL", "UNBEATEN ... 6-0", "BREAKOUT LB DAVIS ... 2/3". Before, each storyline took two truncated lines.
+  - The stakes and beats are on the STORYLINES panel only.
+  - The YOUR CALL button names the storyline and player.
+  - Names in the headline moment and the storyline rows are links.
+- **The STORYLINES panel:**
+  - Names are links (a click on a name opens the player; the rest of the row still replays).
+  - Lines cut at a word.
+  - A finished story's outcome uses both lines instead of repeating as its last beat.
+- **The decision card's options** wrap to two lines.
+- Tests: 502 pass. Checked in headless Chrome: the links resolve to the right players.
+
 ## Done: confidence follows what everyone saw (2026-11-20)
 - **The bug:**
   - In a playtest, a 7-1 team's QB, fresh off a milestone, was "in a slump".
