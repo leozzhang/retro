@@ -35,7 +35,7 @@ import { autoGamePlan } from './season/staff';
 import { SCHEME_PASS } from './season/staff';
 import { START_SLOTS } from './season/confidence';
 import { actOnLeaving, buildBoard, entryOdds, leavingList, MIN_COUNT, PORTAL } from './season/portal';
-import { advanceOffseason, startToPortal } from './season/offseason';
+import { advanceOffseason, startOffseason, startToPortal } from './season/offseason';
 import { baseRoster } from './season/world';
 import { overall } from './data/positions';
 import { prospect } from './data/recruits';
@@ -1326,12 +1326,30 @@ function userGames(): string[] {
 function storyReport(seasons: SeasonState[]): string[] {
   const teams = (process.env.STORY_TEAMS ?? 'texas,kansas,memphis,toledo,newmexicostate').split(',').filter(Boolean);
   const all = [...seasons];
+  // The tier teams play open-ended careers with the user recruiting (nobody acting), so recruiting's stories run.
+  const open: SeasonState[] = [];
   for (const [i, t] of teams.entries()) {
     if (!TEAMS.some((x) => x.id === t)) continue;
-    const s = newSeason(defaultConfig(t), 100 + i);
+    const s = newSeason({ ...defaultConfig(t), length: 'open' }, 100 + i);
     while (!seasonOver(s)) advanceWeek(s);
     all.push(s);
+    open.push(s);
   }
+  // The first one's offseason: each stage's reveal, and the new season's opener.
+  const osCards = new Map<string, number>();
+  if (open[0]) {
+    const s = open[0];
+    startOffseason(s);
+    for (let i = 0; i < 40; i++) {
+      const next = advanceOffseason(s);
+      if (next === s) continue;
+      for (const m of [...(s.moments ?? []), ...(next.moments ?? [])].filter((x) => x.os)) osCards.set(m.os!, (osCards.get(m.os!) ?? 0) + 1);
+      break;
+    }
+  }
+  const recruitArcs = open.reduce((t, s) => t + (s.stories ?? []).filter((x) => x.kind === 'recruitment').length, 0);
+  const commits = open.reduce((t, s) => t + (s.moments ?? []).filter((x) => x.kind === 'commit' && x.opp === s.config.userTeamId).length, 0);
+  const asks = open.reduce((t, s) => t + (s.stories ?? []).filter((x) => x.kind === 'recruitment' && x.decision).length, 0);
   let weeks = 0;
   let big = 0;
   let full = 0;
@@ -1380,6 +1398,8 @@ function storyReport(seasons: SeasonState[]): string[] {
     `storylines a season: ${[...arcs].sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${k} ${per(v.n)} (${pctText(v.done / v.n)} closed)`).join('  ')}`,
     `decisions a season ${per(decisions)} (target 0.5-3; the report never takes one: ${decided} taken by the staff's chart)`,
     `save size ${(kb / n).toFixed(0)} KB gzipped a season`,
+    `recruiting (${open.length} open seasons, the user recruiting): ${(recruitArcs / open.length).toFixed(1)} recruitments followed (target 2-6), ${(commits / open.length).toFixed(1)} of them commit to you, ${(asks / open.length).toFixed(1)} decisions (target 1-3)`,
+    `offseason cards (${teams[0]}): ${[...osCards].map(([k, v]) => `${k} ${v}`).join('  ')}`,
   ];
 }
 

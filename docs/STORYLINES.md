@@ -6,15 +6,23 @@ The sim already makes drama: next men up, breakouts, breakthroughs, injuries, up
 | --- | --- |
 | Moments: what's worth a scene each week (`MOMENTS`) | `src/season/moments.ts` |
 | Storylines: the arcs, their stakes, decisions (`STORY`) | `src/season/storylines.ts` |
+| Recruiting's storylines and the commitment scene (`RSTORY`) | `src/season/recruitStories.ts` |
+| The races, transfer risk, new faces, senior day, draft stock (`TSTORY`) | `src/season/teamStories.ts` |
+| The offseason's reveals and the season opener | `src/season/offseasonMoments.ts` |
 | The Week Wrap's scenes | `src/render/momentScreen.ts`, parts in `src/render/momentArt.ts` |
 | HOME's THE WEEK'S STORY box, the STORYLINES panel | `src/render/seasonScreen.ts` |
 | The `wrap` screen, its input, HOME's M / Y / Enter | `src/game/game.ts` (`toSeason`, `openWrap`, `updateWrap`, `updateStories`) |
-| Stored | `SeasonState.moments`, `seenMoments`, `buzz`, `stories`; `TeamState.pin`; `SeasonConfig.wrap` |
+| Stored | `SeasonState.moments`, `seenMoments`, `buzz`, `stories`, `lineup` (the offseason's snapshot of the user's starters); `TeamState.pin`; `SeasonConfig.wrap` |
 | Every scene with sample data (dev builds) | `window.game.momentGallery()` (`src/render/momentGallery.ts`) |
 | Season report | the STORY section of `npm run season` |
 
 ## Rules
-- **Display only, except decisions.** The `moments` week step runs last and draws no randomness: its wording varies by a hash of ids, like the fan pulse. `src/moments.test.ts` checks that a season with the step and one without are identical apart from `moments`, `buzz` and `stories`. The one thing that reaches the sim is a decision, and it acts only through the depth chart.
+- **Display only, except decisions.**
+  - The `moments` week step runs last and draws no randomness: its wording varies by a hash of ids, like the fan pulse.
+  - `src/moments.test.ts` checks that a season with the step and one without are identical apart from `moments`, `buzz` and `stories`.
+  - The same goes for the offseason's reveals and the opener (`STAGE_MOMENTS.on` off in the test).
+  - Recruiting is read through `peekRecruiting`, which puts the recruiting school cache back as it was.
+  - The one thing that reaches the sim is a decision, and it acts only through a lever the game already has: the depth chart, an official visit (`toggleVisit`) or an in-home (`inHome`).
 - **Text is written when it happens**, like the news, and player cards are copied in (`MomentPlayer`), so a moment still reads right after the roster changes.
 - **Season-scoped.** A new season starts with no moments or storylines. Careers and the chronicle keep the history.
 
@@ -68,6 +76,46 @@ Each runs a few weeks with **stakes**: what the next game decides. The stakes sh
 | `reunion` | a starter facing the school he transferred from | | the game |
 | `homecoming` | a starter playing a road game in his home state (not your own state) | | the game |
 
+### Recruiting (`recruitStories.ts`)
+| Kind | Opens | Moves | Closes |
+| --- | --- | --- | --- |
+| `recruitment` | the user climbs into the top `RSTORY.enter` (3) of a 4-star or better, a national top 150, or a top target's market; at most `open` (4) at once, the most valuable first. A decommit from the user reopens his story as WAVERING. | his market place each week (YOU LEAD, NO. 2: TEXAS LEADS), his official visit's verdict (from `vibe`: LOVED THE LSU GAME; "THE STAFF HOSTED HIM" when the staff recruit), an in-home | the hat pick (`commit` moment: his top 3 schools' plates, one locks in): to the user, tier 3 for a 5-star or top 100; elsewhere, "PICKS ALABAMA". Out of his top 5 for 2 weeks. Signing day settles the rest. |
+| `recruitClass` | the first commit | the national rank and commits out of the room; a ladder moment into the top 25, the top 10, No. 1, or up 5+ inside the top 25 | signing day |
+
+- **Decisions** (only with the user recruiting; 4-stars and up; at most `RSTORY.asks` (3) a season, one a week):
+  - **HOST HIM FOR THE <OPP> GAME?** when the user's next game is at home and there's a visit slot. It calls `toggleVisit`.
+  - **SEND THE STAFF INTO HIS LIVING ROOM?** from championship week, when the user is No. 1-2 or he's wavering. It calls `inHome`.
+  - The story goes on after either answer. An unanswered question is passed.
+- **The visit weekend:** UP NEXT lists the recruits in the stands; the final adds "3 RECRUITS ON VISITS: 2 LOVED IT".
+
+### The rest of the program (`teamStories.ts`)
+| Kind | Opens | Closes |
+| --- | --- | --- |
+| `confRace` | in a conference with a title game, 2+ conference games in, in the top `confPlace` (3) and alive | CLINCHED (tier 3) when at most one rival can still reach the user's conference wins; ELIMINATED when two have more than the user can reach; else the title game decides |
+| `bubble` | from the first CFP poll, CFP top 20, in the field or within 4 spots of it (the field picked today with `selectPlayoff`) | selection: the seed, or left out. Moving in or out of the field is a tier-2 beat. |
+| `award` | a user player top 3 in a position award's race (O'Brien, Walker, Biletnikoff, Groza) | the ceremony (`award` moment for a winner) |
+| `transferRisk` | a user player at MISERABLE morale (`TSTORY.miserable`) who matters (within 4 of his position's weakest starter, or a 4-star+); at most 2. Why from `moraleReason`. Unhappy about his role with a slot he can take: **decision: GIVE HIM THE START?** (a depth pin) | back to CONTENT, or the portal's reveal: ENTERED THE PORTAL / STAYED |
+| `phenom` | a true freshman (`joinYear`) who starts with a spark or a big line; his recruiting stars and rank | the season's end |
+| `newFace` | the season opener, for up to 3 new starters at playmaker positions (THE NEW QB: TRANSFER FROM UCF) | 3 starts (the first is TRANSFER DEBUT / THE DEBUT, tier 2) |
+| `seniorDay` | the week before the last regular-season home game; the seniors leaving (`seniorsLeaving`) | the game, then a SENIOR DAY card of the seniors with their career starts |
+| `draftStock` | weeks 6, 10, 14: a user starter projected in the first `draftRound` (2) rounds (`teamProjections`) | departures: DRAFTED (round, pick, city), DECLARED/WENT UNDRAFTED, or COMING BACK |
+
+## The offseason (`offseasonMoments.ts`)
+Each stage ends with a reveal (`stageMoments`, called by `advanceOffseason`). The offseason screens open it (`Game.stageWrap`) and go back to their stage after. Every card plays, in the order built (`wrapOrder` keeps an offseason list whole). The WEEK WRAP setting OFF skips them.
+| Stage | Cards |
+| --- | --- |
+| carousel | STAFF CHANGES: the user's carousel news. The season's stories nothing in the offseason settles close here, and the user's lineup is kept (`lineup`) for the opener. |
+| departures | THE PICK IS IN for each first-rounder (the pick rolling, the city, his card), DRAFT NIGHT for every pick, FAREWELL: who graduated, who declared, who stays. Closes draft stock. |
+| signing | SIGNED for up to 3 4-star-plus signees, THE CLASS (tiles), CLASS RANKINGS, THE ONES THAT GOT AWAY. Closes recruitments and the class. |
+| portal | THE PORTAL OPENS: the user's entrants. Closes transfer risks. |
+
+**The season opener** (`seasonOpener`, from `newSeason` with the offseason's state), week 0:
+1. THE <YEAR> SEASON: the preseason rank, last year's record, starters returning.
+2. NEW ARRIVALS: transfers in (from where), then the freshmen.
+3. NEW STARTERS: each changed starting slot, who moved in (transfer, true freshman, moves up) and whom he replaces (drafted, graduated, transferred, moved to another slot, beaten out).
+4. PLAYERS TO WATCH, 5. GAMES CIRCLED (ranked opponents and named rivalries).
+It opens the `newFace` stories.
+
 **Continuity rules** (`startingRoles`, `challenger`, `injuredStarters`; tested in `src/moments.test.ts`):
 - **Next man up:**
   - Only an injury to a real starter has one. A real starter was in last game's starting lineup (`TeamState.st`); a package slot like WR4, TE2 or DIME doesn't count.
@@ -95,6 +143,17 @@ Targets:
 - A tier-3 moment in 25-45% of game weeks (one every 2-4 weeks).
 - Fewer than 35% of weeks with nothing past the final.
 - 0.5-3 decisions a season.
+- Recruiting (the tier teams play open-ended careers with the user recruiting and nobody acting):
+  - 2-6 recruitments followed a season;
+  - 1-3 recruiting decisions.
+- The offseason's cards per stage are listed for the first tier team.
+
+Last run (5 georgia seasons plus the 5 tier teams):
+- BIG: 4.8 cards a week.
+- Tier-3 moments: 35.7% of weeks; nothing past the final: 11.4% of weeks.
+- Decisions: 2.0 a season.
+- Recruiting: 3.6 recruitments followed and 1.4 recruiting decisions a season. 0.2 commit to the user, since nobody makes the offers.
+- Offseason cards (texas): carousel 1, departures 4, signing 5, opener 5.
 
 The tuning that got there:
 - Slumps at the staff's line (-0.35) fired for 7 starters in one week. They're now -0.5 after 3 starts, playmakers and kickers only, at most 2 open.
@@ -104,5 +163,5 @@ The numbers are in PROGRESS.md.
 
 ## Not built yet
 - **In-game:** a pregame intro with the storylines to watch, and lower-thirds when a storyline's player makes a play (`liveBox` has his line live). The final screen could read its moment's style.
-- **More arcs:** the hot seat (coach career), the conference race and the playoff bubble (CFP 9-16), a freshman phenom, a senior's last home game, records (the program's and careers').
+- **More arcs:** the hot seat (coach career has no firing yet), records (the program's and careers'), a portal pursuit during the portal stage (who you're chasing, round by round).
 - **Sound:** stingers for the scenes.

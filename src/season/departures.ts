@@ -76,6 +76,16 @@ function redshirtFor(state: SeasonState, team: string, a: Athlete): number | und
   return fresh || medical ? state.year : undefined;
 }
 
+/**
+ * Where a team's draft-eligible players project this year (pick, as if all declared), best first.
+ * Pure: the storylines' draft stock reads it during the season.
+ */
+export function teamProjections(state: SeasonState, team: string): { a: Athlete; proj: number; grad: boolean }[] {
+  const pool = draftClass(state);
+  const proj = projections(pool);
+  return pool.filter((x) => x.team === team).map((x) => ({ a: x.a, proj: proj.get(x.a.id)!, grad: x.grad }));
+}
+
 /** Projected pick by id among this year's draft class (everyone eligible, as if all declared). */
 function projections(pool: Prospect[]): Map<string, number> {
   return new Map(pool.map((x, i) => [x.a.id, i + 1]));

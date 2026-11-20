@@ -6,7 +6,7 @@ import type { Moment, MomentPlayer, SeasonState, Storyline } from '../season/typ
 import { drawHint } from './hud';
 import {
   backdrop, clamp01, confetti, devBadge, DIM, ease, GOLD, GREEN, hero, moveMark, playerCard, rain, ratingBars, RED, rise, rolled, seg,
-  slam, SOFT, spotlight, trophy, wrap,
+  slam, SOFT, spotlight, starPips, trophy, wrap,
 } from './momentArt';
 import type { Pose } from './sprites';
 import { text } from './text';
@@ -49,6 +49,14 @@ export function sceneDur(m: Moment): number {
     case 'around':
     case 'preview': return 0.5 + 0.12 * (m.rows?.length ?? 0);
     case 'decision': return 0.8;
+    case 'commit': return 2.8 + per;
+    case 'draft': return m.p ? 2.4 + per : 0.6 + 0.12 * (m.rows?.length ?? 0);
+    case 'signing': return m.p ? 1.8 + per : 0.6 + 0.06 * (m.rows?.length ?? 0);
+    case 'farewell': return 0.6 + 0.06 * (m.rows?.length ?? 0);
+    case 'staff':
+    case 'portal':
+    case 'arrivals': return 0.5 + 0.12 * (m.rows?.length ?? 0);
+    case 'opener': return 1.8 + per;
     default: return 1.2 + per;
   }
 }
@@ -84,16 +92,30 @@ export function drawWrap(g: CanvasRenderingContext2D, s: SeasonState, v: WrapVie
     case 'around': drawAround(g, m, team, t); break;
     case 'preview': drawPreview(g, m, team, t); break;
     case 'decision': drawDecision(g, m, team, t, story, v); break;
+    case 'commit': drawCommit(g, m, team, t); break;
+    case 'award': drawLadder(g, m, team, t, 'heisman'); break;
+    case 'draft': if (m.p) drawDraft(g, m, team, t); else drawList(g, m, team, t); break;
+    case 'signing': if (m.p) drawSigning(g, m, team, t); else drawTiles(g, m, team, t); break;
+    case 'farewell': drawTiles(g, m, team, t); break;
+    case 'staff':
+    case 'portal':
+    case 'arrivals': drawList(g, m, team, t); break;
+    case 'opener': drawOpener(g, m, team, t); break;
     default: drawStory(g, m, team, t, story);
   }
   drawFrame(g, m, v, story);
 }
 
+const OS_LABEL: Record<NonNullable<Moment['os']>, string> = {
+  carousel: 'THE CAROUSEL', departures: 'DEPARTURES', signing: 'SIGNING DAY', portal: 'THE PORTAL', opener: 'A NEW SEASON',
+};
+
 /** The strip on top (the week, which card) and the hint bar. */
 function drawFrame(g: CanvasRenderingContext2D, m: Moment, v: WrapView, story: Storyline | undefined): void {
   g.fillStyle = 'rgba(5,7,10,0.85)';
   g.fillRect(0, 0, VIEW_W, 18);
-  text(g, v.replay ? `REPLAY  -  WEEK ${m.week}` : `WEEK ${m.week} WRAP`, 8, 5, { color: GOLD, shadow: false });
+  const when = m.os ? OS_LABEL[m.os] : `WEEK ${m.week}`;
+  text(g, v.replay ? `REPLAY  -  ${when}` : m.os ? when : `${when} WRAP`, 8, 5, { color: GOLD, shadow: false });
   const n = v.list.length;
   for (let i = 0; i < n; i++) {
     g.fillStyle = i === v.i ? GOLD : i < v.i ? SOFT : '#2a3546';
@@ -101,8 +123,12 @@ function drawFrame(g: CanvasRenderingContext2D, m: Moment, v: WrapView, story: S
   }
   if (m.arc && m.kind !== 'decision' && story) text(g, `STORYLINE: ${story.title}`.slice(0, 36), CX, 5, { align: 'center', color: SOFT, shadow: false });
   const done = v.t >= sceneDur(m);
-  if (m.kind === 'decision' && story?.decision && !story.decision.chosen) drawHint(g, '1 / 2 OR CLICK: CHOOSE   ESC: DECIDE LATER ON HOME');
-  else drawHint(g, `${done ? 'CLICK OR SPACE: NEXT' : 'CLICK: SKIP AHEAD'}   ESC: ${v.i < n - 1 ? 'SKIP TO HOME' : 'HOME'}   ${v.i + 1}/${n}`);
+  if (m.kind === 'decision' && story?.decision && story.decision.chosen === undefined) drawHint(g, '1 / 2 OR CLICK: CHOOSE   ESC: DECIDE LATER ON HOME');
+  else {
+    // An offseason stage's reveal goes back to its stage, not HOME.
+    const where = m.os && m.os !== 'opener' ? (v.i < n - 1 ? 'SKIP' : 'BACK') : v.i < n - 1 ? 'SKIP TO HOME' : 'HOME';
+    drawHint(g, `${done ? 'CLICK OR SPACE: NEXT' : 'CLICK: SKIP AHEAD'}   ESC: ${where}   ${v.i + 1}/${n}`);
+  }
 }
 
 function titleBlock(g: CanvasRenderingContext2D, m: Moment, t: number, x: number, color: string, align: CanvasTextAlign = 'center', at = 0.25): void {
@@ -233,7 +259,7 @@ function drawLadder(g: CanvasRenderingContext2D, m: Moment, team: Team, t: numbe
     spotlight(g, 110, FLOOR, ease(seg(t, 0.1, 0.5)));
     trophy(g, 110, FLOOR, 4);
     if (m.p) hero(g, team, m.p.skin, 220, FLOOR, 5, t < 1 ? 'stand' : 'cheer', -1);
-    if (m.title === 'HEISMAN TROPHY') confetti(g, m.id, t, [GOLD, '#e2b070', '#ffffff']);
+    if (m.title === 'HEISMAN TROPHY' || m.kind === 'award') confetti(g, m.id, t, [GOLD, '#e2b070', '#ffffff']);
   } else if (m.n) {
     const now = rolled(m.n[0], m.n[1], seg(t, 0.3, 1.0));
     rise(g, 'NO.', 150, 104, seg(t, 0.2, 0.3), { color: SOFT, align: 'center' });
@@ -285,7 +311,8 @@ function drawStakes(g: CanvasRenderingContext2D, m: Moment, team: Team, t: numbe
 
 function drawTiles(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
   backdrop(g, team, t, 'dark');
-  slam(g, m.title, CX, 26, seg(t, 0.05, 0.3), 24, GREEN);
+  const lvl = m.kind === 'progress';
+  slam(g, m.title, CX, 26, seg(t, 0.05, 0.3), fit(m.title, 600, 24), lvl ? GREEN : GOLD);
   rise(g, m.sub, CX, 58, seg(t, 0.2, 0.3), { color: '#ffffff', align: 'center' });
   const rows = m.rows ?? [];
   const cols = 3;
@@ -304,8 +331,8 @@ function drawTiles(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number
     g.fillRect(x, y + (1 - f) * 10, 2, 34);
     const [name, pos] = [r.text.slice(0, r.text.lastIndexOf(' ')), r.text.slice(r.text.lastIndexOf(' ') + 1)];
     text(g, name.slice(0, 17), x + 8, y + 6, { color: '#ffffff', shadow: false });
-    text(g, pos + (r.me ? '  BREAKTHROUGH' : ''), x + 8, y + 20, { color: r.me ? GOLD : SOFT, shadow: false });
-    text(g, r.val ?? '', x + w - 8, y + 10, { size: 16, color: GREEN, align: 'right' });
+    text(g, pos + (r.me && lvl ? '  BREAKTHROUGH' : ''), x + 8, y + 20, { color: r.me ? GOLD : SOFT, shadow: false });
+    text(g, r.val ?? '', x + w - 8, y + 10, { size: lvl || /^\d+\*?$/.test(r.val ?? '') ? 16 : 8, color: lvl ? GREEN : r.me ? GOLD : '#ffffff', align: 'right' });
     g.restore();
   });
   if (rows.length > shown.length) rise(g, `AND ${rows.length - shown.length} MORE`, CX, 322, seg(t, 1.4, 0.3), { color: SOFT, align: 'center' });
@@ -417,8 +444,8 @@ function drawDecision(g: CanvasRenderingContext2D, m: Moment, team: Team, t: num
     const f = ease(seg(t, 0.4 + i * 0.15, 0.35));
     if (f <= 0) return;
     const chosen = d.chosen === o.id;
-    const other = !!d.chosen && !chosen;
-    const hot = !d.chosen && inBox(r, v.mx, v.my);
+    const other = d.chosen !== undefined && !chosen;
+    const hot = d.chosen === undefined && inBox(r, v.mx, v.my);
     g.save();
     g.globalAlpha = f * (other ? 0.45 : 1);
     g.fillStyle = chosen ? 'rgba(255,210,63,0.16)' : hot ? '#1a2230' : 'rgba(20,27,38,0.95)';
@@ -439,4 +466,133 @@ function drawDecision(g: CanvasRenderingContext2D, m: Moment, team: Team, t: num
     if (chosen) text(g, 'YOUR DECISION', r.x + r.w / 2, r.y + r.h - 14, { color: GOLD, align: 'center' });
     g.restore();
   });
+}
+
+// ------------------------------------------------------------ recruiting and the offseason
+
+/** A plain practice look for a recruit before he picks (its own id: sprites cache by it). */
+const NEUTRAL = {
+  ...teamById('smu'), id: 'recruit',
+  colors: {
+    ...teamById('smu').colors, primary: '#3a4456', secondary: '#c9d2df', helmet: '#c9d2df', stripe: '#c9d2df', logo: '#c9d2df', mask: '#8a93a3',
+    jerseyHome: '#3a4456', jerseyAway: '#3a4456', trimHome: '#c9d2df', trimAway: '#c9d2df', pantsHome: '#8a93a3', pantsAway: '#8a93a3', socks: '#3a4456',
+  },
+} as Team;
+
+/** A recruit's commitment: his card, then his top schools' plates flicker and one locks in. */
+function drawCommit(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
+  const p = m.p!;
+  const plates = m.rows ?? [];
+  const pick = plates.find((r) => r.me);
+  const ours = pick?.team === m.team;
+  const to = pick?.team ? teamById(pick.team) : team;
+  const locked = t >= 1.9;
+  backdrop(g, locked ? to : team, t, locked && ours ? 'gold' : 'dark');
+  if (locked && ours) confetti(g, m.id, t - 1.9, [GOLD, '#ffffff', team.colors.primary, team.colors.secondary]);
+  spotlight(g, 130, FLOOR, ease(seg(t, 0.1, 0.5)));
+  // In plain colors until he picks: then his school's.
+  hero(g, locked ? to : NEUTRAL, p.skin, 130, FLOOR, 6, locked && ours ? 'cheer' : 'stand', 1);
+  const x = 260;
+  rise(g, m.lines[0] ?? '', x, 24, seg(t, 0.05, 0.3), { color: SOFT });
+  rise(g, `${p.pos} ${p.name}`.slice(0, 22), x, 40, seg(t, 0.15, 0.3), { color: '#ffffff', size: 16 });
+  if (t >= 0.25) starPips(g, p.stars, x, 64);
+  rise(g, p.rank ? `NO. ${p.rank} NATIONALLY` : '', x + 54, 64, seg(t, 0.3, 0.3), { color: GOLD });
+  rise(g, p.home, x, 80, seg(t, 0.35, 0.3), { color: DIM });
+  // The plates: the light runs across them, then stops on his choice.
+  const w = 104;
+  const gap = 10;
+  const px = x + (360 - plates.length * w - (plates.length - 1) * gap) / 2;
+  const hot = t < 1.9 ? Math.floor(t * 9) % Math.max(1, plates.length) : plates.findIndex((r) => r.me);
+  plates.forEach((r, i) => {
+    const f = ease(seg(t, 0.4 + i * 0.12, 0.3));
+    if (f <= 0) return;
+    const tm = teamById(r.team!);
+    const bx = px + i * (w + gap);
+    const out = locked && !r.me;
+    g.save();
+    g.globalAlpha = f * (out ? 0.35 : 1);
+    g.fillStyle = tm.colors.primary;
+    g.fillRect(bx, 110, w, 70);
+    g.fillStyle = tm.colors.secondary;
+    g.fillRect(bx, 170, w, 10);
+    if (t >= 0.8 && i === hot) {
+      g.strokeStyle = GOLD;
+      g.lineWidth = 3;
+      g.strokeRect(bx - 2, 108, w + 4, 74);
+    }
+    text(g, tm.abbr, bx + w / 2, 132, { size: 16, align: 'center', color: '#ffffff' });
+    g.restore();
+  });
+  if (locked) {
+    slam(g, m.title, x + 180, 206, seg(t, 1.9, 0.4), fit(m.title, 360), ours ? GOLD : RED);
+    rise(g, `TO ${to.school.toUpperCase()}`, x + 180, 244, seg(t, 2.2, 0.3), { color: '#ffffff', align: 'center' });
+    lines(g, m.lines.slice(1, 2), x + 180, 262, t, 2.4, 'center', 44);
+  }
+}
+
+/** Draft night: the pick rolls in, the city, his card. */
+function drawDraft(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
+  backdrop(g, team, t, 'dark');
+  const p = m.p!;
+  spotlight(g, 160, FLOOR, ease(seg(t, 0.1, 0.5)));
+  hero(g, team, p.skin, 160, FLOOR, 6, t < 1.4 ? 'stand' : Math.floor(t * 2.5) % 2 ? 'cheer' : 'spikeUp', 1);
+  if (t >= 1.4) confetti(g, m.id, t - 1.4, [GOLD, '#ffffff', team.colors.primary], 60);
+  const x = 300;
+  rise(g, 'THE PICK IS IN', x, 26, seg(t, 0.05, 0.3), { color: SOFT });
+  rise(g, 'ROUND 1', x, 46, seg(t, 0.3, 0.3), { color: '#ffffff', size: 16 });
+  if (m.n) text(g, t >= 0.5 ? `PICK ${rolled(60, m.n[1], seg(t, 0.5, 0.9))}` : '', x, 70, { size: 32, color: t >= 1.4 ? GOLD : '#ffffff' });
+  rise(g, (m.lines[0] ?? '').split(': ')[1] ?? '', x, 112, seg(t, 1.4, 0.3), { color: GOLD, size: 16 });
+  if (t >= 1.6) playerCard(g, p, x, 140, 300, team, seg(t, 1.6, 0.3));
+  lines(g, m.lines.slice(1), x, 212, t, 1.9, 'left', 36);
+}
+
+/** A signee: in the user's colors, his stars, rank and hometown. */
+function drawSigning(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
+  backdrop(g, team, t, m.tier >= 3 ? 'gold' : 'team');
+  const p = m.p!;
+  spotlight(g, 160, FLOOR, ease(seg(t, 0.1, 0.5)));
+  hero(g, team, p.skin, 160, FLOOR, 6, t < 0.8 ? 'stand' : 'cheer', 1);
+  if (m.tier >= 3 && t >= 0.8) confetti(g, m.id, t - 0.8, [GOLD, '#ffffff', team.colors.primary], 60);
+  const x = 300;
+  slam(g, m.title, x, 26, seg(t, 0.2, 0.4), 32, GOLD, 'left');
+  rise(g, `${p.pos} ${p.name}`.slice(0, 20), x, 70, seg(t, 0.5, 0.3), { color: '#ffffff', size: 16 });
+  if (t >= 0.6) starPips(g, p.stars, x, 96);
+  lines(g, m.lines, x, 122, t, 0.9, 'left', 40);
+}
+
+/** Rows with a second line each: the staff, arrivals, new starters, the games circled. */
+function drawList(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
+  backdrop(g, team, t, 'dark');
+  slam(g, m.title, CX, 26, seg(t, 0.05, 0.3), fit(m.title, 600, 24), GOLD);
+  rise(g, m.sub, CX, 58, seg(t, 0.2, 0.3), { color: '#ffffff', align: 'center' });
+  (m.rows ?? []).slice(0, 8).forEach((r, i) => {
+    const f = ease(seg(t, 0.3 + i * 0.12, 0.3));
+    if (f <= 0) return;
+    const y = 78 + i * 30;
+    const x = 40 + (1 - f) * 120;
+    g.save();
+    g.globalAlpha = f;
+    g.fillStyle = r.me ? 'rgba(255,210,63,0.14)' : 'rgba(20,27,38,0.95)';
+    g.fillRect(x, y, VIEW_W - 80, 26);
+    g.fillStyle = teamById(r.team ?? m.team).colors.primary;
+    g.fillRect(x, y, 6, 26);
+    const ls = r.val ? [r.text, r.val] : wrap(r.text, 66).slice(0, 2);
+    ls.forEach((w, j) => text(g, w.slice(0, 66), x + 14, y + (ls.length > 1 ? 4 + j * 11 : 9), { color: j === 0 ? (r.me ? GOLD : '#ffffff') : r.val ? SOFT : '#ffffff', shadow: false }));
+    g.restore();
+  });
+}
+
+/** The new season's title card: the school, then the year slams in over a team-color wipe. */
+function drawOpener(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
+  backdrop(g, team, t, 'team');
+  const f = ease(seg(t, 0, 0.6));
+  g.fillStyle = team.colors.primary;
+  g.fillRect(0, 150, VIEW_W * f, 26);
+  g.fillStyle = team.colors.secondary;
+  g.fillRect(VIEW_W * (1 - f), 176, VIEW_W * f, 4);
+  ['#c68a5e', '#8d5a3b', '#e0b48a'].forEach((skin, i) => hero(g, team, skin, CX + (i - 1) * 170, FLOOR + 40, 4, t < 1.2 ? 'stand' : 'cheer', 1, { alpha: ease(seg(t, 0.3 + i * 0.1, 0.4)) }));
+  slam(g, team.school.toUpperCase(), CX, 40, seg(t, 0.2, 0.4), fit(team.school, 600, 24), '#ffffff');
+  slam(g, m.title, CX, 80, seg(t, 0.5, 0.4), fit(m.title, 600), GOLD);
+  rise(g, m.sub, CX, 156, seg(t, 0.9, 0.3), { color: '#ffffff', align: 'center', size: 16 });
+  lines(g, m.lines, CX, 196, t, 1.1);
 }

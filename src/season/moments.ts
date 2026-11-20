@@ -331,6 +331,14 @@ function finalMoment(state: SeasonState, week: number, g: SeasonGame, before: Po
     p = playerNow(state, u, best.l.id);
     if (p) lines.push(`GAME BALL: ${withPos(p)} ${statLine(best.l)}`);
   }
+  // Recruits on official visits: how the day went for them.
+  const rs = state.recruiting;
+  const vis = g.home === u && rs ? (rs.visits[g.id] ?? []).filter((id) => rs.ov[id]?.includes(u)) : [];
+  if (vis.length) {
+    const loved = vis.filter((id) => (rs!.vibe[id] ?? 0) >= 0.25).length;
+    const cold = vis.filter((id) => (rs!.vibe[id] ?? 0) < -0.4).length;
+    lines.push(`${vis.length} RECRUIT${vis.length === 1 ? '' : 'S'} ON VISITS: ${loved ? `${loved} LOVED IT` : cold ? `${cold} LEFT COLD` : 'GOOD REVIEWS'}`);
+  }
   const now = after?.week === week ? rankIn(after, u) : wr;
   const tier = style === 'champion' || style === 'title' || style === 'upset' ? 3 : style === 'stunned' || style === 'rivalry' ? 2 : 1;
   const head: Record<string, string[]> = {
@@ -481,6 +489,8 @@ function around(state: SeasonState, week: number, ev: WeekEvents, before: Poll |
  */
 export function wrapOrder(ms: Moment[], level: 'all' | 'big' | 'off'): Moment[] {
   if (level === 'off') return [];
+  // An offseason reveal or the season opener plays every card, in the order it was built.
+  if (ms.length && ms.every((m) => m.os)) return [...ms];
   const rank = (m: Moment) => (m.kind === 'final' ? 0 : m.kind === 'around' ? 4 : m.kind === 'preview' ? 3 : m.kind === 'progress' ? 2 : 1);
   const sorted = [...ms].sort((a, b) => rank(a) - rank(b) || b.tier - a.tier || b.w - a.w);
   if (level === 'all') return sorted;
@@ -509,7 +519,9 @@ export function headlineMoment(state: SeasonState): Moment | undefined {
   if (!ms.length) return undefined;
   const week = ms[ms.length - 1].week;
   const wk = ms.filter((m) => m.week === week);
-  return wk.filter((m) => !['final', 'around', 'progress', 'decision', 'preview'].includes(m.kind)).sort((a, b) => b.tier - a.tier || b.w - a.w)[0] ?? wk.find((m) => m.kind === 'final');
+  // A list card (the staff, arrivals, a class) isn't a headline; a player's card is.
+  const list = (m: Moment) => ['staff', 'farewell', 'arrivals', 'portal'].includes(m.kind) || (['draft', 'signing'].includes(m.kind) && !m.p);
+  return wk.filter((m) => !['final', 'around', 'progress', 'decision', 'preview'].includes(m.kind) && !list(m)).sort((a, b) => b.tier - a.tier || b.w - a.w)[0] ?? wk.find((m) => m.kind === 'final');
 }
 
 /**
@@ -541,6 +553,7 @@ export function mergeWeek(ms: Moment[], stories: SeasonState['stories']): Moment
 /** The newest week's moments, in the order the wrap plays them all. */
 export function lastWeekMoments(state: SeasonState): Moment[] {
   const ms = state.moments ?? [];
-  const week = ms[ms.length - 1]?.week;
-  return wrapOrder(ms.filter((m) => m.week === week), 'all');
+  const last = ms[ms.length - 1];
+  // A week's moments, or the latest offseason reveal (one stage's, or the opener).
+  return wrapOrder(ms.filter((m) => m.week === last?.week && m.os === last?.os), 'all');
 }

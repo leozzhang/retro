@@ -466,6 +466,8 @@ export class Game {
   private seasonView: SeasonView = newSeasonView();
   /** The Week Wrap, or a replay of moments (render/momentScreen.ts). */
   private wrapView?: WrapView;
+  /** Where the wrap returns when it closes (missing: the hub). */
+  private wrapBack?: () => void;
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private programView?: ProgramView;
   /** Where Esc goes from a program page: the screen it was opened from, or the program page before. */
@@ -1155,10 +1157,14 @@ export class Game {
     }
   }
 
-  /** Show moments one scene at a time: the Week Wrap, or a replay from HOME or STORYLINES. */
-  openWrap(list: Moment[], replay: boolean): void {
+  /**
+   * Show moments one scene at a time: the Week Wrap, or a replay from HOME or STORYLINES. `back` is
+   * where it returns (an offseason stage's reveal goes back to the offseason's screens).
+   */
+  openWrap(list: Moment[], replay: boolean, back?: () => void): void {
     if (!list.length) return;
     this.wrapView = newWrapView(list, replay);
+    this.wrapBack = back;
     this.screen = 'wrap';
   }
 
@@ -1169,7 +1175,10 @@ export class Game {
       this.save();
     }
     this.wrapView = undefined;
-    this.screen = 'season';
+    const back = this.wrapBack;
+    this.wrapBack = undefined;
+    if (back) back();
+    else this.screen = 'season';
   }
 
   /**
@@ -1192,7 +1201,7 @@ export class Game {
       return;
     }
     const d = m.kind === 'decision' ? storyOf(s, m)?.decision : undefined;
-    if (d && !d.chosen) {
+    if (d && d.chosen === undefined) {
       const i = input.hit('Digit1') ? 0 : input.hit('Digit2') ? 1 : input.mouse.pressed ? decisionAt(input.mouse.x, input.mouse.y) : -1;
       if (i >= 0 && d.options[i]) {
         decide(s, m.arc!, d.options[i].id);
@@ -2074,6 +2083,19 @@ export class Game {
   // ------------------------------------------------------------ coaching carousel
 
   /** The offseason's current stage. */
+  /**
+   * An offseason stage just ran: its reveal (season/offseasonMoments.ts), back to the offseason's
+   * screens after. False when there's nothing to show.
+   */
+  private stageWrap(): boolean {
+    const s = this.season;
+    const list = s ? unseenWrap(s).filter((m) => m.os && m.os !== 'opener') : [];
+    if (!list.length) return false;
+    const screen = this.screen;
+    this.openWrap(list, false, () => (screen === 'portal' ? (this.screen = 'portal') : this.toOffseason()));
+    return true;
+  }
+
   private toOffseason(): void {
     const stage = this.season?.offseason?.stage;
     if (stage === 'carousel') {
@@ -2111,7 +2133,7 @@ export class Game {
     if (signingDay && (input.hit('Space', 'Enter') || (pressed && inBox(RECRUIT_ADVANCE, x, y)))) {
       advanceOffseason(s);
       this.save();
-      this.toOffseason();
+      if (!this.stageWrap()) this.toOffseason();
       return;
     }
     const n = RECRUIT_TABS.length;
@@ -2223,7 +2245,7 @@ export class Game {
     if (input.hit('Space', 'Enter') || (pressed && inBox(DEPARTURES_ADVANCE, x, y))) {
       advanceOffseason(s);
       this.save();
-      this.toOffseason();
+      if (!this.stageWrap()) this.toOffseason();
       return;
     }
     const count = departureRowCount(s, v.tab);
@@ -2279,7 +2301,7 @@ export class Game {
       advanceOffseason(s);
       this.save();
       if (s.offseason?.stage !== 'carousel') {
-        this.toOffseason();
+        if (!this.stageWrap()) this.toOffseason();
         return;
       }
       Object.assign(v, { sel: 0, top: 0, chair: Math.min(v.chair, Math.max(0, openChairs(s).length - 1)), note: `ROUND ${s.offseason.round}: SEE WHO SIGNED ON AROUND THE LEAGUE` });
@@ -2377,6 +2399,7 @@ export class Game {
       }
       this.save();
       this.portalView = { ...newPortalView(s), tab: PORTAL_TABS[v.tab] === 'LEAVING' ? 0 : v.tab, chip: v.chip };
+      this.stageWrap();
       return;
     }
     const which = PORTAL_TABS[v.tab];

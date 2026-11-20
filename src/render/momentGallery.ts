@@ -55,5 +55,24 @@ export function galleryMoments(s: SeasonState): Moment[] {
       { text: `NEW NO. 1: ${TEAMS[7].school.toUpperCase()}`, team: TEAMS[7].id },
       { text: `HEISMAN 1. ${qb.name} ${TEAMS.find((t) => t.id === u)!.abbr}`, mv: 2, me: true, team: u },
     ] },
+    // Recruiting, the awards, the offseason's reveals and the season opener.
+    { ...base, id: 'g16', kind: 'commit', tier: 3, title: 'COMMITTED', sub: `5* ${wr.pos} ${wr.name}`, opp: u, p: { ...wr, stars: 5, rank: 14, cls: 'RECRUIT' },
+      lines: ['THE HAT PICK', 'NO. 14 NATIONALLY, NO. 2 WR', `FROM ${wr.home}`],
+      rows: [{ text: TEAMS[3].abbr, team: TEAMS[3].id }, { text: 'YOU', team: u, me: true }, { text: TEAMS[9].abbr, team: TEAMS[9].id }] },
+    { ...base, id: 'g17', kind: 'poll', tier: 3, title: 'CLASS RANKINGS', sub: 'A TOP 10 CLASS', n: [14, 8], lines: ['18 COMMITS'], rows: rows(5, (i) => ({ text: `${i + 6}. ${i === 2 ? 'YOU' : TEAMS[i + 10].school.toUpperCase()}`, val: `${20 - i} / ${2400 - i * 60}`, me: i === 2, team: i === 2 ? u : TEAMS[i + 10].id })) },
+    { ...base, id: 'g18', kind: 'award', tier: 3, title: "DAVEY O'BRIEN AWARD", sub: `${qb.pos} ${qb.name} WINS THE DAVEY O'BRIEN AWARD`, p: qb, rows: rows(5, (i) => ({ text: `${i + 1}. ${i ? `PLAYER ${i}` : qb.name}`, val: 'QB', me: !i, team: i ? TEAMS[i + 3].id : u })) },
+    { ...base, id: 'g19', kind: 'staff', tier: 2, title: 'STAFF CHANGES', sub: '3 CHANGES ON YOUR STAFF', os: 'carousel', rows: [
+      { text: `HIRED: ${TEAMS[12].school.toUpperCase()} NAMES YOUR DC M. IRVING HEAD COACH`, team: TEAMS[12].id },
+      { text: 'YOUR LB COACH K. WILLIAMS FOLLOWS HIM', team: u },
+      { text: 'THE STAFF FILLS YOUR DEF. COORDINATOR JOB WITH C. COOK', team: u },
+    ] },
+    { ...base, id: 'g20', kind: 'draft', tier: 3, title: 'THE PICK IS IN', sub: `${hb.pos} ${hb.name}`, p: hb, n: [1, 7], os: 'departures', lines: ['ROUND 1, PICK 7: CHICAGO', 'AN UNDERCLASSMAN, DECLARED EARLY'] },
+    { ...base, id: 'g21', kind: 'farewell', tier: 2, title: 'FAREWELL', sub: '14 GRADUATE, 3 DECLARE, 1 STAYS', os: 'departures', rows: sq.athletes.slice(0, 9).map((a, i) => ({ text: `${a.first} ${a.last} ${a.pos}`.toUpperCase(), val: i ? (i % 3 ? 'GRAD' : 'NFL') : 'BACK', me: !i })) },
+    { ...base, id: 'g22', kind: 'signing', tier: 3, title: 'SIGNED', sub: `5* ${qb2.pos} ${qb2.name}`, p: { ...qb2, stars: 5, rank: 6, cls: 'RECRUIT' }, os: 'signing', lines: ['NO. 6 NATIONALLY, NO. 1 QB', `FROM ${qb2.home}`] },
+    { ...base, id: 'g23', kind: 'arrivals', tier: 2, title: 'NEW STARTERS', sub: '3 NEW FACES IN THE LINEUP', os: 'opener', rows: [
+      { text: `QB: ${qb2.pos} ${qb2.name}`, val: `TRANSFER FROM ${TEAMS[20].abbr}. REPLACES ${qb.name} (DRAFTED, RD 1)`, team: TEAMS[20].id, me: true },
+      { text: `RB: ${hb.pos} ${hb.name}`, val: 'MOVES UP. REPLACES A STARTER (GRADUATED)', team: u },
+    ] },
+    { ...base, id: 'g24', kind: 'opener', tier: 3, title: `THE ${s.year + 1} SEASON`, sub: 'PRESEASON NO. 8', os: 'opener', lines: ['LAST YEAR: 10-3', '15 OF 24 STARTERS RETURN'] },
   ];
 }

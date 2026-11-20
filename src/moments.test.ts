@@ -5,6 +5,10 @@ import { advanceWeek, defaultConfig, newSeason, WEEK_STEPS } from './season/seas
 import { challenger, decide, startingRoles } from './season/storylines';
 import type { Moment, SeasonState } from './season/types';
 import { squadFor } from './season/world';
+import { advanceOffseason, startOffseason } from './season/offseason';
+import { STAGE_MOMENTS } from './season/offseasonMoments';
+import { nextHomeGame, openRecruiting } from './season/recruiting';
+import { RSTORY } from './season/recruitStories';
 
 const run = (team: string, seed: number, weeks: number, steps = WEEK_STEPS) => {
   const s = newSeason(defaultConfig(team), seed);
@@ -139,4 +143,109 @@ describe('next man up', () => {
     expect(Object.values(ts.st)).not.toContain(up!.athlete.id);
     expect(ts.progress?.[up!.athlete.id]?.gs ?? 0).toBeLessThan((ts.gp ?? 0) / 2);
   });
+});
+
+// ---------------------------------------------------------------- part 2: recruiting, races, the offseason
+
+const openRun = (team: string, seed: number, delegate = false) => {
+  const c = { ...defaultConfig(team), length: 'open' as const };
+  c.delegate = { ...c.delegate, recruiting: delegate };
+  const s = newSeason(c, seed);
+  for (let i = 0; i < 30 && s.phase !== 'complete'; i++) advanceWeek(s);
+  return s;
+};
+
+/** A season, its offseason and the next season's start, with the stage reveals and the opener on or off. */
+const throughOffseason = (on: boolean) => {
+  STAGE_MOMENTS.on = on;
+  try {
+    const s = openRun('georgia', 3);
+    startOffseason(s);
+    for (let i = 0; i < 40; i++) {
+      const next = advanceOffseason(s);
+      if (next !== s) return { prev: s, next };
+    }
+    throw new Error('the offseason never ended');
+  } finally {
+    STAGE_MOMENTS.on = true;
+  }
+};
+
+const stripAll = (s: SeasonState) => JSON.stringify({ ...s, moments: undefined, buzz: undefined, stories: undefined, seenMoments: undefined, lineup: undefined });
+
+describe('recruiting, races and the offseason as storylines', () => {
+  it('change nothing in a season with user recruiting, and follow the user recruits', { timeout: 120000 }, () => {
+    const c = { ...defaultConfig('georgia'), length: 'open' as const };
+    const go = (steps = WEEK_STEPS) => {
+      const s = newSeason(c, 3);
+      const saved = WEEK_STEPS.splice(0, WEEK_STEPS.length, ...steps);
+      try {
+        for (let i = 0; i < 9; i++) advanceWeek(s);
+      } finally {
+        WEEK_STEPS.splice(0, WEEK_STEPS.length, ...saved);
+      }
+      return s;
+    };
+    const on = go();
+    expect(strip(on)).toBe(strip(go(WEEK_STEPS.filter((x) => x.name !== 'moments'))));
+    expect(on.stories!.some((x) => x.kind === 'recruitment')).toBe(true);
+  });
+
+  it('a recruiting decision acts through the visit and in-home levers; staff recruiting never asks', { timeout: 120000 }, () => {
+    const s = openRun('georgia', 3);
+    const asked = s.stories!.filter((x) => x.kind === 'recruitment' && x.decision);
+    expect(asked.length).toBeGreaterThan(0);
+    expect(asked.length).toBeLessThanOrEqual(RSTORY.asks);
+    expect(openRun('georgia', 3, true).stories!.some((x) => x.kind === 'recruitment' && x.decision)).toBe(false);
+
+    // Hosting: the decision puts him on the next home game's visit list.
+    const t = run('kansas', 5, 3);
+    t.config.length = 'open';
+    const home = nextHomeGame(t)!;
+    const rs = t.recruiting ?? (openRecruiting(t), t.recruiting!);
+    const id = Object.keys(rs.interest).find((x) => !rs.commits[x] && !(rs.ov[x]?.length))!;
+    t.stories = [{ id: 'r', kind: 'recruitment', team: 'kansas', title: '', opened: 3, status: 'open', beats: [], stakes: '', decision: { prompt: '', slot: '', act: 'visit', week: 3, options: [{ id, label: 'HOST', sub: '' }, { id: '', label: 'NO', sub: '' }] } }];
+    decide(t, 'r', id);
+    expect(rs.visits[home.id]).toContain(id);
+    expect(t.stories[0].status).toBe('open');
+  });
+
+  it('the conference race never calls a clinch or an elimination the title game contradicts', { timeout: 120000 }, () => {
+    for (const [team, seed] of [['georgia', 3], ['smu', 7]] as const) {
+      const s = openRun(team, seed);
+      const inIt = s.games.some((g) => g.kind === 'champ' && (g.home === team || g.away === team));
+      const race = s.stories!.find((x) => x.kind === 'confRace');
+      if (!race) continue;
+      if (race.k?.clinched) expect(inIt).toBe(true);
+      if (race.outcome === 'ELIMINATED') expect(inIt).toBe(false);
+    }
+  });
+
+  it('the offseason reveals and the opener change nothing, and tell it straight', () => {
+    const on = throughOffseason(true);
+    const off = throughOffseason(false);
+    expect(stripAll(on.prev)).toBe(stripAll(off.prev));
+    expect(stripAll(on.next)).toBe(stripAll(off.next));
+    const u = 'georgia';
+    const stages = new Set(on.prev.moments!.filter((m) => m.os).map((m) => m.os));
+    for (const st of ['carousel', 'departures', 'signing'] as const) expect(stages.has(st)).toBe(true);
+    // A draft card reads his class as it was this season (three seasons out of high school at least), not his generated freshman self.
+    for (const m of on.prev.moments!.filter((x) => x.kind === 'draft' && x.p)) expect(m.p!.cls).not.toMatch(/^(RS )?FR/);
+    // The opener lists every transfer in, and every new starter says whom he replaces.
+    const arrivals = on.next.moments!.find((m) => m.title === 'NEW ARRIVALS');
+    const tin = Object.entries(on.prev.portal?.commits ?? {}).filter(([, t]) => t === u).length;
+    if (tin) expect(arrivals!.rows!.filter((r) => r.val?.includes('TRANSFER')).length).toBe(Math.min(tin, 8));
+    const st = starters(squadFor(on.next, u));
+    const was = on.prev.lineup ?? {};
+    const newQb = was.QB && was.QB !== st.QB.id;
+    const rows = on.next.moments!.find((m) => m.title === 'NEW STARTERS')?.rows ?? [];
+    if (newQb) expect(rows.some((r) => r.text.startsWith('QB:') && r.val!.includes('REPLACES'))).toBe(true);
+    // A transfer risk closes with the portal: entered if he's an entrant, stayed if not.
+    const entrants = new Set((on.prev.portal?.entrants ?? []).filter((e) => e.from === u).map((e) => e.id));
+    for (const s of on.prev.stories!.filter((x) => x.kind === 'transferRisk')) {
+      expect(s.status).toBe('resolved');
+      if (s.outcome === 'ENTERED THE PORTAL') expect(entrants.has(s.star!.id)).toBe(true);
+      if (s.outcome === 'STAYED') expect(entrants.has(s.star!.id)).toBe(false);
+    }
+  }, 120000);
 });

@@ -2,6 +2,40 @@
 
 _Last updated: 2026-11-19_
 
+## Done: storylines across recruiting, the offseason and the program (2026-11-20)
+Storylines now tie in the rest of the game (docs/STORYLINES.md).
+
+**Recruiting** (`season/recruitStories.ts`):
+- Following prospects:
+  - The 4-star-plus prospects the user climbs into the top 3 for are followed week by week: market place, visit verdicts, in-homes.
+  - The commitment is a hat-pick scene: his top 3 schools' plates flicker and one locks in.
+  - Decommits reopen as WAVERING.
+- With staff recruiting, the user watches it unfold. With the user recruiting, up to 3 decisions a season use the existing levers: host an official visit (`toggleVisit`) or an in-home (`inHome`).
+- The class rank is a storyline with ladder moments.
+- Visiting recruits show on UP NEXT and in the final.
+
+**The offseason:**
+- Each stage ends with a reveal (`season/offseasonMoments.ts`):
+  - STAFF CHANGES;
+  - DRAFT NIGHT (each first-rounder's pick rolls in) and FAREWELL;
+  - SIGNING DAY (4-star-plus signees, the class, class rankings, the ones that got away);
+  - THE PORTAL OPENS.
+- The new season opens with THE <YEAR> SEASON, NEW ARRIVALS, NEW STARTERS (who replaces whom and why), PLAYERS TO WATCH and GAMES CIRCLED. It opens "THE NEW QB"-style stories for up to 3 new starters.
+
+**Program arcs** (`season/teamStories.ts`):
+- the conference race (clinched or eliminated, never contradicted by the title game: tested);
+- the playoff bubble (the field picked today);
+- the position awards with a ceremony;
+- transfer risk, from morale, with a "give him a start" decision, closed by the portal;
+- freshman phenom;
+- senior day;
+- draft stock, closed at departures.
+
+**Rules and verification:**
+- Display only, as before. The offseason reveals and opener change nothing (tested with `STAGE_MOMENTS` off). Recruiting is read through `peekRecruiting` so its school cache is untouched.
+- Tests: 515 (11 storyline tests).
+- Checked in headless Chrome: the full offseason, with each reveal returning to its stage, the opener, and HOME with the new storylines. The new scenes were also checked in `momentGallery()`.
+
 ## Done: storylines easier to read on HOME (2026-11-20)
 - **Positions on names:** every player a storyline or moment names is written with his position: "QB JOHN SMITH" (`withPos`, `season/moments.ts`). Text is written when it happens, so moments from before keep their old wording.
 - **The matchup card** no longer lists storylines under the @. They repeated THE WEEK'S STORY.

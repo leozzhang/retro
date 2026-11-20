@@ -6,6 +6,7 @@ import { openDepartures, runDepartures } from './departures';
 import { openSigning, recruitsReact, runSigningDay } from './recruiting';
 import { autoPortal, closePortal, coachesWork, decide, judgePromises, leavingList, listCuts, newPortal, overCap, rollEntries } from './portal';
 import type { NewsItem, OffseasonStage, SeasonState } from './types';
+import { stageMoments, userCards } from './offseasonMoments';
 
 /**
  * The offseason, between a complete season and the next (open-ended seasons only). Its stages run in
@@ -53,13 +54,16 @@ export function advanceOffseason(state: SeasonState): SeasonState {
       checkOffice(state, 'carousel');
       recruitsReact(state);
       openDepartures(state);
+      stageMoments(state, 'carousel');
     }
     return state;
   }
   if (os.stage === 'departures') {
     if (os.round === 0) {
+      const cards = userCards(state);
       runDepartures(state);
       checkOffice(state, 'draft');
+      stageMoments(state, 'departures', cards);
       os.round = 1;
     } else {
       os.stage = 'signing';
@@ -72,6 +76,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
     if (os.round === 0) {
       runSigningDay(state);
       checkOffice(state, 'signing');
+      stageMoments(state, 'signing');
       os.round = 1;
     } else {
       os.stage = 'portal';
@@ -85,6 +90,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
   if (os.round === 0) {
     rollEntries(state);
     coachesWork(state, 1);
+    stageMoments(state, 'portal');
     os.round = 1;
     return state;
   }

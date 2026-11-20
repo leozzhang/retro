@@ -321,6 +321,23 @@ function setBar(s: RSchool, pos: Position): void {
 /** Drop the week's schools (a commit moved a chart in a way a fresh build should see). */
 const dropSchools = (state: SeasonState) => state.recruiting && schoolCache.delete(state.recruiting);
 
+/**
+ * Read the recruiting world without leaving a trace: the school cache is put back as it was, so a
+ * display-only reader (storylines) never changes what the next recruiting step sees.
+ */
+export function peekRecruiting<T>(state: SeasonState, f: () => T): T {
+  const rs = state.recruiting;
+  const hit = rs && schoolCache.get(rs);
+  try {
+    return f();
+  } finally {
+    if (rs) {
+      if (hit) schoolCache.set(rs, hit);
+      else schoolCache.delete(rs);
+    }
+  }
+}
+
 // ---------------------------------------------------------------- appeal
 
 /** A school's appeal to him: his wants times its factors, his dream school, and the program's pipeline in his state. */

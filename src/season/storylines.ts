@@ -8,6 +8,10 @@ import { BREAKOUT, CONFIDENCE, START_SLOTS } from './confidence';
 import { impact, statLine } from './gameStars';
 import { injuredStarters, momentPlayer, withPos, MOMENTS, nextGame, nextText, pick, userGame, type WeekEvents } from './moments';
 import { rivalrySeries } from './program';
+import { inHome, toggleVisit } from './recruiting';
+import { recruitStories, recruitTag } from './recruitStories';
+import { prospect } from '../data/recruits';
+import { teamStories } from './teamStories';
 import { records, recordText, winner } from './standings';
 import type { Moment, MomentPlayer, SeasonGame, SeasonState, Storyline, StoryKind } from './types';
 import { squadFor } from './world';
@@ -35,11 +39,11 @@ export const STORY = { hotHand: 0.15, slump: -0.5, slumpStarts: 3, slumpW: 0.55,
 
 const SCHOOL = (id: string) => teamById(id).school.toUpperCase();
 
-function open(state: SeasonState, kind: StoryKind, key: string): Storyline | undefined {
+export function open(state: SeasonState, kind: StoryKind, key: string): Storyline | undefined {
   return state.stories?.find((s) => s.status === 'open' && s.kind === kind && s.id.startsWith(`${kind}:${key}`));
 }
 
-function had(state: SeasonState, kind: StoryKind, key: string): boolean {
+export function had(state: SeasonState, kind: StoryKind, key: string): boolean {
   return !!state.stories?.some((s) => s.kind === kind && s.id.startsWith(`${kind}:${key}`));
 }
 
@@ -51,6 +55,25 @@ function who(sq: Squad, id: string) {
 /** Starts at `slot` this season: the last game's starters (`TeamState.st`) is who started. */
 function startedAt(state: SeasonState, id: string): boolean {
   return Object.values(state.teamState[state.config.userTeamId]?.st ?? {}).includes(id);
+}
+
+/** What a week's story code shares: the state, the week's game, and the add / beat / resolve helpers. */
+export interface StoryKit {
+  state: SeasonState;
+  u: string;
+  week: number;
+  ev: WeekEvents;
+  out: Moment[];
+  g: SeasonGame | undefined;
+  won: boolean;
+  next: SeasonGame | undefined;
+  sq: Squad;
+  roles: Set<string>;
+  add: (s: Omit<Storyline, 'opened' | 'status' | 'beats'>) => Storyline;
+  beat: (s: Storyline, text: string, tone: 'up' | 'down' | 'flat', m?: Partial<Moment> & { tier?: 1 | 2 | 3 }) => void;
+  resolve: (s: Storyline, outcome: string) => void;
+  line: (id: string) => import('./types').PlayerLine | undefined;
+  prog: (id: string) => import('./types').Progress | undefined;
 }
 
 /**
@@ -89,10 +112,16 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
   const line = (id: string) => (g ? g.result!.box.players.find((l) => l.id === id) : undefined);
   const prog = (id: string) => state.teamState[u]?.progress?.[id];
   const opp = g ? (g.home === u ? g.away : g.home) : '';
+  const kit: StoryKit = { state, u, week, ev, out, g, won, next, sq, roles, add, beat, resolve, line, prog };
 
-  // A decision left open last week: the staff's chart stood.
+  // A decision left open last week: the staff's chart stood (or the chance passed).
   for (const s of stories) {
-    if (s.status !== 'open' || !s.decision || s.decision.chosen || s.decision.week >= week) continue;
+    if (s.status !== 'open' || !s.decision || s.decision.chosen !== undefined || s.decision.week >= week) continue;
+    if (keepsGoing(s)) {
+      s.decision.chosen = '';
+      s.beats.push({ week, text: s.decision.act === 'visit' ? 'NO VISIT THIS TIME' : s.decision.act === 'inhome' ? 'NO IN-HOME' : 'THE STAFF KEPT THE CHART', tone: 'flat' });
+      continue;
+    }
     const who = s.decision.options.find((o) => startedAt(state, o.id)) ?? s.decision.options[0];
     s.decision.chosen = who.id;
     resolve(s, `THE STAFF'S CALL: ${who.label.replace(/^(RIDE|GO BACK TO|STICK WITH|START) /, '')} STARTED`);
@@ -323,6 +352,10 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
   }
   if (next) openGameStories(state, week, next, sq, add);
 
+  // ---- Recruiting, the races, morale, new faces, draft stock (season/recruitStories.ts, teamStories.ts).
+  recruitStories(kit);
+  teamStories(kit);
+
   // ---- The preview: what the next game decides.
   if (next) {
     const rows = stories
@@ -330,6 +363,9 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
       .sort((a, b) => Number(b.game === next.id) - Number(a.game === next.id))
       .slice(0, 5)
       .map((s) => ({ text: `${s.title}${s.star ? `: ${withPos(s.star)}` : ''}`, val: s.stakes, team: u, me: s.game === next.id }));
+    // Recruits the user is hosting on official visits.
+    const visiting = next.home === u ? (state.recruiting?.visits[next.id] ?? []).map((id) => prospect(id)).filter((p): p is NonNullable<typeof p> => !!p) : [];
+    if (visiting.length) rows.push({ text: 'IN THE STANDS', val: `OFFICIAL VISITS: ${visiting.slice(0, 3).map(recruitTag).join(', ')}${visiting.length > 3 ? ` +${visiting.length - 3}` : ''}`, team: u, me: false });
     if (rows.length) {
       out.push({
         id: `${state.year}:${week}:preview`, week, kind: 'preview', tier: 1, w: -0.5, team: u, title: 'UP NEXT', sub: nextText(state, next),
@@ -411,7 +447,7 @@ function watchStakes(sw: { t: number; n: number; z: number }): string {
   return `${how}: ${left} GAME${left === 1 ? '' : 'S'} LEFT`;
 }
 
-function decisionMoment(state: SeasonState, week: number, s: Storyline): Moment {
+export function decisionMoment(state: SeasonState, week: number, s: Storyline): Moment {
   return {
     id: `${state.year}:${week}:decide:${s.id}`, week, kind: 'decision', tier: 3, w: 10, team: state.config.userTeamId,
     title: 'YOUR CALL', sub: s.decision!.prompt, lines: [], p: s.star, q: s.other, arc: s.id,
@@ -420,7 +456,12 @@ function decisionMoment(state: SeasonState, week: number, s: Storyline): Moment 
 
 /** The storylines waiting on the user's decision. */
 export function pendingDecisions(state: SeasonState): Storyline[] {
-  return (state.stories ?? []).filter((s) => s.status === 'open' && s.decision && !s.decision.chosen);
+  return (state.stories ?? []).filter((s) => s.status === 'open' && s.decision && s.decision.chosen === undefined);
+}
+
+/** A storyline that runs on after its decision: a recruitment, a transfer risk. */
+function keepsGoing(s: Storyline): boolean {
+  return (s.decision?.act ?? 'depth') !== 'depth' || s.kind === 'transferRisk';
 }
 
 /**
@@ -431,21 +472,35 @@ export function pendingDecisions(state: SeasonState): Storyline[] {
 export function decide(state: SeasonState, storyId: string, id: string): void {
   const s = state.stories?.find((x) => x.id === storyId);
   const d = s?.decision;
-  if (!s || !d || d.chosen || !d.options.some((o) => o.id === id)) return;
+  if (!s || !d || d.chosen !== undefined || !d.options.some((o) => o.id === id)) return;
   d.chosen = id;
-  const ts = (state.teamState[state.config.userTeamId] ??= {} as never);
-  if (ts.depth && !state.config.delegate.depthChart) {
-    const list = (ts.depth[d.slot] ?? []).filter((x) => x !== id);
-    ts.depth = { ...ts.depth, [d.slot]: [id, ...list] };
-  } else {
-    ts.pin = { slot: d.slot, id };
-  }
   const o = d.options.find((x) => x.id === id)!;
+  if (keepsGoing(s)) {
+    // The lever, then the story carries on: a visit, an in-home, a start for an unhappy player.
+    const u = state.config.userTeamId;
+    if (id && d.act === 'visit') toggleVisit(state, id);
+    else if (id && d.act === 'inhome') inHome(state, u, id);
+    else if (id) pinStarter(state, d.slot, id);
+    s.beats.push({ week: d.week, text: id ? `YOU CHOSE: ${o.label}` : 'YOU PASSED', tone: 'flat' });
+    return;
+  }
+  pinStarter(state, d.slot, id);
   const text = `YOU CHOSE: ${o.label}`;
   s.beats.push({ week: d.week, text, tone: 'flat' });
   s.status = 'resolved';
   s.outcome = text;
   s.stakes = '';
+}
+
+/** `id` starts at `slot`: a user-edited chart is edited, a staff chart gets the pin. */
+function pinStarter(state: SeasonState, slot: string, id: string): void {
+  const ts = (state.teamState[state.config.userTeamId] ??= {} as never);
+  if (ts.depth && !state.config.delegate.depthChart) {
+    const list = (ts.depth[slot] ?? []).filter((x) => x !== id);
+    ts.depth = { ...ts.depth, [slot]: [id, ...list] };
+  } else {
+    ts.pin = { slot, id };
+  }
 }
 
 /** The storyline a moment belongs to. */

@@ -25,6 +25,7 @@ import { joinYear } from '../data/rosterGen';
 import { GAME_SIM, settleTie, simGame, winOdds } from './simGame';
 import { emphasisMods, groupOf, type TeamMods } from './emphasis';
 import { openRecruiting, recruitWeek } from './recruiting';
+import { seasonOpener } from './offseasonMoments';
 import { STANDARD } from '../data/emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
 import type { GameStory } from './story';
@@ -73,6 +74,8 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
   state.news.push({ week: 0, kind: 'poll', teams: [pre.ranks[0].team], text: `${teamById(pre.ranks[0].team).school} opens ${year} at No. 1 in the preseason AP poll` });
   // A class only matters with a next season to enroll in.
   if (config.length === 'open') openRecruiting(state);
+  // The new year's opener: who arrived, who replaces whom (season/offseasonMoments.ts).
+  if (prev?.phase === 'offseason') seasonOpener(prev, state);
   return state;
 }
 

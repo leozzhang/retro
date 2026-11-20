@@ -759,6 +759,8 @@ export interface SeasonState {
   buzz?: { week: number; top: { id: string; team: string; name: string; pos: Position; score: number }[] }[];
   /** The user's storylines this season (season/storylines.ts). Only their decisions reach the sim, through the depth chart. */
   stories?: Storyline[];
+  /** The user's starting lineup as the season ended (slot to id), kept for the new season's opener (season/offseasonMoments.ts). Display only. */
+  lineup?: Record<string, string>;
 }
 
 /** A player as a moment shows him, copied in so the card survives roster changes. */
@@ -775,11 +777,17 @@ export interface MomentPlayer {
   ovr: number;
   skin: string;
   dev: DevTrait;
+  /** A recruit's national rank. */
+  rank?: number;
+  /** A transfer's old school (a team id). */
+  from?: string;
 }
 
 export type MomentKind =
   | 'final' | 'breakout' | 'breakthrough' | 'injury' | 'firstStart' | 'poll' | 'heisman' | 'milestone'
-  | 'stakes' | 'progress' | 'around' | 'story' | 'decision' | 'preview';
+  | 'stakes' | 'progress' | 'around' | 'story' | 'decision' | 'preview'
+  // Recruiting, awards, and the offseason's reveals and the season opener (season/offseasonMoments.ts).
+  | 'commit' | 'award' | 'staff' | 'draft' | 'farewell' | 'signing' | 'portal' | 'opener' | 'arrivals';
 
 /** How a game's final card plays: a win or loss, or the bigger versions of one. */
 export type FinalStyle = 'win' | 'loss' | 'upset' | 'stunned' | 'rivalry' | 'title' | 'champion';
@@ -825,9 +833,12 @@ export interface Moment {
   style?: FinalStyle;
   /** The storyline it's a beat of. */
   arc?: string;
+  /** The offseason stage it closed (its reveal), or 'opener' for the new season's opener. */
+  os?: OffseasonStage | 'opener';
 }
 
-export type StoryKind = 'nextManUp' | 'breakoutWatch' | 'slump' | 'heisman' | 'unbeaten' | 'bowlChase' | 'rivalry' | 'reunion' | 'homecoming';
+export type StoryKind = 'nextManUp' | 'breakoutWatch' | 'slump' | 'heisman' | 'unbeaten' | 'bowlChase' | 'rivalry' | 'reunion' | 'homecoming'
+  | 'recruitment' | 'recruitClass' | 'confRace' | 'bubble' | 'award' | 'transferRisk' | 'phenom' | 'seniorDay' | 'draftStock' | 'newFace';
 
 export interface StoryBeat {
   week: number;
@@ -835,10 +846,15 @@ export interface StoryBeat {
   tone: 'up' | 'down' | 'flat';
 }
 
-/** A choice at a storyline's turning point: who starts at `slot`. */
+/**
+ * A choice at a storyline's turning point, through a lever the game already has: who starts at `slot`
+ * (`depth`, the default), host a recruit on an official visit (`visit`), or send the staff for an
+ * in-home (`inhome`). A recruiting option's id is the prospect's, or '' to pass.
+ */
 export interface StoryDecision {
   prompt: string;
   slot: string;
+  act?: 'depth' | 'visit' | 'inhome';
   options: { label: string; sub: string; id: string }[];
   /** The option taken (an id), once decided. */
   chosen?: string;

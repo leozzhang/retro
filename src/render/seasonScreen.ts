@@ -524,7 +524,7 @@ function drawWeekStory(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVie
       const tail = storyTail(s, st);
       const row = storyTag(s, st, 27 - (tail ? tail.length + 1 : 0));
       drawRich(g, row, PX + 8, y, { color: '#ffffff', shadow: false });
-      if (tail) text(g, tail, PX + HALF_W - 8, y, { align: 'right', color: st.decision && !st.decision.chosen ? GOLD : SOFT, shadow: false });
+      if (tail) text(g, tail, PX + HALF_W - 8, y, { align: 'right', color: st.decision && st.decision.chosen === undefined ? GOLD : SOFT, shadow: false });
       y += 11;
     }
     if (shown.length < open.length) text(g, `+${open.length - shown.length} MORE (Y)`, PX + 8, y, { color: DIM, shadow: false });
@@ -537,6 +537,8 @@ function drawWeekStory(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVie
 const STORY_SHORT: Record<Storyline['kind'], string> = {
   nextManUp: 'NEXT UP', breakoutWatch: 'BREAKOUT', slump: 'SLUMP', heisman: 'HEISMAN', unbeaten: 'UNBEATEN',
   bowlChase: 'BOWL CHASE', rivalry: 'RIVALRY', reunion: 'REUNION', homecoming: 'HOMECOMING',
+  recruitment: 'RECRUIT', recruitClass: 'THE CLASS', confRace: 'CONF RACE', bubble: 'PLAYOFF', award: 'AWARD',
+  transferRisk: 'UNHAPPY', phenom: 'PHENOM', seniorDay: 'SENIOR DAY', draftStock: 'DRAFT', newFace: 'NEW FACE',
 };
 
 /** "SLUMP QB SMITH": a storyline's short name and its player (position, last name, linked), in `n` characters. */
@@ -550,7 +552,7 @@ function storyTag(s: SeasonState, st: Storyline, n: number): RichLine {
 
 /** What's on the line, in a word or two: YOUR CALL, a record, starts toward a breakout, the game. */
 function storyTail(s: SeasonState, st: Storyline): string {
-  if (st.decision && !st.decision.chosen) return 'YOUR CALL';
+  if (st.decision && st.decision.chosen === undefined) return 'YOUR CALL';
   const game = st.game ? s.games.find((x) => x.id === st.game) : undefined;
   if (game) return `VS ${teamById(game.home === st.team ? game.away : game.home).abbr}`;
   switch (st.kind) {
@@ -561,6 +563,15 @@ function storyTail(s: SeasonState, st: Storyline): string {
       const at = (s.buzz?.[s.buzz.length - 1]?.top ?? []).findIndex((x) => x.id === st.star?.id);
       return at >= 0 ? `NO. ${at + 1}` : '';
     }
+    case 'recruitment': return st.meter?.label === 'YOU LEAD' ? 'LEAD' : st.k?.rank ? `NO. ${st.k.rank}` : '';
+    case 'recruitClass': return st.k?.rank ? `NO. ${st.k.rank}` : '';
+    case 'confRace': return st.k?.clinched ? 'IN' : st.k?.place ? `${st.k.place}${['TH', 'ST', 'ND', 'RD'][st.k.place] ?? 'TH'}` : '';
+    case 'bubble': return st.k?.seed ? `SEED ${st.k.seed}` : 'OUT';
+    case 'award': return st.k?.at !== undefined ? `NO. ${st.k.at + 1}` : '';
+    case 'draftStock': return st.k?.round && st.k.round < 99 ? `RD ${st.k.round}` : '';
+    case 'transferRisk': return 'RISK';
+    case 'newFace':
+    case 'phenom': return st.k?.starts ? `${st.k.starts} GS` : '';
     case 'nextManUp': {
       const due = (st.k?.due as number | undefined) ?? 0;
       return due >= 99 ? 'SEASON' : due > s.week ? `${due - s.week} WK` : '';
@@ -875,7 +886,7 @@ function drawStorylines(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVi
     const hot = inBox({ x: PX, y, w: PW, h: STORY_ROW - 2 }, v.mx, v.my);
     g.fillStyle = hot ? '#1f2a3a' : open ? '#18202c' : '#11161e';
     g.fillRect(PX + 4, y, PW - 8, STORY_ROW - 3);
-    g.fillStyle = st.decision && !st.decision.chosen ? GOLD : open ? ACCENT : DIM;
+    g.fillStyle = st.decision && st.decision.chosen === undefined ? GOLD : open ? ACCENT : DIM;
     g.fillRect(PX + 4, y, 2, STORY_ROW - 3);
     const teams = [st.team, ...(st.game ? [s.games.find((x) => x.id === st.game)].flatMap((x) => (x ? [x.home, x.away] : [])) : [])];
     if (st.star) {
