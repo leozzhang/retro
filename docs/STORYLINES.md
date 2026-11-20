@@ -63,7 +63,13 @@ Each runs a few weeks with **stakes**: what the next game decides. The stakes sh
 | `reunion` | a starter facing the school he transferred from | | the game |
 | `homecoming` | a starter playing a road game in his home state (not your own state) | | the game |
 
-**Continuity rules** (`startingRoles`, `challenger`; tested in `src/moments.test.ts`):
+**Continuity rules** (`startingRoles`, `challenger`, `injuredStarters`; tested in `src/moments.test.ts`):
+- **Next man up:**
+  - Only an injury to a real starter has one. A real starter was in last game's starting lineup (`TeamState.st`); a package slot like WR4, TE2 or DIME doesn't count.
+  - The next man up is a bench player now in the starting lineup at any slot: he didn't start last game and has started fewer than half the team's games. The same position first, then the same role, one per injury.
+  - A starter who slid over from another slot, or came back from a missed game, is never the next man up.
+  - If no bench player moved up, there's no next man up.
+  - The injury card and the storyline use the same answer.
 - A slump's challenger has **no starting role anywhere**, so he's never another slot's starter, and never a starter sitting hurt.
 - He's healthy and not slumping himself (confidence over `CONFIDENCE.slump`, no open slump story), within `slumpReach` overall.
 - No challenger means no decision, just the beat.

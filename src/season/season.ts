@@ -250,7 +250,14 @@ const progress: WeekStep = (state, ctx) => {
       // Morale first: it reads last game's starters, which the confidence step moves on.
       moraleStep(state, ts, sq, seasonRng(state, 'morale', t, ctx.week));
       const bases = new Map(baseRoster(state, t).map((a) => [a.id, generatedAthlete(a.id) ?? a]));
-      const conf = confidenceStep(state, ts, sq, grades, bases, ctx.week, seasonRng(state, 'confidence', t, ctx.week));
+      // What the game looked like: the box score, and the result against the pregame odds.
+      const game = state.games.find((x) => x.id === id);
+      const won = game?.result ? (game.result.home === game.result.away ? 0.5 : (game.result.home > game.result.away) === (t === game.home) ? 1 : 0) : undefined;
+      const odds = winOdds(home, away, neutral);
+      const seen = game?.result && won !== undefined
+        ? { lines: new Map(game.result.box.players.filter((l) => l.team === t).map((l) => [l.id, l])), edge: won - (t === game.home ? odds : 1 - odds) }
+        : undefined;
+      const conf = confidenceStep(state, ts, sq, grades, bases, ctx.week, seasonRng(state, 'confidence', t, ctx.week), seen);
       ctx.events.sparks.push(...conf.sparks);
       ctx.events.breakouts.push(...conf.breakouts);
       if (t === user) {

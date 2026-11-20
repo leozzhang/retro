@@ -4,9 +4,9 @@ import { athleteName, healthy, starters, type Squad } from '../data/depth';
 import type { Athlete } from '../data/athletes';
 import { overall } from '../data/positions';
 import { teamById } from '../data/teams';
-import { BREAKOUT, CONFIDENCE, newStarters, START_SLOTS } from './confidence';
+import { BREAKOUT, CONFIDENCE, START_SLOTS } from './confidence';
 import { impact, statLine } from './gameStars';
-import { momentPlayer, MOMENTS, nextGame, nextText, pick, userGame, type WeekEvents } from './moments';
+import { injuredStarters, momentPlayer, MOMENTS, nextGame, nextText, pick, userGame, type WeekEvents } from './moments';
 import { rivalrySeries } from './program';
 import { records, recordText, winner } from './standings';
 import type { Moment, MomentPlayer, SeasonGame, SeasonState, Storyline, StoryKind } from './types';
@@ -150,9 +150,8 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
       s.stakes = left ? `${s.other!.name} BACK IN ABOUT ${left} WEEK${left === 1 ? '' : 'S'}` : `${s.other!.name} COULD BE BACK NEXT WEEK`;
     }
   }
-  const fresh = newStarters(state, state.teamState[u] ?? ({} as never), sq);
-  for (const e of (state.injuryLog ?? []).filter((x) => x.week === week && x.team === u && x.starter && (x.season || x.weeks >= 2))) {
-    const step = fresh.find((f) => f.replaced.id === e.id);
+  for (const { e, up: step } of injuredStarters(state, week)) {
+    if (!e.season && e.weeks < 2) continue;
     const inj = who(sq, e.id);
     if (!step || !inj) continue;
     const star = momentPlayer(step.athlete, u);
@@ -215,7 +214,10 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
     }
   }
   const st = state.teamState[u]?.st ?? {};
-  for (const [slot, id] of Object.entries(st)) {
+  // Two straight wins: nobody's "in a slump" on a team that's rolling, whatever his number says.
+  const lastTwo = state.games.filter((x) => x.result && (x.home === u || x.away === u)).sort((a, b) => a.week - b.week).slice(-2);
+  const rolling = lastTwo.length === 2 && lastTwo.every((x) => winner(x) === u);
+  for (const [slot, id] of rolling ? [] : Object.entries(st)) {
     const a = who(sq, id);
     const c = prog(id)?.c ?? 0;
     if (!a || !healthy(a) || !roles.has(id) || c > STORY.slump || (prog(id)?.gs ?? 0) < STORY.slumpStarts || had(state, 'slump', `${id}:${state.year}`) || prog(id)?.sp) continue;

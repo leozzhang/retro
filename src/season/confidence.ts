@@ -1,10 +1,11 @@
 import type { Athlete, DevTrait } from '../data/athletes';
 import { healthOf, healthy, HEALTH, starters, type Squad } from '../data/depth';
-import { overall, POS_ROLE, SLOT_POS } from '../data/positions';
+import { overall, POS_ROLE, SLOT_POS, type Position } from '../data/positions';
 import { clamp, type Rng } from '../engine/math';
 import { DEF_SLOTS, OFF_SLOTS, type GameGrade } from './grades';
 import { levelUp } from './progression';
-import type { ConfEvent, Progress, RatingDelta, SeasonState, TeamState } from './types';
+import type { ConfEvent, PlayerLine, Progress, RatingDelta, SeasonState, TeamState } from './types';
+import { impact } from './gameStars';
 
 /**
  * Confidence over a season, next man up, and breakouts. Confidence follows how a player plays against
@@ -30,10 +31,10 @@ import type { ConfEvent, Progress, RatingDelta, SeasonState, TeamState } from '.
  * - `offseason`: share of confidence carried into next season.
  */
 export const CONFIDENCE = {
-  rate: 0.45,
+  rate: 0.42,
   snapSd: 0.45,
   zCap: 3,
-  perfScale: 1.2,
+  perfScale: 1.3,
   spark: 0.5,
   sparkStarts: 3,
   sparkKeep: 0.5,
@@ -71,9 +72,60 @@ export function perfZ(g: GameGrade): number {
 
 const round3 = (x: number) => Math.round(x * 1000) / 1000;
 
+/**
+ * What a game looked like from outside, beside his grades: his box score against a starter's usual game
+ * at his position (`MIX.prod`; only where the box shows the work: QB, backs, receivers, tight ends,
+ * kickers), and the team's result against its pregame odds (`edge`, won minus the odds).
+ */
+export interface GameSeen {
+  line?: PlayerLine;
+  edge?: number;
+}
+
+/**
+ * The game's performance mixes three looks, each a z:
+ * - `grade`: his snap grades against what his matchups expected (`perfZ`);
+ * - `prod`: his box score in `impact` spreads against a starter's usual game at his slot (the X
+ *   receiver out-produces the slot), `base` [mean, spread] measured over starters' lines;
+ * - `result`: the team's win or loss against its pregame odds, over `resultSd`; a QB owns it most (`qb`).
+ * The weights are relative: the mix is scaled back to a z of the grade's spread.
+ */
+export const MIX = {
+  grade: 0.55,
+  prod: 0.6,
+  result: 0.55,
+  qb: 1.2,
+  resultSd: 0.35,
+  cap: 2.5,
+  base: { QB: [0.91, 0.96], RB: [1.12, 1.17], X: [1.28, 0.96], Z: [0.65, 0.74], SL: [0.3, 0.67], TE: [0.44, 0.69], K: [0.1, 0.57] } as Record<string, [number, number]>,
+  /** QB snap grades run under their expectation on average (his confidence sat at -0.11 when the rest sat at 0): recentered here, not in the grades. */
+  gradeShift: { QB: 0.2 } as Partial<Record<Position, number>>,
+  /** A player with no starting slot is measured at his position's usual one. */
+  slotOf: { QB: 'QB', HB: 'RB', FB: 'RB', WR: 'Z', TE: 'TE', K: 'K' } as Partial<Record<Position, string>>,
+};
+
+const EMPTY_LINE = { cmp: 0, att: 0, passYds: 0, passTd: 0, int: 0, rush: 0, rushYds: 0, rushTd: 0, rec: 0, recYds: 0, recTd: 0, fgm: 0, fga: 0, sk: 0, defInt: 0 };
+
+/** The game's mixed z for a player at `pos`, starting at `slot` (`MIX`); with nothing seen it's his grade's z alone. */
+export function gameZ(g: GameGrade, pos: Position, seen?: GameSeen, slot?: string): number {
+  const parts: [number, number][] = [[MIX.grade, perfZ(g) + (MIX.gradeShift[pos] ?? 0)]];
+  const key = slot && MIX.base[slot] ? slot : MIX.slotOf[pos];
+  const base = key ? MIX.base[key] : undefined;
+  if (seen && base && g.share >= 0.5) {
+    const l = seen.line ?? { id: '', team: g.team, name: '', pos, ...EMPTY_LINE };
+    parts.push([MIX.prod, clamp((impact(l, false) - base[0]) / base[1], -MIX.cap, MIX.cap)]);
+  }
+  if (seen?.edge !== undefined) parts.push([MIX.result * (pos === 'QB' ? MIX.qb : 1), clamp(seen.edge / MIX.resultSd, -MIX.cap, MIX.cap)]);
+  if (parts.length === 1) return parts[0][1];
+  const w = parts.reduce((t, [k]) => t + k, 0);
+  const norm = Math.sqrt(parts.reduce((t, [k]) => t + k * k, 0));
+  // Scaled so the mix spreads like one look: correlated looks agreeing reach further.
+  return clamp((parts.reduce((t, [k, z]) => t + k * z, 0) / w) * (w / norm), -CONFIDENCE.zCap, CONFIDENCE.zCap);
+}
+
 /** One game's step: confidence moves toward the game's performance, more for more playing time. */
-export function updateConfidence(p: Progress, g: GameGrade): void {
-  const perf = Math.tanh(perfZ(g) / CONFIDENCE.perfScale);
+export function updateConfidence(p: Progress, g: GameGrade, pos?: Position, seen?: GameSeen, slot?: string): void {
+  const perf = Math.tanh((pos ? gameZ(g, pos, seen, slot) : perfZ(g)) / CONFIDENCE.perfScale);
   const w = CONFIDENCE.rate * Math.sqrt(clamp(g.share, 0, 1));
   const c = p.c ?? 0;
   p.c = round3(clamp(c + w * (perf - c), -1, 1));
@@ -206,6 +258,7 @@ function breakOut(state: SeasonState, p: Progress, a: Athlete, base: Athlete, we
  */
 export function confidenceStep(
   state: SeasonState, ts: TeamState, squad: Squad, grades: Map<string, GameGrade>, bases: Map<string, Athlete>, week: number, rng: Rng,
+  seen?: { lines: Map<string, PlayerLine>; edge: number },
 ): { sparks: SparkEvent[]; breakouts: BreakoutEvent[] } {
   const team = squad.team.id;
   const prog = (ts.progress ??= {});
@@ -219,9 +272,12 @@ export function confidenceStep(
   };
 
   // Everyone who played moves toward how he played; benching penalties fade.
+  const lineup = starters(squad);
+  const slotOf = new Map(START_SLOTS.filter((sl) => lineup[sl]).map((sl) => [lineup[sl].id, sl]));
+  const look = (id: string) => seen && { line: seen.lines.get(id), edge: seen.edge };
   for (const a of squad.athletes) {
     const g = gradeOf(a.id);
-    if (g) updateConfidence(entry(a.id), g);
+    if (g) updateConfidence(entry(a.id), g, a.pos, look(a.id), slotOf.get(a.id));
   }
   for (const p of Object.values(prog)) {
     if (!p.bh) continue;
@@ -265,7 +321,8 @@ export function confidenceStep(
   for (const [id, p] of Object.entries(prog)) {
     const started = nowIds.has(id);
     const g = gradeOf(id);
-    const z = g ? perfZ(g) : 0;
+    const pos = byId.get(id)?.pos;
+    const z = g ? (pos ? gameZ(g, pos, look(id), slotOf.get(id)) : perfZ(g)) : 0;
     if (p.sp) {
       if (started) {
         const keep = z >= 0 ? p.sp * CONFIDENCE.sparkKeep : 0;

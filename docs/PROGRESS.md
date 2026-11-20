@@ -2,6 +2,29 @@
 
 _Last updated: 2026-11-19_
 
+## Done: confidence follows what everyone saw (2026-11-20)
+- **The bug:**
+  - In a playtest, a 7-1 team's QB, fresh off a milestone, was "in a slump".
+  - Confidence moved only on snap grades against expectation. A good QB on a good team can win and put up numbers while grading a little under that, and the √snaps z makes a small shortfall big.
+  - Starting QBs' confidence correlated 0.04 with their results and 0.10 with their box scores. 25% were slumping at any time, half of those winning.
+- **The fix (`gameZ`, `MIX` in season/confidence.ts):** a game's performance mixes three looks:
+  - the grade
+  - the box score against a starter's usual game at his slot (QB, RB, X, Z, SL, TE, K)
+  - the result against the pregame odds, the QB owning it most
+
+  Breakouts and sparks read the same mix. QB grades, which ran under expectation, are recentered for confidence only.
+- **The slump storyline** no longer opens while the team has won its last two.
+- **Now:**
+  - QB confidence correlates 0.64 with results and 0.63 with box score.
+  - Slumping QBs who won 2 of their last 3: 48% → 8%.
+  - CONFIDENCE targets: SD 0.30, 3.5% beyond ±0.6, 3.7 sparks a team-season, 9.5% of sparks break out, 5.8% of team-seasons bench a slumping QB.
+  - Scores held: one-score 38.1%, 28+ 17.8%.
+  - Tables in CONFIDENCE.md.
+- **Tests:** `confidence.test.ts`: a winning, producing QB grading a bit under expectation is rolling; three picks in a loss is a bad game.
+  - `season.test.ts`'s poll test is one seeded season. Its ranked-loser drop came in at 4.9 against a floor of 5, so the floor is 4.5 now.
+  - `npm test` 502 pass.
+- **Not checked:** `npm run balance` (the reference matchup's players carry no confidence, so it shouldn't move). In a save, a player's confidence moves to the new measure over his next two or three games.
+
 ## Fixed: hub navigation and storyline continuity (2026-11-20)
 - **Esc from a page** (PROGRAM, ROSTER, OFFICE...) came back to HOME's panel with the page's item still selected, a hybrid where HOME's story buttons did nothing. Opening a page now resets the hub to HOME (`openPage`), and the "ENTER: OPEN" hybrid is gone.
 - **"Lost the job" while still WR1:**
@@ -10,6 +33,9 @@ _Last updated: 2026-11-19_
 - **A starter offered as a slump's replacement, or a slumping one:**
   - **The bug:** the challenger was anyone on the slot's list who hadn't started the last game.
   - **The fix:** now he has no starting role anywhere, is healthy, and isn't slumping or in a slump story (`challenger`).
+- **Next man up was a starter:**
+  - **The bug:** when the slot receiver went down, the staff slid WR1 over, and the confidence code's pairing named WR1, who had missed the game before.
+  - **The fix:** the next man up is now a bench player newly in the lineup at any slot (`injuredStarters` in season/moments.ts), and only a real starter's injury has one. Package slots like WR4, TE2 and DIME are bench roles.
 - **Next man up's ending** now reads the chart: KEEPS THE JOB when the staff keep the backup on.
 - Tests: `src/moments.test.ts` "storyline continuity". `npm test` 499 pass. Checked in Chrome: Esc from PROGRAM, ROSTER, OFFICE and PLAYBOOK (by hotkey and by click) lands on HOME, and Y works there.
 - Stories already in a save keep their old text; new weeks follow the fixed rules.

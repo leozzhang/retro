@@ -5,7 +5,7 @@ import { teamById } from './data/teams';
 import { mulberry32 } from './engine/math';
 import { simulateDrive, type SimPlay } from './game/rules';
 import {
-  BREAKOUT, CONFIDENCE, confidenceStep, confOf, perfZ, sparkReason, START_SLOTS, updateConfidence,
+  BREAKOUT, CONFIDENCE, confidenceStep, confOf, gameZ, perfZ, sparkReason, START_SLOTS, updateConfidence,
 } from './season/confidence';
 import { gradeGame, type GameGrade } from './season/grades';
 import { advanceWeek, defaultConfig, newSeason } from './season/season';
@@ -256,5 +256,28 @@ describe('confidence over a season', () => {
     expect(b.confLog).toEqual(a.confLog);
     expect(JSON.stringify(b.teamState)).toBe(JSON.stringify(a.teamState));
     expect((a.confLog ?? []).some((e) => e.kind === 'spark')).toBe(true);
+  });
+});
+
+describe('confidence reads what everyone saw', () => {
+  const line = (o: Record<string, number>) => ({ id: 'q', team: 'georgia', name: '', pos: 'QB' as const, cmp: 0, att: 0, passYds: 0, passTd: 0, int: 0, rush: 0, rushYds: 0, rushTd: 0, rec: 0, recYds: 0, recTd: 0, fgm: 0, fga: 0, sk: 0, defInt: 0, ...o });
+  const big = line({ cmp: 24, att: 32, passYds: 340, passTd: 3 });
+  const bad = line({ cmp: 12, att: 30, passYds: 120, passTd: 0, int: 3 });
+
+  it('a QB who grades a little under expectation but wins and puts up numbers is rolling, not slumping', () => {
+    // Three straight games graded below what his matchups expected, as a good QB on a good team can.
+    const p = { xp: 0, lvl: 0, d: {} };
+    for (let i = 0; i < 3; i++) updateConfidence(p, grade(-0.6), 'QB', { line: big, edge: 0.3 }, 'QB');
+    expect(confOf(p)).toBeGreaterThan(0.2);
+    // The same grades alone (the old measure) read as shaky.
+    const q = { xp: 0, lvl: 0, d: {} };
+    for (let i = 0; i < 3; i++) updateConfidence(q, grade(-0.6));
+    expect(confOf(q)).toBeLessThan(-0.1);
+  });
+
+  it('three picks in a loss reads as a bad game, even graded even', () => {
+    expect(gameZ(grade(0), 'QB', { line: bad, edge: -0.6 }, 'QB')).toBeLessThan(-1);
+    // A lineman has no box score to read: his grade and the result.
+    expect(gameZ(grade(0), 'OT', { edge: 0.4 })).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { starters } from './data/depth';
-import { MOMENTS, unseenWrap, wrapOrder, markSeen } from './season/moments';
+import { injuredStarters, MOMENTS, unseenWrap, wrapOrder, markSeen } from './season/moments';
 import { advanceWeek, defaultConfig, newSeason, WEEK_STEPS } from './season/season';
 import { challenger, decide, startingRoles } from './season/storylines';
 import type { Moment, SeasonState } from './season/types';
@@ -111,5 +111,32 @@ describe('storyline continuity', () => {
       expect(next?.id).not.toBe(alt.id);
     }
     for (const a of Object.values(st)) expect(challenger(s, sq, 'SL', slot, roles)?.id).not.toBe(a.id);
+  });
+});
+
+describe('next man up', () => {
+  it('is a bench player now starting, never a starter who slid over or came back; a package player gets none', () => {
+    const s = run('kansas', 5, 4);
+    const ts = s.teamState.kansas;
+    const week = s.week - 1;
+    const st = starters(squadFor(s, 'kansas'));
+    const [wr1, slot, wr4] = [st.X, st.SL, st.WR4];
+    // WR1 missed last game (he's not in last game's lineup) but has started all season.
+    ts.st = { ...ts.st };
+    for (const [k, v] of Object.entries(ts.st)) if (v === wr1.id) delete ts.st[k];
+    ((ts.progress ??= {})[wr1.id] ??= { xp: 0, lvl: 0, d: {} }).gs = ts.gp;
+    // The slot receiver is out for the season, and so is the WR4 (a package player).
+    ts.injuries = { ...(ts.injuries ?? {}), [slot.id]: { weeks: 99, type: 'TEST', season: true }, ...(wr4 ? { [wr4.id]: { weeks: 99, type: 'TEST', season: true } } : {}) };
+    const ev = (a: typeof slot) => ({ week, team: 'kansas', id: a.id, name: a.last, pos: a.pos, weeks: 99, type: 'TEST', season: true, starter: true });
+    s.injuryLog = [...(s.injuryLog ?? []), ev(slot), ...(wr4 ? [ev(wr4)] : [])];
+    const out = injuredStarters(s, week);
+    const ids = out.map((x) => x.e.id);
+    expect(ids).toContain(slot.id);
+    if (wr4) expect(ids).not.toContain(wr4.id);
+    const up = out.find((x) => x.e.id === slot.id)!.up;
+    expect(up).toBeDefined();
+    expect(up!.athlete.id).not.toBe(wr1.id);
+    expect(Object.values(ts.st)).not.toContain(up!.athlete.id);
+    expect(ts.progress?.[up!.athlete.id]?.gs ?? 0).toBeLessThan((ts.gp ?? 0) / 2);
   });
 });

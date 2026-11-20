@@ -32,8 +32,17 @@ Every player has a **confidence** from -1 (shaken) to +1 (rolling). It follows h
 
 ## 2. How confidence moves (`updateConfidence`)
 After each game he played:
-- **Performance:** his game's average snap grade, weighted by `1 + leverage` (the `lsum`/`lw` fields on `GameGrade`), as a z: `avg · √snaps / snapSd`, capped at ±3. A full-time starter's z has an SD of about 1.1, and a few snaps barely move it. The game's performance is `tanh(z / perfScale)`.
-- **Step:** `c += rate · √share · (performance − c)`, an EMA with `rate` 0.45, so the last two or three games matter most.
+- **Performance (`gameZ`, `MIX`):** a mix of three looks at the game, each a z, so confidence follows what anyone watching saw:
+  - **Grade:** his snap grades against what his matchups expected, weighted by `1 + leverage` (`perfZ`: `avg · √snaps / snapSd`, capped at ±3; about 1.1 SD for a full-time starter). QBs' grades run under expectation on average, so `gradeShift` recenters them for confidence only; the grades themselves are untouched.
+  - **Production:** his box score in `impact` spreads (season/gameStars.ts) against a starter's usual game **at his slot** (`MIX.base`, measured over starters' lines: the X receiver out-produces the slot). It counts only where the box shows the work: QB, RB, X, Z, SL, TE and K, at half playing time or more. Defenders only get a line with a sack or a pick, so it would only ever be good news for them.
+  - **Result:** the team's win or loss against its pregame odds (`winOdds`), over `resultSd`. A favorite winning is a small plus; an upset either way is a big one. The QB owns it most (`MIX.qb`).
+  - The weights are relative. The mix is scaled back to one look's spread, so agreeing looks reach further. With nothing but a grade (an old save's game), it's the grade alone.
+  - The game's performance is `tanh(z / perfScale)`.
+- **Step:** `c += rate · √share · (performance − c)`, an EMA with `rate` 0.42, so the last two or three games matter most.
+- **Breakouts and sparks** read the same mixed z: a breakout means games that looked good, not just graded well.
+- **Why the mix:** on grades alone, confidence barely tracked anything visible. Starting QBs' confidence correlated 0.04 with their last 3 results and 0.10 with their box scores. A quarter of them were "slumping" at any time, and half of those had won 2 of their last 3 with big numbers. A good QB on a good team is expected to succeed on most snaps, so he could win and put up a milestone while grading a little under it.
+  - Now (2 seasons, every regular week from week 5) the correlations are 0.64 with results and 0.63 with box score for QBs, 0.55-0.66 for backs and receivers, and 0.47 with results for corners.
+  - Slumping QBs who won 2 of their last 3 fell from 48% to 8%; hot ones who lost 2 of 3, from 44% to 11%.
 - **Weeks he doesn't play:** no change.
 - **New season** (`carryConfidence`): half carries over; starts, sparks, windows and penalties clear.
 - **XP:** the progression multiplier's confidence part is `1 + 0.1 × conf` (0.9–1.1), as before but from the stored value instead of the last 3 grades.
@@ -83,15 +92,20 @@ The worry: a starter and a slightly worse backup, and the best move is always to
 
 The season report's FARMING CHECK runs it: Georgia swapping QB1 and QB2 every week fires no sparks and leaves QB1 at -0.45 on the field. The same season with QB1 hurt for weeks 4–6 sparks QB2 once.
 
-## Calibration (`npm run season`, 5 seasons)
+## Calibration (`npm run season`)
 | Measure | Sim | Target |
 | --- | --- | --- |
-| Starters' confidence SD (every regular week) | 0.31 | about 0.3 |
-| Starters beyond ±0.6 | 4.5% | about 5% |
-| Sparks per team-season | 4.2 (injured 2.4, slumping 0.8, outplayed 1.0) | 2–4, most after injuries |
-| Sparks that break out | 9.9% (57 a season nationally) | about 1 in 10 |
-| Team-seasons with a slumping QB benched | 8.8% | 5–10% |
+| Starters' confidence SD (every regular week) | 0.30 | about 0.3 |
+| Starters beyond ±0.6 | 3.5% | about 5% |
+| Sparks per team-season | 3.7 (injured 2.4, slumping 0.5, outplayed 0.9) | 2–4, most after injuries |
+| Sparks that break out | 9.5% (49 a season nationally) | about 1 in 10 |
+| Team-seasons with a slumping QB benched | 5.8% | 5–10% |
 
+- **2026-11-20, the mix:** 2 seasons.
+  - Scores held: 25.8 points per team, 38.1% one-score games (it was 38.0%), 17.8% won by 28+ (18.2%), 5.0 ranked losses a week (4.8).
+  - FARMING CHECK: swapping QB1 and QB2 every week fires no sparks and leaves QB1 at -0.61 on the field.
+  - The first try (rate 0.38, perfScale 1.45) was too calm: SD 0.26, 1.8% beyond ±0.6, slumping QBs benched 3.6%.
+- The grades-only numbers before it were SD 0.31, 4.5% beyond ±0.6, 4.2 sparks, 9.9% breakouts, 8.8% slumping QBs benched.
 - The first version had a rest-day reason. It made 8.5 sparks a team-season from staff rest days alone, so it was dropped: a rest day isn't a lost job.
 - **Scores** didn't move outside noise: 26.2 points per team, 34.0% one-score games, 5.1 ranked losses a week.
 - **Progression:** the mean starter gain went from 1.45 to 1.40. Starters lose a few more games to slump benchings and sparked backups, and kickers and punters (one per team, never benched) don't. The punter row was already flagged (29% over the mean, was 28%). The kicker sits at 14% over (was 14.5%), just under the line. Not tuned.

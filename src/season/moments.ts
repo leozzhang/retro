@@ -1,12 +1,12 @@
 import { CALENDAR } from '../data/season/calendar';
 import { classLabel, DEV_LABEL, type Athlete } from '../data/athletes';
-import { athleteName } from '../data/depth';
-import { overall } from '../data/positions';
+import { athleteName, starters } from '../data/depth';
+import { overall, POS_ROLE } from '../data/positions';
 import { teamById } from '../data/teams';
 import { hashString } from '../engine/math';
 import { heismanRace } from './awards';
 import type { BreakoutEvent, SparkEvent } from './confidence';
-import { newStarters } from './confidence';
+import { START_SLOTS } from './confidence';
 import { impact, statLine } from './gameStars';
 import { outText } from './injuries';
 import { latestPoll, rankIn } from './polls';
@@ -14,7 +14,7 @@ import { rivalrySeries } from './program';
 import { applyDelta, deltaText, type LevelUpEvent } from './progression';
 import { loser, records, recordText, winner } from './standings';
 import { seasonStats, type StatKey } from './stats';
-import type { Moment, MomentPlayer, MomentRow, PlayerLine, Poll, SeasonGame, SeasonState } from './types';
+import type { InjuryEvent, Moment, MomentPlayer, MomentRow, PlayerLine, Poll, SeasonGame, SeasonState } from './types';
 import { squadFor } from './world';
 
 /**
@@ -122,6 +122,36 @@ function lineOf(g: SeasonGame, id: string): PlayerLine | undefined {
   return g.result?.box.players.find((l) => l.id === id);
 }
 
+/**
+ * This week's injuries to the user's real starters (last game's starting lineup, `TeamState.st`; the
+ * package slots like WR4, TE2 or DIME don't count), each with his next man up: a bench player who's now
+ * in the starting lineup at any slot. Not a starter who slid over from another slot or came back from
+ * a missed game: a bench player is one who didn't start last game and has started fewer than half the
+ * team's games. The same position first, then the same role; one man per injury. None moved up, none told.
+ */
+export function injuredStarters(state: SeasonState, week: number): { e: InjuryEvent; up?: { athlete: Athlete; slot: string } }[] {
+  const u = state.config.userTeamId;
+  const ts = state.teamState[u];
+  const last = new Set(Object.values(ts?.st ?? {}));
+  const hurt = (state.injuryLog ?? []).filter((x) => x.week === week && x.team === u && last.has(x.id))
+    .sort((a, b) => (MOMENTS.posW[b.pos] ?? 0) - (MOMENTS.posW[a.pos] ?? 0));
+  if (!hurt.length) return [];
+  const sq = squadFor(state, u);
+  const now = starters(sq);
+  const games = ts?.gp ?? 0;
+  const bench = START_SLOTS.filter((slot) => now[slot] && !last.has(now[slot].id))
+    .map((slot) => ({ slot, athlete: now[slot] }))
+    .filter((x) => (ts?.progress?.[x.athlete.id]?.gs ?? 0) < games / 2);
+  const used = new Set<string>();
+  return hurt.map((e) => {
+    const pick = (ok: (a: Athlete) => boolean) => bench.filter((x) => !used.has(x.athlete.id) && ok(x.athlete))
+      .sort((a, b) => overall(b.athlete.r, b.athlete.pos) - overall(a.athlete.r, a.athlete.pos))[0];
+    const up = pick((a) => a.pos === e.pos) ?? pick((a) => POS_ROLE[a.pos] === POS_ROLE[e.pos]);
+    if (up) used.add(up.athlete.id);
+    return { e, up };
+  });
+}
+
 /** Every moment of the week, unordered. `ev` is what the week's steps gathered. */
 export function weekMoments(state: SeasonState, week: number, ev: WeekEvents): Moment[] {
   const out: Moment[] = [];
@@ -169,13 +199,10 @@ export function weekMoments(state: SeasonState, week: number, ev: WeekEvents): M
   }
 
   // Injuries to the user's starters, with the man who steps in next game.
-  const ts = state.teamState[u];
-  const fresh = ts ? newStarters(state, ts, squadFor(state, u)) : [];
-  for (const e of (state.injuryLog ?? []).filter((x) => x.week === week && x.team === u && x.starter)) {
+  for (const { e, up } of injuredStarters(state, week)) {
     const q = playerNow(state, u, e.id);
     if (!q) continue;
-    const step = fresh.find((f) => f.replaced.id === e.id);
-    const p = step ? momentPlayer(step.athlete, u) : undefined;
+    const p = up ? momentPlayer(up.athlete, u) : undefined;
     const long = e.season || e.weeks >= 2;
     const lines = [`${e.type.toUpperCase()}: ${outText(e).toUpperCase()}`];
     if (p) {
