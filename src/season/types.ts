@@ -57,6 +57,8 @@ export interface SeasonConfig {
    * (data/fbs/history.ts), or every team starting from nothing. Set when the dynasty starts. Missing means real.
    */
   history?: 'real' | 'fresh';
+  /** The Week Wrap after each week (season/moments.ts): every moment, the big ones only, or none. Missing means BIG. */
+  wrap?: 'all' | 'big' | 'off';
 }
 
 /** `all`: every snap of a CPU drive in a played game, watched on the field (the CPU DRIVES setting only). */
@@ -302,6 +304,11 @@ export interface TeamState {
   pipe?: Record<string, number>;
   /** The user's offense on film from its live games, for the next DC's prior (game/offModel.ts `FilmBook`). User team only. */
   film?: FilmBook;
+  /**
+   * A storyline decision on a staff chart (season/storylines.ts): the staff start `id` at `slot` while
+   * he's healthy, this season. User team only; a user-edited chart takes the decision directly instead.
+   */
+  pin?: { slot: string; id: string };
 }
 
 /** Includes `HC`: the head coach's chair. */
@@ -744,6 +751,126 @@ export interface SeasonState {
   chronicle?: Record<string, ChronItem[]>;
   /** The coach's office: what the user has earned (season/achievements.ts). Kept across seasons; nothing in the sim reads it. */
   office?: OfficeState;
+  /** This season's moments for the Week Wrap (season/moments.ts), oldest first. Display only. */
+  moments?: Moment[];
+  /** How many of `moments` the user has seen. */
+  seenMoments?: number;
+  /** The Heisman race each week from the watch week on, top 10 (season/moments.ts). Display only. */
+  buzz?: { week: number; top: { id: string; team: string; name: string; pos: Position; score: number }[] }[];
+  /** The user's storylines this season (season/storylines.ts). Only their decisions reach the sim, through the depth chart. */
+  stories?: Storyline[];
+}
+
+/** A player as a moment shows him, copied in so the card survives roster changes. */
+export interface MomentPlayer {
+  id: string;
+  team: string;
+  name: string;
+  num: number;
+  pos: Position;
+  /** Class label: "RS SO". */
+  cls: string;
+  stars: number;
+  home: string;
+  ovr: number;
+  skin: string;
+  dev: DevTrait;
+}
+
+export type MomentKind =
+  | 'final' | 'breakout' | 'breakthrough' | 'injury' | 'firstStart' | 'poll' | 'heisman' | 'milestone'
+  | 'stakes' | 'progress' | 'around' | 'story' | 'decision' | 'preview';
+
+/** How a game's final card plays: a win or loss, or the bigger versions of one. */
+export type FinalStyle = 'win' | 'loss' | 'upset' | 'stunned' | 'rivalry' | 'title' | 'champion';
+
+/** One row of a moment's list: the poll or Heisman ladder, level-up tiles, around the FBS. */
+export interface MomentRow {
+  text: string;
+  /** Right-hand value: "+3", "12-0", a rank. */
+  val?: string;
+  /** Places moved (ladders). */
+  mv?: number;
+  /** The user's team or player. */
+  me?: boolean;
+  team?: string;
+}
+
+/**
+ * Something worth stopping for after a week (docs/STORYLINES.md): its text is written when it
+ * happens, like the news. `tier` 3 is the biggest; `w` orders moments within a tier.
+ */
+export interface Moment {
+  id: string;
+  week: number;
+  kind: MomentKind;
+  tier: 1 | 2 | 3;
+  w: number;
+  team: string;
+  opp?: string;
+  game?: string;
+  title: string;
+  sub: string;
+  lines: string[];
+  /** The player it's about, and a second one (the injured starter, the man he replaced). */
+  p?: MomentPlayer;
+  q?: MomentPlayer;
+  /** A number that rolls: rank or overall, from and to. */
+  n?: [number, number];
+  d?: RatingDelta;
+  dev?: [DevTrait, DevTrait];
+  rows?: MomentRow[];
+  /** A final's score (user first) and style. */
+  score?: [number, number];
+  style?: FinalStyle;
+  /** The storyline it's a beat of. */
+  arc?: string;
+}
+
+export type StoryKind = 'nextManUp' | 'breakoutWatch' | 'slump' | 'heisman' | 'unbeaten' | 'bowlChase' | 'rivalry' | 'reunion' | 'homecoming';
+
+export interface StoryBeat {
+  week: number;
+  text: string;
+  tone: 'up' | 'down' | 'flat';
+}
+
+/** A choice at a storyline's turning point: who starts at `slot`. */
+export interface StoryDecision {
+  prompt: string;
+  slot: string;
+  options: { label: string; sub: string; id: string }[];
+  /** The option taken (an id), once decided. */
+  chosen?: string;
+  /** The week it was offered. */
+  week: number;
+}
+
+/**
+ * A storyline (season/storylines.ts): a run of weeks about one player or the team, with what's at
+ * stake next and how it ended. `star` is the player it's about, `other` the second one.
+ */
+export interface Storyline {
+  id: string;
+  kind: StoryKind;
+  team: string;
+  title: string;
+  star?: MomentPlayer;
+  other?: MomentPlayer;
+  /** A game it's about (rivalry, reunion, homecoming). */
+  game?: string;
+  /** The depth chart slot it's about (next man up, slump). */
+  slot?: string;
+  opened: number;
+  status: 'open' | 'resolved';
+  beats: StoryBeat[];
+  /** What the next game decides. */
+  stakes: string;
+  meter?: { at: number; of: number; label: string };
+  decision?: StoryDecision;
+  outcome?: string;
+  /** Kind-specific counters: starts, wins as the starter, the week the starter is due back. */
+  k?: Record<string, number>;
 }
 
 /** One thing in the coach's office (docs/OFFICE.md). */

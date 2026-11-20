@@ -15,6 +15,8 @@ import { archiveSeason, storyWeek } from './career';
 import { archiveChronicle, seasonRows } from './program';
 import { archiveCoaches, programXp, progressCoaches } from './coaching';
 import { carryConfidence, confidenceStep, type BreakoutEvent, type SparkReason } from './confidence';
+import { emptyEvents, mergeWeek, weekMoments, type WeekEvents } from './moments';
+import { storyStep } from './storylines';
 import { carryMorale, moraleOf, moraleStep } from './morale';
 import { gradeGame, type GameGrade } from './grades';
 import { healWeek, injureGame, outText } from './injuries';
@@ -130,6 +132,8 @@ interface WeekContext {
   played: Map<string, { drives: DriveLog[]; home: Squad; away: Squad; neutral: boolean }>;
   /** Each game's grades, by game id, from the progress step: injuries read the snaps and hits. */
   grades: Map<string, Map<string, GameGrade>>;
+  /** What the steps did this week, for the moments (season/moments.ts). */
+  events: WeekEvents;
 }
 
 type WeekStep = (state: SeasonState, ctx: WeekContext) => void;
@@ -239,11 +243,16 @@ const progress: WeekStep = (state, ctx) => {
       for (const [g, pick] of Object.entries(focus?.picks ?? {}) as [Group, string][]) {
         if (pick !== STANDARD) (ts.eg ??= {})[g] = (ts.eg[g] ?? 0) + 1;
       }
-      if (t === user) for (const e of events) if (e.big) told(e);
+      if (t === user) {
+        for (const e of events) if (e.big) told(e);
+        ctx.events.levelUps.push(...events);
+      }
       // Morale first: it reads last game's starters, which the confidence step moves on.
       moraleStep(state, ts, sq, seasonRng(state, 'morale', t, ctx.week));
       const bases = new Map(baseRoster(state, t).map((a) => [a.id, generatedAthlete(a.id) ?? a]));
       const conf = confidenceStep(state, ts, sq, grades, bases, ctx.week, seasonRng(state, 'confidence', t, ctx.week));
+      ctx.events.sparks.push(...conf.sparks);
+      ctx.events.breakouts.push(...conf.breakouts);
       if (t === user) {
         for (const e of conf.sparks) {
           state.news.push({
@@ -335,6 +344,7 @@ const transition: WeekStep = (state, ctx) => {
     state.phase = 'confChamp';
   } else if (state.phase === 'confChamp') {
     selection(state, week);
+    ctx.events.selection = true;
     state.phase = 'postseason';
   } else if (state.phase === 'postseason') {
     recordBracket(state);
@@ -360,6 +370,15 @@ const transition: WeekStep = (state, ctx) => {
 const office: WeekStep = (state, ctx) => {
   checkOffice(state, 'game', ctx.week);
   if (state.phase === 'complete') checkOffice(state, 'season', ctx.week);
+};
+
+/**
+ * Story (display only, no randomness): the user's storylines open, move and close (season/storylines.ts),
+ * then the week's moments for the Week Wrap (season/moments.ts). Last, so they see everything the week did.
+ */
+const moments: WeekStep = (state, ctx) => {
+  const beats = storyStep(state, ctx.week, ctx.events);
+  (state.moments ??= []).push(...mergeWeek([...weekMoments(state, ctx.week, ctx.events), ...beats], state.stories));
 };
 
 /** The year's final AP top 25, win shares and development records, for next years' reputations. */
@@ -396,6 +415,7 @@ export const WEEK_STEPS: { name: string; run: WeekStep }[] = [
   { name: 'news', run: news },
   { name: 'transition', run: transition },
   { name: 'office', run: office },
+  { name: 'moments', run: moments },
 ];
 
 /**
@@ -409,7 +429,7 @@ export function advanceWeek(
   state: SeasonState, userResult?: GameResult, userDrives?: DriveLog[], userStory?: GameStory, userWatch?: WeekContext['userWatch'],
 ): void {
   if (seasonOver(state)) return;
-  const ctx: WeekContext = { week: state.week, userResult, userDrives, userStory, userWatch, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map() };
+  const ctx: WeekContext = { week: state.week, userResult, userDrives, userStory, userWatch, plans: new Map(), emph: new Map(), played: new Map(), grades: new Map(), events: emptyEvents() };
   for (const step of WEEK_STEPS) step.run(state, ctx);
   delete state.teamState[state.config.userTeamId]?.emph;
   if (!seasonOver(state)) state.week++;

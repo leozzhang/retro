@@ -229,12 +229,12 @@ export function confidenceStep(
     if (p.bh < 0.02) delete p.bh;
   }
 
-  // Next man up: a spark for an earned job. A user's chart that benches an in-form starter for a
-  // weaker one costs the starter; the staff never do that (their chart is by the book).
+  // Next man up: a spark for an earned job. A user's chart (or a storyline decision's pin) that benches
+  // an in-form starter for a weaker one costs the starter; the staff never do that (their chart is by the book).
   const log = (state.confLog ??= []);
   const sparks: SparkEvent[] = [];
   for (const f of fresh) {
-    if (!f.reason && !f.rest && ts.depth) {
+    if (!f.reason && !f.rest && (ts.depth || ts.pin?.slot === f.slot)) {
       const pd = entry(f.replaced.id);
       pd.bh = round3((pd.bh ?? 0) + CONFIDENCE.benchHit);
       log.push({ week, team, id: f.replaced.id, pos: f.replaced.pos, kind: 'bench' });

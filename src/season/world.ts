@@ -34,7 +34,7 @@ export function squadFor(state: SeasonState, teamId: string): Squad {
     levels += p.lvl;
     if (p.c || p.sp || p.bh || p.dev || p.pot) form += `${id}:${p.c ?? 0}:${p.sp ?? 0}:${p.bh ?? 0}:${p.dev ?? ''}:${p.pot ?? 0},`;
   }
-  const key = `${levels}|${JSON.stringify(inj)}|${JSON.stringify(hp)}|${form}|${JSON.stringify(ts.st ?? null)}|${ts.gp ?? 0}|${(state.injuryLog ?? []).length}|${rosterKey(ts)}`;
+  const key = `${levels}|${JSON.stringify(inj)}|${JSON.stringify(hp)}|${form}|${JSON.stringify(ts.st ?? null)}|${ts.gp ?? 0}|${(state.injuryLog ?? []).length}|${rosterKey(ts)}|${ts.pin ? `${ts.pin.slot}:${ts.pin.id}` : ''}`;
   const hit = cache.get(ts);
   if (hit && hit.key === key && hit.depth === ts.depth) return hit.squad;
   const hurt = Object.keys(hp).length > 0;
@@ -59,7 +59,10 @@ export function squadFor(state: SeasonState, teamId: string): Squad {
     })
     : base.athletes;
   // The staff chart reads ratings, health and confidence, so it's rebuilt when any has changed.
-  const depth = ts.depth ?? (levels || hurt || form ? buildDepth(athletes, ts.st) : base.depth);
+  let depth = ts.depth ?? (levels || hurt || form ? buildDepth(athletes, ts.st) : base.depth);
+  // A storyline decision on a staff chart (season/storylines.ts `decide`): its man first at the slot.
+  const pin = ts.pin;
+  if (pin && !ts.depth && depth[pin.slot]?.includes(pin.id)) depth = { ...depth, [pin.slot]: [pin.id, ...depth[pin.slot].filter((x) => x !== pin.id)] };
   // Next man up: the spark is on the field from his first start. The chart is built without it.
   const sparked = new Set(newStarters(state, ts, { team: base.team, athletes, depth }).filter((f) => f.spark).map((f) => f.athlete.id));
   if (sparked.size) {

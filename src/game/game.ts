@@ -33,7 +33,7 @@ import {
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
 import { AUDIBLE_PAGE, AUDIBLE_TABS, audibleCardRect, audiblePage, drawAudible, type AudibleKind, type AudibleView } from '../render/audibleOverlay';
 import {
-  drawSeason, navAt, navItems, newSeasonView, newsMaxScroll, PLAY_KEYS_BTN, playMenuRect, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV,
+  drawSeason, DECIDE_BTN, navAt, navItems, newSeasonView, newsMaxScroll, REPLAY_BTN, STORIES_BTN, storiesMaxScroll, storyAt, PLAY_KEYS_BTN, playMenuRect, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV,
   type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
@@ -58,6 +58,10 @@ import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
 import { advanceWeek, defaultConfig, engineTeam, newSeason, seasonOver, userGameThisWeek } from '../season/season';
+import { lastWeekMoments, markSeen, unseenWrap } from '../season/moments';
+import { decide, pendingDecisions, storyOf } from '../season/storylines';
+import { decisionAt, drawWrap, newWrapView, sceneDur, type WrapView } from '../render/momentScreen';
+import { galleryMoments } from '../render/momentGallery';
 import { engineGame, enginePart, isEngineSnap, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
 import { advanceOffseason, startOffseason } from '../season/offseason';
@@ -89,7 +93,7 @@ import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog } from '../season/simGame';
 import { engineCredit } from '../season/cast';
 import { newStory, type DriveCredit, type GameStory, type StoryDrive } from '../season/story';
-import type { DriveLog, GameResult, KeyLevel, OfficeState, SeasonGame, SeasonState } from '../season/types';
+import type { DriveLog, GameResult, KeyLevel, Moment, OfficeState, SeasonGame, SeasonState } from '../season/types';
 import type { SimPlay as LiveSimPlay } from './rules';
 import { cueShow, drawShow, drawShowStill, keyShow, prefetchShow, showFocus, updateShow, type KeyShow, type ShowCtx } from './highlights';
 import { WATCH_LEVELS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
@@ -109,7 +113,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game' | 'wrap';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -139,6 +143,7 @@ const IQ_OPTIONS: DefenseIq[] = ['STATIC', 'NORMAL', 'SHARP'];
 /** Daylight for the runner (render/renderer.ts): always, until the handoff, or never. */
 const ASSIST_OPTIONS: RunAssist[] = ['FULL', 'LIGHT', 'OFF'];
 const READ_OPTIONS: NonNullable<SeasonConfig['readHelp']>[] = ['FULL', 'SHELL', 'OFF'];
+const WRAP_OPTIONS: NonNullable<SeasonConfig['wrap']>[] = ['all', 'big', 'off'];
 
 /**
  * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
@@ -201,6 +206,12 @@ const SETTINGS: {
     options: READ_OPTIONS, start: 0,
     apply: (c, i) => (c.readHelp = READ_OPTIONS[i]),
     read: (c) => READ_OPTIONS.indexOf(c.readHelp ?? 'FULL'),
+  },
+  {
+    label: 'WEEK WRAP', help: 'AFTER EACH WEEK: ALL ITS MOMENTS, THE BIG ONES, OR NONE',
+    options: WRAP_OPTIONS.map((o) => o.toUpperCase()), start: 1,
+    apply: (c, i) => (c.wrap = WRAP_OPTIONS[i]),
+    read: (c) => WRAP_OPTIONS.indexOf(c.wrap ?? 'big'),
   },
   {
     label: 'HISTORY', help: 'REAL PROGRAM HISTORY TO 2025, OR EVERY TEAM STARTS FROM NOTHING',
@@ -453,6 +464,8 @@ export class Game {
   /** Watching a simulated game's key plays: the result is already in the season. */
   private watchOnly = false;
   private seasonView: SeasonView = newSeasonView();
+  /** The Week Wrap, or a replay of moments (render/momentScreen.ts). */
+  private wrapView?: WrapView;
   private teamView: TeamView = { pos: 0, sel: 0, drag: null, mx: 0, my: 0 };
   private programView?: ProgramView;
   /** Where Esc goes from a program page: the screen it was opened from, or the program page before. */
@@ -596,6 +609,9 @@ export class Game {
         break;
       case 'settings':
         this.updateDynastySettings(input);
+        break;
+      case 'wrap':
+        this.updateWrap(dt, input);
         break;
     }
     if (this.inGame() && this.clock.quarter !== this.windQuarter) {
@@ -1128,11 +1144,118 @@ export class Game {
   private toSeason(): void {
     this.screen = 'season';
     this.seasonView = newSeasonView();
+    // A week just played: its moments first (season/moments.ts). With the wrap off they're just marked seen.
+    const s = this.season;
+    if (!s || (s.seenMoments ?? 0) >= (s.moments?.length ?? 0)) return;
+    const list = unseenWrap(s);
+    if (list.length) this.openWrap(list, false);
+    else {
+      markSeen(s);
+      this.save();
+    }
+  }
+
+  /** Show moments one scene at a time: the Week Wrap, or a replay from HOME or STORYLINES. */
+  openWrap(list: Moment[], replay: boolean): void {
+    if (!list.length) return;
+    this.wrapView = newWrapView(list, replay);
+    this.screen = 'wrap';
+  }
+
+  private closeWrap(): void {
+    const s = this.season!;
+    if (!this.wrapView?.replay) {
+      markSeen(s);
+      this.save();
+    }
+    this.wrapView = undefined;
+    this.screen = 'season';
+  }
+
+  /**
+   * The wrap: a click or Space finishes the scene's animation, then moves on; Esc goes home. A decision
+   * waits for 1 or 2 (or a click on a side); Esc leaves it for HOME.
+   */
+  private updateWrap(dt: number, input: Input): void {
+    const v = this.wrapView;
+    const s = this.season;
+    if (!v || !s) {
+      this.screen = 'season';
+      return;
+    }
+    v.t += dt;
+    v.mx = input.mouse.x;
+    v.my = input.mouse.y;
+    const m = v.list[v.i];
+    if (!m || input.hit('Escape', 'Backspace')) {
+      this.closeWrap();
+      return;
+    }
+    const d = m.kind === 'decision' ? storyOf(s, m)?.decision : undefined;
+    if (d && !d.chosen) {
+      const i = input.hit('Digit1') ? 0 : input.hit('Digit2') ? 1 : input.mouse.pressed ? decisionAt(input.mouse.x, input.mouse.y) : -1;
+      if (i >= 0 && d.options[i]) {
+        decide(s, m.arc!, d.options[i].id);
+        this.save();
+        v.t = Math.max(v.t, sceneDur(m));
+      }
+      return;
+    }
+    if (input.hit('Space', 'Enter', 'ArrowRight', 'KeyD') || input.mouse.pressed) {
+      if (v.t < sceneDur(m)) v.t = sceneDur(m) + 0.01;
+      else if (++v.i >= v.list.length) this.closeWrap();
+      else v.t = 0;
+    }
+  }
+
+  /**
+   * The hub's story controls: on HOME, M replays the week's moments, Y opens STORYLINES and Enter (or
+   * the gold card) takes a waiting decision; on STORYLINES, a click replays a storyline's moments.
+   * True when it handled the input.
+   */
+  private updateStories(input: Input): boolean {
+    const s = this.season!;
+    const v = this.seasonView;
+    const m = input.mouse;
+    const at = (b: { x: number; y: number; w: number; h: number }) => m.pressed && inRect(m.x, m.y, b);
+    if (v.nav === 'STORYLINES') {
+      if (m.wheel) v.scroll = Math.max(0, Math.min(storiesMaxScroll(s), v.scroll + m.wheel));
+      const st = m.pressed ? storyAt(s, v, m.x, m.y) : undefined;
+      if (st) {
+        const ms = (s.moments ?? []).filter((x) => x.arc === st.id);
+        this.openWrap(ms, true);
+        return true;
+      }
+    }
+    if (v.nav !== 'HOME') return false;
+    const week = lastWeekMoments(s);
+    if ((input.hit('KeyM') || at(REPLAY_BTN)) && week.length) {
+      this.openWrap(week, true);
+      return true;
+    }
+    if ((input.hit('KeyY') || at(STORIES_BTN)) && s.stories?.length) {
+      Object.assign(v, { nav: 'STORYLINES', scroll: 0 });
+      return true;
+    }
+    const pend = pendingDecisions(s)[0];
+    if (pend && (input.hit('Enter') || at(DECIDE_BTN))) {
+      const d = (s.moments ?? []).filter((x) => x.kind === 'decision' && x.arc === pend.id).pop();
+      if (d) this.openWrap([d], true);
+      return !!d;
+    }
+    return false;
+  }
+
+  /** Dev builds: one moment of every kind from the user's roster, to look at (`window.game.momentGallery()`). */
+  momentGallery(): void {
+    if (this.season) this.openWrap(galleryMoments(this.season), true);
   }
 
   /** Open a sidebar page. */
   private openPage(item: NavItem): void {
     if (item.off) return;
+    // A page is its own screen: coming back from it lands on HOME, never on a page's item.
+    Object.assign(this.seasonView, { nav: 'HOME', sub: 0, scroll: 0 });
     if (item.page === 'team') this.toTeam();
     else if (item.page === 'playbook') this.toBook();
     else if (item.page === 'prep') this.toPrep();
@@ -1158,9 +1281,11 @@ export class Game {
       return;
     }
     if (input.hit('Escape', 'Backspace')) {
-      this.toTitle();
+      if (v.nav === 'STORYLINES') Object.assign(v, { nav: 'HOME', scroll: 0 });
+      else this.toTitle();
       return;
     }
+    if (this.updateStories(input)) return;
     const items = navItems(s);
     // W/S step through the panels only (HOME, SCHEDULE, then AROUND THE FBS); pages open by click or hotkey.
     const live = items.filter((it) => !it.off && !it.page);
@@ -1170,11 +1295,6 @@ export class Game {
     const at = Math.max(0, live.findIndex((it) => it.id === v.nav));
     if (input.hit('KeyW', 'ArrowUp')) select(live[(at + live.length - 1) % live.length].id);
     if (input.hit('KeyS', 'ArrowDown')) select(live[(at + 1) % live.length].id);
-    const cur = items.find((it) => it.id === v.nav);
-    if (cur?.page && input.hit('Enter')) {
-      this.openPage(cur);
-      return;
-    }
     // A/D or the arrows: the week (newest first, so "next" is a smaller step back), conference or poll.
     if (SUB_PANELS.has(v.nav)) {
       const d = (input.hit('KeyD', 'ArrowRight') || (m.pressed && inRect(m.x, m.y, SUB_NEXT)) ? 1 : 0)
@@ -1199,10 +1319,8 @@ export class Game {
     if (m.pressed) {
       const it = navAt(s, m.x, m.y);
       if (it && !it.off) {
-        if (it.page) {
-          select(it.id);
-          this.openPage(it);
-        } else select(it.id);
+        if (it.page) this.openPage(it);
+        else select(it.id);
         return;
       }
       const link = linkAt(m.x, m.y);
@@ -1238,6 +1356,7 @@ export class Game {
     }
     advanceWeek(s);
     this.save();
+    this.toSeason();
   }
 
   /**
@@ -1476,7 +1595,8 @@ export class Game {
   /** Queue a toast for each new office item (and a new room) since last look. Not on the field. */
   private watchOffice(): void {
     const s = this.season;
-    if (!s) return;
+    // The wrap has the screen: the office's toast waits for the hub.
+    if (!s || this.screen === 'wrap') return;
     let w = this.officeWatch;
     if (!w || w.season !== s) {
       // A loaded save starts quiet; a season rolled over keeps counting from the same office.
@@ -3796,6 +3916,10 @@ export class Game {
     }
     if (this.screen === 'roster') {
       drawRoster(g, buildSquad(TEAMS[this.rosterIdx]), this.rosterPage);
+      return;
+    }
+    if (this.screen === 'wrap' && this.wrapView) {
+      drawWrap(g, this.season!, this.wrapView);
       return;
     }
     if (this.screen === 'season') {

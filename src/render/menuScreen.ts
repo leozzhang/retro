@@ -246,8 +246,8 @@ export interface SettingRow {
 const SET_X = 120;
 const SET_W = VIEW_W - 2 * SET_X;
 const SET_Y = 88;
-const SET_H = 16;
-const SET_STEP = 18;
+const SET_H = 15;
+const SET_STEP = 17;
 
 export function settingRect(i: number): Box {
   return { x: SET_X, y: SET_Y + i * SET_STEP, w: SET_W, h: SET_H };

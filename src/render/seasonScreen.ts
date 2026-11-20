@@ -8,10 +8,11 @@ import { teamLabel } from '../season/news';
 import { OFFSEASON_STAGES } from '../season/offseason';
 import { latestPoll, rankIn } from '../season/polls';
 import { phaseLabel, userGameThisWeek } from '../season/season';
-import { lastPlayedWeek, upgradedLastWeek } from '../season/progression';
 import { records, recordText, standings } from '../season/standings';
 import { LEADER_CATEGORIES, leaders, seasonStats } from '../season/stats';
-import type { SeasonGame, SeasonState } from '../season/types';
+import type { SeasonGame, SeasonState, Storyline } from '../season/types';
+import { headlineMoment, lastWeekMoments } from '../season/moments';
+import { pendingDecisions } from '../season/storylines';
 import { squadFor } from '../season/world';
 import { drawHint } from './hud';
 import { drawRich, gameLink, linkText, newsRich, playerLink, teamLink, type RichLine } from './links';
@@ -243,6 +244,8 @@ function hintFor(s: SeasonState, v: SeasonView, item: NavItem | undefined): stri
   const parts = ['W/S MENU'];
   if (SUB_PANELS.has(v.nav) && (v.nav !== 'POLLS' || latestPoll(s, 'cfp'))) parts.push(`A/D ${v.nav === 'STANDINGS' ? 'CONF' : v.nav === 'POLLS' ? 'POLL' : 'WEEK'}`);
   if (v.nav === 'NEWS') parts.push('Q/E SCROLL');
+  if (v.nav === 'HOME' && s.moments?.length) parts.push('M REPLAY  Y STORYLINES');
+  if (v.nav === 'STORYLINES') parts.push('CLICK REPLAY  ESC HOME');
   const act = primaryAction(s);
   if (!act.off) parts.push(`SPACE ${act.label}`);
   if (userGameThisWeek(s)) parts.push('X SIM');
@@ -291,8 +294,11 @@ export function drawSeason(g: CanvasRenderingContext2D, s: SeasonState, v: Seaso
     case 'PLAYOFF':
       drawPlayoff(g, s);
       break;
+    case 'STORYLINES':
+      drawStorylines(g, s, v);
+      break;
     default:
-      // HOME, and the pages' items (their panel is HOME until Enter opens them).
+      // HOME (pages open as their own screens).
       drawHome(g, s, v);
   }
   if (v.playMenu !== undefined) {
@@ -364,13 +370,8 @@ function drawHome(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): v
   if (s.phase === 'offseason') drawStages(g, s);
   else if (s.phase === 'complete') drawChampion(g, s);
   else drawMatchup(g, s);
-  drawLastWeek(g, s);
+  drawWeekStory(g, s, v);
   drawConfMini(g, s);
-  if (navItems(s).find((it) => it.id === v.nav)?.page) {
-    // A page's item is selected: say what Enter opens.
-    const it = navItems(s).find((x) => x.id === v.nav)!;
-    text(g, `ENTER: OPEN ${it.label}`, PCX, 332, { align: 'center', color: GOLD });
-  }
 }
 
 const CARD_Y = 36;
@@ -409,7 +410,17 @@ function drawMatchup(g: CanvasRenderingContext2D, s: SeasonState): void {
   teamSide(g, s, opp, PR - 96, game.home === opp && !game.neutral, -1);
   text(g, vsText(game, u), PCX, CARD_Y + 44, { size: 16, align: 'center', color: '#ffffff' });
   const where = game.neutral ? 'NEUTRAL SITE' : game.home === u ? 'HOME' : 'AWAY';
-  text(g, where, PCX, CARD_Y + 66, { align: 'center', color: SOFT, shadow: false });
+  text(g, where, PCX, CARD_Y + 62, { align: 'center', color: SOFT, shadow: false });
+  // What this game decides: the storylines riding on it, this game's own first.
+  const riding = (s.stories ?? [])
+    .filter((st) => st.status === 'open' && st.stakes && (st.game === game.id || !st.game))
+    .sort((a, b) => Number(b.game === game.id) - Number(a.game === game.id))
+    .slice(0, 3);
+  riding.forEach((st, i) => {
+    const who = st.star ? ` ${st.star.name.split(' ').pop()}` : '';
+    const label = st.title.length + who.length <= 24 ? `${st.title}${who}` : who ? `${st.title.split(' ')[0]}${who}` : st.title;
+    text(g, label.slice(0, 24), PCX, CARD_Y + 76 + i * 11, { align: 'center', color: st.game === game.id ? GOLD : ACCENT, shadow: false });
+  });
 }
 
 function drawStages(g: CanvasRenderingContext2D, s: SeasonState): void {
@@ -455,67 +466,74 @@ function drawChampion(g: CanvasRenderingContext2D, s: SeasonState): void {
   text(g, next, PCX, CARD_Y + 99, { align: 'center', color: SOFT, shadow: false });
 }
 
-/**
- * Last week on the user's team: its level-ups, and the biggest story among a breakout, a
- * breakthrough or a next man up.
- */
-function progressLine(s: SeasonState): string {
-  const u = s.config.userTeamId;
-  const week = lastPlayedWeek(s);
-  const prog = Object.values(s.teamState[u]?.progress ?? {});
-  const ups = prog.filter((p) => upgradedLastWeek(s, p)).length;
-  const items = s.news.filter((n) => n.kind === 'progress' && n.week === week && n.teams.includes(u)).map((n) => n.text);
-  const pick = (tag: string) => items.filter((t) => t.startsWith(tag)).pop();
-  const name = (t: string) => t.slice(t.indexOf(': ') + 2).split(' (')[0].toUpperCase();
-  let tail = '';
-  const bo = pick('BREAKOUT:');
-  const bt = pick('BREAKTHROUGH:');
-  const nm = pick('NEXT MAN UP:');
-  if (bo) tail = `BREAKOUT: ${name(bo)}`;
-  else if (bt) {
-    // "BREAKTHROUGH: Name (UGA QB) +2 SAC +2 MAC" becomes "BREAKTHROUGH: NAME +4".
-    const pts = [...bt.matchAll(/\+(\d+)/g)].reduce((x, m) => x + Number(m[1]), 0);
-    tail = `BREAKTHROUGH: ${name(bt)} +${pts}`;
-  } else if (nm) tail = `NEXT MAN UP: ${name(nm)}`;
-  const head = ups ? `${ups} LEVEL-UP${ups === 1 ? '' : 'S'}` : '';
-  return [head, tail].filter(Boolean).join('  ');
-}
-
 const LOW_Y = CARD_Y + CARD_H + 8;
 const LOW_H = 326 - LOW_Y;
 const HALF_W = 236;
 
-function drawLastWeek(g: CanvasRenderingContext2D, s: SeasonState): void {
+/** HOME's buttons in THE WEEK'S STORY: replay the week's moments, take a pending decision, all storylines. */
+export const REPLAY_BTN: Box = { x: PX + 8, y: LOW_Y + LOW_H - 20, w: 108, h: 14 };
+export const STORIES_BTN: Box = { x: PX + 120, y: LOW_Y + LOW_H - 20, w: 108, h: 14 };
+export const DECIDE_BTN: Box = { x: PX + 6, y: LOW_Y + 32, w: HALF_W - 12, h: 30 };
+
+function smallBtn(g: CanvasRenderingContext2D, b: Box, label: string, v: SeasonView, on = true): void {
+  const hot = on && inBox(b, v.mx, v.my);
+  g.fillStyle = hot ? '#24324a' : '#1a2230';
+  g.fillRect(b.x, b.y, b.w, b.h);
+  text(g, label, b.x + b.w / 2, b.y + 3, { align: 'center', color: !on ? DIM : hot ? GOLD : ACCENT, shadow: false });
+}
+
+/**
+ * THE WEEK'S STORY: last game's result, a decision waiting on the user, the week's top moment with its
+ * player, and the storylines in progress; the moments replay from here (M), all storylines open (Y).
+ */
+function drawWeekStory(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): void {
   const u = s.config.userTeamId;
-  box(g, PX, LOW_Y, HALF_W, LOW_H, 'LAST GAME');
-  const chars = Math.floor((HALF_W - 16) / 8);
-  const lines: { l: RichLine; c: string }[] = [];
-  const plain = (t: string, c: string) => lines.push({ l: { t, spans: [] }, c });
+  box(g, PX, LOW_Y, HALF_W, LOW_H, "THE WEEK'S STORY");
+  let y = LOW_Y + 20;
   const last = s.games.filter((x) => x.result && (x.home === u || x.away === u)).sort((a, b) => b.week - a.week)[0];
   if (last) {
     const res = resultText(last, u);
     const oppId = last.home === u ? last.away : last.home;
     const head = `${res} ${vsText(last, u)} `;
     const abbr = teamById(oppId).abbr;
-    lines.push({ l: lineWith(head + abbr, head.length, abbr.length, teamLink(oppId)), c: res.startsWith('W') ? GREEN : res.startsWith('L') ? RED : '#ffffff' });
-  } else plain('NO GAMES PLAYED YET', DIM);
-  const prog = progressLine(s);
-  if (prog) for (const l of newsRich(s, { text: prog, teams: [u] }, chars)) lines.push({ l, c: GREEN });
-  // The newest week of news about the user's team, apart from the progress items above.
-  const mine = s.news.filter((n) => n.teams.includes(u) && n.kind !== 'progress');
-  const week = mine.length ? mine[mine.length - 1].week : undefined;
-  if (week !== undefined) {
-    plain('', DIM);
-    plain(week === 0 ? 'PRESEASON NEWS' : `WEEK ${week} NEWS`, ACCENT);
+    drawRich(g, lineWith(head + abbr, head.length, abbr.length, teamLink(oppId)), PX + 8, y, { color: res.startsWith('W') ? GREEN : res.startsWith('L') ? RED : '#ffffff', shadow: false });
+  } else text(g, 'NO GAMES PLAYED YET', PX + 8, y, { color: DIM, shadow: false });
+  y += 12;
+  const pend = pendingDecisions(s)[0];
+  if (pend?.decision) {
+    const b = DECIDE_BTN;
+    const hot = inBox(b, v.mx, v.my);
+    g.fillStyle = hot ? '#3a3010' : '#2a240c';
+    g.fillRect(b.x, b.y, b.w, b.h);
+    g.fillStyle = GOLD;
+    g.fillRect(b.x, b.y, 2, b.h);
+    text(g, 'YOUR CALL (ENTER)', b.x + 8, b.y + 4, { color: GOLD, shadow: false });
+    text(g, pend.decision.prompt.slice(0, 27), b.x + 8, b.y + 17, { color: '#ffffff', shadow: false });
+    y = b.y + b.h + 6;
   }
-  const max = Math.floor((LOW_H - 22) / 10);
-  // Whole items only: one that doesn't fit is left for the NEWS panel.
-  for (const n of [...mine].reverse().filter((x) => x.week === week)) {
-    const w = newsRich(s, n, chars);
-    if (lines.length + w.length > max) break;
-    w.forEach((l) => lines.push({ l, c: '#ffffff' }));
+  const m = headlineMoment(s);
+  if (m && m.kind !== 'final') {
+    const team = teamById(m.team);
+    if (m.p) g.drawImage(getSprite(teamUniform(team, true), m.p.skin, m.kind === 'injury' ? 'stand' : 'cheer', 1), PX + 8, y, 40, 44);
+    const tx = m.p ? PX + 54 : PX + 8;
+    const n = Math.floor((PX + HALF_W - 8 - tx) / 8);
+    text(g, m.title.slice(0, n), tx, y + 2, { color: m.kind === 'injury' ? RED : GOLD, shadow: false });
+    wrapWords(m.sub, n).slice(0, 3).forEach((l, i) => text(g, l, tx, y + 14 + i * 10, { color: '#ffffff', shadow: false }));
+    y += 48;
   }
-  lines.slice(0, max).forEach((x, i) => drawRich(g, x.l, PX + 8, LOW_Y + 20 + i * 10, { color: x.c, shadow: false }));
+  const open = (s.stories ?? []).filter((st) => st.status === 'open' && st.stakes);
+  const room = Math.floor((REPLAY_BTN.y - 2 - (y + 11)) / 21);
+  if (open.length && room > 0) {
+    text(g, 'STORYLINES', PX + 8, y, { color: ACCENT, shadow: false });
+    y += 11;
+    for (const st of open.slice(0, room)) {
+      text(g, `${st.title}${st.star ? `: ${st.star.name}` : ''}`.slice(0, 27), PX + 8, y, { color: '#ffffff', shadow: false });
+      text(g, st.stakes.slice(0, 27), PX + 8, y + 9, { color: SOFT, shadow: false });
+      y += 21;
+    }
+  }
+  smallBtn(g, REPLAY_BTN, 'M: REPLAY WEEK', v, lastWeekMoments(s).length > 0);
+  smallBtn(g, STORIES_BTN, 'Y: STORYLINES', v, (s.stories ?? []).length > 0);
 }
 
 function drawConfMini(g: CanvasRenderingContext2D, s: SeasonState): void {
@@ -777,4 +795,58 @@ function drawPlayoff(g: CanvasRenderingContext2D, s: SeasonState): void {
   const u = s.config.userTeamId;
   const bowl = s.games.find((x) => x.kind === 'bowl' && (x.home === u || x.away === u));
   if (bowl) text(g, `${bowl.name!.toUpperCase()}: ${vsText(bowl, u)} ${teamById(bowl.home === u ? bowl.away : bowl.home).abbr}  ${resultText(bowl, u)}`.slice(0, 60), PCX, 330, { align: 'center', color: GOLD });
+}
+
+// ------------------------------------------------------------ STORYLINES
+
+const STORY_ROW = 40;
+const STORY_TOP = 50;
+
+function storyRows(s: SeasonState): Storyline[] {
+  const all = [...(s.stories ?? [])];
+  return [...all.filter((x) => x.status === 'open').reverse(), ...all.filter((x) => x.status !== 'open').reverse()];
+}
+
+export function storiesMaxScroll(s: SeasonState): number {
+  return Math.max(0, storyRows(s).length - Math.floor((326 - STORY_TOP) / STORY_ROW));
+}
+
+/** The storyline under the mouse on the STORYLINES panel. */
+export function storyAt(s: SeasonState, v: SeasonView, x: number, y: number): Storyline | undefined {
+  if (x < PX || x >= PR || y < STORY_TOP) return undefined;
+  return storyRows(s)[v.scroll + Math.floor((y - STORY_TOP) / STORY_ROW)];
+}
+
+/** Every storyline this season: the running ones first, then how the others ended. A click replays one. */
+function drawStorylines(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonView): void {
+  g.fillStyle = CARD;
+  g.fillRect(PX, 36, PW, 290);
+  text(g, `${s.year} STORYLINES`, PCX, 40, { align: 'center', color: GOLD });
+  const rows = storyRows(s);
+  if (!rows.length) {
+    text(g, 'NO STORYLINES YET: PLAY A WEEK', PCX, 120, { align: 'center', color: DIM, shadow: false });
+    return;
+  }
+  const fit = Math.floor((326 - STORY_TOP) / STORY_ROW);
+  rows.slice(v.scroll, v.scroll + fit).forEach((st, i) => {
+    const y = STORY_TOP + i * STORY_ROW;
+    const open = st.status === 'open';
+    const hot = inBox({ x: PX, y, w: PW, h: STORY_ROW - 2 }, v.mx, v.my);
+    g.fillStyle = hot ? '#1f2a3a' : open ? '#18202c' : '#11161e';
+    g.fillRect(PX + 4, y, PW - 8, STORY_ROW - 3);
+    g.fillStyle = st.decision && !st.decision.chosen ? GOLD : open ? ACCENT : DIM;
+    g.fillRect(PX + 4, y, 2, STORY_ROW - 3);
+    text(g, `${st.title}${st.star ? `: ${st.star.name}` : ''}`.slice(0, 44), PX + 12, y + 4, { color: open ? '#ffffff' : SOFT, shadow: false });
+    text(g, `WK ${st.opened}${open ? '' : `-${st.beats[st.beats.length - 1]?.week ?? st.opened}`}`, PR - 12, y + 4, { align: 'right', color: DIM, shadow: false });
+    const now = open ? st.stakes : st.outcome ?? '';
+    text(g, now.slice(0, 58), PX + 12, y + 15, { color: open ? GOLD : SOFT, shadow: false });
+    const trail = st.beats.slice(-3).map((b) => b.text).join('  /  ');
+    text(g, trail.slice(0, 58), PX + 12, y + 26, { color: DIM, shadow: false });
+    if (st.meter && open) {
+      g.fillStyle = '#2a3546';
+      g.fillRect(PR - 92, y + 18, 80, 4);
+      g.fillStyle = GOLD;
+      g.fillRect(PR - 92, y + 18, 80 * Math.min(1, st.meter.at / st.meter.of), 4);
+    }
+  });
 }

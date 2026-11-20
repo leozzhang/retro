@@ -1,6 +1,44 @@
 # Progress
 
-_Last updated: 2026-11-16_
+_Last updated: 2026-11-19_
+
+## Fixed: hub navigation and storyline continuity (2026-11-20)
+- **Esc from a page** (PROGRAM, ROSTER, OFFICE...) came back to HOME's panel with the page's item still selected, a hybrid where HOME's story buttons did nothing. Opening a page now resets the hub to HOME (`openPage`), and the "ENTER: OPEN" hybrid is gone.
+- **"Lost the job" while still WR1:**
+  - **The bug:** a slump closed as a lost job whenever the player didn't start the last game, so a week out hurt or a rest day counted.
+  - **The fix:** it closes only when he has no starting role left (`startingRoles`). A hurt player's slump closes as HURT.
+- **A starter offered as a slump's replacement, or a slumping one:**
+  - **The bug:** the challenger was anyone on the slot's list who hadn't started the last game.
+  - **The fix:** now he has no starting role anywhere, is healthy, and isn't slumping or in a slump story (`challenger`).
+- **Next man up's ending** now reads the chart: KEEPS THE JOB when the staff keep the backup on.
+- Tests: `src/moments.test.ts` "storyline continuity". `npm test` 499 pass. Checked in Chrome: Esc from PROGRAM, ROSTER, OFFICE and PLAYBOOK (by hotkey and by click) lands on HOME, and Y works there.
+- Stories already in a save keep their old text; new weeks follow the fixed rules.
+
+## Done: storylines and the Week Wrap (2026-11-19)
+See [STORYLINES.md](STORYLINES.md).
+- **Why:** breakouts, the next man up, upsets and Heisman buzz each left as one line of news. Nothing picked the important ones, staged them, set them up before the game or asked the player anything.
+- **The Week Wrap:** after every week, the week's moments play as animated full-screen scenes. Each one finishes on a click and moves on with the next; Esc goes home.
+  - The final: a score slam, the rank rolling, the game ball. An upset storms the field with confetti, a stunning loss rains, a rivalry shows the series.
+  - BREAKOUT: the leap, the dev trait flipping, the bars filling, and how he got there.
+  - INJURY into NEXT MAN UP: the starter down in red, his replacement running in with his card and the game that's his.
+  - Also: FIRST START, BREAKTHROUGH, the AP poll ladder, the Heisman ladder with a trophy, milestones, stakes (bowl eligible, unbeaten, title game, playoff seed), level-up tiles, UP NEXT, and AROUND THE FBS.
+  - The WEEK WRAP setting is ALL / BIG (default) / OFF.
+- **Storylines:** next man up, breakout watch, slumps, the Heisman campaign, the unbeaten run, the bowl chase, and the rivalry, reunion and homecoming games. Each has stakes for the next game, shown in UP NEXT, on HOME's matchup card and in the new THE WEEK'S STORY box (it replaces LAST GAME). Y opens the STORYLINES panel, where a click replays a storyline; M replays the week.
+- **Decisions:** when an injured starter is back after a backup's hot run, WHO STARTS?; a slumping playmaker with a close backup, STICK WITH HIM OR MAKE A CHANGE. 1 or 2 picks one; Esc leaves a gold YOUR CALL card on HOME; an ignored decision goes to the staff's chart. A choice edits the user's chart, or pins a staff chart (`TeamState.pin`, laid on in `squadFor`). The benching penalty applies to a pin as to a user chart. Nothing else reaches the sim.
+- **Checked:**
+  - `npm run season` (2 seasons, against HEAD): every existing row is byte-identical apart from timings, and the save is +11 KB a season.
+  - STORY section:
+    - BIG shows 4.4 cards a week (max 7).
+    - 40.6% of weeks have a tier-3 moment; 18.8% have nothing past the final.
+    - 2.6 decisions a season.
+  - `npm test`: 502 pass. `src/moments.test.ts` covers the step changing nothing, the injury → next man up → story link, the wrap order and caps, seen marks, and the pin vs. a user chart.
+  - In headless Chrome: `window.game.momentGallery()` shows every scene; a Kansas dynasty played weeks 1–9 with the wrap opening itself. The QB decision ran through the real input: Esc, then Enter on HOME, then 2. The pinned QB started the next game.
+- **Flags / next:**
+  - BIG can reach 7 cards (final + a decision + 3 + UP NEXT + AROUND).
+  - Slumps open 5 a season, most closing on their own.
+  - Not yet checked by hand in a played game, only simmed weeks.
+  - Next: a pregame intro with the storylines to watch, in-game lower-thirds for a storyline's player, the final screen using its moment's style, and arcs for the hot seat, conference race, playoff bubble and senior day. Sound stingers.
+
 
 ## Fixed: no deep safety on 4th and 20 (2026-11-16)
 - **The bug:** an aggressive DC called Cover 0 on 28% of snaps at 4th and 20, the same as on 3rd and 8. The long-yardage dial (`longBlitz`) only grew with distance, and it favors Cover 0 most. And when the DC expected short-yardage plays (`heavy`: you'd been running sneaks), the Goal Line call opened on any down: up to 49% zero-shell at 4th and 20.

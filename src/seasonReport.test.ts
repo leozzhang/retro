@@ -43,6 +43,7 @@ import { freshmanLevel } from './data/rosterGen';
 import { TEAM_STATE } from './data/fbs/geo';
 import { ACHIEVEMENTS, checkOffice, levelOf, newOffice, type OfficeHook } from './season/achievements';
 import type { OfficeState } from './season/types';
+import { wrapOrder } from './season/moments';
 
 /**
  * `npm run season`: simulate whole seasons headlessly and write season.txt. SEASONS=n sets the count,
@@ -1316,6 +1317,72 @@ function userGames(): string[] {
   return rows;
 }
 
+/**
+ * STORY (docs/STORYLINES.md): the Week Wrap and storylines for the user's team, over the report's seasons
+ * plus one season for each of `STORY_TEAMS` (a team per tier). Cards a week on BIG and ALL, weeks with a
+ * tier-3 moment, weeks with nothing past the final, moments by kind, storylines by kind and how they
+ * ended, decisions, and what they cost a save. Display only: the rest of the report must not change.
+ */
+function storyReport(seasons: SeasonState[]): string[] {
+  const teams = (process.env.STORY_TEAMS ?? 'texas,kansas,memphis,toledo,newmexicostate').split(',').filter(Boolean);
+  const all = [...seasons];
+  for (const [i, t] of teams.entries()) {
+    if (!TEAMS.some((x) => x.id === t)) continue;
+    const s = newSeason(defaultConfig(t), 100 + i);
+    while (!seasonOver(s)) advanceWeek(s);
+    all.push(s);
+  }
+  let weeks = 0;
+  let big = 0;
+  let full = 0;
+  let maxBig = 0;
+  let t3 = 0;
+  let quiet = 0;
+  let kb = 0;
+  const kinds = new Map<string, number>();
+  const arcs = new Map<string, { n: number; done: number }>();
+  let decisions = 0;
+  let decided = 0;
+  for (const s of all) {
+    const ms = s.moments ?? [];
+    for (const w of new Set(ms.map((m) => m.week))) {
+      const wk = ms.filter((m) => m.week === w);
+      if (!wk.some((m) => m.kind === 'final')) continue;
+      weeks++;
+      const b = wrapOrder(wk, 'big').length;
+      big += b;
+      maxBig = Math.max(maxBig, b);
+      full += wk.length;
+      if (wk.some((m) => m.tier === 3)) t3++;
+      if (!wk.some((m) => m.tier >= 2 && m.kind !== 'final')) quiet++;
+    }
+    for (const m of ms) kinds.set(m.kind, (kinds.get(m.kind) ?? 0) + 1);
+    for (const st of s.stories ?? []) {
+      const a = arcs.get(st.kind) ?? { n: 0, done: 0 };
+      a.n++;
+      if (st.status === 'resolved') a.done++;
+      arcs.set(st.kind, a);
+      if (st.decision) {
+        decisions++;
+        if (st.decision.chosen) decided++;
+      }
+    }
+    kb += gzipSync(JSON.stringify({ m: s.moments, s: s.stories, b: s.buzz })).length / 1024;
+  }
+  const n = all.length;
+  const per = (x: number) => (x / n).toFixed(1);
+  return [
+    '', '== STORY ==', '',
+    `${n} user seasons (${seasons.length} georgia, then ${teams.join(', ')}), ${weeks} weeks with a game`,
+    `wrap cards a week: BIG ${(big / weeks).toFixed(1)} (max ${maxBig}; target 3-6), ALL ${(full / weeks).toFixed(1)}`,
+    `weeks with a tier-3 moment ${pctText(t3 / weeks)} (target 25-45%); with nothing past the final ${pctText(quiet / weeks)} (target under 35%)`,
+    `moments a season: ${[...kinds].sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${per(v)}`).join('  ')}`,
+    `storylines a season: ${[...arcs].sort((a, b) => b[1].n - a[1].n).map(([k, v]) => `${k} ${per(v.n)} (${pctText(v.done / v.n)} closed)`).join('  ')}`,
+    `decisions a season ${per(decisions)} (target 0.5-3; the report never takes one: ${decided} taken by the staff's chart)`,
+    `save size ${(kb / n).toFixed(0)} KB gzipped a season`,
+  ];
+}
+
 it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const n = Number(process.env.SEASONS ?? 5);
   const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
@@ -1345,7 +1412,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const rows = [
     ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
     ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
-    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...detail(seasons[0]),
+    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...storyReport(seasons), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);
