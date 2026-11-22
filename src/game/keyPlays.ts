@@ -65,7 +65,7 @@ export const KEY_PLAYS = {
   /** Yards for a big play, and for a notable one (FULL only). */
   explosive: 20,
   gain: 12,
-  /** A loss this big on a snap is shown as a sack. */
+  /** A loss this big on a snap is shown as a sack, when the snap was one (its credit says so; an uncredited snap is taken as one). */
   sack: -3,
   /** A drive stopped this close (yards to the goal) is a red-zone stop. */
   redZone: 20,
@@ -111,7 +111,8 @@ function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last:
   const conv = converted(p);
   if (p.down === 4) return conv ? { kind: 'fourthConv', priority: 2 } : { kind: 'fourthStop', priority: 3 };
   if (p.explosive || p.gain >= T.explosive) return { kind: 'explosive', priority: 2 };
-  if (p.gain <= T.sack) return { kind: 'sack', priority: dfn ? 2 : 1 };
+  // A screen or a run stopped behind the line isn't a sack: only the credit's sacks are.
+  if (p.gain <= T.sack && (!snap || snap.kind === 'sack')) return { kind: 'sack', priority: dfn ? 2 : 1 };
   if (p.down === 3) {
     if (conv) return { kind: 'thirdConv', priority: p.toGo >= T.longThird ? 2 : 1 };
     const redZone = last && 100 - p.yard <= T.redZone && d.result !== 'TOUCHDOWN';

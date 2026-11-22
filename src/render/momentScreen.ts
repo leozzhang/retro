@@ -366,26 +366,37 @@ function drawAround(g: CanvasRenderingContext2D, m: Moment, team: Team, t: numbe
   });
 }
 
+/** UP NEXT's rows: as many as fit (24 px each with a gap) between `top` and the floor line at `bottom`. */
+const PREVIEW = { top: 112, bottom: 306, max: 7 };
+
 function drawPreview(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number): void {
   backdrop(g, team, t, 'dark');
   const opp = m.opp ? teamById(m.opp) : team;
-  hero(g, team, '#c68a5e', 80, 178, 4, 'stand', 1);
-  hero(g, opp, '#8d5a3b', VIEW_W - 80, 178, 4, 'stand', -1, { home: false });
+  // Up to 3 storylines sit under the two players; more move the players up beside the title so
+  // every row fits above the floor line.
+  const rows = (m.rows ?? []).slice(0, PREVIEW.max);
+  const many = rows.length > 3;
+  const [scale, floor] = many ? [3, 100] : [4, 178];
+  hero(g, team, '#c68a5e', many ? 70 : 80, floor, scale, 'stand', 1);
+  hero(g, opp, '#8d5a3b', VIEW_W - (many ? 70 : 80), floor, scale, 'stand', -1, { home: false });
   slam(g, 'UP NEXT', CX, 26, seg(t, 0.05, 0.3), 32, GOLD);
   rise(g, m.sub, CX, 70, seg(t, 0.2, 0.3), { color: '#ffffff', align: 'center', size: 16 });
   rise(g, m.lines[0] ?? '', CX, 96, seg(t, 0.3, 0.3), { color: SOFT, align: 'center' });
-  (m.rows ?? []).forEach((r, i) => {
+  const top = many ? PREVIEW.top : 190;
+  const step = Math.min(30, (PREVIEW.bottom - top) / Math.max(1, rows.length));
+  rows.forEach((r, i) => {
     const f = ease(seg(t, 0.4 + i * 0.12, 0.3));
     if (f <= 0) return;
-    const y = 190 + i * 30;
+    const y = Math.round(top + i * step);
     g.save();
     g.globalAlpha = f;
     g.fillStyle = r.me ? 'rgba(255,210,63,0.16)' : 'rgba(20,27,38,0.95)';
-    g.fillRect(40, y, VIEW_W - 80, 26);
+    g.fillRect(40, y, VIEW_W - 80, step - 4);
     g.fillStyle = r.me ? GOLD : team.colors.primary;
-    g.fillRect(40, y, 3, 26);
+    g.fillRect(40, y, 3, step - 4);
     text(g, r.text.slice(0, 34), 52, y + 4, { color: r.me ? GOLD : '#ffffff', shadow: false });
-    text(g, (r.val ?? '').slice(0, 70), 52, y + 15, { color: SOFT, shadow: false, size: 8 });
+    // 68 characters end inside the card (it ends at VIEW_W - 40).
+    text(g, (r.val ?? '').slice(0, 68), 52, y + 15, { color: SOFT, shadow: false, size: 8 });
     g.restore();
   });
 }
