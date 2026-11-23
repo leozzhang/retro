@@ -7,7 +7,7 @@ import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTea
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
 import { athleteName, buildSquad, lineupOf, onField, reorderPosition, starters, teamConf, withLineup, type Lineup, type Squad } from '../data/depth';
 import { changedSlots, nextManUp, sideOf, subCandidates, substitute, type SubSide } from './lineup';
-import { drawSubs, drawSubsChip, newSubsView, setSubsTab, slotAt, slotLabel, SUB_ROWS, subRowAt, SUBS_CHIP, SUBS_DONE, subsTabRect, type SubsView } from '../render/subsScreen';
+import { drawSubs, drawSubsChip, newSubsView, setSubsTab, slotAt as slotAt0, slotLabel, SUB_ROWS, subRowAt as subRowAt0, SUBS_CHIP, SUBS_DONE, subsTabRect, type SubsView } from '../render/subsScreen';
 import type { Athlete } from '../data/athletes';
 import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
@@ -18,6 +18,7 @@ import type { Input } from '../engine/input';
 import { audioPrefs, audioRunning, setAudioPref, type AudioPrefs } from '../engine/audio';
 import { music, type MusicMode } from '../engine/music';
 import { preloadSfx, sfx } from '../engine/sfx';
+import { armClick, noteHit, takeClick, tracked } from '../engine/clicks';
 import { CREDITS } from '../data/audio';
 import { crowd as stadium } from './crowd';
 import { fieldSounds } from './sounds';
@@ -27,19 +28,19 @@ import {
   storyUserSnap, userCredit, type LiveBox, type SnapAt, type UserSnap,
 } from '../season/liveBox';
 import { newRecorder, pickReel, recordFrame, TAPE, tapeScore, type Tape, type TapeRecorder } from './tape';
-import { drawGame, GAME_TABS, gameReelAt, gameScrollMax, gameTabAt, type GameView, type ReelThumb } from '../render/gameScreen';
+import { drawGame, GAME_TABS, gameReelAt as gameReelAt0, gameScrollMax, gameTabAt as gameTabAt0, type GameView, type ReelThumb } from '../render/gameScreen';
 import { drawField, makeCrowd } from '../render/field';
 import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo } from '../render/hud';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay, type RunAssist } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
 import {
-  BOOK_PAGE, BOOK_TABS, bookCardAt, bookCardRect, bookPages, bookPlays, bookTabAt, drawPlaybook, STAR_BTN, starRect, type BookOwner, type BookView,
+  BOOK_PAGE, BOOK_TABS, bookCardAt as bookCardAt0, bookCardRect, bookPages, bookPlays, bookTabAt as bookTabAt0, drawPlaybook, STAR_BTN, starRect, type BookOwner, type BookView,
 } from '../render/playbookScreen';
 import { drawMiniPlay, drawStar } from '../render/playDiagram';
 import { AUDIBLE_PAGE, AUDIBLE_TABS, audibleCardRect, audiblePage, drawAudible, type AudibleKind, type AudibleView } from '../render/audibleOverlay';
 import {
-  drawSeason, DECIDE_BTN, navAt, navItems, newSeasonView, newsMaxScroll, REPLAY_BTN, STORIES_BTN, storiesMaxScroll, storyAt, PLAY_KEYS_BTN, playMenuRect, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV,
+  drawSeason, DECIDE_BTN, navAt as navAt0, navItems, newSeasonView, newsMaxScroll, REPLAY_BTN, STORIES_BTN, storiesMaxScroll, storyAt as storyAt0, PLAY_KEYS_BTN, playMenuRect, primaryAction, PRIMARY_BTN, SIM_BTN, SUB_NEXT, SUB_PANELS, SUB_PREV,
   type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
@@ -48,25 +49,25 @@ import {
 } from '../render/menuScreen';
 import {
   drawRecruit, FILTER_BTN, GROUP_CHIPS, groupChipRect, newRecruitView, RECRUIT_ACTIONS, RECRUIT_ADVANCE, RECRUIT_ROWS, RECRUIT_TABS, recruitActionRect,
-  recruitRowRect, recruitRows, recruitTabAt, SEARCH_FILTERS, type RecruitView,
+  recruitRowRect, recruitRows, recruitTabAt as recruitTabAt0, SEARCH_FILTERS, type RecruitView,
 } from '../render/recruitScreen';
 import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, toggleVisit } from '../season/recruiting';
-import { careerList, careerRowAt, careerTabAt, modeAt, newCareerView } from '../render/careerScreen';
-import { beginLinks, linkAt, overLink, type Link } from '../render/links';
-import { drawProgram, programScrollMax, programTabAt, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
-import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt, type OfficeView } from '../render/officeScreen';
+import { careerList, careerRowAt as careerRowAt0, careerTabAt as careerTabAt0, modeAt as modeAt0, newCareerView } from '../render/careerScreen';
+import { beginLinks, linkAt as linkAt0, overLink, type Link } from '../render/links';
+import { drawProgram, programScrollMax, programTabAt as programTabAt0, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
+import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt as officeTabAt0, type OfficeView } from '../render/officeScreen';
 import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
 import { ROOMS } from '../data/office';
-import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
+import { drawPrep, maxScroll, PREP_TABS, prepCardRect, prepTabAt as prepTabAt0, STAFF_ROLES, staffOptionRect, staffRowRect, type PrepView } from '../render/prepScreen';
 import { groupEmphases, STANDARD } from '../data/emphasis';
 import { buildStaff, coachName, dcAdjust, GROUPS, ocAdjust, type Coach, type Group } from '../data/coaches';
 import { scoutReport } from '../season/scouting';
-import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox, rowAt, tabAt, type TeamView } from '../render/teamScreen';
+import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox as inBox0, rowAt as rowAt0, tabAt as tabAt0, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
 import { advanceWeek, defaultConfig, engineTeam, newSeason, seasonOver, userGameThisWeek } from '../season/season';
 import { lastWeekMoments, markSeen, unseenWrap } from '../season/moments';
 import { decide, pendingDecisions, storyOf } from '../season/storylines';
-import { decisionAt, drawWrap, newWrapView, sceneDur, type WrapView } from '../render/momentScreen';
+import { decisionAt as decisionAt0, drawWrap, newWrapView, sceneDur, type WrapView } from '../render/momentScreen';
 import { galleryMoments } from '../render/momentGallery';
 import { engineGame, enginePart, isEngineSnap, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
@@ -74,15 +75,15 @@ import { advanceOffseason, startOffseason } from '../season/offseason';
 import { actOnLeaving, offer, pursue, setTarget, withdraw } from '../season/portal';
 import { fireAssistant, interview, offerChair, withdrawOffer } from '../season/carousel';
 import {
-  CAROUSEL_ADVANCE, CAROUSEL_ROWS, CAROUSEL_TABS, carouselActionRect, carouselRowRect, carouselTabAt, chairChipRect, drawCarousel, hiringRows,
+  CAROUSEL_ADVANCE, CAROUSEL_ROWS, CAROUSEL_TABS, carouselActionRect, carouselRowRect, carouselTabAt as carouselTabAt0, chairChipRect, drawCarousel, hiringRows,
   leagueRows, newCarouselView, openChairs, staffRows, type CarouselView,
 } from '../render/carouselScreen';
 import {
-  actionRect, ADVANCE_BTN, BOARD_ROWS, boardRows, chipRect, drawPortal, LEAVING_ROWS, leavingRows, newPortalView, PORTAL_TABS, portalTabAt, POS_CHIPS,
+  actionRect, ADVANCE_BTN, BOARD_ROWS, boardRows, chipRect, drawPortal, LEAVING_ROWS, leavingRows, newPortalView, PORTAL_TABS, portalTabAt as portalTabAt0, POS_CHIPS,
   rowRect, type PortalView,
 } from '../render/portalScreen';
 import {
-  departureRowCount, DEPARTURE_ROWS, DEPARTURE_TABS, DEPARTURES_ADVANCE, departuresRowRect, departuresTabAt, drawDepartures, MEET_BTN,
+  departureRowCount, DEPARTURE_ROWS, DEPARTURE_TABS, DEPARTURES_ADVANCE, departuresRowRect, departuresTabAt as departuresTabAt0, drawDepartures, MEET_BTN,
   newDeparturesView, watchRows, type DeparturesView,
 } from '../render/departuresScreen';
 import { meetOnWatch } from '../season/departures';
@@ -327,9 +328,33 @@ function tabRect(i: number, n: number) {
   return { x: x0 + i * (TAB_W + 4), y: TAB_Y, w: TAB_W, h: TAB_H };
 }
 
+/** Hit tests: each reports to engine/clicks.ts, so a click's sound plays only on a hit. */
 function inRect(x: number, y: number, r: { x: number; y: number; w: number; h: number }): boolean {
-  return x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h;
+  return noteHit(x, y, x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
 }
+const bookCardAt = tracked(bookCardAt0);
+const bookTabAt = tracked(bookTabAt0);
+const careerRowAt = tracked(careerRowAt0);
+const careerTabAt = tracked(careerTabAt0);
+const carouselTabAt = tracked(carouselTabAt0);
+const decisionAt = tracked(decisionAt0);
+const departuresTabAt = tracked(departuresTabAt0);
+const gameReelAt = tracked(gameReelAt0);
+const gameTabAt = tracked(gameTabAt0);
+const linkAt = tracked(linkAt0);
+const modeAt = tracked(modeAt0);
+const navAt = tracked(navAt0);
+const officeTabAt = tracked(officeTabAt0);
+const portalTabAt = tracked(portalTabAt0);
+const prepTabAt = tracked(prepTabAt0);
+const programTabAt = tracked(programTabAt0);
+const recruitTabAt = tracked(recruitTabAt0);
+const rowAt = tracked(rowAt0);
+const slotAt = tracked(slotAt0);
+const storyAt = tracked(storyAt0);
+const subRowAt = tracked(subRowAt0);
+const tabAt = tracked(tabAt0);
+const inBox = tracked(inBox0);
 
 export class Game {
   private screen: Screen = 'title';
@@ -545,6 +570,7 @@ export class Game {
     this.t += dt;
     this.mouseMoved = input.mouse.x !== this.menuMouse.x || input.mouse.y !== this.menuMouse.y;
     this.menuMouse = { x: input.mouse.x, y: input.mouse.y };
+    if (input.mouse.pressed) armClick(input.mouse.x, input.mouse.y);
     if (input.hit('F1', 'Backquote')) this.debug = !this.debug;
     this.watchOffice();
     switch (this.screen) {
@@ -778,8 +804,11 @@ export class Game {
       this.lastHover = false;
       return;
     }
+    // A click sounds only when it hit something: a button, tab, card, row or link (engine/clicks.ts),
+    // a click that changed the screen, or a screen where a click anywhere goes on.
+    const clicked = takeClick() || (input.mouse.pressed && (scr !== prev || scr === 'notice' || scr === 'final' || scr === 'roster'));
     if (input.hit('Escape', 'Backspace')) sfx('back');
-    else if (input.hit('Enter', 'Space') || input.mouse.pressed || input.hit('Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9')) sfx('select');
+    else if (input.hit('Enter', 'Space') || clicked || input.hit('Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9')) sfx('select');
     else if (input.hit('ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Tab')) sfx('nav');
     else if (input.mouse.wheel) sfx('scroll');
     else if (scr !== prev && input.anyHit()) sfx('select');

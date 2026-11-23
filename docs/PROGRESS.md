@@ -5,7 +5,7 @@ _Last updated: 2026-11-22_
 ## Done: music and sound (2026-11-22)
 The game has sound for the first time (docs/AUDIO.md).
 - **Music:** the main theme (Bert Cole's "I've Got Your Back!", intro then a gapless loop) on the menus and the first hub visit, then a shuffled playlist of the 30 ansimuz tracks that never repeats one of the last 12. The music fades out on the field and resumes after the game.
-- **Effects:** menu clicks (nav, select, back, hover, scroll) for every screen at once from `Game.sounds()`; the wrap's card swipe and decision stinger; office toasts; win and loss stingers. On the field: hike, throw whoosh, catches, tackles by the carrier's speed, sacks, whistles, kicks, the doink, and touchdown, field goal and turnover jingles.
+- **Effects:** menu sounds (nav, select, back, hover, scroll) for every screen at once from `Game.sounds()`. A click sounds only when it hits a button, tab, card, row or link (`engine/clicks.ts`); the wrap's card swipe and decision stinger; office toasts; win and loss stingers. On the field: hike, throw whoosh, catches, tackles by the carrier's speed, sacks, whistles, kicks, the doink, and touchdown, field goal and turnover jingles.
 - **Crowd:** a stadium bed that rises on big downs and hushes when the home team is hurt, with roars and cheers that follow home and away.
 - **SETTINGS on the title** (also V on the hub's SETTINGS): MUSIC, EFFECTS and CROWD volumes (global, saved), and the credits the licenses ask for.
 - **Sources:** Kenney (CC0), Gregor Quendel's crowd (CC-BY 4.0), and synths for the whistle, whooshes and thumps.

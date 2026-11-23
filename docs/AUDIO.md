@@ -32,7 +32,8 @@ The music, the sound effects and the stadium crowd. All of it is display only: n
 ### Menus
 These play in `Game.sounds()` on every screen except play, kick and the wrap:
 - Esc or Backspace: `back`
-- Enter, Space, a click, or a digit: `select`
+- Enter, Space, or a digit: `select`
+- a click: `select`, but only when it hits something. Each hit test (`inRect`, `inBox`, and the screens' `...At` lookups wrapped by `tracked`) reports to `engine/clicks.ts`. A click also counts when it changed the screen, or on the screens where a click anywhere goes on (notice, final, roster). A click on nothing is silent.
 - arrows, WASD, Q/E, Tab: `nav`
 - the mouse wheel: `scroll`
 - a hotkey that changed the screen: `select`
