@@ -58,6 +58,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
+      // The theme plays at boot, before any click (a browser waits for the first gesture).
+      autoplayPolicy: 'no-user-gesture-required',
       nodeIntegration: false,
       sandbox: true,
     },

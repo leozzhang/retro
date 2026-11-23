@@ -15,6 +15,12 @@ import { DEF_SLOTS, teamById, TEAMS, type RosterPlayer, type Team } from '../dat
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_H, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
+import { audioPrefs, audioRunning, setAudioPref, type AudioPrefs } from '../engine/audio';
+import { music, type MusicMode } from '../engine/music';
+import { preloadSfx, sfx } from '../engine/sfx';
+import { CREDITS } from '../data/audio';
+import { crowd as stadium } from './crowd';
+import { fieldSounds } from './sounds';
 import { mulberry32, type Vec3 } from '../engine/math';
 import {
   creditCpuDrive, creditUserFg, creditUserSnap, finishLiveBox, liveGamePlays, newLiveBox, storyAgainst, storyCpuDrive, storyUserEnd, storyUserPoints,
@@ -37,7 +43,7 @@ import {
   type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
-  drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
+  drawAudioSettings, drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
   slotConfirmRects, slotDeleteRect, slotRect, type MenuItem, type SettingRow, type SlotsView,
 } from '../render/menuScreen';
 import {
@@ -46,7 +52,7 @@ import {
 } from '../render/recruitScreen';
 import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, toggleVisit } from '../season/recruiting';
 import { careerList, careerRowAt, careerTabAt, modeAt, newCareerView } from '../render/careerScreen';
-import { beginLinks, linkAt, type Link } from '../render/links';
+import { beginLinks, linkAt, overLink, type Link } from '../render/links';
 import { drawProgram, programScrollMax, programTabAt, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
 import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt, type OfficeView } from '../render/officeScreen';
 import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
@@ -113,7 +119,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game' | 'wrap';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game' | 'wrap' | 'audio';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -335,6 +341,16 @@ export class Game {
   private qIdx = QUARTER_OPTIONS.indexOf(DEFAULT_QUARTER);
   /** Main menu: the highlighted item. */
   private menuSel = 0;
+  /** The SOUND page (the title's SETTINGS, or V on the hub's): its row, and the screen it goes back to. */
+  private audioSel = 0;
+  private audioBack: Screen = 'title';
+  /** Last step's screen, toast and hover, for the sounds of what changed (`sounds`). */
+  private lastScreen: Screen = 'title';
+  private lastToast: unknown = undefined;
+  private lastHover = false;
+  /** The final's stinger has played for this game. */
+  private finalSung = false;
+  private audioLoaded = false;
   /** The dynasty save slots, and the slot being played (1 to `SLOTS`; 0 outside a dynasty). */
   private slotsView: SlotsView = { sel: 0, confirm: -1, loading: -1, mx: 0, my: 0 };
   private slot = 0;
@@ -615,7 +631,11 @@ export class Game {
       case 'wrap':
         this.updateWrap(dt, input);
         break;
+      case 'audio':
+        this.updateAudio(input);
+        break;
     }
+    this.sounds(input);
     if (this.inGame() && this.clock.quarter !== this.windQuarter) {
       this.windQuarter = this.clock.quarter;
       this.wind = nextQuarterWind(this.wind, this.rng);
@@ -632,6 +652,7 @@ export class Game {
     if (m) items.push({ id: 'continue', label: `CONTINUE: ${teamById(m.teamId).school.toUpperCase()}`.slice(0, 32), desc: `${m.year}  ${m.phase}`.slice(0, 32) });
     items.push({ id: 'dynasty', label: 'DYNASTY', desc: 'BUILD A PROGRAM OVER SEASONS' });
     items.push({ id: 'exhibition', label: 'EXHIBITION', desc: 'PICK TWO TEAMS AND KICK OFF' });
+    items.push({ id: 'sound', label: 'SETTINGS', desc: 'SOUND AND CREDITS' });
     return items;
   }
 
@@ -658,11 +679,113 @@ export class Game {
     }
     const item = items[this.menuSel];
     if (item.id === 'continue') this.openSlot(latestSlot());
+    else if (item.id === 'sound') this.toAudio('title');
     else if (item.id === 'dynasty') {
       this.screen = 'slots';
       const last = latestSlot();
       this.slotsView = { sel: Math.max(0, (last || freeSlot() || 1) - 1), confirm: -1, loading: -1, mx: m.x, my: m.y };
     } else this.screen = 'exhibition';
+  }
+
+  // ------------------------------------------------------------ sound
+
+  private toAudio(back: Screen): void {
+    this.audioBack = back;
+    this.audioSel = 0;
+    this.screen = 'audio';
+  }
+
+  private audioRows(): { label: string; value: number; help: string; key: keyof AudioPrefs }[] {
+    const p = audioPrefs();
+    return [
+      { key: 'music', label: 'MUSIC', value: p.music, help: 'THE SOUNDTRACK IN THE MENUS AND THE HUB' },
+      { key: 'sfx', label: 'EFFECTS', value: p.sfx, help: 'CLICKS, HITS, WHISTLES AND STINGERS' },
+      { key: 'crowd', label: 'CROWD', value: p.crowd, help: 'THE STADIUM ON GAME DAY' },
+    ];
+  }
+
+  /** The SOUND page: W/S picks a row, A/D (or its arrows) sets it; changes save at once. */
+  private updateAudio(input: Input): void {
+    const m = input.mouse;
+    if (input.hit('Escape', 'Backspace', 'Enter', 'Space') || (m.pressed && inRect(m.x, m.y, GO_BTN))) {
+      this.screen = this.audioBack;
+      return;
+    }
+    const rows = this.audioRows();
+    const n = rows.length;
+    if (input.hit('KeyW', 'ArrowUp')) this.audioSel = (this.audioSel + n - 1) % n;
+    if (input.hit('KeyS', 'ArrowDown')) this.audioSel = (this.audioSel + 1) % n;
+    const change = (i: number, d: number) => {
+      setAudioPref(rows[i].key, rows[i].value + d);
+      // A taste of the new level on the effects rows.
+      if (rows[i].key !== 'music') sfx('toggle');
+    };
+    if (input.hit('KeyA', 'ArrowLeft')) change(this.audioSel, -1);
+    if (input.hit('KeyD', 'ArrowRight')) change(this.audioSel, 1);
+    if (m.pressed) {
+      for (let i = 0; i < n; i++) {
+        if (!inRect(m.x, m.y, settingRect(i))) continue;
+        this.audioSel = i;
+        const a = settingArrows(i);
+        if (inRect(m.x, m.y, a.prev)) change(i, -1);
+        else if (inRect(m.x, m.y, a.next)) change(i, 1);
+      }
+    }
+  }
+
+  /**
+   * Every step, after the screen's update: the music's mode, the stadium, the field's sounds
+   * (game/sounds.ts) and the menus' clicks. Display only: nothing here touches game state.
+   */
+  private sounds(input: Input): void {
+    const scr = this.screen;
+    const prev = this.lastScreen;
+    this.lastScreen = scr;
+    if (audioRunning() && !this.audioLoaded) {
+      this.audioLoaded = true;
+      preloadSfx();
+      stadium.preload();
+    }
+    const onField = this.inGame();
+    const menu = scr === 'title' || scr === 'exhibition' || scr === 'slots' || scr === 'newTeam' || scr === 'newSettings' || scr === 'roster' || (scr === 'audio' && this.audioBack === 'title');
+    const mode: MusicMode = onField ? 'silent' : menu ? 'theme' : 'hub';
+    music.setMode(mode);
+    music.update();
+    if (onField) stadium.start();
+    else stadium.stop();
+    // The field: what's on screen, with whose ball it is and whose stadium.
+    const userHome = !!this.user && this.homeId === this.user.id;
+    const show = scr === 'notice' ? this.notices[0]?.show : undefined;
+    if (scr === 'play') fieldSounds.play(this.play, { userBall: true, userHome, down: this.drive.down });
+    else if (show?.play) fieldSounds.play(show.play, { userBall: show.userBall, userHome });
+    else fieldSounds.play(null, { userBall: true, userHome });
+    if (scr === 'kick') fieldSounds.kick(this.kick, { userBall: true, userHome });
+    else if (show?.kick) fieldSounds.kick(show.kick, { userBall: show.userBall, userHome });
+    else fieldSounds.kick(null, { userBall: true, userHome });
+    fieldSounds.update();
+    if (scr === 'final' && !this.finalSung) {
+      this.finalSung = true;
+      sfx(this.score.user > this.score.cpu ? 'jingleWin' : 'jingleLoss', { delay: 0.3 });
+    } else if (scr !== 'final') this.finalSung = false;
+    // The office's toasts, as each one shows (off the field and out of the wrap).
+    if (!onField && scr !== 'wrap') {
+      const t = this.toasts[0];
+      if (t && t !== this.lastToast) sfx('jingleUnlock');
+      this.lastToast = t;
+    }
+    // The menus: keys and clicks. The field's own keys (and the wrap, which has its own) stay quiet.
+    if (scr === 'play' || scr === 'kick' || scr === 'wrap' || prev === 'play' || prev === 'kick') {
+      this.lastHover = false;
+      return;
+    }
+    if (input.hit('Escape', 'Backspace')) sfx('back');
+    else if (input.hit('Enter', 'Space') || input.mouse.pressed || input.hit('Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9')) sfx('select');
+    else if (input.hit('ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Tab')) sfx('nav');
+    else if (input.mouse.wheel) sfx('scroll');
+    else if (scr !== prev && input.anyHit()) sfx('select');
+    const hover = overLink();
+    if (hover && !this.lastHover) sfx('hover');
+    this.lastHover = hover;
   }
 
   // ------------------------------------------------------------ exhibition
@@ -1197,6 +1320,7 @@ export class Game {
     v.my = input.mouse.y;
     const m = v.list[v.i];
     if (!m || input.hit('Escape', 'Backspace')) {
+      if (m) sfx('back');
       this.closeWrap();
       return;
     }
@@ -1205,15 +1329,23 @@ export class Game {
       const i = input.hit('Digit1') ? 0 : input.hit('Digit2') ? 1 : input.mouse.pressed ? decisionAt(input.mouse.x, input.mouse.y) : -1;
       if (i >= 0 && d.options[i]) {
         decide(s, m.arc!, d.options[i].id);
+        sfx('jingleDecide');
         this.save();
         v.t = Math.max(v.t, sceneDur(m));
       }
       return;
     }
     if (input.hit('Space', 'Enter', 'ArrowRight', 'KeyD') || input.mouse.pressed) {
-      if (v.t < sceneDur(m)) v.t = sceneDur(m) + 0.01;
-      else if (++v.i >= v.list.length) this.closeWrap();
-      else v.t = 0;
+      if (v.t < sceneDur(m)) {
+        v.t = sceneDur(m) + 0.01;
+        sfx('nav');
+      } else if (++v.i >= v.list.length) {
+        sfx('select');
+        this.closeWrap();
+      } else {
+        sfx('swipe');
+        v.t = 0;
+      }
     }
   }
 
@@ -1425,6 +1557,10 @@ export class Game {
     const c = this.season!.config;
     if (input.hit('Escape', 'Backspace', 'Enter', 'Space') || (m.pressed && inRect(m.x, m.y, GO_BTN))) {
       this.screen = 'season';
+      return;
+    }
+    if (input.hit('KeyV')) {
+      this.toAudio('settings');
       return;
     }
     const n = SETTINGS.length;
@@ -3933,7 +4069,7 @@ export class Game {
     beginLinks(this.menuMouse.x, this.menuMouse.y);
     if (
       this.screen === 'title' || this.screen === 'exhibition' || this.screen === 'slots' || this.screen === 'newTeam' || this.screen === 'newSettings' ||
-      this.screen === 'settings'
+      this.screen === 'settings' || this.screen === 'audio'
     ) {
       this.renderMenu(g);
       return;
@@ -4417,6 +4553,10 @@ export class Game {
       case 'settings':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'CHANGES SAVE AS YOU MAKE THEM');
         drawSettings(g, user, this.slot, this.settingRows(true), this.settingSel, x, y, true);
+        break;
+      case 'audio':
+        drawBackdrop(g, this.cam, user, cpu, this.crowd, 'SETTINGS', 'SOUND AND CREDITS');
+        drawAudioSettings(g, this.audioRows(), this.audioSel, CREDITS, x, y);
         break;
     }
   }

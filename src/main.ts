@@ -5,6 +5,7 @@ import { RENDER_SCALE, STEP, VIEW_H, VIEW_W } from './engine/constants';
 import { Input } from './engine/input';
 import { initStore, onStoreError } from './engine/storage';
 import { Game } from './game/game';
+import { music } from './engine/music';
 import { STARRED_KEY } from './game/starred';
 import { overLink } from './render/links';
 import { text } from './render/text';
@@ -40,7 +41,8 @@ async function boot(): Promise<void> {
   const input = new Input(canvas);
   const game = new Game();
   if (import.meta.env.DEV) (window as unknown as { game: Game }).game = game; // console debugging
-  if (import.meta.env.DEV) Object.assign(window, { AIM_FEEL, CONF }); // live-tune the aim feel and CONF.shakenLag
+  // Live-tune the aim feel and CONF.shakenLag; music.next() skips a track, music.history() shows the shuffle.
+  if (import.meta.env.DEV) Object.assign(window, { AIM_FEEL, CONF, music });
   let acc = 0;
   let last = performance.now();
 

@@ -1,6 +1,17 @@
 # Progress
 
-_Last updated: 2026-11-19_
+_Last updated: 2026-11-22_
+
+## Done: music and sound (2026-11-22)
+The game has sound for the first time (docs/AUDIO.md).
+- **Music:** the main theme (Bert Cole's "I've Got Your Back!", intro then a gapless loop) on the menus and the first hub visit, then a shuffled playlist of the 30 ansimuz tracks that never repeats one of the last 12. The music fades out on the field and resumes after the game.
+- **Effects:** menu clicks (nav, select, back, hover, scroll) for every screen at once from `Game.sounds()`; the wrap's card swipe and decision stinger; office toasts; win and loss stingers. On the field: hike, throw whoosh, catches, tackles by the carrier's speed, sacks, whistles, kicks, the doink, and touchdown, field goal and turnover jingles.
+- **Crowd:** a stadium bed that rises on big downs and hushes when the home team is hurt, with roars and cheers that follow home and away.
+- **SETTINGS on the title** (also V on the hub's SETTINGS): MUSIC, EFFECTS and CROWD volumes (global, saved), and the credits the licenses ask for.
+- **Sources:** Kenney (CC0), Gregor Quendel's crowd (CC-BY 4.0), and synths for the whistle, whooshes and thumps.
+- **The sim is untouched:** `Play` and `KickPlay` have no audio code; `game/sounds.ts` reads their state from outside.
+- **Checked:** tests pass (four slow season tests timed out with the app running and pass alone). In the app over CDP: the theme at boot, the hub handoff at the loop's end, the shuffle (200 picks, no repeat within 12, all 30 heard), music silent and the crowd bed on the field, and effects firing on snaps and kicks.
+- **Next:** listen through and retune gains and the jingle picks by ear; a crowd groan and a recorded whistle (Freesound CC0, needs an account); a band or drum cadence between plays.
 
 ## Done: storylines across recruiting, the offseason and the program (2026-11-20)
 Storylines now tie in the rest of the game (docs/STORYLINES.md).

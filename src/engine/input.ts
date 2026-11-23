@@ -1,4 +1,5 @@
 import { VIEW_H, VIEW_W } from './constants';
+import { unlockAudio } from './audio';
 import type { Vec } from './math';
 
 const BLOCKED = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'F1', 'Tab', 'Backquote']);
@@ -13,6 +14,7 @@ export class Input {
 
   constructor(private canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (e) => {
+      unlockAudio();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
       if (BLOCKED.has(e.code)) e.preventDefault();
@@ -23,6 +25,7 @@ export class Input {
       this.mouse.down = false;
     });
     canvas.addEventListener('mousedown', (e) => {
+      unlockAudio();
       if (e.button === 2) this.mouse.rpressed = true;
       if (e.button !== 0) return;
       this.updatePos(e);
@@ -62,6 +65,11 @@ export class Input {
 
   hit(...codes: string[]): boolean {
     return codes.some((c) => this.pressed.has(c));
+  }
+
+  /** Any key went down this step. */
+  anyHit(): boolean {
+    return this.pressed.size > 0;
   }
 
   /** WASD / arrow movement axis in world orientation (+x downfield, +y toward near sideline). */

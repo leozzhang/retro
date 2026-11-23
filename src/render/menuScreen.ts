@@ -68,7 +68,7 @@ function goButton(g: CanvasRenderingContext2D, label: string, hot: boolean): voi
 // ------------------------------------------------------------ main menu
 
 export interface MenuItem {
-  id: 'continue' | 'dynasty' | 'exhibition';
+  id: 'continue' | 'dynasty' | 'exhibition' | 'sound';
   label: string;
   desc: string;
 }
@@ -284,10 +284,53 @@ export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number,
   if (rows[sel]) text(g, rows[sel].help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });
   if (hub) {
     goButton(g, 'DONE', inBox(GO_BTN, mx, my));
-    drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER / ESC: BACK TO THE HUB');
+    drawHint(g, 'W/S: SETTING   A/D: CHANGE   V: SOUND   ENTER / ESC: BACK TO THE HUB');
     return;
   }
   if (y + 40 < GO_BTN.y) text(g, 'MORE OPTIONS ARE COMING', VIEW_W / 2, y + 30, { align: 'center', color: DIM, shadow: false });
   goButton(g, 'START DYNASTY', inBox(GO_BTN, mx, my));
   drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER: START   ESC: BACK');
+}
+
+// ------------------------------------------------------------ sound (the title's SETTINGS)
+
+/** The sound page: a row for each volume (as a setting row, 0-10 with a bar), then the credits. */
+export function drawAudioSettings(g: CanvasRenderingContext2D, rows: { label: string; value: number; help: string }[], sel: number, credits: { line: string; sub: string }[], mx: number, my: number): void {
+  g.fillStyle = 'rgba(20,27,38,0.9)';
+  g.fillRect(SET_X, 64, SET_W, 20);
+  text(g, 'SOUND', SET_X + 8, 70, { color: GOLD });
+  text(g, 'APPLIES TO EVERY GAME', SET_X + SET_W - 8, 70, { align: 'right', color: SOFT, shadow: false });
+  rows.forEach((row, i) => {
+    const r = settingRect(i);
+    const hot = i === sel;
+    g.fillStyle = hot ? CARD_HOT : 'rgba(20,27,38,0.9)';
+    g.fillRect(r.x, r.y, r.w, r.h);
+    if (hot) {
+      g.fillStyle = GOLD;
+      g.fillRect(r.x, r.y, 3, r.h);
+    }
+    text(g, row.label, r.x + 12, r.y + 4, { color: hot ? GOLD : '#ffffff' });
+    const a = settingArrows(i);
+    text(g, '<', a.prev.x + 10, r.y + 4, { align: 'center', color: inBox(a.prev, mx, my) ? GOLD : ACCENT });
+    text(g, '>', a.next.x + 10, r.y + 4, { align: 'center', color: inBox(a.next, mx, my) ? GOLD : ACCENT });
+    // Ten pips between the arrows.
+    const x0 = a.prev.x + 26;
+    const span = a.next.x - 6 - x0;
+    for (let k = 0; k < 10; k++) {
+      g.fillStyle = k < row.value ? (hot ? GOLD : '#cfd6df') : '#2a3546';
+      g.fillRect(Math.round(x0 + (k * span) / 10), r.y + 4, Math.floor(span / 10) - 3, 7);
+    }
+  });
+  let y = SET_Y + rows.length * SET_STEP + 6;
+  if (rows[sel]) text(g, rows[sel].help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });
+  y += 20;
+  text(g, 'CREDITS', VIEW_W / 2, y, { align: 'center', color: GOLD });
+  y += 14;
+  for (const c of credits) {
+    text(g, c.line, VIEW_W / 2, y, { align: 'center', color: '#ffffff', shadow: false });
+    text(g, c.sub, VIEW_W / 2, y + 10, { align: 'center', color: DIM, shadow: false });
+    y += 22;
+  }
+  goButton(g, 'DONE', inBox(GO_BTN, mx, my));
+  drawHint(g, 'W/S: ROW   A/D: VOLUME   ENTER / ESC: BACK');
 }
