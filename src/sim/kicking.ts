@@ -66,10 +66,18 @@ export function legSpeed(kpw: number, power: number): number {
 }
 
 /** Off a tee the kicker gets a full approach and a clean strike. */
-export const TEE_BOOST = 1.12;
+export const TEE_BOOST = 1.14;
+/** A punter's drop and full swing put more into the ball than a field goal's short approach to the hold. */
+export const PUNT_BOOST = 1.05;
 
-export function launchKick(from: Vec3, p: KickParams, kpw: number, tee = false): KickFlight {
-  const v = legSpeed(kpw, p.power) * (tee ? TEE_BOOST : 1);
+/** The leg's boost by unit: the tee on kickoffs, the swing on punts, none on field goals and extra points. */
+export function footBoost(unit: string): number {
+  return unit === 'kickoff' ? TEE_BOOST : unit === 'punt' ? PUNT_BOOST : 1;
+}
+
+/** `tee`: true for a kickoff's tee, or the boost itself (`footBoost`). */
+export function launchKick(from: Vec3, p: KickParams, kpw: number, tee: boolean | number = false): KickFlight {
+  const v = legSpeed(kpw, p.power) * (tee === true ? TEE_BOOST : tee === false ? 1 : tee);
   const a = (p.loft * Math.PI) / 180;
   const h = v * Math.cos(a);
   return {
@@ -168,7 +176,7 @@ export const PRED_DT = 1 / 30;
 
 /** Run the kick forward without bounce randomness. Stops at the far end line or a sideline. */
 export function predictKick(
-  from: Vec3, p: KickParams, kpw: number, wind: Wind, b: BounceProfile, tee = false, maxT = 12,
+  from: Vec3, p: KickParams, kpw: number, wind: Wind, b: BounceProfile, tee: boolean | number = false, maxT = 12,
 ): KickPrediction {
   const k = launchKick(from, p, kpw, tee);
   const pts: Vec3[] = [{ ...k.pos }];
@@ -205,6 +213,32 @@ export function applyKickError(p: KickParams, kac: number, pressure: number, rng
     power: clamp(p.power * (1 + gauss(rng) * sd.power), 0, 1.05),
     loft: p.loft + gauss(rng) * sd.loft,
   };
+}
+
+/**
+ * The shank: a punt or kickoff off the side of the foot, the heavy tail the Gaussian error doesn't have.
+ * - `base`: the odds for a kicker at `goodKac` or better in calm air with no rush.
+ * - `perKac`: more for each point of accuracy under `goodKac`.
+ * - `pressure`: the odds multiply by 1 + this x the rush's pressure (0..1).
+ * - `perMph`: more for each mph of wind.
+ * - `dir`: how far off line it goes (radians, a uniform draw in the range, either way).
+ * - `power`: the share of the leg that gets into it.
+ * Field goals and extra points don't shank: their misses are the meter's and the aim's.
+ */
+export const SHANK = { base: 0.005, goodKac: 90, perKac: 0.0008, pressure: 2, perMph: 0.0006, dir: [0.22, 0.55], power: [0.5, 0.78] };
+
+export function shankOdds(kac: number, pressure: number, windMph: number): number {
+  const S = SHANK;
+  return (S.base + Math.max(0, S.goodKac - kac) * S.perKac + windMph * S.perMph) * (1 + pressure * S.pressure);
+}
+
+/** The kick off the side of his foot. */
+export function applyShank(p: KickParams, rng: Rng): KickParams {
+  const [d0, d1] = SHANK.dir;
+  const [p0, p1] = SHANK.power;
+  const off = (d0 + rng() * (d1 - d0)) * (rng() < 0.5 ? -1 : 1);
+  const a = Math.atan2(p.dir.y, p.dir.x) + off;
+  return { dir: { x: Math.cos(a), y: Math.sin(a) }, power: p.power * (p0 + rng() * (p1 - p0)), loft: p.loft * (0.7 + rng() * 0.4) };
 }
 
 /**

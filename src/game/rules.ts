@@ -111,7 +111,9 @@ export function applyTry(drive: Drive, out: PlayOutcome): Applied {
 
 export type KickResult =
   | 'fgGood' | 'fgMiss' | 'xpGood' | 'xpMiss' | 'blocked'
-  | 'touchback' | 'fairCatch' | 'downed' | 'oob' | 'returned' | 'returnTd' | 'recovered';
+  | 'touchback' | 'fairCatch' | 'downed' | 'oob' | 'returned' | 'returnTd' | 'recovered'
+  /** The rugby punter ran it (the run option): a first down, a touchdown, or the ball over on downs at the spot. */
+  | 'fakeRun';
 
 export interface KickOutcome {
   result: KickResult;
@@ -122,6 +124,10 @@ export interface KickOutcome {
   text: string;
   sub: string;
   color: string;
+  /** A foul on the receiving team at the punt (running into or roughing the kicker), `yards` from the line. */
+  foul?: { kind: 'roughing' | 'running'; yards: number };
+  /** A punt's yards to go on 4th down, when known (a penalty or the run option can make it a first down). */
+  toGo?: number;
 }
 
 /** NCAA spots, in yards from the CPU's own goal line. */
@@ -134,10 +140,39 @@ function cpuYard(spot: number): number {
   return clamp(Math.round(OPP_GOAL - spot), 1, 99);
 }
 
+/** The kicking team's ball with a new set of downs at world x `los` (a first down off a foul or a fake). */
+function keepBall(drive: Drive, los: number, headline: string): Applied {
+  const at = clamp(los, OWN_GOAL + 0.5, OPP_GOAL - 0.5);
+  const next = { los: at, ballY: clamp(drive.ballY, HASH_TOP, HASH_BOT), down: 1, firstDownX: Math.min(OPP_GOAL, at + 10) };
+  return { drive: next, userPoints: 0, cpuPoints: 0, headline, change: { kind: 'none' } };
+}
+
+/**
+ * A foul on the receivers at the punt, the kicking team's choice: roughing (15 and a first down) is always
+ * taken; running into the kicker (5 yards) only when it makes the line to gain, or the punt was run back
+ * for a score. Null when declined.
+ */
+function puntFoul(drive: Drive, out: KickOutcome): Applied | null {
+  const f = out.foul;
+  if (!f || out.unit !== 'punt') return null;
+  const toGo = out.toGo ?? drive.firstDownX - drive.los;
+  const name = f.kind === 'roughing' ? 'ROUGHING THE KICKER' : 'RUNNING INTO THE KICKER';
+  if (f.kind === 'roughing' || f.yards >= toGo || out.result === 'returnTd') return keepBall(drive, drive.los + f.yards, `${name}: FIRST DOWN`);
+  return null;
+}
+
 export function applyKick(drive: Drive, out: KickOutcome): Applied {
   const base = { drive, userPoints: 0, cpuPoints: 0 };
   const cpuBall = (cpuStart: number, headline = ''): Applied => ({ ...base, headline, change: { kind: 'cpuBall', cpuStart } });
+  const foul = puntFoul(drive, out);
+  if (foul) return foul;
   switch (out.result) {
+    case 'fakeRun': {
+      if (out.spot >= OPP_GOAL) return { ...base, userPoints: 6, headline: 'TOUCHDOWN', change: { kind: 'pat' } };
+      const line = drive.los + (out.toGo ?? drive.firstDownX - drive.los);
+      if (out.spot >= line) return keepBall(drive, out.spot, 'FIRST DOWN');
+      return cpuBall(cpuYard(out.spot), 'TURNOVER ON DOWNS');
+    }
     case 'fgGood':
       return { ...base, userPoints: 3, headline: 'FIELD GOAL', change: { kind: 'kickoff' } };
     case 'xpGood':

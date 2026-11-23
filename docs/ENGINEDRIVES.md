@@ -739,9 +739,13 @@ The user's simulated games (SIM GAME, the simulated quarters, the exhibition's S
   - **Too many fair catches** and too few punt returns (FBS: about 40% fair caught, 8–9 yd a return).
   - **Kickoff returns are a little short** (FBS about 21 yd).
 - **Tests** (`src/engineDrive.test.ts`): kicks are in order between the drives, a muff keeps the ball, touchbacks land at the 25 and the 20, return touchdowns add up on the game page, EVERY SNAP picks every kick, and every show of a game plays to its end.
-- **Not built:** played games still skip the CPU's kicks (you take over at the old net, or the 25). Return yards aren't in the box score.
+- **Not built:** return yards aren't in the box score.
+- **Update (2026-11-23, docs/KICKING.md):**
+  - The CPU kicker is `game/cpuKicker.ts`, and its call comes from the kicking team's ST coach by situation (`kickoffCall`, `puntCall`): every kick type, onside kicks late and the rugby punt against a block look.
+  - The return look comes from `returnCall`.
+  - `KickRun` steps a kick, so played games now play the CPU's punts and kickoffs to you live (mirrored).
+  - The fair-catch and return flags above are fixed: punts 38% fair caught and 6.8-yard returns; kickoff returns about 18 yards.
 
 ## Not built yet (later phases)
 - Live substitutions in played games: garbage-time twos on the field, and rotations. Audibles already keep the called personnel ("Audibles" above); substitutions need who is on the field to be explicit per snap.
-- Kicks through `KickPlay` in played games (the CPU's punts and kickoffs to you). Simulated games have them ("Kicks in engine games").
 - The fitted DC table for CPU-vs-CPU sims (phase 5).

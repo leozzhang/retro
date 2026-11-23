@@ -21,7 +21,7 @@ import { COMPOSITION } from './data/rosterGen';
 import { DEF_EXTRA, DEF_SLOTS, OFF_EXTRA, OFF_SLOTS, ST_SLOTS, teamById, TEAMS } from './data/teams';
 import { accuracyAt, AIM_FEEL, aimLag, composure, stepAimCursor, throwErrorSd } from './sim/passing';
 import { clutchRoster, shakenAimLag } from './data/confidence';
-import { HASH_BOT, HASH_TOP, STEP } from './engine/constants';
+import { FIELD_W, HASH_BOT, HASH_TOP, STEP } from './engine/constants';
 import type { Input } from './engine/input';
 import { handoffKind, Play } from './game/playState';
 import { matchDefense } from './game/matchups';
@@ -32,9 +32,11 @@ import {
   applyKick, applyOutcome, applyTry, converted, downDistance, fieldLabel, movesChains, simulateDrive, startDrive, type KickOutcome, type PlayOutcome,
 } from './game/rules';
 import {
-  CALM, fgCheck, fgDistance, METER_HALF, mistimeAngle, POSTS_X, POSTS_Y, predictKick, timingGreen, UPRIGHT_HALF, type BounceProfile,
+  CALM, fgCheck, fgDistance, footBoost, METER_HALF, mistimeAngle, POSTS_X, POSTS_Y, predictKick, timingGreen, UPRIGHT_HALF, type BounceProfile,
 } from './sim/kicking';
 import { kickDef } from './data/specialTeams';
+import { KickRun, type KickRunOpts } from './game/engineKick';
+import { kickParams } from './game/cpuKicker';
 import { KickPlay } from './game/kickPlay';
 import { flightPos, passParams } from './sim/ball';
 import { cutKeep, facingQB } from './sim/ai';
@@ -622,6 +624,95 @@ describe('kick rules', () => {
     expect(rec.change.kind).toBe('none');
     expect(rec.drive.los).toBe(95);
     expect(rec.drive.down).toBe(1);
+  });
+  it('a flag on the punt return team: roughing is 15 and a first down; running into the kicker only when 5 makes the line', () => {
+    const fourth = (toGo: number) => ({ los: 40, ballY: 26.6, down: 4, firstDownX: 40 + toGo });
+    const punt = (foul: KickOutcome['foul'], result: KickOutcome['result'] = 'fairCatch') => ({ ...k(result, 'punt', 85), foul });
+    const rough = applyKick(fourth(8), punt({ kind: 'roughing', yards: 15 }));
+    expect(rough.change.kind).toBe('none');
+    expect(rough.drive.los).toBe(55);
+    expect(rough.drive.down).toBe(1);
+    const short = applyKick(fourth(3), punt({ kind: 'running', yards: 5 }));
+    expect(short.change.kind).toBe('none');
+    expect(short.drive.los).toBe(45);
+    // 4th and 8: five yards doesn't make it, so the punt stands.
+    expect(start(applyKick(fourth(8), punt({ kind: 'running', yards: 5 })))).toBe(25);
+    // A return touchdown on the play: take the flag.
+    expect(applyKick(fourth(8), punt({ kind: 'running', yards: 5 }, 'returnTd')).change.kind).toBe('none');
+  });
+  it('the punter\'s run: a first down past the line to gain, a touchdown in the end zone, else the ball over on downs', () => {
+    const fourth = { los: 50, ballY: 26.6, down: 4, firstDownX: 52 };
+    const run = (spot: number) => ({ ...k('fakeRun', 'punt', spot), toGo: 2 });
+    const made = applyKick(fourth, run(55));
+    expect(made.change.kind).toBe('none');
+    expect(made.drive.down).toBe(1);
+    expect(made.drive.los).toBe(55);
+    expect(start(applyKick(fourth, run(51)))).toBe(59);
+    const td = applyKick(fourth, run(110));
+    expect(td.userPoints).toBe(6);
+    expect(td.change.kind).toBe('pat');
+  });
+});
+
+describe('the CPU kicker', () => {
+  const M = H.referenceMatchup();
+  const kick = { team: M.off, roster: M.offR };
+  const recv = { team: M.def, roster: M.defR };
+  const run = (id: string, los: number, seed: number, opts: KickRunOpts = {}) => {
+    const r = new KickRun(kick, recv, kickDef(id), los, mulberry32(seed), opts);
+    r.finishPlay();
+    return r;
+  };
+  it('kicks the same kick from the same seed', () => {
+    for (const id of ['punt', 'rugby', 'ko-corner', 'ko-onside']) {
+      const a = run(id, id.startsWith('ko') ? 45 : 40, 9).finish();
+      const b = run(id, id.startsWith('ko') ? 45 : 40, 9).finish();
+      expect(b.outcome.result).toBe(a.outcome.result);
+      expect(b.outcome.spot).toBeCloseTo(a.outcome.spot, 6);
+    }
+  });
+  it('aims each call at its target in calm air', () => {
+    const at = (id: string, los: number) => {
+      const kp = new KickPlay({ kickTeam: M.off, recvTeam: M.def, kickRoster: M.offR, recvRoster: M.defR, def: kickDef(id), los, ballY: 26.6, wind: CALM, rng: mulberry32(1) });
+      const p = kickParams(kp, CALM, mulberry32(1), { exact: true });
+      return predictKick(kp.kickFrom(), p, kp.kicker.r.kpw, CALM, kp.def.bounce, footBoost(kp.unit)).land;
+    };
+    expect(Math.abs(at('pooch', 70).x - (110 - 14))).toBeLessThan(1.5);
+    expect(Math.abs(at('ko-corner', 45).x - (110 - 7))).toBeLessThan(1.5);
+    expect(Math.abs(at('ko-corner', 45).y - FIELD_W / 2)).toBeGreaterThan(10);
+    // A coffin corner comes down just out of bounds.
+    const c = at('coffin', 70);
+    expect(c.y < 0 || c.y > FIELD_W).toBe(true);
+    // The deep kick and the punt go as far as the leg takes them.
+    expect(at('ko-deep', 45).x).toBeGreaterThan(at('ko-corner', 45).x);
+    expect(at('punt', 40).x - 40).toBeGreaterThan(40);
+  });
+  it('the kicking team only recovers a kickoff it hasn\'t been touched once it has gone 10 yards', () => {
+    let kept = 0;
+    for (let seed = 1; seed <= 60; seed++) {
+      const r = run('ko-onside', 45, seed);
+      const o = r.kp.outcome!;
+      if (o.result !== 'recovered') continue;
+      kept++;
+      expect(r.kp.touched || o.spot >= 55 - 0.5).toBe(true);
+    }
+    expect(kept).toBeGreaterThan(5);
+  });
+  it('the hands team takes most onside kicks; a return team caught off guard loses about half', () => {
+    const rate = (ret: 'return' | 'hands') => {
+      let kept = 0;
+      for (let seed = 1; seed <= 80; seed++) if (run('ko-onside', 45, seed, { ret }).finish().kickStart !== null) kept++;
+      return kept / 80;
+    };
+    const surprise = rate('return');
+    const hands = rate('hands');
+    expect(surprise).toBeGreaterThan(0.3);
+    expect(hands).toBeLessThan(0.25);
+    expect(surprise).toBeGreaterThan(hands + 0.15);
+  });
+  it('field goals keep the user\'s drag: no leg boost, no shank', () => {
+    expect(footBoost('fg')).toBe(1);
+    expect(footBoost('xp')).toBe(1);
   });
 });
 

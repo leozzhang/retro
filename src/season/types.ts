@@ -46,7 +46,9 @@ export interface SeasonConfig {
   defIq?: 'STATIC' | 'NORMAL' | 'SHARP';
   /** Daylight for the runner in live games (render/renderer.ts `RunAssist`): always, until the handoff, or never. Missing means FULL. */
   runAssist?: 'FULL' | 'LIGHT' | 'OFF';
-  /** Slow motion while the QB aims a pass or the punter aims a punt in live games. Missing means off. */
+  /** Punts and kickoffs in live games: watched (SPACE skips) or straight to the result. Missing means watch. */
+  kicks?: 'watch' | 'result';
+  /** Slow motion while the QB aims a pass in live games. Missing means off. */
   aimSlow?: boolean;
   /** The presnap read line in live games: the shell and the rest of the look, the shell only, or nothing. Missing means FULL. */
   readHelp?: 'FULL' | 'SHELL' | 'OFF';

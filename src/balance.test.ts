@@ -11,9 +11,9 @@ import { teamById } from './data/teams';
 import { FIELD_W, STEP } from './engine/constants';
 import { add, clamp, dist, hashString, len, mulberry32, norm, scale, sub, type Rng } from './engine/math';
 import type { KickPlay } from './game/kickPlay';
+import { KickRun } from './game/engineKick';
 import type { Play } from './game/playState';
 import { resolvePlay } from './game/resolvePlay';
-import { applyKick, startDrive } from './game/rules';
 import { newWind } from './game/wind';
 import { CALM, type KickParams, type Wind } from './sim/kicking';
 import type { Player } from './sim/player';
@@ -449,90 +449,49 @@ const KREPS = 200;
 const OWN = (yd: number) => 10 + yd;
 const fieldLbl = (x: number) => (x - 10 <= 50 ? `own ${x - 10}` : `opp ${110 - x}`);
 
-/** Direction from the kick spot to a target point on the field. */
-function toward(from: { x: number; y: number }, x: number, y: number) {
-  const l = Math.hypot(x - from.x, y - from.y);
-  return { x: (x - from.x) / l, y: (y - from.y) / l };
-}
-
-function puntRows(rng: Rng): string[] {
+/** Punts and kickoffs, every call kicked by the CPU kicker (game/cpuKicker.ts) against a return look; the full grid is `npm run kicks`. */
+function cpuKickRows(rng: Rng): string[] {
   const rows: string[] = [];
-  const cases: [string, number, (kp: KickPlay) => KickParams][] = [
-    ['punt', OWN(30), () => ({ power: 1, dir: { x: 1, y: 0 }, loft: 54 })],
-    ['pooch', OWN(60), () => ({ power: 0.74, dir: { x: 1, y: 0 }, loft: 64 })],
-    ['coffin', OWN(62), (kp) => ({ power: 0.85, dir: toward(kp.kicker.pos, 104, 52), loft: 46 })],
-    ['line-drive', OWN(30), () => ({ power: 1, dir: { x: 1, y: 0 }, loft: 34 })],
+  const kick = { team: M.off, roster: M.offR };
+  const recv = { team: M.def, roster: M.defR };
+  const cases: [string, number][] = [
+    ['punt', OWN(30)], ['directional', OWN(30)], ['rugby', OWN(30)], ['line-drive', OWN(30)], ['pooch', OWN(60)], ['coffin', OWN(60)],
+    ['ko-deep', 45], ['ko-corner', 45], ['ko-squib', 45], ['ko-sky', 45], ['ko-onside', 45],
   ];
-  for (const [id, los, params] of cases) {
+  for (const [id, los] of cases) {
     const kd = kickDef(id);
-    const s = { n: 0, gross: 0, net: 0, tb: 0, fc: 0, ret: 0, retY: 0, blk: 0, i20: 0, td: 0, oob: 0, downed: 0, muff: 0 };
+    const s = { n: 0, start: 0, starts: 0, tb: 0, fc: 0, ret: 0, retY: 0, blk: 0, i20: 0, td: 0, oob: 0, keep: 0, gross: 0 };
     for (let i = 0; i < KREPS; i++) {
-      const { o, catchX } = runKick(kd, los, params, newWind(rng), rng);
-      if (!o) continue;
+      const run = new KickRun(kick, recv, kd, los, rng, { wind: newWind(rng) });
+      run.finishPlay();
+      const k = run.finish();
+      const o = k.outcome;
       s.n++;
-      const a = applyKick(startDrive(los - 10), o);
-      const cpuStart = a.change.kind === 'cpuBall' ? a.change.cpuStart : null;
       if (o.result === 'blocked') s.blk++;
-      if (o.result === 'returnTd') s.td++;
-      if (o.result === 'recovered') s.muff++;
+      if (k.recvTd) s.td++;
+      if (k.kickStart !== null) s.keep++;
       if (o.result === 'touchback') s.tb++;
       if (o.result === 'fairCatch') s.fc++;
       if (o.result === 'oob') s.oob++;
-      if (o.result === 'downed') s.downed++;
-      if (o.result === 'returned' && catchX !== null) {
+      if (o.result === 'returned' || o.result === 'returnTd') {
         s.ret++;
-        s.retY += catchX - o.spot;
+        s.retY += k.ret;
       }
-      const end = o.result === 'returned' && catchX !== null ? catchX : o.result === 'touchback' ? 110 : o.spot;
-      s.gross += Math.min(110, end) - los;
-      if (cpuStart !== null) {
-        s.net += 110 - los - cpuStart;
-        if (cpuStart <= 20) s.i20++;
+      const caught = run.kp.returnFrom();
+      s.gross += (caught !== null && (o.result === 'returned' || o.result === 'returnTd') ? caught : Math.min(110, o.spot)) - los;
+      if (k.recvStart !== null) {
+        s.start += k.recvStart;
+        s.starts++;
+        if (k.recvStart <= 20) s.i20++;
       }
     }
     const pct = (k: number) => `${((k / s.n) * 100).toFixed(0)}%`;
+    const unit = kd.unit === 'punt' ? 'PUNT' : 'KO  ';
+    const at = kd.unit === 'punt' ? ` from ${fieldLbl(los)}` : '';
     rows.push(
-      `PUNT ${kd.name.padEnd(14)} from ${fieldLbl(los)} | gross ${(s.gross / s.n).toFixed(1)} net ${(s.net / s.n).toFixed(1)} ` +
-        `in20 ${pct(s.i20)} tb ${pct(s.tb)} fc ${pct(s.fc)} oob ${pct(s.oob)} downed ${pct(s.downed)} ` +
-        `ret ${pct(s.ret)} (${(s.retY / Math.max(1, s.ret)).toFixed(1)} avg) blk ${s.blk} td ${s.td} muff-rec ${s.muff}`,
-    );
-  }
-  return rows;
-}
-
-function kickoffRows(rng: Rng): string[] {
-  const rows: string[] = [];
-  const tee = { x: 45, y: 26.6 };
-  const cases: [string, (kp: KickPlay) => KickParams][] = [
-    ['ko-deep', () => ({ power: 1, dir: { x: 1, y: 0 }, loft: 45 })],
-    ['ko-sky', () => ({ power: 0.62, dir: { x: 1, y: 0 }, loft: 62 })],
-    ['ko-squib', () => ({ power: 1, dir: { x: 1, y: 0 }, loft: 12 })],
-    ['ko-corner', () => ({ power: 0.97, dir: toward(tee, 105, 46), loft: 42 })],
-  ];
-  for (const [id, params] of cases) {
-    const kd = kickDef(id);
-    const s = { n: 0, start: 0, tb: 0, fc: 0, ret: 0, retY: 0, oob: 0, td: 0, rec: 0 };
-    for (let i = 0; i < KREPS; i++) {
-      const { o, catchX } = runKick(kd, 45, params, newWind(rng), rng);
-      if (!o) continue;
-      s.n++;
-      const a = applyKick(startDrive(25), o);
-      if (a.change.kind === 'cpuBall') s.start += a.change.cpuStart;
-      if (o.result === 'touchback') s.tb++;
-      if (o.result === 'fairCatch') s.fc++;
-      if (o.result === 'oob') s.oob++;
-      if (o.result === 'returnTd') s.td++;
-      if (o.result === 'recovered') s.rec++;
-      if (o.result === 'returned' && catchX !== null) {
-        s.ret++;
-        s.retY += catchX - o.spot;
-      }
-    }
-    const pct = (k: number) => `${((k / s.n) * 100).toFixed(0)}%`;
-    const owned = s.n - s.td - s.rec;
-    rows.push(
-      `KO   ${kd.name.padEnd(14)} | cpu start ${(s.start / Math.max(1, owned)).toFixed(1)} tb ${pct(s.tb)} fc ${pct(s.fc)} oob ${pct(s.oob)} ` +
-        `ret ${pct(s.ret)} (${(s.retY / Math.max(1, s.ret)).toFixed(1)} avg) td ${s.td} muff-rec ${s.rec}`,
+      `${unit} ${kd.name.padEnd(14)}${at.padEnd(12)} | their start ${(s.start / Math.max(1, s.starts)).toFixed(1)}` +
+        (kd.unit === 'punt' ? ` gross ${(s.gross / s.n).toFixed(1)} in20 ${pct(s.i20)}` : '') +
+        ` tb ${pct(s.tb)} fc ${pct(s.fc)} oob ${pct(s.oob)} ret ${pct(s.ret)} (${(s.retY / Math.max(1, s.ret)).toFixed(1)} avg) blk ${s.blk} td ${s.td} kept ${s.keep}`,
     );
   }
   return rows;
@@ -642,7 +601,7 @@ it.runIf(process.env.npm_lifecycle_event === 'balance')('balance report', () => 
   const rows = [...passRows('PASS', pass, rng), '', ...passRows('PA  ', pa, rng), '', ...runRows(runs, mulberry32(43))];
   // Kicks use their own RNG so they don't shift the scrimmage rows.
   const krng = mulberry32(7);
-  rows.push('', ...puntRows(krng), '', ...kickoffRows(krng), '', ...fgRows(krng));
+  rows.push('', ...cpuKickRows(krng), '', ...fgRows(krng));
   // Per-play rows also get their own RNG, after everything else.
   rows.push('', ...perPlayRows([...pass, ...pa].filter(picked), mulberry32(11)));
   rows.push('', ...shortRows(LEGACY.filter((p) => p.short && picked(p)), mulberry32(13)));

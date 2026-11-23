@@ -3,7 +3,7 @@ import { clockOut, goForTwo, tempo as situationTempo, type Situation } from './s
 import { defIdentity, pickLineGame, preventLevel, situationMix, sticks } from '../data/identity';
 import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type PlayDef } from '../data/plays';
 import { ocBook, ocStyle, STYLES } from '../data/offStyles';
-import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef } from '../data/specialTeams';
+import { KICKOFF_CALLS, kickDef, ST_TAB, type KickDef, type ReturnScheme } from '../data/specialTeams';
 import { clutchRoster, confLabel, lateAndClose, leverage, shakenAimLag, unitEdge } from '../data/confidence';
 import { athleteName, buildSquad, lineupOf, onField, reorderPosition, starters, teamConf, withLineup, type Lineup, type Squad } from '../data/depth';
 import { changedSlots, nextManUp, sideOf, subCandidates, substitute, type SubSide } from './lineup';
@@ -13,7 +13,7 @@ import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
 import { DEF_SLOTS, teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
-import { FIELD_W, OPP_GOAL, OWN_GOAL, VIEW_H, VIEW_W } from '../engine/constants';
+import { FIELD_W, OPP_GOAL, OWN_GOAL, STEP, VIEW_H, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { audioPrefs, audioRunning, setAudioPref, type AudioPrefs } from '../engine/audio';
 import { music, type MusicMode } from '../engine/music';
@@ -22,7 +22,7 @@ import { armClick, noteHit, takeClick, tracked } from '../engine/clicks';
 import { CREDITS } from '../data/audio';
 import { crowd as stadium } from './crowd';
 import { fieldSounds } from './sounds';
-import { mulberry32, type Vec3 } from '../engine/math';
+import { hashString, mulberry32, type Rng, type Vec3 } from '../engine/math';
 import {
   creditCpuDrive, creditUserFg, creditUserSnap, finishLiveBox, liveGamePlays, newLiveBox, storyAgainst, storyCpuDrive, storyUserEnd, storyUserPoints,
   storyUserSnap, userCredit, type LiveBox, type SnapAt, type UserSnap,
@@ -113,6 +113,9 @@ import {
   timeLeftInHalf, KNEEL_SECS, SPIKE_SECS, type Clock, type Tempo,
 } from './clock';
 import { KickPlay } from './kickPlay';
+import { AUTO_INPUT } from './autopilot';
+import { CpuKicker, forecast, kickoffCall, puntCall, returnCall, windAlong, type KickContext, type KickForecast } from './cpuKicker';
+import { KICKOFF_FROM, kickCaption, kickoffRun, puntRun, returnerOf, SAFETY_KICK_FROM, type EngineKick, type KickRun } from './engineKick';
 import { HARD_COUNT, Play } from './playState';
 import { personnelOf, resolvePlay } from './resolvePlay';
 import {
@@ -198,7 +201,13 @@ const SETTINGS: {
     read: (c) => ASSIST_OPTIONS.indexOf(c.runAssist ?? 'FULL'),
   },
   {
-    label: 'SLOW AIM', help: 'SLOW MOTION WHILE AIMING A PASS OR A PUNT',
+    label: 'KICKS', help: 'PUNTS AND KICKOFFS: WATCH THEM (SPACE SKIPS), OR JUMP TO THE RESULT',
+    options: ['WATCH', 'RESULT ONLY'], start: 0,
+    apply: (c, i) => (c.kicks = i === 1 ? 'result' : 'watch'),
+    read: (c) => (c.kicks === 'result' ? 1 : 0),
+  },
+  {
+    label: 'SLOW AIM', help: 'SLOW MOTION WHILE AIMING A PASS',
     options: ['OFF', 'ON'], start: 0,
     apply: (c, i) => (c.aimSlow = i === 1),
     read: (c) => (c.aimSlow ? 1 : 0),
@@ -245,6 +254,17 @@ interface Notice {
   /** A line over the banner: the user's DC on a CPU drive. */
   note?: string;
 }
+
+/** The receiving team's look, as the kick HUD names it. */
+function lookText(unit: string, ret: ReturnScheme): string {
+  if (ret === 'block') return 'THEY SHOW: PUNT BLOCK, NINE COMING';
+  if (ret === 'safe') return 'THEY SHOW: SAFE, NOBODY RUSHING';
+  if (ret === 'hands') return 'THEY SHOW: THE HANDS TEAM';
+  return unit === 'punt' ? 'THEY SHOW: A RETURN' : 'THEY SHOW: A RETURN, FRONT LINE BACK';
+}
+
+/** Seconds the receivers' look is on screen before the CPU kicker snaps the punt or approaches the ball. */
+const KICK_SHOW = 0.9;
 
 /** Slow motion while the QB (or a punter) aims, when the SLOW AIM setting is on. */
 const AIM_TIME_SCALE = 0.65;
@@ -425,6 +445,17 @@ export class Game {
   private drive: Drive = startDrive(25);
   private play: Play | null = null;
   private kick: KickPlay | null = null;
+  /** The kicker on the user's punts and kickoffs (the user calls them; field goals and extra points stay the user's). */
+  private kicker: CpuKicker | null = null;
+  /** The kick is being run to the whistle (SPACE, or the KICKS: RESULT ONLY setting). */
+  private kickFast = false;
+  /** The CPU's look on the user's punt or kickoff, and the user's ST coach's call against it. */
+  private kickLook: ReturnScheme = 'return';
+  private kickTip: string | null = null;
+  /** The user's onside kicks this game (the CPU's hands team stays alert for another). */
+  private onsides = 0;
+  /** Each kick card's forecast for this snap (`forecast`). */
+  private kickCast = new Map<string, KickForecast>();
   private callMode: CallMode = 'normal';
   /**
    * Overtime on the field (null in regulation): who has the ball first in the odd periods (the toss
@@ -465,7 +496,10 @@ export class Game {
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
-  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' | 'game' = 'call';
+  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' | 'game' | 'cpuKick' = 'call';
+  /** The CPU's punt or kickoff to the user, played live after the notices (`startCpuKick`), and the one on the field. */
+  private pendingCpuKick: { unit: 'punt' | 'kickoff'; yard: number } | null = null;
+  private cpuKick: { run: KickRun; unit: 'punt' | 'kickoff'; yard: number; result: EngineKick | null; banner: { title: string; line: string } | null } | null = null;
   private tab = 0;
   /** Formation chip picked on each playbook tab (index into `chipsFor`), and the page within it. */
   private chip: Record<number, number> = {};
@@ -1098,6 +1132,7 @@ export class Game {
     this.wind = newWind(this.rng);
     this.windQuarter = 1;
     this.kickSketch.clear();
+    this.onsides = 0;
     this.tab = 0;
     this.liveDrives = this.seasonGame ? [{ off: user.id, plays: [] }] : null;
     // The box score is built as the game goes (exhibitions keep none). Its casting stream is its own.
@@ -1124,7 +1159,11 @@ export class Game {
     this.setupEngine();
     this.dcNote = null;
     if (from > 1 && this.seasonGame) this.simAhead(from);
-    else this.toCall();
+    else {
+      // The opening kickoff: the CPU kicks to the user (who kicks off the second half).
+      this.pendingCpuKick = { unit: 'kickoff', yard: KICKOFF_FROM };
+      this.startCpuKick();
+    }
   }
 
   /** The key-play level for the CPU's drives in this game, or for simulated stretches. */
@@ -2804,6 +2843,45 @@ export class Game {
     };
   }
 
+  /** The user's side of a punt or kickoff for the special-teams coaches (game/cpuKicker.ts). */
+  private userKickContext(unit: 'punt' | 'kickoff'): KickContext {
+    const c = this.clock;
+    const k = this.userRoster[unit === 'punt' ? 'P' : 'K']?.r;
+    return {
+      lead: this.score.user - this.score.cpu, secsLeft: inOvertime(c) ? Infinity : timeLeftInHalf(c), finalHalf: c.quarter >= 3,
+      ...(unit === 'punt' ? { yard: Math.round(this.drive.los - OWN_GOAL), toGo: Math.round(this.drive.firstDownX - this.drive.los) } : {}),
+      kpw: k?.kpw ?? 70, kac: k?.kac ?? 70, returner: returnerOf(this.cpuRoster), along: windAlong(this.wind), onsides: this.onsides,
+    };
+  }
+
+  /**
+   * The CPU's return look for a punt or kickoff the user may call (shown on the call screen and the field),
+   * the user's ST coach's call against it, and fresh forecasts for the cards.
+   */
+  private setKickLook(mode: CallMode): void {
+    this.kickCast.clear();
+    this.kickTip = null;
+    this.kickLook = 'return';
+    const unit = mode === 'kickoff' ? 'kickoff' : mode === 'normal' && this.drive.down === 4 && !this.ot ? 'punt' : null;
+    if (!unit) return;
+    const ctx = this.userKickContext(unit);
+    this.kickLook = returnCall(unit, ctx, this.rng);
+    const seen = { ...ctx, ret: this.kickLook };
+    this.kickTip = unit === 'kickoff' ? kickoffCall(seen, this.rng) : puntCall(seen, this.rng);
+  }
+
+  /** A kick card's forecast: the kicker's aim for the call, then his misses, in this wind (cached for the snap). */
+  private kickForecast(def: KickDef): KickForecast | null {
+    if (def.unit !== 'punt' && def.unit !== 'kickoff') return null;
+    let f = this.kickCast.get(def.id);
+    if (!f) {
+      const kp = this.newKick(def);
+      f = forecast(kp, this.wind, mulberry32(hashString(`${def.id}:${Math.round(kp.los)}`)));
+      this.kickCast.set(def.id, f);
+    }
+    return f;
+  }
+
   private toCall(mode: CallMode = 'normal'): void {
     if (mode === 'pat' && this.mustGoForTwo()) mode = 'try';
     this.screen = 'call';
@@ -2816,7 +2894,9 @@ export class Game {
     this.checkDone = false;
     this.checkNote = null;
     this.kick = null;
+    this.kicker = null;
     this.applied = null;
+    this.setKickLook(mode);
     this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
     // The CPU defense's identity: its own call mix (more zero blitz on third and long if that's who it is) and press rates.
     const ident = defIdentity(this.cpu, this.dcOf(this.cpu));
@@ -3265,12 +3345,11 @@ export class Game {
     else this.showNotices('call');
   }
 
-  private startKick(def: KickDef): void {
-    this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
+  /** The user's kick play for `def`, with the CPU's look on punts and kickoffs. */
+  private newKick(def: KickDef, rng: Rng = this.rng): KickPlay {
     const kickoff = def.unit === 'kickoff';
-    const place = def.unit === 'fg' || def.unit === 'xp';
-    this.snapLev = place ? this.snapLeverage(true) : 0;
-    this.kick = new KickPlay({
+    const auto = def.unit === 'punt' || kickoff;
+    return new KickPlay({
       kickTeam: this.user,
       recvTeam: this.cpu,
       homeId: this.homeId,
@@ -3280,10 +3359,28 @@ export class Game {
       los: kickoff ? KICKOFF_LINE : this.drive.los,
       ballY: kickoff ? FIELD_W / 2 : this.drive.ballY,
       wind: this.wind,
-      rng: this.rng,
+      rng,
+      ...(auto ? { ret: this.kickLook } : {}),
+      ...(def.unit === 'punt' && this.drive.down === 4 ? { fake: { toGo: Math.round(this.drive.firstDownX - this.drive.los) } } : {}),
     });
+  }
+
+  private startKick(def: KickDef): void {
+    this.cam.setZoom(1, 1, { x: this.drive.los, y: this.drive.ballY });
+    const place = def.unit === 'fg' || def.unit === 'xp';
+    this.snapLev = place ? this.snapLeverage(true) : 0;
+    this.kick = this.newKick(def);
+    // Punts and kickoffs: the user called it, the kicker kicks it.
+    this.kicker = place ? null : new CpuKicker(this.kick, this.wind, this.rng);
+    if (def.onside) this.onsides++;
+    this.kickFast = false;
     this.applied = null;
     this.screen = 'kick';
+  }
+
+  /** Watching kicks, or straight to the result (the KICKS setting; exhibitions watch). */
+  private kicksFast(): boolean {
+    return this.seasonGame && this.season ? this.season.config.kicks === 'result' : false;
   }
 
   /**
@@ -3390,6 +3487,10 @@ export class Game {
   // ------------------------------------------------------------ kicks
 
   private updateKick(dt: number, input: Input): void {
+    if (this.cpuKick) {
+      this.updateCpuKick(dt, input);
+      return;
+    }
     const kp = this.kick!;
     if (kp.phase === 'presnap') {
       if (this.tickBetweenPlays(dt)) return;
@@ -3398,20 +3499,42 @@ export class Game {
         this.kick = null;
         return;
       }
-      if (kp.unit === 'punt' && (input.hit('Space') || input.mouse.pressed)) {
-        kp.snap();
-        runoffAtSnap(this.clock, this.tempo);
-        snapClock(this.clock);
-        input.mouse.pressed = false; // the snap click must not start the punt aim
+      // The CPU kicker goes once the look has been on screen a moment (SPACE goes now).
+      const k = this.kicker;
+      if (k && !k.started && (kp.time >= KICK_SHOW || input.hit('Space', 'Enter') || input.mouse.pressed)) {
+        k.start();
+        if (kp.unit === 'punt') {
+          runoffAtSnap(this.clock, this.tempo);
+          snapClock(this.clock);
+        }
+        input.mouse.pressed = false;
+        if (this.kicksFast()) this.kickFast = true;
       }
+    } else if (this.kicker && kp.phase !== 'over' && !this.kickFast && (input.hit('Space', 'Enter') || input.mouse.pressed)) {
+      // Skip: run it to the whistle.
+      this.kickFast = true;
+      input.mouse.pressed = false;
     }
     const was = kp.phase;
-    kp.update(dt, input);
+    if (this.kicker) {
+      // Fast: the whole kick in one frame (the clock runs as it would have).
+      const steps = this.kickFast && kp.phase !== 'presnap' ? Math.ceil(30 / STEP) : 1;
+      for (let i = 0; i < steps && kp.phase !== 'over'; i++) {
+        const step = steps > 1 ? STEP : dt;
+        this.kicker.step();
+        kp.update(step, AUTO_INPUT);
+        if (steps > 1 && kp.clockRunning()) tickLive(this.clock, step);
+      }
+      if (steps > 1) {
+        const f = kp.focus();
+        this.cam.follow(f.x, f.lead);
+      }
+    } else kp.update(dt, input);
     if (was === 'presnap' && kp.phase !== 'presnap' && kp.unit === 'fg') {
       runoffAtSnap(this.clock, this.tempo);
       snapClock(this.clock);
     }
-    if (kp.clockRunning()) tickLive(this.clock, dt);
+    if (kp.clockRunning() && !(this.kicker && this.kickFast)) tickLive(this.clock, dt);
     const f = kp.focus();
     this.cam.follow(f.x, f.lead);
 
@@ -3465,7 +3588,10 @@ export class Game {
         const sub = c.kind === 'pick6' ? 'Pick six' : c.sub;
         this.notify({ title: `${this.cpu.abbr} SCORES`, sub: `${sub}. Kickoff to you.`, extra: '' });
         if (this.clock.time <= 0) this.periodOver();
-        else this.showNotices('call');
+        else {
+          this.pendingCpuKick = { unit: 'kickoff', yard: KICKOFF_FROM };
+          this.showNotices('cpuKick');
+        }
         return;
       }
       default:
@@ -4061,8 +4187,19 @@ export class Game {
       }
       return;
     }
-    this.drive = this.freshDrive(sim.defPoints === 2 ? 40 : userStartAfter(sim, this.rng));
+    // The CPU kicks to the user, live: a punt from where its drive ended, its kickoff after a score, its free kick after a safety.
+    const kicks = sim.result === 'PUNT' ? { unit: 'punt' as const, yard: sim.endYard }
+      : sim.defPoints === 2 ? { unit: 'kickoff' as const, yard: SAFETY_KICK_FROM }
+      : sim.result === 'TOUCHDOWN' || sim.result === 'FIELD GOAL' ? { unit: 'kickoff' as const, yard: KICKOFF_FROM }
+      : null;
     adminStop(c);
+    if (kicks && !this.ot) {
+      this.pendingCpuKick = kicks;
+      notice.extra = kicks.unit === 'punt' ? `${this.cpu.abbr} punts  ${clockText(c)}` : `${this.cpu.abbr} kicks off  ${clockText(c)}`;
+      this.showNotices('cpuKick');
+      return;
+    }
+    this.drive = this.freshDrive(userStartAfter(sim, this.rng));
     notice.extra = `Your ball at the ${fieldLabel(this.drive.los)}  ${clockText(c)}`;
     this.showNotices('call');
   }
@@ -4092,6 +4229,106 @@ export class Game {
     else if (this.afterNotices === 'game') this.screen = 'game';
     else if (this.afterNotices === 'kickoff') this.toCall('kickoff');
     else if (this.afterNotices === 'pat') this.toCall('pat');
+    else if (this.afterNotices === 'cpuKick' && this.pendingCpuKick) this.startCpuKick();
+    else this.toCall();
+  }
+
+  /**
+   * The CPU kicks to the user, played live: its special-teams coach calls the kick against the user's look
+   * (both by situation), its kicker kicks it, and both return units are the AI. The kick play runs in the
+   * CPU's frame (it attacks +x), drawn on a mirrored camera in mirrored wind. SPACE skips to the result.
+   */
+  private startCpuKick(): void {
+    const p = this.pendingCpuKick!;
+    this.pendingCpuKick = null;
+    const kick = { team: this.cpu, roster: this.cpuRoster };
+    const recv = { team: this.user, roster: this.userRoster };
+    const wind: Wind = { mph: this.wind.mph, dir: { x: -this.wind.dir.x, y: this.wind.dir.y } };
+    const c = this.clock;
+    const sit = { lead: this.score.cpu - this.score.user, secsLeft: timeLeftInHalf(c), finalHalf: c.quarter >= 3 };
+    const opts = { wind, sit, homeId: this.homeId };
+    const run = p.unit === 'punt' ? puntRun(kick, recv, p.yard, this.rng, opts) : kickoffRun(kick, recv, this.rng, { ...opts, from: p.yard });
+    this.cpuKick = { run, unit: p.unit, yard: p.yard, result: null, banner: null };
+    this.kick = run.kp;
+    this.kicker = null;
+    this.kickFast = false;
+    this.applied = null;
+    this.play = null;
+    this.cam.mirror = true;
+    this.cam.setZoom(1, 1, { x: run.kp.los, y: run.kp.ballY });
+    this.cam.follow(run.kp.focus().x, run.kp.focus().lead);
+    this.screen = 'kick';
+  }
+
+  private updateCpuKick(dt: number, input: Input): void {
+    const ck = this.cpuKick!;
+    const run = ck.run;
+    const kp = run.kp;
+    const skip = input.hit('Space', 'Enter') || input.mouse.pressed;
+    input.mouse.pressed = false;
+    if (!ck.result) {
+      if (!run.kicker.started) {
+        if (kp.time >= KICK_SHOW || skip) {
+          run.start();
+          if (this.kicksFast()) this.kickFast = true;
+        }
+      } else if (skip) this.kickFast = true;
+      const steps = this.kickFast && run.kicker.started ? Math.ceil(30 / STEP) : 1;
+      for (let i = 0; i < steps && !run.done(); i++) {
+        run.step();
+        if (kp.clockRunning()) tickLive(this.clock, STEP);
+      }
+      const f = kp.focus();
+      this.cam.follow(f.x, f.lead);
+      if (run.done()) this.endCpuKick();
+      return;
+    }
+    // The result banner: SPACE or a moment moves the game on.
+    kp.update(dt, AUTO_INPUT);
+    if ((kp.overTime > 0.6 && skip) || kp.overTime > 2.8) this.afterCpuKick();
+  }
+
+  /** The whistle on the CPU's kick: where the user's ball is (or the CPU kept it, or the user scored). */
+  private endCpuKick(): void {
+    const ck = this.cpuKick!;
+    const ek = ck.run.finish();
+    ck.result = ek;
+    ck.banner = kickCaption(ek, ck.unit, ck.yard);
+    adminStop(this.clock);
+    const box = this.liveBox;
+    if (ek.recvTd) {
+      this.score.user += 6;
+      if (box) {
+        const p: LiveSimPlay = { gain: ek.ret, explosive: true, turnover: false, down: 1, toGo: 10, yard: Math.max(1, 100 - ek.ret), t: 0, lev: 0, punt: true };
+        storyUserSnap(box, this.atNow(), p, null);
+        storyUserPoints(box, 6, 'TOUCHDOWN');
+      }
+    }
+  }
+
+  private afterCpuKick(): void {
+    const ck = this.cpuKick!;
+    const ek = ck.result!;
+    this.cpuKick = null;
+    this.kick = null;
+    this.cam.mirror = false;
+    if (this.brain) {
+      newDrive(this.brain);
+      this.dcNote = null;
+    }
+    if (ek.recvTd) {
+      // The user's try, even with no time left.
+      this.drive = { los: OPP_GOAL - 3, ballY: FIELD_W / 2, down: 1, firstDownX: OPP_GOAL, try: true };
+      this.toCall('pat');
+      return;
+    }
+    if (ek.kickStart !== null) {
+      // The CPU kept it: an onside kick or a muff recovered, or a flag on the user's return team.
+      this.cpuDrive(ek.kickStart);
+      return;
+    }
+    this.drive = this.freshDrive(ek.recvStart ?? 25);
+    if (this.clock.time <= 0) this.periodOver();
     else this.toCall();
   }
 
@@ -4179,18 +4416,19 @@ export class Game {
     }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
-    drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
+    if (this.cpuKick) drawLines(g, this.cam, this.cpuKick.run.kp.los, this.cpuKick.run.kp.los);
+    else drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
     if (this.kick) drawKickPlay(g, this.cam, this.kick, this.debug);
     else if (this.play) drawPlay(g, this.cam, this.play, this.debug, false, this.runAssist(), this.menuMouse);
     else this.drawBallSpot(g);
 
-    const center = this.watchOnly ? 'FINAL' : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
+    const center = this.watchOnly ? 'FINAL' : this.cpuKick ? `${this.cpu.abbr} ${this.cpuKick.unit === 'punt' ? 'PUNTS' : 'KICKS OFF'}` : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
     const right = this.watchOnly ? 'SIMULATED' : this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
     const shown = this.screen === 'notice' ? this.notices[0] : undefined;
     drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockText(this.clock), center, right);
     const huddle =
       this.screen === 'call' || (this.screen === 'play' && this.play?.phase === 'presnap') ||
-      (this.screen === 'kick' && this.kick?.phase === 'presnap');
+      (this.screen === 'kick' && this.kick?.phase === 'presnap' && !this.cpuKick);
     if (huddle && this.callMode !== 'kickoff') drawPlayClock(g, playClockText(this.clock), this.clock.play, this.t);
     if (huddle && this.callMode === 'normal') drawTempo(g, this.tempo === 'hurry', this.screen === 'call');
     const kicking = this.screen === 'kick' || (this.screen === 'call' && this.cards()[0]?.kind === 'kick');
@@ -4248,6 +4486,21 @@ export class Game {
   }
 
   private renderKickHud(g: CanvasRenderingContext2D, kp: KickPlay): void {
+    const ck = this.cpuKick;
+    if (ck) {
+      if (ck.banner && ck.result) {
+        const r = ck.result;
+        const color = r.recvTd ? '#ffd23f' : r.kickStart !== null ? '#ff5a5a' : '#9ad7ff';
+        const where = r.recvTd ? 'TOUCHDOWN!' : r.kickStart !== null ? `${this.cpu.abbr} BALL` : `YOUR BALL AT THE ${fieldLabel(OWN_GOAL + (r.recvStart ?? 25)).toUpperCase()}`;
+        drawBanner(g, ck.banner.title, ck.banner.line, color, where);
+        drawHint(g, 'CLICK OR SPACE TO CONTINUE');
+        return;
+      }
+      text(g, `${this.cpu.abbr}: ${kp.def.name.toUpperCase()}`, VIEW_W / 2, 34, { size: 8, align: 'center', color: '#ffd23f' });
+      text(g, `YOUR RETURN TEAM: ${kp.ret === 'block' ? 'PUNT BLOCK' : kp.ret === 'safe' ? 'SAFE' : kp.ret === 'hands' ? 'HANDS TEAM' : 'RETURN'}`, VIEW_W / 2, 46, { align: 'center', color: '#cfe3ff' });
+      drawHint(g, 'SPACE: SKIP TO THE RESULT');
+      return;
+    }
     if (kp.phase === 'over' && kp.outcome && this.applied) {
       const o = kp.outcome;
       const h = this.applied.headline;
@@ -4256,6 +4509,14 @@ export class Game {
       return;
     }
     const fg = kp.unit === 'fg' || kp.unit === 'xp';
+    if (this.kicker) {
+      // The user called it; the kicker kicks it. Their look, the call, and the skip.
+      const pre = kp.phase === 'presnap';
+      text(g, `${kp.def.name.toUpperCase()}${kp.def.good ? `: ${kp.def.good}` : ''}`, VIEW_W / 2, 34, { size: 8, align: 'center', color: '#ffd23f' });
+      text(g, lookText(kp.unit, kp.ret), VIEW_W / 2, 46, { align: 'center', color: kp.ret === 'return' ? '#cfe3ff' : '#ff9a5a' });
+      drawHint(g, pre ? 'SPACE: GO NOW   ESC: BACK' : 'SPACE: SKIP TO THE RESULT');
+      return;
+    }
     if (kp.meter()?.live) {
       drawHint(g, 'SPACE: KICK IT ON THE GREEN');
       return;
@@ -4402,8 +4663,9 @@ export class Game {
     const hc = this.hover >= 0 ? cards[this.hover] : undefined;
     const fallback =
       this.callMode === 'pat' ? 'TOUCHDOWN! KICK THE PAT OR GO FOR TWO'
-      : this.callMode === 'kickoff' ? 'KICKOFF: CHOOSE A KICK'
+      : this.callMode === 'kickoff' ? `KICKOFF. ${lookText('kickoff', this.kickLook)}`
       : this.callMode === 'try' ? (this.mustGoForTwo() ? 'OVERTIME: TWO-POINT TRY FROM THE 3' : 'TWO-POINT TRY FROM THE 3   ESC: BACK')
+      : this.tabs()[this.tab]?.kind === 'st' && this.drive.down === 4 && !this.ot ? `4TH DOWN. ${lookText('punt', this.kickLook)}`
       : 'CHOOSE A PLAY';
     const tip = hc
       ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.kind === 'kneel' || hc.kind === 'spike' ? CLOCK_TIP[hc.kind] : hc.def.tip).toUpperCase()
@@ -4506,7 +4768,11 @@ export class Game {
       return;
     }
     const d = c.def;
-    let sub = d.unit === 'punt' ? 'PUNT' : d.unit === 'kickoff' ? 'KICKOFF' : 'FROM THE 3, 20 YARDS';
+    if (d.unit === 'punt' || d.unit === 'kickoff') {
+      this.drawCallKickCard(g, d, i);
+      return;
+    }
+    let sub = 'FROM THE 3, 20 YARDS';
     let subColor = '#8fa0b8';
     if (d.unit === 'fg') {
       const yds = fgDistance(this.drive.los, OPP_GOAL);
@@ -4517,10 +4783,8 @@ export class Game {
     // Flight sketch: distance across, height up, same scale for every card.
     let pts = this.kickSketch.get(d.id);
     if (!pts) {
-      const kicker = this.userRoster[d.unit === 'punt' ? 'P' : 'K'];
-      const from = { x: 0, y: 26, z: d.unit === 'punt' ? 1 : 0.1 };
-      const power = d.unit === 'kickoff' && d.id !== 'ko-squib' ? 1 : d.id === 'pooch' || d.id === 'ko-sky' ? 0.6 : 0.85;
-      pts = predictKick(from, { power, dir: { x: 1, y: 0 }, loft: d.loft }, kicker.r.kpw, CALM, d.bounce, d.unit === 'kickoff').pts;
+      const kicker = this.userRoster.K;
+      pts = predictKick({ x: 0, y: 26, z: 0.1 }, { power: 0.85, dir: { x: 1, y: 0 }, loft: d.loft }, kicker.r.kpw, CALM, d.bounce).pts;
       this.kickSketch.set(d.id, pts);
     }
     const x0 = r.x + 12;
@@ -4535,6 +4799,24 @@ export class Game {
       g.fillRect(Math.round(sx), Math.round(y0 - p.z * 1.4), 1, 1);
     }
     text(g, `LOFT ${d.loft}`, r.x + r.w - 6, r.y + 6, { align: 'right', color: '#5d6b80', shadow: false });
+  }
+
+  /**
+   * A punt or kickoff card: where the kicker's version of it comes down and hangs in this wind, how often it
+   * goes for a touchback or out of bounds, what it's for and what it risks, and the ST coach's pick.
+   */
+  private drawCallKickCard(g: CanvasRenderingContext2D, d: KickDef, i: number): void {
+    const f = this.kickForecast(d)!;
+    let line: string;
+    if (d.onside) line = this.kickLook === 'hands' ? 'HANDS TEAM IS IN' : 'NOT EXPECTING IT';
+    else line = `${f.land <= 0 ? 'END ZONE' : `THEIR ${Math.max(1, Math.round(f.land))}`}, ${f.hang.toFixed(1)}S HANG`;
+    const r = this.cardFrame(g, i, d.name, line, '#cfe3ff');
+    const pct = (x: number) => `${Math.round(x * 100)}%`;
+    const odds = d.onside ? '' : d.unit === 'punt' ? `TB ${pct(f.tb)} OUT ${pct(f.oob)} IN20 ${pct(f.in20)}` : `TB ${pct(f.tb)} OUT ${pct(f.oob)}`;
+    if (odds) text(g, odds, r.x + 6, r.y + 25, { color: '#8fa0b8', shadow: false });
+    if (d.good) text(g, `+ ${d.good}`, r.x + 6, r.y + 37, { color: '#5cff7a', shadow: false });
+    if (d.risk) text(g, `- ${d.risk}`, r.x + 6, r.y + 47, { color: '#ff9a5a', shadow: false });
+    if (this.kickTip === d.id) text(g, 'ST COACH', r.x + r.w - 6, r.y + 6, { align: 'right', color: '#ffd23f', shadow: false });
   }
 
   private drawCard(g: CanvasRenderingContext2D, p: PlayDef, i: number): void {

@@ -1,6 +1,6 @@
 import {
-  FG_BLOCK, FG_UNIT, HOLD_DEPTH, KICKOFF_RETURN, KICKOFF_UNIT, PUNT_RETURN, PUNT_UNIT,
-  type KickDef, type KickUnit, type StSpot,
+  FG_BLOCK, FG_UNIT, HOLD_DEPTH, KICKOFF_HANDS, KICKOFF_ONSIDE, KICKOFF_RETURN, KICKOFF_UNIT, PUNT_BLOCK, PUNT_RETURN, PUNT_SAFE, PUNT_UNIT,
+  type KickDef, type KickUnit, type ReturnScheme, type StSpot,
 } from '../data/specialTeams';
 import { templateValue } from '../data/athletes';
 import { SLOT_POS } from '../data/positions';
@@ -14,8 +14,8 @@ import { pursue, returnerAI } from '../sim/ai';
 import { launch, makeBall, updateFlight, type Ball } from '../sim/ball';
 import { anchorBlockers, formEngagements, release, updateEngagements } from '../sim/blocking';
 import {
-  applyKickError, applyMistime, fgCheck, fgDistance, kickErrorSd, launchKick, METER_HALF, mistimeAngle, predictKick, stepKick,
-  timingGreen,
+  applyKickError, applyMistime, applyShank, fgCheck, fgDistance, footBoost, kickErrorSd, launchKick, METER_HALF, mistimeAngle, predictKick, shankOdds,
+  stepKick, timingGreen,
   type FgResult, type KickFlight, type KickParams, type KickPrediction, type Wind,
 } from '../sim/kicking';
 import { celebrateWant, startCelebration } from '../sim/celebrate';
@@ -25,7 +25,8 @@ import { returnTackleChance, TACKLE_RANGE } from '../sim/tackling';
 import type { Popup } from './playState';
 import { fieldLabel, type KickOutcome, type KickResult } from './rules';
 
-export type KickPhase = 'presnap' | 'snap' | 'set' | 'approach' | 'flight' | 'loose' | 'return' | 'over';
+/** `fake`: the rugby punter tucked it and is running (the run option). */
+export type KickPhase = 'presnap' | 'snap' | 'set' | 'approach' | 'flight' | 'loose' | 'return' | 'fake' | 'over';
 
 export interface KickSetup {
   kickTeam: Team;
@@ -40,6 +41,10 @@ export interface KickSetup {
   ballY: number;
   wind: Wind;
   rng: Rng;
+  /** The receiving team's look (default: a normal return). */
+  ret?: ReturnScheme;
+  /** A punt on 4th down: yards to go, for the rugby punter's run option. Missing: no run. */
+  fake?: { toGo: number };
 }
 
 /** Drag length (screen px) for a full-power kick. */
@@ -54,10 +59,41 @@ export const PUNT_GETOFF = METER_HALF;
 export const FG_STRIKE = 0.9;
 /** A rusher this close to the punter (or holder) with the ball still on him blocks the kick. */
 const BLOCK_REACH = 1.0;
+/**
+ * A bad punt snap: `odds` of one, sent off target and slower (`speedMul`); the punter fields it clean by
+ * his hands, else he bobbles it for `bobble` seconds (a range): odds `bobbleBase` plus `bobblePerCth` a
+ * point of catching under 75.
+ */
+export const BAD_SNAP = { odds: 0.018, speedMul: 0.72, off: 1.4, bobbleBase: 0.4, bobblePerCth: 0.012, bobble: [0.3, 0.6] };
+/**
+ * The rugby punt: the punter rolls out at `rollSpeed` (yd/s across, `rollUp` upfield) and kicks `extra`
+ * seconds later than a spiral. The run option: on 4th and `toGo` or less, with `minSpd` speed, once he's
+ * outside the end of the line (`wide` yards off the ball), he runs `odds` of the time when no free defender
+ * is in the alley ahead of him: between him and the line to gain, out to `alley` yards toward the sideline
+ * (a man peeling back downfield faster than `peel` yd/s to block for the return doesn't count). The return
+ * team is `react` seconds seeing it (they had turned to block for the return).
+ */
+export const RUGBY = { rollSpeed: 5.0, rollUp: 1.0, attackUp: 1.0, extra: 0.55, toGo: 3, wide: 2.5, alley: 12, peel: 1.0, past: 4, minSpd: 45, odds: 0.35, react: 1.0 };
+/**
+ * Roughing and running into the kicker: a free rusher within `reach` of the punter as the ball leaves his
+ * foot hits him `odds` of the time, closer is likelier. `roughShare` of those are roughing (15 yards and a
+ * first down), the rest running into the kicker (5 yards).
+ */
+export const ROUGH = { reach: 1.6, odds: 0.2, roughShare: 0.3, running: 5, roughing: 15 };
+/**
+ * Onside kicks: receivers who aren't the hands team react `lag` seconds late (they turned to run back and
+ * block), and a hop off the turf gets away from them `muff` of the time (`muffHands` for the hands team, on
+ * top of the usual muff). A loose ball both sides reach (`reach` yards) goes to one of them by closeness
+ * and `cth` + `str`.
+ */
+export const ONSIDE = { lag: 0.7, reach: 1.0, muff: 0.25, muffHands: 0.15 };
+
 /** Base chance a field goal gets blocked even when the protection holds (a low kick, a penetrating tackle). */
 const FG_BLOCK_BASE = 0.007;
 /** Returner calls a fair catch if a cover man is this close as the ball comes down. */
-const FAIR_CATCH_RANGE: Record<'punt' | 'kickoff', number> = { punt: 7, kickoff: 11 };
+const FAIR_CATCH_RANGE: Record<'punt' | 'kickoff', number> = { punt: 5.4, kickoff: 9 };
+/** How much a returner's speed and moves (their mean over 75) shrink that range, a point. */
+const FAIR_CATCH_TRUST = 0.015;
 /** Base chance a returner muffs a catch, before hands and traffic. */
 const MUFF: Record<'punt' | 'kickoff', number> = { punt: 0.018, kickoff: 0.008 };
 /** Tackle odds multiplier for a cover man still engaged with a blocker. */
@@ -66,7 +102,7 @@ const ARM_TACKLE = 0.5;
  * Return blockers' edge over cover men: return units are built from defenders
  * with poor blocking ratings, who'd otherwise lose every block at once.
  */
-const RETURN_BLOCK_EDGE = 15;
+const RETURN_BLOCK_EDGE = 30;
 /**
  * Diving tackle: a cover man within this range lunges (lower odds; a miss
  * leaves him on the turf). Without it an AI returner can stay just out of
@@ -139,6 +175,21 @@ export class KickPlay {
   private catchX = 0;
   /** Tackles the returner has broken so far (each makes the next one likelier to hold). */
   private broken = 0;
+  /** The receiving team's look. */
+  readonly ret: ReturnScheme;
+  private readonly fake: { toGo: number } | null;
+  /** The punt or kickoff came off the side of his foot. */
+  shanked = false;
+  /** A bad punt snap, and the seconds the punter bobbles it. */
+  badSnap = false;
+  private bobble = 0;
+  /** Which way the rugby punter rolls (+1: toward high y). */
+  readonly rollSide: number;
+  private runChecked = false;
+  /** When the punter tucked it and ran. */
+  private fakeAt = 0;
+  /** A foul on the receiving team at the kick. */
+  foul: { kind: 'roughing' | 'running'; yards: number } | null = null;
 
   constructor(s: KickSetup) {
     this.def = s.def;
@@ -149,9 +200,16 @@ export class KickPlay {
     this.rng = s.rng;
     this.loft = s.def.loft;
     this.recvTeam = s.recvTeam.abbr;
+    this.ret = s.ret ?? 'return';
+    this.fake = s.fake ?? null;
+    this.rollSide = s.ballY > FIELD_W / 2 ? -1 : 1; // roll to the wide side
 
+    const puntRet = this.ret === 'block' ? PUNT_BLOCK : this.ret === 'safe' ? PUNT_SAFE : PUNT_RETURN;
+    const koRet = this.ret === 'hands' ? KICKOFF_HANDS : KICKOFF_RETURN;
     const [kickUnit, recvUnit] =
-      this.unit === 'punt' ? [PUNT_UNIT, PUNT_RETURN] : this.unit === 'kickoff' ? [KICKOFF_UNIT, KICKOFF_RETURN] : [FG_UNIT, FG_BLOCK];
+      this.unit === 'punt' ? [PUNT_UNIT, puntRet]
+      : this.unit === 'kickoff' ? [s.def.onside ? KICKOFF_ONSIDE : KICKOFF_UNIT, koRet]
+      : [FG_UNIT, FG_BLOCK];
     const place = (sp: StSpot) => ({
       x: Math.min(s.los + sp.dx, FIELD_LEN - 0.5),
       y: clamp(sp.mode === 'abs' ? sp.y : s.ballY + sp.y, 1, FIELD_W - 1),
@@ -215,7 +273,21 @@ export class KickPlay {
     const tgt = this.unit === 'punt' ? this.kicker.pos : this.kickSpot;
     const from = { x: c.pos.x + 0.3, y: c.pos.y, z: 0.4 };
     const to = { x: tgt.x + 0.3, y: tgt.y, z: this.unit === 'punt' ? 1.2 : 0.6 };
-    launch(this.ball, from, to, dist(from, to) / SNAP_SPEED, 0.3, 'snap');
+    let speed = SNAP_SPEED;
+    if (this.unit === 'punt' && this.rng() < BAD_SNAP.odds) {
+      // High, low or wide: slower to him, and he may bobble it.
+      this.badSnap = true;
+      speed *= BAD_SNAP.speedMul;
+      to.y += (this.rng() - 0.5) * 2 * BAD_SNAP.off;
+      to.z = this.rng() < 0.5 ? 0.3 : 2.4;
+      const p = this.kicker;
+      if (this.rng() < BAD_SNAP.bobbleBase + Math.max(0, 75 - p.r.cth) * BAD_SNAP.bobblePerCth) {
+        const [b0, b1] = BAD_SNAP.bobble;
+        this.bobble = b0 + this.rng() * (b1 - b0);
+      }
+      this.popup('BAD SNAP!', p.pos, '#ff9a5a');
+    }
+    launch(this.ball, from, to, dist(from, to) / speed, 0.3, 'snap');
     if (this.unit === 'fg' || this.unit === 'xp') this.assignFgProtection();
   }
 
@@ -273,12 +345,13 @@ export class KickPlay {
   preview(): { params: KickParams; pred: KickPrediction; sd: { dir: number; power: number } } | null {
     const params = this.aimParams();
     if (!params) return null;
-    const pred = predictKick(this.kickFrom(), params, this.kicker.r.kpw, { mph: 0, dir: ZERO }, this.def.bounce, this.unit === 'kickoff');
+    const pred = predictKick(this.kickFrom(), params, this.kicker.r.kpw, { mph: 0, dir: ZERO }, this.def.bounce, footBoost(this.unit));
     const sd = kickErrorSd(this.kicker.r.kac, this.unit === 'punt' ? this.pressure() : 0);
     return { params, pred, sd };
   }
 
-  private kickFrom(): Vec3 {
+  /** Where the ball leaves the foot (the punter's spot moves with him). */
+  kickFrom(): Vec3 {
     if (this.unit === 'punt') return { x: this.kicker.pos.x + 0.6, y: this.kicker.pos.y, z: 1.0 };
     return { ...this.kickSpot };
   }
@@ -302,7 +375,8 @@ export class KickPlay {
   private startPuntSwing(): void {
     this.phase = 'approach';
     this.releaseTime = this.time;
-    this.strikeAt = this.time + PUNT_GETOFF;
+    this.strikeAt = this.time + PUNT_GETOFF + this.bobble + (this.def.rollout ? RUGBY.extra : 0);
+    if (this.bobble) this.popup('BOBBLED!', this.kicker.pos, '#ff9a5a');
     setPose(this.kicker, 'puntDrop', Infinity);
   }
 
@@ -356,7 +430,13 @@ export class KickPlay {
         break;
       case 'approach':
         if (this.unit === 'kickoff') this.kickoffApproach();
-        else if (this.readyToStrike(this.time >= this.strikeAt!)) this.kickNow();
+        else {
+          if (this.unit === 'punt' && !this.runChecked && this.strikeAt !== null && this.time >= this.strikeAt - 0.15) this.checkRunOption();
+          if (this.phase === 'approach' && this.readyToStrike(this.time >= this.strikeAt!)) this.kickNow();
+        }
+        break;
+      case 'fake':
+        this.checkFakeRun();
         break;
       case 'flight':
       case 'loose':
@@ -434,7 +514,13 @@ export class KickPlay {
     const pressure = this.unit === 'punt' ? this.pressure() : 0;
     const e = this.timing ?? 0;
     this.timingPopup(e);
-    const actual = applyKickError(applyMistime(p, e, k.r.kac), k.r.kac, pressure, this.rng);
+    let actual = applyKickError(applyMistime(p, e, k.r.kac), k.r.kac, pressure, this.rng);
+    if ((this.unit === 'punt' || this.unit === 'kickoff') && this.rng() < shankOdds(k.r.kac, pressure, this.wind.mph)) {
+      actual = applyShank(actual, this.rng);
+      this.shanked = true;
+      this.popup('SHANKED!', k.pos, '#ff5a5a');
+    }
+    if (this.unit === 'punt') this.checkRoughing();
     setPose(k, 'kick', 0.45);
     if (this.holder) setPose(this.holder, 'hold', 0.6);
     this.kickTime = this.time;
@@ -445,7 +531,7 @@ export class KickPlay {
       this.blockKick(from);
       return;
     }
-    this.flight = launchKick(from, actual, k.r.kpw, this.unit === 'kickoff');
+    this.flight = launchKick(from, actual, k.r.kpw, footBoost(this.unit));
     this.phase = 'flight';
     for (const d of this.recv) release(d);
     for (const o of this.kick) release(o);
@@ -454,7 +540,7 @@ export class KickPlay {
       return;
     }
     // Receivers read the ball (wind included) and pick who fields it.
-    this.pred = predictKick(from, actual, k.r.kpw, this.wind, this.def.bounce, this.unit === 'kickoff');
+    this.pred = predictKick(from, actual, k.r.kpw, this.wind, this.def.bounce, footBoost(this.unit));
     const land = this.pred.land;
     let best: Player | null = null;
     let bs = Infinity;
@@ -468,6 +554,112 @@ export class KickPlay {
     }
     this.catcher = best;
     this.letItGo = this.unit === 'punt' && land.x >= OPP_GOAL - 10 && land.x < OPP_GOAL + 12;
+  }
+
+  /** A free rusher on the punter as the ball leaves his foot: running into or roughing the kicker. */
+  private checkRoughing(): void {
+    const k = this.kicker;
+    for (const d of this.recv) {
+      if (d.down || d.engagedBy.length || d.job !== 'rush') continue;
+      const dd = dist(d.pos, k.pos);
+      if (dd > ROUGH.reach) continue;
+      if (this.rng() >= ROUGH.odds * (1 - dd / ROUGH.reach * 0.6)) continue;
+      const rough = this.rng() < ROUGH.roughShare;
+      this.foul = rough ? { kind: 'roughing', yards: ROUGH.roughing } : { kind: 'running', yards: ROUGH.running };
+      knockDown(k, rough ? 1.2 : 0.6);
+      this.popup(rough ? 'FLAG: ROUGHING!' : 'FLAG: RAN INTO HIM', k.pos, '#ffd23f');
+      return;
+    }
+  }
+
+  /**
+   * The rugby punter's run option, read just before the kick: a short 4th down, a clear corner ahead of
+   * him and the legs for it. He tucks it and the kick play becomes a run.
+   */
+  private checkRunOption(): void {
+    this.runChecked = true;
+    if (!this.def.rollout || !this.fake || this.fake.toGo > RUGBY.toGo || this.blockedKick) return;
+    const k = this.kicker;
+    if (k.r.spd < RUGBY.minSpd) return;
+    // Outside the end of the line, and nobody free in the alley to the line to gain.
+    const side = this.rollSide;
+    if (Math.abs(k.pos.y - this.ballY) < RUGBY.wide) return;
+    const ahead = this.los + this.fake.toGo + 1;
+    // Anyone short of the line to gain (and `past` yards beyond it) on his side can still get him; a man
+    // already peeling back past it to block for the return has given up the edge.
+    const inAlley = (d: Player) => {
+      const across = (d.pos.y - k.pos.y) * side;
+      if (across <= -2 || across >= RUGBY.alley || d.pos.x <= k.pos.x - 1) return false;
+      return d.pos.x < ahead + RUGBY.past && d.vel.x < RUGBY.peel;
+    };
+    if (this.recv.some((d) => !d.down && !d.engaged && !d.engagedBy.length && inAlley(d))) return;
+    if (this.rng() >= RUGBY.odds) return;
+    this.queued = null;
+    this.strikeAt = null;
+    this.phase = 'fake';
+    this.fakeAt = this.time;
+    this.carrier = k;
+    this.catchX = 0;
+    k.pose = null;
+    this.ball.state = 'held';
+    this.ball.carrier = k;
+    this.popup('HE TAKES OFF!', k.pos, '#ffd23f');
+    for (const d of this.recv) release(d);
+  }
+
+  /** A short 4th down on a rugby punt: the punter attacks the line as he rolls, the run a real threat. */
+  private runLive(): boolean {
+    return !!this.def.rollout && !!this.fake && this.fake.toGo <= RUGBY.toGo && this.kicker.r.spd >= RUGBY.minSpd;
+  }
+
+  /** The punter on the run: upfield, drifting away from the nearest man. */
+  private punterRun(c: Player): void {
+    const near = this.nearestTo(this.recv, c.pos);
+    let dy = this.rollSide * 0.2;
+    if (near && dist(near.pos, c.pos) < 4) dy = (c.pos.y > near.pos.y ? 1 : -1) * 0.4;
+    if (c.pos.y < 3) dy = Math.max(dy, 0.2);
+    if (c.pos.y > FIELD_W - 3) dy = Math.min(dy, -0.2);
+    c.want = scale(norm({ x: 1, y: dy }), maxSpeed(c) * RETURN_SPEED);
+  }
+
+  private checkFakeRun(): void {
+    const c = this.carrier!;
+    if (c.down) return;
+    const toGo = this.fake?.toGo ?? 10;
+    const done = (why: string) => {
+      const yds = Math.round(c.pos.x - this.los);
+      const made = c.pos.x >= this.los + toGo;
+      this.endWith('fakeRun', c.pos, made ? 'FAKE PUNT: FIRST DOWN!' : 'FAKE PUNT: STOPPED', `${why}. Punter run for ${yds} yards`);
+    };
+    if (c.pos.x >= OPP_GOAL) {
+      startCelebration(c, ['leap']);
+      this.endWith('fakeRun', c.pos, 'FAKE PUNT TOUCHDOWN!', `#${c.num} ${c.name} goes all the way`);
+      return;
+    }
+    if (c.pos.y < 0 || c.pos.y > FIELD_W) {
+      done('Out of bounds');
+      return;
+    }
+    if (this.time - this.snapTime > 12) {
+      done('Brought down');
+      return;
+    }
+    for (const t of this.recv) {
+      if (t.down || t.tackleCd > 0 || t.engaged) continue;
+      const arm = t.engagedBy.length > 0;
+      if (dist(t.pos, c.pos) > (arm ? TACKLE_RANGE * 0.8 : TACKLE_RANGE)) continue;
+      if (this.rng() < returnTackleChance(t.r.tkl, c.r.elu, c.r.str, this.broken) * (arm ? ARM_TACKLE : 1)) {
+        knockDown(c);
+        knockDown(t);
+        done(`Tackled by #${t.num} ${t.name}`);
+        return;
+      }
+      t.tackleCd = 1.2;
+      knockDown(t, 0.9);
+      this.broken++;
+      c.vel = scale(c.vel, 0.6);
+      this.popup('BROKEN TACKLE!', c.pos, '#ff9a5a');
+    }
   }
 
   private timingPopup(e: number): void {
@@ -562,8 +754,10 @@ export class KickPlay {
       let near = Infinity;
       for (const o of this.kick) if (!o.down) near = Math.min(near, dist(o.pos, c.pos));
       const unit = this.unit as 'punt' | 'kickoff';
-      const inside25 = this.pred!.land.x > OPP_GOAL - 25;
-      if (near < FAIR_CATCH_RANGE[unit] && (unit === 'punt' || inside25)) {
+      // NCAA: a kickoff can be fair caught anywhere (inside the 25 it comes out to the 25); not an onside hop.
+      // A returner who trusts his legs waits longer before he calls for it.
+      const trust = clamp(1 + (75 - (c.r.spd + c.r.elu) / 2) * FAIR_CATCH_TRUST, 0.6, 1.3);
+      if (near < FAIR_CATCH_RANGE[unit] * trust && !this.def.onside) {
         this.fairCatch = true;
         setPose(c, 'fairCatch', 2);
       }
@@ -578,7 +772,9 @@ export class KickPlay {
     let near = Infinity;
     for (const o of this.kick) if (!o.down) near = Math.min(near, dist(o.pos, p.pos));
     const unit = this.unit as 'punt' | 'kickoff';
-    const muff = MUFF[unit] + (75 - p.r.cth) * 0.001 + (near < 3 ? 0.025 : 0) + (clean ? 0 : 0.03);
+    const onside = this.def.onside && p.pos.x < this.los + 25 ? (this.ret === 'hands' ? ONSIDE.muffHands : ONSIDE.muff) : 0;
+    const contested = near < 3 ? this.def.contested ?? 0 : 0;
+    const muff = MUFF[unit] + (75 - p.r.cth) * 0.001 + (near < 3 ? 0.025 : 0) + (clean ? 0 : 0.03) + onside + contested;
     if (!this.muffed && this.rng() < muff) {
       this.muffed = true;
       this.phase = 'loose';
@@ -610,11 +806,20 @@ export class KickPlay {
     this.catchX = p.pos.x;
     this.phase = 'return';
     setPose(p, 'catch', 0.2);
+    // A bounding squib takes a moment to gather.
+    if (!clean && this.def.gather) {
+      p.stun = Math.max(p.stun, this.def.gather);
+      p.vel = scale(p.vel, 0.3);
+    }
   }
 
   private checkLooseBall(): void {
     const k = this.flight!;
     if (k.pos.z > 1.3) return;
+    // A kickoff is a free kick: either side may have it once it has gone 10 yards (or a receiver touched it).
+    if (this.unit === 'kickoff' && (this.touched || k.pos.x >= this.los + 10)) {
+      if (this.kickoffScrum(k)) return;
+    }
     // Kicking team: down a punt (or recover a muff). They leave an untouched kickoff alone.
     if (this.unit === 'punt' || this.touched) {
       for (const o of this.kick) {
@@ -639,6 +844,37 @@ export class KickPlay {
     if (k.mode === 'rest' && this.unit === 'punt' && !this.muffed) {
       this.endWith('downed', k.pos, 'DEAD BALL', `${this.grossText()}, rolls dead at the ${fieldLabel(k.pos.x)}`);
     }
+  }
+
+  /**
+   * A live kickoff on the ground with a man of each side at it: the ball goes to one of them by how close
+   * he is and his hands and strength (`ONSIDE`). Returns true when it ended the play or was fielded.
+   */
+  private kickoffScrum(k: KickFlight): boolean {
+    const near = (ps: Player[], reach: number) => ps.filter((p) => !p.down && p.stun <= 0 && Math.hypot(p.pos.x - k.pos.x, p.pos.y - k.pos.y) < reach);
+    const kick = near(this.kick, ONSIDE.reach).filter((p) => p !== this.kicker || this.def.onside);
+    if (!kick.length) return false;
+    const recv = near(this.recv, ONSIDE.reach);
+    const w = (p: Player) => (ONSIDE.reach + 0.2 - Math.hypot(p.pos.x - k.pos.x, p.pos.y - k.pos.y)) * (0.5 + (p.r.cth + p.r.str) / 300);
+    const all = [...kick, ...recv];
+    let roll = this.rng() * all.reduce((a, p) => a + w(p), 0);
+    let win = all[0];
+    for (const p of all) {
+      roll -= w(p);
+      if (roll <= 0) {
+        win = p;
+        break;
+      }
+    }
+    if (win.side === 'def') {
+      this.field(win, false);
+      return true;
+    }
+    setPose(win, 'catch', 1);
+    this.popup('RECOVERED!', win.pos, '#ffd23f');
+    const onside = this.def.onside && !this.touched;
+    this.endWith('recovered', k.pos, onside ? 'ONSIDE KICK RECOVERED!' : 'KICKING TEAM RECOVERS!', `#${win.num} ${win.name} comes up with it`);
+    return true;
   }
 
   private grossText(): string {
@@ -753,12 +989,25 @@ export class KickPlay {
       p.want = p.celebrate ? celebrateWant(p) : scale(p.vel, 0.9);
       return;
     }
+    if (this.phase === 'fake') {
+      const c = this.carrier!;
+      if (p === c) this.punterRun(p);
+      else if (p.side === 'def') {
+        if (this.time - this.fakeAt < RUGBY.react) p.want = scale(p.vel, 0.9);
+        else pursue(p, c);
+      } else this.fakeBlock(p, c);
+      return;
+    }
     if (p === this.carrier) {
       this.returner(p);
       return;
     }
     if (p === this.kicker && (this.phase === 'presnap' || this.phase === 'snap' || this.phase === 'set' || this.phase === 'approach')) {
-      if (this.unit === 'punt') p.want = this.phase === 'approach' ? { x: 2.2, y: 0 } : ZERO;
+      if (this.unit === 'punt') {
+        if (this.phase !== 'approach') p.want = ZERO;
+        else if (this.def.rollout) p.want = { x: this.runLive() ? RUGBY.attackUp : RUGBY.rollUp, y: this.rollSide * RUGBY.rollSpeed };
+        else p.want = { x: 2.2, y: 0 };
+      }
       else if (this.phase !== 'set' && this.phase !== 'approach') p.want = ZERO;
       return; // FG and kickoff approaches are driven by the phase code
     }
@@ -833,6 +1082,12 @@ export class KickPlay {
     }
     if (!k) return;
     const land = this.phase === 'loose' ? k.pos : this.pred?.land ?? k.pos;
+    if (this.def.onside && !safety) {
+      // Onside: everyone goes for the ball (it's theirs once it has gone 10 yards).
+      const at = this.phase === 'loose' ? add(k.pos, scale(k.vel, 0.2)) : land;
+      p.want = seek(p, { x: Math.max(at.x, this.los + 9.5), y: at.y }, maxSpeed(p), 0.2);
+      return;
+    }
     if (safety) {
       p.want = seek(p, { x: land.x - 20, y: lerp(p.pos.y, land.y, 0.4) }, maxSpeed(p) * 0.7);
       return;
@@ -846,7 +1101,8 @@ export class KickPlay {
     }
     let squeeze = p.job === 'gunner' ? 0.8 : p.job === 'protect' ? 0.5 : 0.3;
     if (this.def.directional) squeeze += 0.25;
-    const stop = this.unit === 'kickoff' && !this.touched ? 5 : 3;
+    // Cover men pull up short of an untouched kickoff's returner, except under a sky kick they go to the ball.
+    const stop = this.unit === 'kickoff' && !this.touched ? (this.def.contested ? 1.2 : 5) : 3;
     p.want = seek(p, { x: Math.min(land.x - stop, OPP_GOAL - 1), y: lerp(p.start.y, land.y, squeeze) }, maxSpeed(p), 1);
   }
 
@@ -899,6 +1155,11 @@ export class KickPlay {
       return;
     }
     const land = this.pred?.land ?? k.pos;
+    // A surprise onside kick: the front wall had turned to run back and block.
+    if (this.def.onside && this.ret !== 'hands' && this.time < this.kickTime + ONSIDE.lag) {
+      p.want = scale(p.vel, 0.85);
+      return;
+    }
     if (this.phase === 'loose' && (!this.letItGo || this.muffed)) {
       // Loose ball: the nearest man goes to pick it up.
       if (this.nearestTo(this.recv, k.pos) === p) {
@@ -973,6 +1234,24 @@ export class KickPlay {
     c.want = scale(dir, maxSpeed(c) * RETURN_SPEED);
   }
 
+  /** The punt team blocking for its running punter: the nearest free man between him and the runner. */
+  private fakeBlock(p: Player, c: Player): void {
+    let best: Player | null = null;
+    let bs = Infinity;
+    for (const d of this.recv) {
+      if (d.down || d.engagedBy.length) continue;
+      const dc = dist(d.pos, c.pos);
+      if (dc > 15) continue;
+      const s = dist(d.pos, p.pos) + dc * 0.4;
+      if (s < bs) {
+        bs = s;
+        best = d;
+      }
+    }
+    if (best) p.want = seek(p, add(best.pos, scale(norm(sub(c.pos, best.pos)), 0.8)), maxSpeed(p) * 0.95, 0.3);
+    else p.want = seek(p, add(c.pos, { x: 5, y: 0 }), maxSpeed(p) * 0.85, 1);
+  }
+
   private leadBlock(p: Player, c: Vec): void {
     let best: Player | null = null;
     let bs = Infinity;
@@ -1003,6 +1282,11 @@ export class KickPlay {
 
   private formBlocks(): void {
     if (this.phase === 'presnap' || this.phase === 'over') return;
+    if (this.phase === 'fake') {
+      const c = this.carrier!;
+      formEngagements(this.kick.filter((o) => o !== c), this.recv, (_b, d) => dist(d.pos, c.pos) < 12);
+      return;
+    }
     if (this.preKick()) {
       if (this.unit === 'kickoff') return;
       formEngagements(this.kick.filter((o) => o.job === 'protect'), this.recv, (b, d) => (d.job === 'rush' || d.job === 'hold') && (!b.mark || b.mark === d || b.mark.down));
@@ -1022,6 +1306,10 @@ export class KickPlay {
 
   private blocking(dt: number): void {
     if (this.phase === 'presnap') return;
+    if (this.phase === 'fake') {
+      updateEngagements(this.recv, () => this.carrier!.pos, this.time, dt, this.rng, { base: 0.4, ramp: 1.2, since: this.snapTime });
+      return;
+    }
     const pre = this.preKick();
     const recvGoal = (): Vec => (this.unit === 'punt' ? this.kicker.pos : this.kickSpot);
     const coverGoal = (o: Player): Vec => this.ballFocus() ?? o.pos;
@@ -1037,6 +1325,10 @@ export class KickPlay {
   }
 
   private anchor(): void {
+    if (this.phase === 'fake') {
+      anchorBlockers(this.recv, () => this.carrier!.pos);
+      return;
+    }
     if (this.preKick()) {
       anchorBlockers(this.recv, () => (this.unit === 'punt' ? this.kicker.pos : this.kickSpot));
       anchorBlockers(this.kick, (o) => ({ x: o.pos.x + 10, y: o.pos.y }));
@@ -1059,13 +1351,15 @@ export class KickPlay {
   }
 
   private endWith(result: KickResult, at: Vec, text: string, sub: string): void {
-    const bad = result === 'returnTd' || result === 'blocked';
-    const good = result === 'recovered' || result === 'downed' || result === 'touchback' || result === 'oob' && this.unit === 'punt';
+    const bad = result === 'returnTd' || result === 'blocked' || (result === 'fakeRun' && at.x < this.los + (this.fake?.toGo ?? 10));
+    const good = result === 'recovered' || result === 'fakeRun' || result === 'downed' || result === 'touchback' || result === 'oob' && this.unit === 'punt';
     this.end(this.outcomeOf(result, at, text, sub, bad ? '#ff5a5a' : good ? '#9ad7ff' : '#ffffff'));
   }
 
   private end(o: KickOutcome): void {
     if (this.phase === 'over') return;
+    if (this.foul) o.foul = this.foul;
+    if (this.fake && this.unit === 'punt') o.toGo = this.fake.toGo;
     this.outcome = o;
     this.pending = null;
     this.phase = 'over';

@@ -302,7 +302,9 @@ class Run {
    * holding the kick's snap the game page reads the score off.
    */
   kickoff(k: ESide, r: ESide, from: number, half: number, left: number): EngineKick {
-    const ek = engineKickoff(this.kickSide(k), this.kickSide(r), driveStream(this.rng), { from, record: this.opts.record, homeId: this.home.id });
+    const ek = engineKickoff(this.kickSide(k), this.kickSide(r), driveStream(this.rng), {
+      from, record: this.opts.record, homeId: this.home.id, sit: { lead: k.tl.points - r.tl.points, secsLeft: left, finalHalf: half >= 1 },
+    });
     const play: SimPlay = { gain: 0, explosive: false, turnover: ek.kickStart !== null, down: 1, toGo: 0, yard: from, t: 0, lev: 0, punt: true };
     const sk = this.tellKick(k, r, ek, 'kickoff', play, half, left);
     if (ek.recvTd) {
@@ -316,7 +318,9 @@ class Run {
 
   /** `o` punts to `d` from where its drive (`told`) ended: as `kickoff`, on the punt's snap. */
   punt(o: ESide, d: ESide, e: EngineDrive, told: StoryDrive, half: number, left: number): EngineKick {
-    const ek = enginePunt(this.kickSide(o), this.kickSide(d), e.endYard, driveStream(this.rng), { record: this.opts.record, homeId: this.home.id });
+    const ek = enginePunt(this.kickSide(o), this.kickSide(d), e.endYard, driveStream(this.rng), {
+      record: this.opts.record, homeId: this.home.id, sit: { lead: o.tl.points - d.tl.points, secsLeft: left, finalHalf: half >= 1 },
+    });
     const last = told.plays.at(-1);
     const play: SimPlay = last?.punt ? last : { gain: 0, explosive: false, turnover: false, down: 4, toGo: 1, yard: e.endYard, t: e.secs, lev: 0, punt: true };
     if (play !== last) told.plays.push(play);

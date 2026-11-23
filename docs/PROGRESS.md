@@ -2,6 +2,36 @@
 
 _Last updated: 2026-11-23_
 
+## Done: special teams revamp: you call it, the kicker kicks it (2026-11-23)
+Details, research and numbers are in docs/KICKING.md.
+- **Punts and kickoffs:**
+  - You pick the call and the CPU kicker kicks it with his ratings (`game/cpuKicker.ts`). Field goals and extra points keep the drag and meter.
+  - Space skips to the result. SETTINGS has KICKS: WATCH or RESULT ONLY.
+  - Each card shows a forecast in this wind: where it lands, hang time, and the touchback, out-of-bounds and inside-20 odds. It also shows what the call is for and what it risks, and the ST coach's pick.
+- **The calls:**
+  - Punts: Punt, Directional, Rugby (rollout, with a run option), Line Drive, Pooch, Coffin Corner.
+  - Kickoffs: Deep, Corner, Squib, Sky, Onside (new).
+- **The receivers' look, read before you call:** RETURN, PUNT BLOCK (nine rush), SAFE, or HANDS TEAM. The CPU picks it by situation and stays alert after an onside kick.
+- **Events:** shanks, bad snaps and bobbles, roughing and running into the kicker (the flag is taken only when it pays), onside scrums, and the rugby punter's run.
+- **The CPU's punts and kickoffs to you are played live** on a mirrored field (`KickRun`, `startCpuKick`), including the opening kickoff. Before, they were a flat 40-yard net or the 25. A return TD is your six and your try; an onside kick or muff the CPU recovers is its ball.
+- **Engine games:** the CPU calls every type by situation (onside kicks late, squibs to protect a lead, the rugby punt against a block).
+- **Physics and AI:** `PUNT_BOOST`, `TEE_BOOST` 1.14, a smaller fair-catch range that shrinks for a confident returner, `RETURN_BLOCK_EDGE` 30, and a 1.9 s punt operation. This fixed the old flags: punt fair catches 79% → 38% and returns 4 → 6.8 yards.
+- **Report:** `npm run kicks` → kicks.txt.
+  - The spiral punt: 43.0 gross, 39.8 net. The deep kick: 49% touchbacks, 17.8-yard returns.
+  - Onside: 53% recovered on a surprise, 16% against the hands team.
+  - Every call but three is best in some situation. The Squib is best nowhere. The plain Punt and the Pooch are each within 0.05 EP of the winner.
+- **Tests:** 7 new in `logic.test.ts` (penalty and fake rules, a deterministic CPU kicker, its aim, onside legality, surprise vs. hands team). The engine kick tests moved to new seeds. `npm test` passes.
+- **Checked in headless Chrome over CDP:**
+  - The opening CPU kickoff, live and mirrored, with Space skipping to the banner.
+  - Your kickoff and punt cards with forecasts and the block look.
+  - A rugby punt against the block look.
+  - A live CPU punt to you, ending at your 21 on 1st down.
+- **Next:**
+  - Return yards in the box score.
+  - User-controlled returns.
+  - A squib niche: the clock at the end of a half isn't modeled in the report.
+  - `simGame`'s abstract `userStartAfter` still uses the old punt net.
+
 ## Done: the title screen's highlight reel (2026-11-23)
 The title's backdrop is now big plays from the great rivalries, not a still field. The two standing players and their school names are gone.
 - **Recorded once, played back:** `npm run reel` (`src/reel.test.ts`) plays 3 engine games on tape for each of 13 matchups in `REEL_GAMES` (`data/titleReel.ts`): Ohio State–Michigan, Texas–Oklahoma, USC–UCLA, Alabama–Auburn, Notre Dame–USC, Georgia–Florida, Army–Navy, FSU–Florida, Clemson–South Carolina, Oregon–Oregon State, the Apple Cup, the Egg Bowl, and Stanford–Cal. It keeps the 2 best snaps from each (TD passes, long TD runs, picks, pick-sixes, big catches and runs).
