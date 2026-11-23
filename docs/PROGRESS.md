@@ -1,6 +1,15 @@
 # Progress
 
-_Last updated: 2026-11-22_
+_Last updated: 2026-11-23_
+
+## Done: the title screen's highlight reel (2026-11-23)
+The title's backdrop is now big plays from the great rivalries, not a still field. The two standing players and their school names are gone.
+- **Recorded once, played back:** `npm run reel` (`src/reel.test.ts`) plays 3 engine games on tape for each of 13 matchups in `REEL_GAMES` (`data/titleReel.ts`): Ohio State–Michigan, Texas–Oklahoma, USC–UCLA, Alabama–Auburn, Notre Dame–USC, Georgia–Florida, Army–Navy, FSU–Florida, Clemson–South Carolina, Oregon–Oregon State, the Apple Cup, the Egg Bowl, and Stanford–Cal. It keeps the 2 best snaps from each (TD passes, long TD runs, picks, pick-sixes, big catches and runs).
+- **Storage:** the clips are compact integer frames at 15 fps in `public/title/reel.json`: 26 clips, about 1 MB on disk and 275 KB gzipped, fetched once. The title runs no sim. `game/titleReel.ts` interpolates positions to 60 Hz and draws with `drawTape` on its own camera, with a fade between clips. The order is shuffled with no repeats.
+- **Look:** the overlay is a little lighter than the other menus (`REEL.dim` 0.66 against 0.72). A dim caption at the bottom left names the rivalry, the schools and the play. If the file is missing, the title falls back to the still field.
+- **Checked:** typecheck and the test suite pass. Screenshots over CDP confirm the clips play and rotate, and the offense attacks the defense's end zone.
+- **Next:** the midfield logo is the offense's, since `drawField` paints its first team at midfield. Re-run `npm run reel` (and commit the file) if poses or sprites change. `REEL_SEED` gives a different set of plays.
+
 
 ## Done: music and sound (2026-11-22)
 The game has sound for the first time (docs/AUDIO.md).

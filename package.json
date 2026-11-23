@@ -21,7 +21,8 @@
     "trace": "vitest run src/trace.test.ts --reporter=verbose",
     "audit": "vitest run src/runAudit.test.ts",
     "adapt": "vitest run src/adapt.test.ts",
-    "drives": "vitest run src/drives.test.ts"
+    "drives": "vitest run src/drives.test.ts",
+    "reel": "vitest run src/reel.test.ts"
   },
   "build": {
     "appId": "com.leo.saturdaygridiron",

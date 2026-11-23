@@ -82,14 +82,10 @@ export function menuRect(i: number): Box {
   return { x: VIEW_W / 2 - MENU_W / 2, y: MENU_Y + i * MENU_STEP, w: MENU_W, h: MENU_H };
 }
 
-export function drawMainMenu(g: CanvasRenderingContext2D, left: Team, right: Team, items: MenuItem[], sel: number): void {
+/** The title's menu, over the backdrop or the highlight reel (game/titleReel.ts). */
+export function drawMainMenu(g: CanvasRenderingContext2D, items: MenuItem[], sel: number): void {
   text(g, 'SATURDAY GRIDIRON', VIEW_W / 2, 40, { size: 24, align: 'center', color: GOLD, shadow: '#7a3e14' });
   text(g, 'COLLEGE FOOTBALL', VIEW_W / 2, 76, { align: 'center', color: '#cfd6df' });
-  // A player from each side, as on the field.
-  for (const [t, cx, home] of [[left, 90, true], [right, VIEW_W - 90, false]] as const) {
-    g.drawImage(getSprite(teamUniform(t, home), '#c68a5e', 'stand', home ? 1 : -1), cx - 40, 128, 80, 88);
-    text(g, t.school.toUpperCase().slice(0, 14), cx, 222, { align: 'center', color: SOFT, shadow: false });
-  }
   items.forEach((it, i) => {
     const r = menuRect(i);
     const hot = i === sel;

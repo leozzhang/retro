@@ -19,6 +19,7 @@ npm run season      # headless full-season sims -> season.txt (SEASONS=n, defaul
 npm run runfit      # who stops each run, short yardage, what each block is worth (ablations), and INTENT (each run's aim gap vs where it hit, blocks, the card) -> runfit.txt (~40 s; RUNFIT_ONLY=id,..., RUNFIT_REPS, RUNFIT_CALLS, RUNFIT_INTENT=0); see docs/RUNGAME.md
 npm run audit       # every designed run vs ten calls x three defense levels, checked against its scheme's design -> audit.txt (~40 s; AUDIT_ONLY=id,..., AUDIT_REPS); see docs/RUNAUDIT.md
 npm run drives      # CPU possessions through the engine vs the drive sim on the same matchups -> drives.txt (~15 s a 60 games; DRIVES_GAMES=n, DRIVES_SEED, DRIVES_ADAPT=1 the coordinators' battle, DRIVES_PAYOFF=1 rewrites src/data/enginePayoff.ts: commit it); see docs/ENGINEDRIVES.md
+npm run reel        # the title screen's highlight reel: rivalry games on tape, the best snaps -> public/title/reel.json (~15 s; commit it; REEL_SEED); data/titleReel.ts, game/titleReel.ts
 npm run trace       # one snap step by step: assignments, positions, blocks (TRACE_PLAY=id TRACE_CALL=id); see docs/FILM.md
 npm run film        # every play vs every defensive call -> film.txt + film.json (~2 min; FILM_ONLY=id,kind, FILM_REPS=n, FILM_EXPLAIN=id,..., FILM_BASE=film.base.json); see docs/FILM.md
 npm run app         # the desktop app on the Vite dev server (hot reload); `-- --remote-debugging-port=9222` for CDP

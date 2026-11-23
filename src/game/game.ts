@@ -27,6 +27,7 @@ import {
   creditCpuDrive, creditUserFg, creditUserSnap, finishLiveBox, liveGamePlays, newLiveBox, storyAgainst, storyCpuDrive, storyUserEnd, storyUserPoints,
   storyUserSnap, userCredit, type LiveBox, type SnapAt, type UserSnap,
 } from '../season/liveBox';
+import { loadReel, TitleReel } from './titleReel';
 import { newRecorder, pickReel, recordFrame, TAPE, tapeScore, type Tape, type TapeRecorder } from './tape';
 import { drawGame, GAME_TABS, gameReelAt as gameReelAt0, gameScrollMax, gameTabAt as gameTabAt0, type GameView, type ReelThumb } from '../render/gameScreen';
 import { drawField, makeCrowd } from '../render/field';
@@ -408,6 +409,9 @@ export class Game {
   /** The current snap's leverage (data/confidence.ts), logged with it for the grades. */
   private snapLev = 0;
   private crowd: HTMLCanvasElement | null = null;
+  /** The title screen's highlight reel, once loaded (null: missing, the still field instead). */
+  private titleReel: TitleReel | null = null;
+  private reelAsked = false;
   /** The two teams the menus' crowd was painted for. */
   private crowdKey = '';
   private cam = new Camera();
@@ -575,7 +579,7 @@ export class Game {
     this.watchOffice();
     switch (this.screen) {
       case 'title':
-        this.updateTitle(input);
+        this.updateTitle(input, dt);
         break;
       case 'exhibition':
         this.updateExhibition(input);
@@ -688,7 +692,12 @@ export class Game {
     this.menuSel = 0;
   }
 
-  private updateTitle(input: Input): void {
+  private updateTitle(input: Input, dt: number): void {
+    if (!this.reelAsked) {
+      this.reelAsked = true;
+      void loadReel().then((r) => (this.titleReel = r));
+    }
+    this.titleReel?.update(dt);
     const items = this.menuItems();
     const n = items.length;
     const m = input.mouse;
@@ -4557,8 +4566,10 @@ export class Game {
     const { x, y } = this.menuMouse;
     switch (this.screen) {
       case 'title':
-        drawBackdrop(g, this.cam, user, cpu, this.crowd);
-        drawMainMenu(g, user, cpu, this.menuItems(), this.menuSel);
+        if (this.titleReel) this.titleReel.draw(g);
+        else drawBackdrop(g, this.cam, user, cpu, this.crowd);
+        drawMainMenu(g, this.menuItems(), this.menuSel);
+        this.titleReel?.drawCaption(g, 8, 348);
         break;
       case 'exhibition':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
