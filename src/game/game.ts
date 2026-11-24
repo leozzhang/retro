@@ -3516,10 +3516,12 @@ export class Game {
       input.mouse.pressed = false;
     }
     const was = kp.phase;
-    if (this.kicker) {
+    // Once it's over the kick still ticks (its `overTime` moves the game on), so the kicker's loop is skipped.
+    const over = () => kp.phase === 'over';
+    if (this.kicker && !over()) {
       // Fast: the whole kick in one frame (the clock runs as it would have).
       const steps = this.kickFast && kp.phase !== 'presnap' ? Math.ceil(30 / STEP) : 1;
-      for (let i = 0; i < steps && kp.phase !== 'over'; i++) {
+      for (let i = 0; i < steps && !over(); i++) {
         const step = steps > 1 ? STEP : dt;
         this.kicker.step();
         kp.update(step, AUTO_INPUT);
@@ -3529,7 +3531,7 @@ export class Game {
         const f = kp.focus();
         this.cam.follow(f.x, f.lead);
       }
-    } else kp.update(dt, input);
+    } else kp.update(dt, this.kicker ? AUTO_INPUT : input);
     if (was === 'presnap' && kp.phase !== 'presnap' && kp.unit === 'fg') {
       runoffAtSnap(this.clock, this.tempo);
       snapClock(this.clock);

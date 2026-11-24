@@ -2,6 +2,9 @@
 
 _Last updated: 2026-11-23_
 
+## Fixed: the game froze after your punts and kickoffs (2026-11-24)
+- After the special teams revamp, every punt and kickoff the CPU kicker struck for you (fair catch, return, touchback, downed) froze on the result banner. `Game.updateKick` only stepped the kick while it wasn't over, so `KickPlay.overTime`, which moves the game on (and lets SPACE skip), never advanced. A finished kick now keeps updating. Checked in the browser: 40 punts across every outcome all move on.
+
 ## Done: special teams revamp: you call it, the kicker kicks it (2026-11-23)
 Details, research and numbers are in docs/KICKING.md.
 - **Punts and kickoffs:**
