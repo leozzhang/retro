@@ -214,7 +214,7 @@ function run(k: StoryKit): void {
       cls.beats.push({ week, text: `UP TO NO. ${at}`, tone: 'up' });
       out.push({
         id: `${state.year}:${week}:class`, week, kind: 'poll', tier: at <= 10 ? 3 : 2, w: 2 + (25 - Math.min(25, at)) / 10, team: u, arc: cls.id,
-        title: 'CLASS RANKINGS', sub, lines: [`${n} COMMITS`], n: [Math.min(26, was), at],
+        title: 'CLASS RANKINGS', sub, lines: [`${n} COMMITS`], n: [was, at], ranked: true,
         rows: ranks.slice(Math.max(0, at - 3), Math.max(0, at - 3) + 5).map((r, i) => ({
           text: `${Math.max(0, at - 3) + i + 1}. ${SCHOOL(r.team)}`, val: `${r.n} / ${r.pts}`, me: r.team === u, team: r.team,
         })),

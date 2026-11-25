@@ -139,7 +139,7 @@ export function stageMoments(state: SeasonState, stage: OffseasonStage, cards?: 
       const from = Math.max(0, at - 3);
       mk('ranks', {
         kind: 'poll', tier: 2, w: 0.5, title: 'CLASS RANKINGS', sub: at <= 10 ? 'A TOP 10 CLASS' : at <= 25 ? 'A TOP 25 CLASS' : `NO. ${at} NATIONALLY`,
-        lines: [`${signed.length} SIGNEES`], n: [at, at],
+        lines: [`${signed.length} SIGNEES`], n: [at, at], ranked: true,
         rows: ranks.slice(from, from + 5).map((r, i) => ({ text: `${from + i + 1}. ${SCHOOL(r.team)}`, val: `${r.n} / ${r.pts}`, me: r.team === u, team: r.team })),
       });
     }

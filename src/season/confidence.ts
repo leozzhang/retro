@@ -343,6 +343,7 @@ export function confidenceStep(
         p.sw.n++;
         p.sw.z = round3(p.sw.z + z);
       }
+      p.sw.r = (p.sw.r ?? '') + (!started ? '-' : z >= BREAKOUT.z ? 'G' : 'S');
       if (p.sw.t >= BREAKOUT.games) {
         const a = byId.get(id);
         const hot = p.sw.n >= BREAKOUT.minStarts && p.sw.z / p.sw.n >= BREAKOUT.z;

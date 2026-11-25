@@ -232,8 +232,12 @@ export interface Progress {
   spn?: number;
   /** The season he last sparked (once a season). */
   spy?: number;
-  /** His breakout window after a spark: team games so far, starts, and their summed performance. */
-  sw?: { t: number; n: number; z: number };
+  /**
+   * His breakout window after a spark: team games so far, starts, and their summed performance; `r` is
+   * each game for the storyline's boxes (display only): G a start at the breakout bar, S a start under
+   * it, - no start.
+   */
+  sw?: { t: number; n: number; z: number; r?: string };
   /** Team game number of his last start this season, and his starts this season. */
   ls?: number;
   gs?: number;
@@ -835,6 +839,8 @@ export interface Moment {
   q?: MomentPlayer;
   /** A number that rolls: rank or overall, from and to. */
   n?: [number, number];
+  /** Every rank in `n` is real (a class ranking, 1 to 138): no NR past 25 the way the AP poll has. */
+  ranked?: boolean;
   d?: RatingDelta;
   dev?: [DevTrait, DevTrait];
   rows?: MomentRow[];
@@ -892,7 +898,11 @@ export interface Storyline {
   beats: StoryBeat[];
   /** What the next game decides. */
   stakes: string;
-  meter?: { at: number; of: number; label: string };
+  /**
+   * A bar from `at` of `of`; with `pips`, one box per step instead (a breakout window's games: G a good
+   * start, S an ordinary one, - no start, ? one before the boxes were kept; boxes past them are to come).
+   */
+  meter?: { at: number; of: number; label: string; pips?: string };
   decision?: StoryDecision;
   outcome?: string;
   /** Kind-specific counters: starts, wins as the starter, the week the starter is due back. */

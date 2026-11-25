@@ -67,7 +67,7 @@ Each runs a few weeks with **stakes**: what the next game decides. The stakes sh
 | Kind | Opens | Moves | Closes |
 | --- | --- | --- | --- |
 | `nextManUp` | a starter hurt 2+ weeks; the star is the replacement `newStarters` names | each start: a beat with his line and his record as the starter | the starter is healthy. If the backup's confidence is `hotHand`+ at a position weighing `decideW`+, it becomes a **decision: WHO STARTS?** Otherwise "returns to the bench after N starts (W-L)". |
-| `breakoutWatch` | a spark with a breakout window | a meter of starts out of `BREAKOUT.minStarts`, and ON PACE / NEEDS BIG GAMES / LAST CHANCE | the breakout, or "the spark fades" |
+| `breakoutWatch` | a spark with a breakout window | one box per game of the window (GOOD, STARTED, NO START, or still to come; `Progress.sw.r`) under the rule (START 3 OF HIS FIRST 4 GAMES AND PLAY WELL), and where he stands: NEEDS 1 MORE START IN 2 GAMES, PLAYING WELL / GRADES TOO LOW, or OUT OF REACH | the breakout, or "the spark fades" |
 | `slump` | a healthy starter at `slump` (-0.5) confidence after 3+ starts, at a playmaker position or the kicker; at most 2 at once | | back over `slumpOut`; hurt; losing the job (only when he has no starting role left: not last game's starter, not in the chart's next lineup, not top of any slot, so a rest day or a week out hurt isn't a lost job); or `slumpWeeks` later. With a `challenger` at a `decideW` position: **decision: STICK WITH HIM or START <BACKUP>** |
 | `heisman` | your player in the weekly top 5 | rank and the next game | the ceremony, or falling out of the top 10 |
 | `unbeaten` | 5-0 (`STORY.unbeaten`) | | the first loss: PERFECT NO MORE |

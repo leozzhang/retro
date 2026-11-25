@@ -15,6 +15,7 @@ import { headlineMoment, lastWeekMoments } from '../season/moments';
 import { pendingDecisions } from '../season/storylines';
 import { squadFor } from '../season/world';
 import { drawHint } from './hud';
+import { drawPips } from './momentArt';
 import { drawRich, gameLink, linkText, newsRich, playerLink, richText, teamLink, type RichLine } from './links';
 import { getSprite, teamUniform } from './sprites';
 import { text } from './text';
@@ -556,7 +557,7 @@ function storyTail(s: SeasonState, st: Storyline): string {
   const game = st.game ? s.games.find((x) => x.id === st.game) : undefined;
   if (game) return `VS ${teamById(game.home === st.team ? game.away : game.home).abbr}`;
   switch (st.kind) {
-    case 'breakoutWatch': return st.meter ? `${st.meter.at}/${st.meter.of}` : '';
+    case 'breakoutWatch': return st.k?.need ? `${st.k.starts}/${st.k.need} GS` : '';
     case 'unbeaten': return recordText(records(s).get(st.team)!);
     case 'bowlChase': return /NEED \d+/.exec(st.stakes)?.[0] ?? '';
     case 'heisman': {
@@ -909,7 +910,8 @@ function drawStorylines(g: CanvasRenderingContext2D, s: SeasonState, v: SeasonVi
     const lines = ls.length > 1 ? [ls[0], clip(ls.slice(1).join(' '), 58)] : [ls[0] ?? '', trail];
     drawRich(g, richText(s, lines[0], teams), PX + 12, y + 15, { color: open ? GOLD : SOFT, shadow: false });
     drawRich(g, richText(s, lines[1], teams), PX + 12, y + 26, { color: ls.length > 1 ? SOFT : DIM, shadow: false });
-    if (st.meter && open) {
+    if (st.meter?.pips !== undefined && open) drawPips(g, st.meter.pips, st.meter.of, PR - 92, y + 16, 80, 8);
+    else if (st.meter && open) {
       g.fillStyle = '#2a3546';
       g.fillRect(PR - 92, y + 18, 80, 4);
       g.fillStyle = GOLD;

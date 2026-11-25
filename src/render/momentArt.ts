@@ -23,6 +23,33 @@ export const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 /** 0 to 1 over `d` seconds from `a`. */
 export const seg = (t: number, a: number, d: number) => clamp01((t - a) / d);
 export const ease = (f: number) => 1 - (1 - clamp01(f)) ** 2;
+/** A storyline meter's boxes (`Storyline.meter.pips`): each one's fill and its word. */
+const PIP: Record<string, [string, string]> = { G: [GREEN, 'GOOD'], S: [GOLD, 'STARTED'], '-': ['#a04848', 'NO START'], '?': [SOFT, 'PLAYED'] };
+
+/**
+ * `of` boxes left to right, the first ones filled by `pips` and the rest to come; with `words`, each box
+ * names its game (GOOD, STARTED, NO START, GAME 3) when it's tall enough to hold a line of text.
+ */
+export function drawPips(g: CanvasRenderingContext2D, pips: string, of: number, x: number, y: number, w: number, h: number, f = 1, words = false): void {
+  const gap = Math.max(2, Math.round(w / of / 12));
+  const bw = (w - gap * (of - 1)) / of;
+  for (let i = 0; i < of; i++) {
+    const bx = x + i * (bw + gap);
+    const pip = i < pips.length && i < Math.ceil(f * of) ? PIP[pips[i]] ?? PIP['?'] : undefined;
+    g.fillStyle = pip ? pip[0] : '#1f2a3a';
+    g.fillRect(bx, y, bw, h);
+    if (!pip) {
+      // To come: an outline, so it reads as an empty box.
+      g.fillStyle = '#3a4a62';
+      g.fillRect(bx, y, bw, 1);
+      g.fillRect(bx, y + h - 1, bw, 1);
+      g.fillRect(bx, y, 1, h);
+      g.fillRect(bx + bw - 1, y, 1, h);
+    }
+    if (words && h >= 12) text(g, pip ? pip[1] : `GAME ${i + 1}`, bx + bw / 2, y + (h - 8) / 2, { color: pip ? INK : DIM, align: 'center', shadow: false });
+  }
+}
+
 export const back = (f: number) => {
   // Overshoot a little and settle: a slam.
   const x = clamp01(f);

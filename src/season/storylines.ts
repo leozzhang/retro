@@ -206,6 +206,7 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
     } else {
       s.meter = watchMeter(p.sw);
       s.stakes = watchStakes(p.sw);
+      s.k = { starts: p.sw.n, need: BREAKOUT.minStarts };
     }
   }
   for (const e of ev.sparks.filter((x) => x.team === u)) {
@@ -214,11 +215,11 @@ export function storyStep(state: SeasonState, week: number, ev: WeekEvents): Mom
     const star = momentPlayer(who(sq, e.athlete.id) ?? e.athlete, u);
     const s = add({
       id: `breakoutWatch:${e.athlete.id}:${state.year}`, kind: 'breakoutWatch', team: u, title: 'BREAKOUT WATCH', star,
-      stakes: watchStakes(p.sw), meter: watchMeter(p.sw),
+      stakes: watchStakes(p.sw), meter: watchMeter(p.sw), k: { starts: p.sw.n, need: BREAKOUT.minStarts },
     });
     beat(s, `${withPos(star)} STEPS IN FOR ${withPos({ pos: e.replaced.pos, name: athleteName(e.replaced) })}`, 'up', {
       tier: 2, w: 1.5 + (MOMENTS.posW[star.pos] ?? 0.5), sub: `${withPos(star)}: THE CHANCE`,
-      lines: [`BREAKOUT WATCH: ${BREAKOUT.minStarts} STRONG STARTS IN HIS FIRST ${BREAKOUT.games} GAMES AND HE BREAKS OUT`, s.stakes],
+      lines: [`START ${BREAKOUT.minStarts} OF HIS FIRST ${BREAKOUT.games} GAMES AND PLAY WELL, AND HE BREAKS OUT`],
     });
   }
 
@@ -436,15 +437,25 @@ export function challenger(state: SeasonState, sq: Squad, slot: string, a: Athle
       && (prog[x.id]?.c ?? 0) > CONFIDENCE.slump && overall(x.r, x.pos) >= overall(a.r, a.pos) - STORY.slumpReach);
 }
 
-function watchMeter(sw: { t: number; n: number; z: number }): Storyline['meter'] {
-  return { at: sw.n, of: BREAKOUT.minStarts, label: `${sw.n} OF ${BREAKOUT.minStarts} STARTS, ${BREAKOUT.games - sw.t} GAME${BREAKOUT.games - sw.t === 1 ? '' : 'S'} LEFT` };
+type Window = { t: number; n: number; z: number; r?: string };
+
+/** One box per game of the window (what each game was), and the rule under them. */
+function watchMeter(sw: Window): Storyline['meter'] {
+  return {
+    at: sw.t, of: BREAKOUT.games, pips: sw.r ?? '?'.repeat(sw.t),
+    label: `START ${BREAKOUT.minStarts} OF HIS FIRST ${BREAKOUT.games} GAMES AND PLAY WELL`,
+  };
 }
 
-function watchStakes(sw: { t: number; n: number; z: number }): string {
+/** Where he stands: the starts he still needs in the games left, and whether his play is good enough. */
+function watchStakes(sw: Window): string {
   const left = BREAKOUT.games - sw.t;
-  const pace = sw.n ? sw.z / sw.n : 0;
-  const how = left <= 1 ? 'LAST CHANCE' : sw.n && pace >= BREAKOUT.z ? 'ON PACE TO BREAK OUT' : 'NEEDS BIG GAMES';
-  return `${how}: ${left} GAME${left === 1 ? '' : 'S'} LEFT`;
+  const need = Math.max(0, BREAKOUT.minStarts - sw.n);
+  const pl = (k: number, w: string) => `${k} ${w}${k === 1 ? '' : 'S'}`;
+  if (need > left) return 'OUT OF REACH: MISSED TOO MANY STARTS';
+  const starts = need ? `NEEDS ${sw.n ? `${need} MORE` : need} START${need === 1 ? '' : 'S'} IN ${pl(left, 'GAME')}` : `HAS HIS ${BREAKOUT.minStarts} STARTS`;
+  if (!sw.n) return starts;
+  return `${starts}, ${sw.z / sw.n >= BREAKOUT.z ? 'PLAYING WELL' : 'GRADES TOO LOW'}`;
 }
 
 export function decisionMoment(state: SeasonState, week: number, s: Storyline): Moment {

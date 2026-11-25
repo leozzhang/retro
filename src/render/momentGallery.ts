@@ -37,7 +37,7 @@ export function galleryMoments(s: SeasonState): Moment[] {
     { ...base, id: 'g3', kind: 'breakout', tier: 3, title: 'BREAKOUT', sub: `${hb.name} HAS ARRIVED`, p: hb, dev: ['normal', 'impact'], n: [hb.ovr - 4, hb.ovr], d: { spd: 1, elu: 2, acc: 2, str: 1 }, lines: [`A ${hb.cls} ${hb.stars}-STAR FROM ${hb.home}`, '4 WEEKS AGO HE STEPPED IN FOR THE INJURED STARTER.'] },
     { ...base, id: 'g4', kind: 'breakthrough', tier: 2, title: 'BREAKTHROUGH', sub: `${wr.name}: IT CLICKED`, p: wr, n: [wr.ovr - 3, wr.ovr], d: { cth: 2, rte: 2, rls: 1 }, lines: [`A ${wr.cls} ${wr.stars}-STAR FROM ${wr.home}`] },
     { ...base, id: 'g5', kind: 'injury', tier: 3, title: 'INJURY', sub: `${qb.name} IS OUT`, p: qb2, q: qb, arc: 'gallery', lines: ['HIGH ANKLE SPRAIN: OUT 3 WEEKS', `NEXT MAN UP: ${qb2.name}`, 'HE HAS NEVER STARTED A GAME', 'HIS TIME: AT #12 LSU'] },
-    { ...base, id: 'g6', kind: 'firstStart', tier: 2, title: 'FIRST START', sub: `${qb2.name}: A WINNER`, p: qb2, arc: 'gallery', lines: [`A ${qb2.cls} ${qb2.stars}-STAR FROM ${qb2.home}`, 'IN HIS FIRST START: 21/30, 288 YDS, 3 TD', 'BREAKOUT WATCH: 3 STRONG STARTS IN HIS FIRST 4 GAMES AND HE BREAKS OUT'] },
+    { ...base, id: 'g6', kind: 'firstStart', tier: 2, title: 'FIRST START', sub: `${qb2.name}: A WINNER`, p: qb2, arc: 'gallery', lines: [`A ${qb2.cls} ${qb2.stars}-STAR FROM ${qb2.home}`, 'IN HIS FIRST START: 21/30, 288 YDS, 3 TD', 'START 3 OF HIS FIRST 4 GAMES AND PLAY WELL, AND HE BREAKS OUT'] },
     { ...base, id: 'g7', kind: 'poll', tier: 3, title: 'THE AP POLL', sub: 'INTO THE TOP 5', n: [9, 4], lines: ['FROM NO. 9 TO NO. 4'], rows: rows(5, (i) => ({ text: `${i + 2}. ${i === 2 ? 'YOU' : TEAMS[i].school.toUpperCase()}`, val: '8-1', mv: i === 2 ? 5 : -1, me: i === 2, team: i === 2 ? u : TEAMS[i].id })) },
     { ...base, id: 'g8', kind: 'heisman', tier: 3, title: 'HEISMAN WATCH', sub: `${qb.name}: THE HEISMAN FRONTRUNNER`, p: qb, n: [3, 1], lines: [`A ${qb.cls} ${qb.stars}-STAR FROM ${qb.home}`], rows: rows(5, (i) => ({ text: `${i + 1}. ${i ? `PLAYER ${i}` : qb.name}`, val: 'QB', mv: i ? -1 : 2, me: !i, team: i ? TEAMS[i + 3].id : u })) },
     { ...base, id: 'g9', kind: 'milestone', tier: 2, title: 'MILESTONE', sub: '1,000 RUSHING YARDS', p: hb, n: [912, 1047], lines: [`${hb.name} THIS SEASON: 1,047 IN 8 GAMES`] },
@@ -47,7 +47,7 @@ export function galleryMoments(s: SeasonState): Moment[] {
     { ...base, id: 'g13', kind: 'progress', tier: 1, title: 'PROGRESS REPORT', sub: '8 LEVEL-UPS THIS WEEK', rows: sq.athletes.slice(0, 8).map((a, i) => ({ text: `${a.first} ${a.last} ${a.pos}`.toUpperCase(), val: `+${1 + (i % 4)}`, me: i === 1, team: u })) },
     { ...base, id: 'g14', kind: 'preview', tier: 1, title: 'UP NEXT', sub: 'AT #12 LSU', opp, lines: ['WEEK 9'], rows: [
       { text: 'HOMECOMING: ' + wr.name, val: 'PLAYS IN FRONT OF FAMILY IN LA', me: true, team: u },
-      { text: 'BREAKOUT WATCH: ' + qb2.name, val: 'ON PACE TO BREAK OUT: 2 GAMES LEFT', team: u },
+      { text: 'BREAKOUT WATCH: ' + qb2.name, val: '1 MORE START IN 2 GAMES, PLAYING WELL', team: u },
       { text: 'THE UNBEATEN RUN', val: '8-0. NEXT: AT #12 LSU', team: u },
     ] },
     { ...base, id: 'g15', kind: 'around', tier: 1, title: 'AROUND THE FBS', sub: `WEEK ${s.week}`, rows: [

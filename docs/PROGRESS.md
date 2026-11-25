@@ -2,6 +2,10 @@
 
 _Last updated: 2026-11-24_
 
+## Fixed: class rankings showed NR; the breakout watch reads at a glance (2026-11-24)
+- The CLASS RANKINGS scenes (signing day, a class climbing during the cycle) reused the AP poll's ladder, which shows any rank past 25 as NR. Moments now carry `ranked` for rankings that go all the way down, so a No. 41 class reads NO. 41.
+- The breakout watch drew a bar of starts plus "GAMES LEFT", and it wasn't clear what either counted. It now draws one box per game of the four-game window: green GOOD (a start at the breakout bar), gold STARTED, red NO START, empty for games still to come. The rule sits under the boxes (START 3 OF HIS FIRST 4 GAMES AND PLAY WELL), and the stakes say where he stands: NEEDS 1 MORE START IN 2 GAMES, PLAYING WELL / GRADES TOO LOW, or OUT OF REACH once he can't get the starts. The hub's tag reads 2/3 GS. Each game's result is kept on `Progress.sw.r`, which is display only; the breakout rule (`BREAKOUT`) is unchanged. A save from before this shows its window's past games as gray PLAYED boxes.
+
 ## Fixed: signing day filled the roster before the transfer portal (2026-11-24)
 Signing day came before the portal and filled every roster to 85. Delegated staffs signed past it (Georgia 86, App State 90), because signing day's class plan counted rising seniors and attrition a second time. `overCap` then pushed players into the portal, and the only room left came from your own entrants, so keeping players cost you the portal.
 - **New order, the real calendar's:** carousel → departures → **portal** → **national signing day** (`OFFSEASON_STAGES`). Early signees join the roster when the portal opens; verbal commits within the class planned at the early period hold spots (`heldSpots`, `RecruitingState.plan`). Signing day fills what's left, in up to 2 rounds of last offers, then placeholder freshmen, then the new season.

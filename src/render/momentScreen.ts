@@ -5,7 +5,7 @@ import { storyOf } from '../season/storylines';
 import type { Moment, MomentPlayer, SeasonState, Storyline } from '../season/types';
 import { drawHint } from './hud';
 import {
-  backdrop, clamp01, confetti, devBadge, DIM, ease, GOLD, GREEN, hero, moveMark, playerCard, rain, ratingBars, RED, rise, rolled, seg,
+  backdrop, clamp01, confetti, devBadge, DIM, drawPips, ease, GOLD, GREEN, hero, moveMark, playerCard, rain, ratingBars, RED, rise, rolled, seg,
   slam, SOFT, spotlight, starPips, trophy, wrap,
 } from './momentArt';
 import type { Pose } from './sprites';
@@ -263,7 +263,7 @@ function drawLadder(g: CanvasRenderingContext2D, m: Moment, team: Team, t: numbe
   } else if (m.n) {
     const now = rolled(m.n[0], m.n[1], seg(t, 0.3, 1.0));
     rise(g, 'NO.', 150, 104, seg(t, 0.2, 0.3), { color: SOFT, align: 'center' });
-    text(g, now >= 26 ? 'NR' : `${now}`, 150, 124, { size: 32, color: t >= 1.3 ? GOLD : '#ffffff', align: 'center' });
+    text(g, now >= 26 && !m.ranked ? 'NR' : `${now}`, 150, 124, { size: 32, color: t >= 1.3 ? GOLD : '#ffffff', align: 'center' });
     rise(g, m.lines[0] ?? '', 150, 176, seg(t, 1.0, 0.3), { color: SOFT, align: 'center' });
     hero(g, team, m.p?.skin ?? '#c68a5e', 150, FLOOR + 40, 3, t < 1.3 ? 'stand' : 'cheer', 1);
   }
@@ -421,12 +421,19 @@ function drawStory(g: CanvasRenderingContext2D, m: Moment, team: Team, t: number
     const f = seg(t, 0.8, 0.5);
     const mw = 300;
     const mx = p ? x : CX - mw / 2;
-    g.fillStyle = '#1f2a3a';
-    g.fillRect(mx, y, mw, 8);
-    g.fillStyle = GOLD;
-    g.fillRect(mx, y, mw * (story.meter.at / story.meter.of) * ease(f), 8);
-    rise(g, story.meter.label, mx, y + 12, f, { color: SOFT, shadow: false });
-    y += 30;
+    if (story.meter.pips !== undefined) {
+      // One box per game, each saying what it was.
+      drawPips(g, story.meter.pips, story.meter.of, mx, y, mw, 16, ease(f), true);
+      rise(g, story.meter.label, mx, y + 20, f, { color: SOFT, shadow: false });
+      y += 38;
+    } else {
+      g.fillStyle = '#1f2a3a';
+      g.fillRect(mx, y, mw, 8);
+      g.fillStyle = GOLD;
+      g.fillRect(mx, y, mw * (story.meter.at / story.meter.of) * ease(f), 8);
+      rise(g, story.meter.label, mx, y + 12, f, { color: SOFT, shadow: false });
+      y += 30;
+    }
   }
   // The story so far.
   const bx = x - (p ? 0 : 150);
