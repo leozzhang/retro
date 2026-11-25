@@ -53,7 +53,7 @@ A season adds about 1.9–2.4 MB of JSON, about 230 KB gzipped. Every player on 
 Older saves with no `careers` show all-time gains in SZN until their first archive.
 
 ## Not built yet
-- Program records and career leaders (all-time passing, rushing, receiving), and a league-wide player search.
+- A league-wide player search. (The user's program records, career leaders and former players are built: see docs/ALUMNI.md.)
 - **Size with departures:** graduated players' careers are kept, and redshirt and graduation lines add up, so a 5-season career runs about 2.9 MB of JSON a season (from about 2.0). Trimming `dnp` rows and non-user redshirt lines are the first levers.
 - Live games record no box scores, so the user's played games add games and starts but no stats.
 - Box-score credit goes to starters only (SEASON.md), so backups' stat lines are thin.

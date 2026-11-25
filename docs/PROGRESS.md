@@ -1,6 +1,13 @@
 # Progress
 
-_Last updated: 2026-11-24_
+_Last updated: 2026-11-25_
+
+## New: THE LETTERMEN, the user's alumni (2026-11-25)
+- Every player the user has coached, past and present, is kept as a plaque (`season/alumni.ts`, `SeasonState.alumni`): origin (signed, inherited, transfer, walk-on), a row per season, overall arc, calling card, honors, curated story lines, and exit (graduated, declared, drafted with round, pick and city, transferred, left FBS). It's frozen when he leaves. Display only: the season report is byte-identical apart from timing.
+- Legacy tiers set the plaque's frame: letterman, bronze STARTER, silver STAR, gold LEGEND, and the black-and-gold HALL OF FAME with a glint. The Hall of Fame is a free toggle (`SeasonState.hof`). Stars and up get a nickname ("THE FRESNO FLASH").
+- The page is the ALUMNI tab on the user's program page (`render/alumniScreen.ts`). ROLL has filters, search and the plaque; RECORDS shows leaders since the user arrived; NUMBERS shows each jersey's lineage; TIMELINE shows the starters by year. A link to a former player opens his plaque.
+- Saves from before backfill on first sync. Size is about 12 KB of JSON a season. `game.devAlumni(n)` sims n seasons and opens it. See docs/ALUMNI.md.
+- **Next:** an NFL "where are they now", yearbooks, and record-broken news.
 
 ## Fixed: HBs won the Heisman about half the time (2026-11-24)
 - **Why:** `production()` paid 1 point per 25 passing yards but 1 per 10 rushing yards, and the cast sim gives the starting HB every non-QB carry (the rushing leader at about 2,700–2,900 yards). Raw totals compared across positions favored backs.

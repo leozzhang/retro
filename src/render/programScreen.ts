@@ -9,6 +9,7 @@ import { records, recordText, standings } from '../season/standings';
 import { seasonStats, type SeasonLine } from '../season/stats';
 import type { SeasonState } from '../season/types';
 import { squadFor, staffFor } from '../season/world';
+import { alumniHint, drawAlumni, type AlumniView } from './alumniScreen';
 import { CAREER_HINT, drawCareer, type CareerView } from './careerScreen';
 import { drawHint } from './hud';
 import { drawRich, gameLink, linkText, newsRich, playerLink, teamLink, wrapSpans, type RichLine } from './links';
@@ -19,11 +20,17 @@ import { text } from './text';
  * A program's page, for any team (the user's is PROGRAM on the hub): the header in its colors with
  * the page's tabs, then OVERVIEW (the fan pulse, the trophy case, the last five seasons, the big
  * headlines), SEASON (schedule, standing, leaders, staff), HISTORY (titles, Heismans, every season
- * on record), NEWS (this season's and the chronicle's) and REGISTRY (every player's career).
+ * on record), NEWS (this season's and the chronicle's), REGISTRY (every player's career) and, on the
+ * user's own page, ALUMNI (render/alumniScreen.ts: everyone the user has coached).
  * Names are links (render/links.ts). See docs/PROGRAM.md.
  */
 
-export const PROGRAM_TABS = ['OVERVIEW', 'SEASON', 'HISTORY', 'NEWS', 'REGISTRY'] as const;
+export const PROGRAM_TABS = ['OVERVIEW', 'SEASON', 'HISTORY', 'NEWS', 'REGISTRY', 'ALUMNI'] as const;
+
+/** ALUMNI is the user's program only. */
+export function programTabCount(s: SeasonState, team: string): number {
+  return team === s.config.userTeamId ? PROGRAM_TABS.length : PROGRAM_TABS.length - 1;
+}
 
 export interface ProgramView {
   team: string;
@@ -31,6 +38,7 @@ export interface ProgramView {
   /** Lines scrolled past on HISTORY and NEWS. */
   scroll: number;
   career: CareerView;
+  alumni: AlumniView;
   mx: number;
   my: number;
 }
@@ -56,8 +64,8 @@ export function programTabRect(i: number): Box {
   return { x, y: 16, w: (PROGRAM_TABS[i].length + 2) * 8, h: 14 };
 }
 
-export function programTabAt(x: number, y: number): number {
-  return PROGRAM_TABS.findIndex((_, i) => inBox(programTabRect(i), x, y));
+export function programTabAt(x: number, y: number, n: number = PROGRAM_TABS.length): number {
+  return PROGRAM_TABS.findIndex((_, i) => i < n && inBox(programTabRect(i), x, y));
 }
 
 function card(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, title: string, right?: string): void {
@@ -92,7 +100,7 @@ export function drawProgram(g: CanvasRenderingContext2D, s: SeasonState, v: Prog
   text(g, `${rank ? `#${rank} ` : ''}${t.school.toUpperCase()} ${t.mascot.toUpperCase()}`, 10, 4, { size: 8 });
   text(g, `${recordText(rec)} (${rec.cw}-${rec.cl} ${t.conference.toUpperCase()})  OVR ${tr.ovr}`, VIEW_W - 10, 4, { align: 'right', color: GOLD });
   text(g, `HC ${ten.name}, ${ordinal(ten.year)} YR`, VIEW_W - 10, 19, { align: 'right', color: '#e6e6e6' });
-  PROGRAM_TABS.forEach((label, i) => {
+  PROGRAM_TABS.slice(0, programTabCount(s, v.team)).forEach((label, i) => {
     const b = programTabRect(i);
     const on = i === v.tab;
     const hover = !on && inBox(b, v.mx, v.my);
@@ -114,11 +122,14 @@ export function drawProgram(g: CanvasRenderingContext2D, s: SeasonState, v: Prog
     case 4:
       drawCareer(g, s, squadFor(s, v.team), v.career);
       break;
+    case 5:
+      drawAlumni(g, s, v.alumni);
+      break;
     default:
       drawOverview(g, s, v);
   }
-  const keys = '1-5 OR CLICK: PAGE';
-  drawHint(g, v.tab === 4 ? CAREER_HINT : v.tab === 2 || v.tab === 3 ? `${keys}  WHEEL OR W/S: SCROLL  CLICK A NAME  ESC: BACK` : `${keys}  CLICK A NAME TO OPEN IT  ESC: BACK`);
+  const keys = `1-${programTabCount(s, v.team)} OR CLICK: PAGE`;
+  drawHint(g, v.tab === 5 ? alumniHint(v.alumni) : v.tab === 4 ? CAREER_HINT : v.tab === 2 || v.tab === 3 ? `${keys}  WHEEL OR W/S: SCROLL  CLICK A NAME  ESC: BACK` : `${keys}  CLICK A NAME TO OPEN IT  ESC: BACK`);
 }
 
 // ------------------------------------------------------------ OVERVIEW

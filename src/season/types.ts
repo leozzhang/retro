@@ -501,6 +501,55 @@ export interface StoryEvent {
   from?: string;
 }
 
+/**
+ * One of the user's players as the program remembers him (season/alumni.ts, docs/ALUMNI.md): built from
+ * his career and frozen once he's gone. Only his seasons with the user's team. Display only.
+ */
+export interface AlumPlaque {
+  id: string;
+  name: string;
+  /** His number as he left (or now); a season he wore another keeps it in its row. */
+  num: number;
+  pos: Position;
+  arch: string;
+  /** "Tyler, TX". */
+  home: string;
+  ht: number;
+  wt: number;
+  stars: number;
+  /** How he came: signed out of high school, on the roster the user inherited, a transfer in, or a walk-on. */
+  origin: 'signed' | 'inherited' | 'transfer' | 'walkon';
+  /** A transfer's old school. */
+  from?: string;
+  /** A signee's national rank. */
+  rank?: number;
+  /** His overall as he arrived. */
+  ovr0: number;
+  rows: AlumSeason[];
+  /** His best ratings at his position, as words. */
+  card: string[];
+  /** Award wins and finalist finishes with the team: "2028 HEISMAN TROPHY". */
+  honors: string[];
+  /** His story's most telling lines with the team. */
+  lines: { year: number; week?: number; kind: StoryEvent['kind']; text: string }[];
+  /** How he left; missing while he's on the roster. */
+  exit?: { kind: 'grad' | 'declare' | 'transfer' | 'left'; year: number; to?: string; draft?: { round: number; pick: number; city: string } };
+  /** The legacy score that sets his frame. */
+  score: number;
+}
+
+/** A season on a plaque: his overall at its end, and his jersey if it differed from the plaque's. */
+export interface AlumSeason {
+  year: number;
+  cls: string;
+  role: CareerRole;
+  gp?: number;
+  gs?: number;
+  ovr: number;
+  num?: number;
+  st?: CareerSeason['st'];
+}
+
 export interface CoachState {
   teamId: string;
   /** 0..100; low means the hot seat. */
@@ -750,6 +799,10 @@ export interface SeasonState {
   confLog?: ConfEvent[];
   /** Every player's history by athlete id (season/career.ts). Kept across seasons; nothing in the sim reads it. */
   careers?: Record<string, Career>;
+  /** The user's players past and present, by athlete id (season/alumni.ts). Kept across seasons; display only. */
+  alumni?: Record<string, AlumPlaque>;
+  /** The user's Hall of Fame: athlete ids, current or former. */
+  hof?: string[];
   /** Coaches' changes by coach id, kept across seasons and jobs (season/coaching.ts). */
   coaches?: Record<string, CoachProgress>;
   /** Every coach's history by coach id. Kept across seasons; nothing in the sim reads it. */

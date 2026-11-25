@@ -56,7 +56,8 @@ import { addToBoard, dropFromBoard, inHome, releasable, setHold, staffFill, togg
 import { prospect } from '../data/recruits';
 import { careerList, careerRowAt as careerRowAt0, careerTabAt as careerTabAt0, modeAt as modeAt0, newCareerView } from '../render/careerScreen';
 import { beginLinks, linkAt as linkAt0, overLink, type Link } from '../render/links';
-import { drawProgram, programScrollMax, programTabAt as programTabAt0, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
+import { drawProgram, programScrollMax, programTabAt as programTabAt0, programTabCount, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
+import { newAlumniView, updateAlumni } from '../render/alumniScreen';
 import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt as officeTabAt0, type OfficeView } from '../render/officeScreen';
 import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
 import { ROOMS } from '../data/office';
@@ -66,14 +67,14 @@ import { buildStaff, coachName, dcAdjust, GROUPS, ocAdjust, type Coach, type Gro
 import { scoutReport } from '../season/scouting';
 import { DEPTH_BTN, depthView, drawTeam, dropIndex, fullMove, inBox as inBox0, rowAt as rowAt0, tabAt as tabAt0, type TeamView } from '../render/teamScreen';
 import { deleteSlot, freeSlot, latestSlot, loadSlot, saveSlot, slotMeta, SLOTS } from '../season/save';
-import { advanceWeek, defaultConfig, engineTeam, newSeason, seasonOver, userGameThisWeek } from '../season/season';
+import { advanceWeek, defaultConfig, engineTeam, newSeason, seasonOver, simSeason, userGameThisWeek } from '../season/season';
 import { lastWeekMoments, markSeen, unseenWrap } from '../season/moments';
 import { decide, pendingDecisions, storyOf } from '../season/storylines';
 import { decisionAt as decisionAt0, drawWrap, newWrapView, sceneDur, type WrapView } from '../render/momentScreen';
 import { galleryMoments } from '../render/momentGallery';
 import { engineGame, enginePart, isEngineSnap, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
-import { advanceOffseason, migrateOffseason, startOffseason } from '../season/offseason';
+import { advanceOffseason, migrateOffseason, simOffseason, startOffseason } from '../season/offseason';
 import { actOnLeaving, offer, pursue, releaseForPortal, setTarget, withdraw } from '../season/portal';
 import { fireAssistant, interview, offerChair, withdrawOffer } from '../season/carousel';
 import {
@@ -1811,6 +1812,24 @@ export class Game {
     }
   }
 
+  /**
+   * Dev: `n` open seasons and their offseasons simmed (staff on every side), then the user's ALUMNI page,
+   * from the console (`game.devAlumni(4)`). Not saved.
+   */
+  devAlumni(n = 3): void {
+    const cfg = { ...defaultConfig(TEAMS[this.userIdx].id), length: 'open' as const, delegate: { depthChart: true, gamePlan: true, portal: true } };
+    let s = newSeason(cfg, 1);
+    for (let i = 0; i < n; i++) {
+      simSeason(s);
+      s = simOffseason(s);
+    }
+    this.season = s;
+    this.slot = 0;
+    this.programBack = [{ screen: 'season' }];
+    this.screen = 'season';
+    this.toProgram(s.config.userTeamId, PROGRAM_TABS.indexOf('ALUMNI'));
+  }
+
   /** Dev: the office showroom in room `tier`, every item on show, from the console (`game.devOffice(3)`). */
   devOffice(tier = ROOMS.length - 1, level = Infinity): void {
     if (!this.season) this.season = newSeason(defaultConfig(TEAMS[this.userIdx].id), 1);
@@ -1881,7 +1900,8 @@ export class Game {
       }
     }
     this.pushBack();
-    this.programView = { team, tab, scroll: 0, career: newCareerView(squadFor(s, team), player), mx: 0, my: 0 };
+    const alumni = tab === PROGRAM_TABS.indexOf('ALUMNI');
+    this.programView = { team, tab, scroll: 0, career: newCareerView(squadFor(s, team), alumni ? undefined : player), alumni: newAlumniView(alumni ? player : undefined), mx: 0, my: 0 };
     this.screen = 'program';
   }
 
@@ -1999,6 +2019,8 @@ export class Game {
     const s = this.season!;
     if (l.kind === 'team') this.toProgram(l.id);
     else if (l.kind === 'game') this.toGame(l.id);
+    // A former player of the user's opens on his plaque.
+    else if (l.team === s.config.userTeamId && s.alumni?.[l.id]?.exit) this.toProgram(l.team, PROGRAM_TABS.indexOf('ALUMNI'), l.id);
     // From a game page every player opens in the registry, so Esc comes back to the game.
     else if (l.team === s.config.userTeamId && this.screen !== 'game') this.toTeam(l.id);
     else this.toProgram(l.team, PROGRAM_TABS.indexOf('REGISTRY'), l.id);
@@ -2032,16 +2054,22 @@ export class Game {
     const { x, y } = input.mouse;
     v.mx = v.career.mx = x;
     v.my = v.career.my = y;
+    const alumniTab = PROGRAM_TABS.indexOf('ALUMNI');
+    // Typing a search takes every key, Esc included.
+    if (v.tab === alumniTab && v.alumni.typing) {
+      if (updateAlumni(s, v.alumni, input)) this.save();
+      return;
+    }
     if (input.hit('Escape', 'Backspace') || (input.hit('KeyH') && v.team === s.config.userTeamId && this.programBack.length <= 1)) {
       this.programBackOut();
       return;
     }
-    const n = PROGRAM_TABS.length;
+    const n = programTabCount(s, v.team);
     const setTab = (i: number) => Object.assign(v, { tab: i, scroll: 0 });
-    ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].forEach((k, i) => input.hit(k) && setTab(i));
+    ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'].slice(0, n).forEach((k, i) => input.hit(k) && setTab(i));
     if (input.hit('Tab')) setTab((v.tab + 1) % n);
     if (input.mouse.pressed) {
-      const tab = programTabAt(x, y);
+      const tab = programTabAt(x, y, n);
       if (tab >= 0) {
         setTab(tab);
         return;
@@ -2052,7 +2080,11 @@ export class Game {
         return;
       }
     }
-    if (v.tab === n - 1) {
+    if (v.tab === alumniTab) {
+      if (updateAlumni(s, v.alumni, input)) this.save();
+      return;
+    }
+    if (v.tab === PROGRAM_TABS.indexOf('REGISTRY')) {
       this.updateRegistry(input, v);
       return;
     }

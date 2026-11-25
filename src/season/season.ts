@@ -1,3 +1,4 @@
+import { syncAlumni } from './alumni';
 import { CALENDAR } from '../data/season/calendar';
 import { TEAMS, teamById } from '../data/teams';
 import { seasonAwards } from './awards';
@@ -50,6 +51,8 @@ export function newSeason(config: SeasonConfig, seed: number, year: number = CAL
     history: prev?.history ?? [],
     careers: prev?.careers ?? {},
     ...(prev?.office ? { office: prev.office } : {}),
+    ...(prev?.alumni ? { alumni: prev.alumni } : {}),
+    ...(prev?.hof ? { hof: prev.hof } : {}),
     // The staffs grow through the offseason (season/coaching.ts).
     ...(prev ? { coaches: progressCoaches(prev) } : {}),
     ...(prev?.coachCareers ? { coachCareers: prev.coachCareers } : {}),
@@ -368,6 +371,7 @@ const transition: WeekStep = (state, ctx) => {
         ...yearRecord(state), teams: seasonRows(state),
       });
       archiveSeason(state);
+      syncAlumni(state);
       archiveCoaches(state);
       if (state.config.coachCareer) state.news.push(...evaluateCoach(state));
     } else if (bracketRoundDone(state)) {

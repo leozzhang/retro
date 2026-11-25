@@ -1,3 +1,4 @@
+import { syncAlumni } from './alumni';
 import { TEAMS } from '../data/teams';
 import { checkOffice } from './achievements';
 import { nextSeason } from './season';
@@ -68,6 +69,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
     if (os.round === 0) {
       const cards = userCards(state);
       runDepartures(state);
+      syncAlumni(state);
       checkOffice(state, 'draft');
       stageMoments(state, 'departures', cards);
       os.round = 1;
@@ -107,6 +109,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
     return state;
   }
   closePortal(state);
+  syncAlumni(state);
   // An old save that signed its class before the portal (the old order) goes straight on.
   if (state.recruiting?.gone) return toNextSeason(state);
   os.stage = 'signing';
@@ -119,6 +122,7 @@ export function advanceOffseason(state: SeasonState): SeasonState {
 function toNextSeason(state: SeasonState): SeasonState {
   const user = state.config.userTeamId;
   refillFreshmen(state);
+  syncAlumni(state);
   const next = nextSeason(state);
   // The coaching changes, the draft, signing day and the user's portal stories open the new year's news.
   const mine: NewsItem[] = state.news
