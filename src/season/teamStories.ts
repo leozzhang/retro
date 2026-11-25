@@ -225,10 +225,16 @@ function transferRisk(k: StoryKit): void {
   const ts = state.teamState[u];
   const ctx = moraleContext(state, sq);
   const stories = state.stories!;
+  // A senior out of eligibility after this season graduates before the portal opens: no risk to it.
+  const leaving = new Set(seniorsLeaving(state, u).map((a) => a.id));
   for (const s of stories.filter((x) => x.kind === 'transferRisk' && x.status === 'open')) {
     const a = sq.athletes.find((x) => x.id === s.star!.id);
     if (!a) {
       resolve(s, 'LEFT THE TEAM');
+      continue;
+    }
+    if (leaving.has(a.id)) {
+      resolve(s, 'IN HIS FINAL SEASON');
       continue;
     }
     const m = moraleOf(ts, a);
@@ -245,6 +251,7 @@ function transferRisk(k: StoryKit): void {
   for (const a of Object.values(st)) weakest.set(a.pos, Math.min(weakest.get(a.pos) ?? 99, overall(a.r, a.pos)));
   for (const a of sq.athletes) {
     if (stories.filter((x) => x.kind === 'transferRisk' && x.status === 'open').length >= TSTORY.riskOpen) break;
+    if (leaving.has(a.id)) continue;
     const m = moraleOf(ts, a);
     if (m > TSTORY.miserable || had(state, 'transferRisk', `${a.id}:${state.year}`)) continue;
     const ovr = overall(a.r, a.pos);

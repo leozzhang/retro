@@ -2,6 +2,9 @@
 
 _Last updated: 2026-11-24_
 
+## Fixed: seniors in their last season flagged as transfer risks (2026-11-24)
+- The TRANSFER RISK storyline picked any unhappy player good enough to matter, without asking whether he could transfer. A senior out of eligibility (every senior who isn't taking a redshirt this season, RS seniors included) graduates in departures before the portal opens, so the warning could never come true. Those players are now skipped (`seniorsLeaving`, the same rule departures use), and an open risk on one, say after a planned redshirt falls through, closes as IN HIS FINAL SEASON. moments.test.ts now checks that no transfer risk is a player who graduated.
+
 ## Fixed: class rankings showed NR; the breakout watch reads at a glance (2026-11-24)
 - The CLASS RANKINGS scenes (signing day, a class climbing during the cycle) reused the AP poll's ladder, which shows any rank past 25 as NR. Moments now carry `ranked` for rankings that go all the way down, so a No. 41 class reads NO. 41.
 - The breakout watch drew a bar of starts plus "GAMES LEFT", and it wasn't clear what either counted. It now draws one box per game of the four-game window: green GOOD (a start at the breakout bar), gold STARTED, red NO START, empty for games still to come. The rule sits under the boxes (START 3 OF HIS FIRST 4 GAMES AND PLAY WELL), and the stakes say where he stands: NEEDS 1 MORE START IN 2 GAMES, PLAYING WELL / GRADES TOO LOW, or OUT OF REACH once he can't get the starts. The hub's tag reads 2/3 GS. Each game's result is kept on `Progress.sw.r`, which is display only; the breakout rule (`BREAKOUT`) is unchanged. A save from before this shows its window's past games as gray PLAYED boxes.

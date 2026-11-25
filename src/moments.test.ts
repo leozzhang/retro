@@ -246,6 +246,8 @@ describe('recruiting, races and the offseason as storylines', () => {
       expect(s.status).toBe('resolved');
       if (s.outcome === 'ENTERED THE PORTAL') expect(entrants.has(s.star!.id)).toBe(true);
       if (s.outcome === 'STAYED') expect(entrants.has(s.star!.id)).toBe(false);
+      // Never a senior out of eligibility: he graduates before the portal opens.
+      if (s.outcome !== 'IN HIS FINAL SEASON') expect(on.prev.careers?.[s.star!.id]?.story.some((e) => e.kind === 'graduated' && e.year === on.prev.year)).not.toBe(true);
     }
   }, 120000);
 });
