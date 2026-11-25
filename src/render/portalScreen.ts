@@ -13,7 +13,9 @@ import {
   suitors, topMotives, type Board, type Standing,
 } from '../season/portal';
 import { SCOUT_TIERS } from '../season/scouting';
+import { commitsOf, releasable } from '../season/recruiting';
 import type { PortalEntrant, SeasonState } from '../season/types';
+import { prospect } from '../data/recruits';
 import { drawHint } from './hud';
 import { ovrColor, shortName } from './rosterScreen';
 import { inBox } from './teamScreen';
@@ -297,8 +299,14 @@ function drawRoom(g: CanvasRenderingContext2D, s: SeasonState, board: Board): vo
   const p = s.portal!;
   const round = s.offseason?.round ?? 0;
   const y0 = 54;
-  text(g, `ROSTER ${school.size}/${PORTAL.rosterMax}  ROOM ${rosterRoom(board, u)}  OPEN TO TRANSFERS ${round ? Math.max(0, openSpots(board, u)) : '-'}`, 10, y0, { color: GOLD });
-  text(g, `TRANSFERS CAN FILL ${Math.round(PORTAL.signShare * 100)}% OF DEPARTURES; WALK-ONS FILL THE REST`, 10, y0 + 12, { color: DIM });
+  text(g, `ROSTER ${school.size}/${PORTAL.rosterMax}  HS COMMITS ${school.held}  ROOM ${rosterRoom(board, u)}  OPEN TO TRANSFERS ${round ? Math.max(0, openSpots(board, u)) : '-'}`, 10, y0, { color: GOLD });
+  const rel = releasable(s);
+  const over = commitsOf(s, u).open - school.held;
+  text(g, over > 0 ? `${over} OVER PLAN: CUT ON SIGNING DAY IF NO ROOM` : `TRANSFER SPOTS: ${school.hold} HELD + HALF YOUR ENTRANTS`, 10, y0 + 12, { color: over > 0 ? ORANGE : DIM });
+  if (rel.length && !s.config.delegate.portal) {
+    const last = prospect(rel[rel.length - 1])!;
+    text(g, `X: RELEASE ${last.stars}* ${last.pos} ${last.a.last.toUpperCase().slice(0, 10)} (1 OF ${rel.length})`, VIEW_W - 8, y0 + 12, { align: 'right', color: ORANGE, shadow: false });
+  }
   // Depth by position against its usual count and minimum.
   // Each header sits over its column.
   const col = { pos: 10, have: 50, top: 138, out: 170, in: 202 };

@@ -92,7 +92,7 @@ describe('who enters', () => {
     const pl = [...board.players.values()].find((p) => motives(p.a).PT >= 0.45 && p.a.pos === 'WR')!;
     const school = (win: number, chart: number[]): School => ({
       id: 'x', home: 'ZZ', win, dev: board.schools.get('georgia')!.dev, room: 0, extra: 0,
-      chart: new Map<Position, number[]>([['WR', chart]]), count: new Map(), size: 80, left: 0, gone: 0, signed: 0,
+      chart: new Map<Position, number[]>([['WR', chart]]), count: new Map(), size: 80, left: 0, gone: 0, signed: 0, held: 0, hold: 0,
     });
     const blueBlood = school(0.9, [pl.ovr + 6, pl.ovr + 5, pl.ovr + 4, pl.ovr + 3]);
     const startsHere = school(0.4, [pl.ovr - 5, pl.ovr - 6, pl.ovr - 7]);
@@ -208,7 +208,7 @@ describe('the user side', () => {
     expect(n).toBe(cap);
     expect(s.portal!.offers[user].length).toBe(cap);
     const sch = board.schools.get(user)!;
-    expect(cap).toBeLessThanOrEqual(Math.ceil(PORTAL.signShare * sch.left + PORTAL.departShare * sch.gone) + PORTAL.overOffer);
+    expect(cap).toBeLessThanOrEqual(Math.ceil(PORTAL.signShare * sch.left) + sch.hold + PORTAL.overOffer);
   });
 
   it('a kept promise lifts morale; a broken one hurts and pushes him toward the portal', () => {

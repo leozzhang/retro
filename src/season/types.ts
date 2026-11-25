@@ -653,17 +653,23 @@ export interface RecruitingState {
   /** Prospects who went unsigned (to FCS or JUCO) after signing day. */
   gone?: string[];
   log: RecruitEvent[];
+  /** Spots a school's class holds back for the transfer portal (the user's dial; `portalHold` otherwise). */
+  hold?: Record<string, number>;
+  /** The signees have started joining rosters (the early signees, as the portal opens). */
+  joined?: boolean;
+  /** Each school's planned class at the early signing period: its commits within it hold spots through the portal. */
+  plan?: Record<string, number>;
 }
 
 /** Offseason stages, in order (season/offseason.ts). */
-export type OffseasonStage = 'carousel' | 'departures' | 'signing' | 'portal';
+export type OffseasonStage = 'carousel' | 'departures' | 'portal' | 'signing';
 
 export interface OffseasonState {
   stage: OffseasonStage;
   /**
    * Carousel: the hiring round, 1 to `CAROUSEL.rounds` (season/carousel.ts). Departures: 0 the declare
-   * watch, 1 who left and the draft. Signing: 0 before national signing day, 1 the class. Portal: 0 the
-   * leaving list, before anyone enters; 1 and 2 the head coaches' rounds.
+   * watch, 1 who left and the draft. Portal: 0 the leaving list, before anyone enters; 1 and 2 the head
+   * coaches' rounds. Signing (after the portal): 0 before national signing day, 1 the class.
    */
   round: number;
   /** Last season's promises, judged when the offseason opened. */
@@ -695,6 +701,8 @@ export type PortalReason = 'buried' | 'contender' | 'home' | 'develop' | 'morale
 
 export interface PortalState {
   entrants: PortalEntrant[];
+  /** HS commits the user released to make room (season/recruiting.ts `releaseCommit`). */
+  released?: number;
   /** Interest by player, then school. */
   interest: Record<string, Record<string, number>>;
   /** Open offers by school. */

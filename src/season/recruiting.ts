@@ -35,8 +35,14 @@ import { baseRoster, headCoachFor, seasonRng, squadFor, staffFor } from './world
  * it's delegated, and the position coaches always make the contacts.
  *
  * Tuning:
- * - `attrition`: spots a class plans for beyond its seniors (early entrants and portal losses);
- *   `classMin`/`classMax` bound a class, `overCommit` the commits taken over it.
+ * - `attrition`: spots a class plans for beyond its seniors (early entrants; portal losses are signing
+ *   day's, after the portal); `portalHold` the spots a
+ *   staff holds back for the transfer portal (the user sets his own, `RecruitingState.hold`), so the
+ *   class signed in the season leaves the portal room. National signing day, after the portal, fills
+ *   what's left to the cap. `classMin`/`classMax` bound a class, `overCommit` the commits taken over it
+ *   (verbal only: the early period signs at most the class).
+ * - `release`: a commit the user lets go to make room for a transfer: his interest in the school falls
+ *   to `interest` times what it was, and the program's pipeline in his state loses `pipe`.
  * - `aimBelow`: how far under a school's freshman level (`freshmanLevel`) its board reaches, and `reach`
  *   further per 10 points of prestige it's short of its tier's mean (a weak brand recruits lower);
  *   `board.mult` targets per open spot, `board.rank` how high a school must rank among the schools
@@ -46,7 +52,8 @@ import { baseRoster, headCoachFor, seasonRng, squadFor, staffFor } from './world
  *   his recruit, the school's appeal and pipelines); `cap` where interest saturates; `decay` a week without contact.
  * - `offer`: interest an offer adds; `offerRank` the market rank a CPU staff offers at; `offerMult` offers
  *   per spot; `pace` the share of its class a staff expects committed by a week, and `paceOffers` extra
- *   offers per commit it's behind; `signingOffers` last offers per open spot on signing day.
+ *   offers per commit it's behind; `signingOffers` last offers per open spot on signing day, in up to
+ *   `signingRounds` rounds while a staff has room.
  * - `pt`: overall points per logistic unit of making next year's two-deep, `growth` what returners add by then.
  * - `win`, `home`, `nfl`: the wants' factors. `dream`: a dream school's pull; `familiar` a program pipeline's.
  * - `visit`: official visits a home game hosts, a prospect's max, and the result's swing; `inHome` the
@@ -63,7 +70,10 @@ import { baseRoster, headCoachFor, seasonRng, squadFor, staffFor } from './world
  *   `effort` (contacts, visits), the CPU staffs' assumed effort.
  */
 export const RECRUITING = {
-  attrition: 3,
+  attrition: 1,
+  portalHold: 4,
+  holdMax: 10,
+  release: { interest: 0.3, pipe: 0.1 },
   classMin: 8,
   classMax: 28,
   overCommit: 2,
@@ -78,6 +88,7 @@ export const RECRUITING = {
   offerRank: 6,
   offerMult: 2,
   signingOffers: 3,
+  signingRounds: 2,
   pace: (week: number, summer: boolean) => (summer ? 0.1 : 0.15 + 0.55 * clamp(week / 15, 0, 1)),
   paceOffers: 2,
   pt: 3,
@@ -114,10 +125,12 @@ export interface RSchool {
   head: number;
   /** Next season's chart: returners' overalls (plus `growth`) and commits' services level, best first. */
   chart: Map<Position, number[]>;
-  /** The class it plans: spots, by position, and commits so far. */
+  /** The class it plans: spots, by position, and commits so far (once departures have run, the commits not yet on the roster). */
   target: number;
   need: Map<Position, number>;
   commits: number;
+  /** Departures have run: the class is the room under the cap, with no over-commits. */
+  late: boolean;
   /** Its freshman level by position: the bottom of its board is `aimBelow` under. */
   aim: Map<Position, number>;
   /** The same, flat for the market's inner loop: by position index the board's floor and the two-deep bar (NaN: open), by group index the factors. */
@@ -195,20 +208,45 @@ function winShares(state: SeasonState): Map<string, [number, number]> {
   return w;
 }
 
-/** The class a school plans: its seniors and `attrition` out, its roster under the cap, by position. */
-function classPlan(roster: { pos: Position; year: string }[]): { target: number; need: Map<Position, number> } {
+/**
+ * The spots a school holds back from its class for the transfer portal: the user's dial, or the
+ * staff's `portalHold`.
+ */
+export function portalHold(state: SeasonState, team: string): number {
+  const h = state.recruiting?.hold?.[team];
+  return h === undefined ? R.portalHold : clamp(Math.round(h), 0, R.holdMax);
+}
+
+/** The user sets the spots his class holds back for the portal (CLASS tab). */
+export function setHold(state: SeasonState, n: number): void {
+  const rs = state.recruiting;
+  if (!rs) return;
+  (rs.hold ??= {})[userTeam(state)] = clamp(Math.round(n), 0, R.holdMax);
+  dropSchools(state);
+}
+
+/** Departures have run: the roster is next year's, so the class fills what's open, with no seniors or attrition left to plan for. */
+const lateCycle = (state: SeasonState) => state.phase === 'offseason' && !!state.departures?.gone;
+
+/**
+ * The class a school plans, by position. In the season: its seniors and `attrition` out, less the
+ * spots it holds for the portal (`hold`). Once departures have run: the room left under the cap
+ * (`roster` has the early signees and transfers on it; open commits count against it).
+ */
+function classPlan(roster: { pos: Position; year: string }[], hold: number, late: boolean): { target: number; need: Map<Position, number> } {
   const count = new Map<Position, number>();
   const leaving = new Map<Position, number>();
   for (const a of roster) {
     count.set(a.pos, (count.get(a.pos) ?? 0) + 1);
-    if (a.year === 'SR') leaving.set(a.pos, (leaving.get(a.pos) ?? 0) + 1);
+    if (!late && a.year === 'SR') leaving.set(a.pos, (leaving.get(a.pos) ?? 0) + 1);
   }
   const out = [...leaving.values()].reduce((a, b) => a + b, 0);
-  const target = clamp(85 - roster.length + out + R.attrition, R.classMin, R.classMax);
+  const attrition = late ? 0 : R.attrition;
+  const target = late ? Math.max(0, 85 - roster.length) : clamp(85 - roster.length + out + attrition - hold, R.classMin, R.classMax);
   const need = new Map<Position, number>();
   let sum = 0;
   for (const [p, c] of COMPOSITION) {
-    const d = Math.max(0, c + c / 85 * R.attrition - ((count.get(p) ?? 0) - (leaving.get(p) ?? 0)));
+    const d = Math.max(0, c + c / 85 * attrition - ((count.get(p) ?? 0) - (leaving.get(p) ?? 0)));
     need.set(p, d);
     sum += d;
   }
@@ -222,7 +260,7 @@ const schoolCache = new WeakMap<RecruitingState, { key: string; map: Map<string,
 /** Every school as recruits see it, cached for the week (commits update its chart in place). */
 export function recruitSchools(state: SeasonState): Map<string, RSchool> {
   const rs = state.recruiting!;
-  const key = `${state.year}:${state.week}:${state.phase}:${state.offseason?.stage ?? ''}`;
+  const key = `${state.year}:${state.week}:${state.phase}:${state.offseason?.stage ?? ''}:${state.offseason?.round ?? ''}`;
   const hit = schoolCache.get(rs);
   if (hit?.key === key) return hit.map;
   const wp = winShares(state);
@@ -237,15 +275,16 @@ export function recruitSchools(state: SeasonState): Map<string, RSchool> {
     return { id: t.id, v: (now + hist.reduce((a, b) => a + b, 0)) / (1 + hist.length) };
   }).sort((a, b) => a.v - b.v);
   const devPct = new Map(rec.map((r, i) => [r.id, i / Math.max(1, rec.length - 1)]));
-  const commitsBy = new Map<string, { pos: Position; pub: number }[]>();
+  const commitsBy = new Map<string, { id: string; pos: Position; pub: number }[]>();
   for (const [id, t] of Object.entries(rs.commits)) {
     const p = prospect(id);
     if (!p) continue;
     let x = commitsBy.get(t);
     if (!x) commitsBy.set(t, (x = []));
-    x.push({ pos: p.pos, pub: p.pub });
+    x.push({ id, pos: p.pos, pub: p.pub });
   }
   const map = new Map<string, RSchool>();
+  const late = lateCycle(state);
   for (const t of TEAMS) {
     const prof = t.profile;
     const w = wp.get(t.id);
@@ -275,8 +314,10 @@ export function recruitSchools(state: SeasonState): Map<string, RSchool> {
       if (!c) chart.set(a.pos, (c = []));
       c.push(overall(a.r, a.pos) + R.growth);
     }
-    const plan = classPlan(roster);
-    const mine = commitsBy.get(t.id) ?? [];
+    const plan = classPlan(roster, portalHold(state, t.id), late);
+    // Early signees already on the roster are in its chart and count; only the commits still coming count against the class.
+    const ids = late ? new Set(roster.map((a) => a.id)) : undefined;
+    const mine = (commitsBy.get(t.id) ?? []).filter((c) => !ids?.has(c.id));
     for (const c of mine) {
       let x = chart.get(c.pos);
       if (!x) chart.set(c.pos, (x = []));
@@ -293,7 +334,7 @@ export function recruitSchools(state: SeasonState): Map<string, RSchool> {
     });
     const school: RSchool = {
       id: t.id, home: TEAM_STATE[t.id] ?? 'TX', win: R.win.season * season + R.win.recent * recent + R.win.brand * brand,
-      dev, nfl, coach, scout, head: headRecruit(state, t.id), chart, target: plan.target, need: plan.need, commits: mine.length, aim,
+      dev, nfl, coach, scout, head: headRecruit(state, t.id), chart, target: plan.target, need: plan.need, commits: mine.length, late, aim,
       floor: new Float64Array(POSITIONS.map((p) => aim.get(p)! - R.aimBelow - R.reach * Math.max(0, TIER_PRESTIGE[prof.tier] - prof.prestige) / 10)), bar2: new Float64Array(POSITIONS.length), fg,
       pipe: state.teamState[t.id]?.pipe ?? {}, cpipe,
     };
@@ -457,14 +498,15 @@ const estCache = new Map<string, { lvl: number; pot: number }>();
  * pipeline in his state. Fixed draws per school and prospect, so a read sharpens instead of re-rolling.
  */
 export function estimate(state: SeasonState, s: RSchool, p: Prospect, effort: number): { lvl: number; pot: number } {
-  const key = `${state.seed}:${s.id}:${p.id}:${effort}:${s.scout[groupOf(p.pos)]}`;
+  const g = groupOf(p.pos);
+  // The pipeline sharpens the read, so it's in the key (it grows as signees join).
+  const pipe = s.cpipe[g][p.a.hometown.state] ?? 0;
+  const key = `${state.seed}:${s.id}:${p.id}:${effort}:${s.scout[g]}:${pipe}`;
   const hit = estCache.get(key);
   if (hit) return hit;
   const rng = mulberry32(hashString(`est:${state.seed}:${s.id}:${p.id}`));
-  const g = groupOf(p.pos);
   const E = R.eval;
   const bias = gauss(rng) * E.bias * (1 - s.scout[g]);
-  const pipe = s.cpipe[g][p.a.hometown.state] ?? 0;
   const sd = (E.noise / Math.sqrt(1 + effort / E.effort)) * (1 - R.pipe.eval * pipe);
   const z1 = gauss(rng);
   const z2 = gauss(rng);
@@ -565,7 +607,7 @@ const open = (rs: RecruitingState, id: string) => !rs.signed[id] && !rs.gone?.in
 /** Room left in a school's class for another commit. */
 export function classRoom(state: SeasonState, team: string): number {
   const s = recruitSchools(state).get(team)!;
-  return s.target + R.overCommit - s.commits;
+  return s.target + (s.late ? 0 : R.overCommit) - s.commits;
 }
 
 const news = (state: SeasonState, text: string, teams: string[]): NewsItem => ({ week: state.phase === 'offseason' ? state.week : state.week, kind: 'recruiting', text, teams });
@@ -789,7 +831,7 @@ function offers(state: SeasonState, mk: Markets, summer: boolean): void {
     const s = schools.get(t.id)!;
     const mine = (rs.offers[t.id] ??= []).filter((id) => open(rs, id) && (!rs.commits[id] || rs.commits[id] === t.id || !summer));
     rs.offers[t.id] = mine;
-    if (s.target + R.overCommit - s.commits <= 0) {
+    if (s.target + (s.late ? 0 : R.overCommit) - s.commits <= 0) {
       rs.offers[t.id] = mine.filter((id) => rs.commits[id] === t.id);
       continue;
     }
@@ -902,6 +944,61 @@ function decommit(state: SeasonState, p: Prospect, why: string): void {
   if (team === userTeam(state)) state.news.push(news(state, `DECOMMIT: ${recruitLabel(p)} reopens his recruitment${why}`, [team]));
 }
 
+/**
+ * Commits a school's roster keeps a spot for through the portal: committed, not on the roster yet,
+ * within the class it planned at the early period (`RecruitingState.plan`). Over-commits past the plan
+ * don't hold one; signing day lets them go if the roster has filled. The portal counts these against
+ * its room (season/portal.ts).
+ */
+export function heldSpots(state: SeasonState, team: string): number {
+  const rs = state.recruiting;
+  if (!rs || rs.gone) return 0;
+  const { open, joined } = commitsOf(state, team);
+  const plan = rs.plan?.[team];
+  return plan === undefined ? open : Math.min(open, Math.max(0, plan - joined));
+}
+
+/** A school's commits: still to join, and on the roster already (the early signees). */
+export function commitsOf(state: SeasonState, team: string): { open: number; joined: number } {
+  const rs = state.recruiting;
+  const have = new Set((state.teamState[team]?.roster?.in ?? []).map((x) => x.id));
+  let open = 0;
+  let joined = 0;
+  for (const [id, t] of Object.entries(rs?.commits ?? {})) if (t === team) have.has(id) ? joined++ : open++;
+  return { open, joined };
+}
+
+/** The user's commits not signed yet: the ones he can release to make room for a transfer. */
+export function releasable(state: SeasonState): string[] {
+  const rs = state.recruiting;
+  if (!rs || rs.gone) return [];
+  const u = userTeam(state);
+  return Object.entries(rs.commits).filter(([id, t]) => t === u && !rs.signed[id]).map(([id]) => id).sort((a, b) => prospect(a)!.rank - prospect(b)!.rank);
+}
+
+/**
+ * The user lets a commit go to free his spot for a transfer: he reopens his recruitment, his interest in
+ * the school falls (`release.interest`), the program's pipeline in his state takes a hit
+ * (`release.pipe`), and the spot joins the class's hold for the portal. Signed commits are binding.
+ */
+export function releaseCommit(state: SeasonState, id: string): boolean {
+  const rs = state.recruiting;
+  const p = prospect(id);
+  const u = userTeam(state);
+  if (!rs || !p || rs.commits[id] !== u || rs.signed[id] || rs.gone) return false;
+  dropSchools(state);
+  decommit(state, p, ': released to make room');
+  const m = (rs.interest[id] ??= {});
+  m[u] = Math.round((m[u] ?? 0) * R.release.interest * 100) / 100;
+  rs.offers[u] = (rs.offers[u] ?? []).filter((x) => x !== id);
+  const ts = (state.teamState[u] ??= {});
+  const st = p.a.hometown.state;
+  if (ts.pipe?.[st]) ts.pipe[st] = round3(Math.max(0, ts.pipe[st] - R.release.pipe));
+  (rs.hold ??= {})[u] = clamp(portalHold(state, u) + 1, 0, R.holdMax);
+  dropSchools(state);
+  return true;
+}
+
 /** How a school's week went for its commits' nerves: a blowout loss, a losing streak, falling out of the poll. */
 function slump(state: SeasonState, team: string, week: number): number {
   const D = R.decommit;
@@ -980,19 +1077,27 @@ export function recruitWeek(state: SeasonState, week: number): void {
 
 /**
  * The early signing period, at the end of championship week: commits sign (binding) by their
- * firmness; late deciders mostly wait for signing day.
+ * firmness; late deciders mostly wait for signing day. A school signs at most its class (`target`):
+ * its over-commits stay verbal, holding a spot through the portal.
  */
 export function earlySigning(state: SeasonState): void {
   const rs = state.recruiting!;
   const E = R.early;
+  const schools = recruitSchools(state);
+  rs.plan = Object.fromEntries(TEAMS.map((t) => [t.id, schools.get(t.id)!.target]));
+  const room = new Map<string, number>();
+  for (const [id, team] of Object.entries(rs.commits)) if (rs.signed[id]) room.set(team, (room.get(team) ?? 0) + 1);
   let n = 0;
-  for (const [id, team] of Object.entries(rs.commits)) {
+  const order = Object.entries(rs.commits).sort((a, b) => prospect(a[0])!.rank - prospect(b[0])!.rank);
+  for (const [id, team] of order) {
     if (rs.signed[id]) continue;
+    if ((room.get(team) ?? 0) >= schools.get(team)!.target) continue;
     const p = prospect(id)!;
     const odds = sigmoid(E.base + E.firm * (p.m.firm - 1)) * (p.m.timeline === 'late' ? E.late : 1);
     if (seasonRng(state, 'recruit', 'early', id)() >= odds) continue;
     rs.signed[id] = team;
     rs.log.push({ week: state.week, id, team, kind: 'sign' });
+    room.set(team, (room.get(team) ?? 0) + 1);
     n++;
   }
   const user = userTeam(state);
@@ -1079,32 +1184,55 @@ export function openSigning(state: SeasonState): void {
 }
 
 /**
- * National signing day: staffs with room make last offers to whoever's left, everyone open decides
- * (no bar: his best offer with room), every commit signs, and the unsigned go to FCS or JUCO. The
- * signees join their rosters as freshmen.
+ * National signing day, after the portal: staffs with room under the cap make last offers to whoever's
+ * left, everyone open decides (no bar: his best offer with room), every commit signs, and the unsigned
+ * go to FCS or JUCO. The signees join their rosters as freshmen. A school whose commits no longer fit
+ * (its roster filled since) lets its lowest go first.
  */
 export function runSigningDay(state: SeasonState): void {
   const rs = state.recruiting;
   if (!rs) return;
+  joinRosters(state);
   dropSchools(state);
-  const schools = recruitSchools(state);
-  // Last offers: open prospects a staff's board reaches who rank it in their top schools.
-  const left = recruitClass(state).filter((p) => open(rs, p.id) && !rs.commits[p.id]);
+  let schools = recruitSchools(state);
+  let cut = false;
   for (const t of TEAMS) {
-    if (!auto(state, t.id)) continue;
     const s = schools.get(t.id)!;
-    const room = s.target - s.commits;
-    if (room <= 0) continue;
-    // Positions it still needs first, then anyone its board would reach (or nearly).
-    const mine = new Set(rs.offers[t.id] ?? []);
-    const cands = left
-      .filter((p) => !mine.has(p.id) && p.pub >= s.floor[POS_IX.get(p.pos)!] - R.aimBelow * 2)
-      .map((p) => ({ p, v: value(state, s, p) + ((s.need.get(p.pos) ?? 0) > 0.3 ? 10 : 0) }))
-      .sort((a, b) => b.v - a.v)
-      .slice(0, Math.ceil(room * R.signingOffers));
-    for (const { p } of cands) makeOffer(state, s, p);
+    if (s.commits <= s.target) continue;
+    const mine = Object.entries(rs.commits).filter(([id, team]) => team === t.id && !rs.signed[id]).map(([id]) => prospect(id)!).sort((a, b) => b.rank - a.rank);
+    for (const p of mine.slice(0, s.commits - s.target)) {
+      decommit(state, p, ': the roster had no room left');
+      cut = true;
+    }
   }
-  decide(state, CALENDAR.champWeek + 1, 'signing', true);
+  if (cut) {
+    dropSchools(state);
+    schools = recruitSchools(state);
+  }
+  // Last offers in rounds: open prospects a staff's board reaches who rank it in their top schools,
+  // until its room under the cap is filled or `signingRounds` run out.
+  for (let round = 0; round < R.signingRounds; round++) {
+    if (round) schools = recruitSchools(state);
+    const left = recruitClass(state).filter((p) => open(rs, p.id) && !rs.commits[p.id]);
+    let offered = 0;
+    for (const t of TEAMS) {
+      if (!auto(state, t.id)) continue;
+      const s = schools.get(t.id)!;
+      const room = s.target - s.commits;
+      if (room <= 0) continue;
+      // Positions it still needs first, then anyone its board would reach (or nearly).
+      const mine = new Set(rs.offers[t.id] ?? []);
+      const cands = left
+        .filter((p) => !mine.has(p.id) && p.pub >= s.floor[POS_IX.get(p.pos)!] - R.aimBelow * 2)
+        .map((p) => ({ p, v: value(state, s, p) + ((s.need.get(p.pos) ?? 0) > 0.3 ? 10 : 0) }))
+        .sort((a, b) => b.v - a.v)
+        .slice(0, Math.ceil(room * R.signingOffers));
+      for (const { p } of cands) makeOffer(state, s, p);
+      offered += cands.length;
+    }
+    decide(state, CALENDAR.champWeek + 1, round ? `signing${round}` : 'signing', true);
+    if (!offered) break;
+  }
   const user = userTeam(state);
   for (const [id, team] of Object.entries(rs.commits)) {
     if (rs.signed[id]) continue;
@@ -1122,9 +1250,14 @@ export function runSigningDay(state: SeasonState): void {
 /**
  * The signees join their rosters as freshmen (they enroll next season, so they don't grow this
  * offseason), with a career line. Programs' and recruiters' pipelines grow with each state they signed from.
+ * Runs when the portal opens (the early signees, so the portal reads them on the chart) and on signing
+ * day (the rest); a signee already on his roster is skipped.
  */
-function joinRosters(state: SeasonState): void {
+export function joinRosters(state: SeasonState): void {
+  if (!state.recruiting) return;
   const rs = state.recruiting!;
+  const fade = !rs.joined;
+  rs.joined = true;
   const by = new Map<string, Prospect[]>();
   for (const [id, team] of Object.entries(rs.signed)) {
     const p = prospect(id)!;
@@ -1134,10 +1267,13 @@ function joinRosters(state: SeasonState): void {
   }
   for (const t of TEAMS) {
     const ts = (state.teamState[t.id] ??= {});
-    const signees = (by.get(t.id) ?? []).sort((a, b) => a.rank - b.rank);
-    // Pipelines: the program's fade a little each year and grow with each signee from a state.
+    const have = new Set((ts.roster?.in ?? []).map((x) => x.id));
+    const signees = (by.get(t.id) ?? []).filter((p) => !have.has(p.id)).sort((a, b) => a.rank - b.rank);
+    if (!signees.length && !fade) continue;
+    // Pipelines: the program's fade a little each year (at the first join) and grow with each signee from a state.
     const pipe: Record<string, number> = {};
-    for (const [st, v] of Object.entries(ts.pipe ?? {})) if (v * R.pipe.decay >= 0.02) pipe[st] = round3(v * R.pipe.decay);
+    for (const [st, v] of Object.entries(ts.pipe ?? {})) if (!fade) pipe[st] = v;
+    else if (v * R.pipe.decay >= 0.02) pipe[st] = round3(v * R.pipe.decay);
     const staff = staffFor(state, t.id);
     const taken = baseRoster(state, t.id).map((a) => a.num);
     const r = (ts.roster ??= {});

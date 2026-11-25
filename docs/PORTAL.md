@@ -12,8 +12,15 @@ A player keeps his id for life, and the id names the roster he was generated on.
 `baseRoster`/`baseSquad` (`season/world.ts`) give the generated roster with the delta applied. `squadFor`, progression's ceilings, confidence's bases and `carryMorale` all start from it. With no deltas, every report is byte-identical to the old code. `newSeason` carries `roster` into the next year.
 
 ## The offseason
-- `Phase` gains `'offseason'`. An open-ended season goes `complete` → `startOffseason` → the portal → `nextSeason`. A one-season game has no offseason.
-- `OFFSEASON_STAGES` is `['carousel', 'departures', 'portal']`: the coaching carousel ([COACHES.md](COACHES.md)) runs first, so players can react to coaches leaving, then departures (redshirts, graduation, early declarations and the NFL draft; [RECRUITING.md](RECRUITING.md)), so the portal reads next year's depth chart. Signing day goes before the portal later; offseason growth runs as the next season opens.
+- `Phase` gains `'offseason'`. An open-ended season goes `complete` → `startOffseason` → the stages → `nextSeason`. A one-season game has no offseason.
+- `OFFSEASON_STAGES` is `['carousel', 'departures', 'portal', 'signing']`, the real calendar's order:
+  - The coaching carousel ([COACHES.md](COACHES.md)) runs first, so players can react to coaches leaving.
+  - Then departures (redshirts, graduation, early declarations and the NFL draft; [RECRUITING.md](RECRUITING.md)), so the portal reads next year's depth chart.
+  - Then the portal. Its chart has the early signees on it (they join as it opens).
+  - National signing day comes last and fills what the portal left (RECRUITING.md).
+  - Offseason growth runs as the next season opens.
+- **Why this order:** signing day used to come before the portal and filled the roster to 85. Delegated staffs could even sign past it, so `overCap` pushed players into the portal. The portal then had no room except what the user's own entrants freed, so the better you kept players, the less portal you got.
+- **Old saves:** a save sitting at signing day with no portal yet opens the portal first (`migrateOffseason`, on load and on advance). One whose class already signed skips signing day after the portal.
 - `SeasonSummary` now keeps the final AP top 25 (`ap`), win shares (`wp`) and level-ups per player (`dev`, from `TeamState.lu`). The portal reads the last two seasons from these for "recent results" and the development record.
 
 ## The player's side
@@ -66,10 +73,14 @@ Rounds 1 and 2 are the head coaches':
 - He gets a free jersey number, and `Progress.tr` records where from.
 - His overall shows exactly. Potential shows as a range that narrows with the position coach's scout; the dev trait shows at tier-2 scouting.
 
+**Room for transfers:**
+- **Roster room** (`rosterRoom`) is the cap, less everyone on the roster who isn't in the portal, less the HS commits still to join (`heldSpots`, season/recruiting.ts). Only commits within the class planned at the early signing period (`RecruitingState.plan`) hold a spot. Over-commits past it don't, and signing day lets them go if the roster fills.
+- **Spots open to transfers** (`openSpots`) are the roster room, within the class's portal hold (`portalHold`: the user's dial, or `RECRUITING.portalHold`, 4) plus `signShare` (half) of the players a school lost to the portal. Before this, `departShare` (0.15) of graduates stood in for the hold.
+- **Releasing a commit** (`releaseForPortal`, X on MY ROOM) frees the user's lowest unsigned commit's spot. It adds one to the hold, his interest in the school falls to `release.interest` (0.3) of what it was, and the program's pipeline in his state loses `release.pipe` (0.1). Signed commits are binding.
+
 **Closing (§7 placeholder):**
-- An unplaced player goes back to his old school if it has room after its position minimums, with a morale hit (`returnHit`). Otherwise he leaves FBS.
-- Placeholder freshmen (`refillFreshmen`, `makeFreshman`) then fill every roster to 85: positions under their minimum first, then the furthest under `COMPOSITION`. They start at the team's generated-freshman level and stand in for the HS class until recruiting.
-- Transfers can take only `signShare` (half) of the players a school lost to the portal, plus `departShare` (0.15) of those who graduated or declared. The freshmen take the rest.
+- An unplaced player goes back to his old school only if it's short of its usual count at his position (`COMPOSITION`) and has room after its position minimums, with a morale hit (`returnHit`). Otherwise he leaves FBS. Before signing day moved after the portal, this check was room only; since rosters now have room when the portal closes, the count check keeps nearly everyone from going home.
+- Then signing day (RECRUITING.md). After it, placeholder freshmen (`refillFreshmen`, `makeFreshman`) fill every roster to 85: positions under their minimum first, then the furthest under `COMPOSITION`. They start at the team's generated-freshman level.
 
 ## Leaving list and promises
 Before the portal opens, the user sees every player with at least 20% odds of entering, with his reason and lean (LEANING OUT at 50%+, TORN otherwise).
@@ -87,7 +98,10 @@ Before the portal opens, the user sees every player with at least 20% odds of en
 
 ## Screen (hub: SPACE on a finished dynasty season)
 - **BOARD:** position chips (Q/E or click). Rows show name, POS, OVR, POT range, class, from, WANTS, your standing and the top suitors. The standing is RATES YOU HIGH (top 3), ON HIS LIST (top 6), LUKEWARM (top 20) or NOT INTERESTED. The card's actions take number keys or clicks.
-- **MY ROOM:** roster and room, the spots open to transfers, depth by position against its usual count (red under the minimum), who signed and who's leaving.
+- **MY ROOM:**
+  - The header reads `ROSTER x/85  HS COMMITS n  ROOM r  OPEN TO TRANSFERS k`, with the hold below it, or a warning when commits run over the plan.
+  - Depth by position against its usual count (red under the minimum), who signed and who's leaving.
+  - X releases the lowest commit for a spot.
 - **LEAVING:** the list above.
 - The header shows the budget: `OFFERS 2/9  VISITS 1/3  CALLS 1/6`, or meetings in round 0.
 - SPACE (or ADVANCE / CLOSE PORTAL) moves on. F hands the portal to staff (`Delegation.portal`). The last advance starts next season, and the user's portal stories open its news.
@@ -116,7 +130,18 @@ The agreed target here is 10–15 a team, with real spread.
 
 **Starter overall by tier against the control** (T1..T5): `+0.20 0.00 +0.16 +0.79 +2.05` after one offseason, and `+0.76 +0.33 +0.32 +2.52 +6.55` after five. The T1–T5 gap closes by 5.8 points.
 
+**After the portal moved ahead of signing day (2026-11-24), 5 seasons against the old order on the same seeds:**
+
+| Measure | Old order | Now |
+| --- | --- | --- |
+| Entrants per team | 12.1 | 10.0 (fewer HS freshmen on the chart when it opens) |
+| Outcomes (sign / home / out of FBS) | 29 / 42 / 29% | 38 / 48 / 14% |
+| Room at open, before entries | often none, some rosters over 85 | about the hold (3–5); never over 85 |
+| Starters since the start after 5 (T1..T5) | 0.89 −0.95 1.22 2.08 4.56 | 0.96 −1.44 0.92 2.07 4.33 |
+| T1–T5 gap change vs control | −3.61 | −3.31 |
+
 ## Flags (not solved)
+- **Entrants sit at the bottom of the 10–15 target** (10.0) since the reorder: the portal reads only the early signees, so fewer backups look buried.
 - **The bottom tiers gain** ("poor get richer", the opposite of the feared rich-get-richer). Buried backups at tier 2–4 are better than tier-5 starters, and they drop down to start. That's realistic.
   - Before departures, class years were frozen and every transfer stayed forever, so the gain compounded (T5 starters +7.1 over a no-portal control after 5 offseasons).
   - **With departures** (RECRUITING.md), transfers graduate and it levels off: since the start of the career, T1–T3 starters hold within about 0.7 over 5 seasons, T4 rises about 2 and T5 about 4.5. Without portal entries, every tier holds within 1.3, so what's left is the drop-down flow itself.

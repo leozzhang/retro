@@ -4,9 +4,10 @@ import { parseRecruit, prospect, recruitPool, recruitSalt } from './data/recruit
 import { freshmanLevel, joinYear } from './data/rosterGen';
 import { TEAMS, teamById } from './data/teams';
 import { advanceOffseason, startOffseason } from './season/offseason';
-import { MIN_COUNT, PORTAL } from './season/portal';
+import { buildBoard, MIN_COUNT, openSpots, overCap, PORTAL, releaseForPortal, rosterRoom } from './season/portal';
 import {
-  classRanks, evaluation, nextHomeGame, offerCap, recruitsReact, recruitWeek, toggleOffer, toggleVisit,
+  classRanks, commitsOf, evaluation, heldSpots, nextHomeGame, offerCap, portalHold, RECRUITING, recruitSchools, recruitsReact, recruitWeek,
+  releasable, setHold, toggleOffer, toggleVisit,
 } from './season/recruiting';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, simSeason } from './season/season';
 import type { SeasonState } from './season/types';
@@ -195,7 +196,92 @@ describe('signing day and arrival', () => {
     const off = gap.map((g, i) => g / n[i]);
     // Tiers 1-4 within 2.5 in any one cycle (the season report checks 1.5 over a career); tier 5 signs tier 4's leftovers (docs/RECRUITING.md flags it).
     for (const x of off.slice(0, 4)) expect(Math.abs(x), off.map((v) => v.toFixed(2)).join(' ')).toBeLessThan(2.5);
-    expect(Math.abs(off[4])).toBeLessThan(4.5);
+    expect(Math.abs(off[4]), off.map((v) => v.toFixed(2)).join(' ')).toBeLessThan(5);
+  }, 120_000);
+});
+
+describe('the portal before signing day', () => {
+  it('the early period signs at most the planned class; the portal opens with the hold free and no roster over the cap', () => {
+    const s = copy();
+    const rs = s.recruiting!;
+    const schools = recruitSchools(s);
+    for (const t of TEAMS) {
+      const signed = Object.entries(rs.signed).filter(([, x]) => x === t.id).length;
+      expect(signed).toBeLessThanOrEqual(schools.get(t.id)!.target);
+      expect(rs.plan![t.id]).toBe(schools.get(t.id)!.target);
+    }
+    toStage(s, 'portal');
+    expect(s.offseason!.round).toBe(0);
+    // The early signees are on their rosters; open commits within the plan hold spots.
+    for (const [id, team] of Object.entries(rs.signed)) expect(baseRoster(s, team).some((a) => a.id === id)).toBe(true);
+    expect(overCap(s)).toEqual([]);
+    const board = buildBoard(s);
+    let free = 0;
+    for (const t of TEAMS) {
+      expect(baseRoster(s, t.id).length + heldSpots(s, t.id)).toBeLessThanOrEqual(PORTAL.rosterMax + 1);
+      free += rosterRoom(board, t.id);
+    }
+    // Before anyone enters, a school has about its hold free (less over-commits and departures under plan, plus early entrants).
+    expect(free / TEAMS.length).toBeGreaterThan(RECRUITING.portalHold - 2);
+  }, 120_000);
+
+  it('signing day runs after the portal and fills only the room left; then the season starts at 85', () => {
+    const s = toStage(copy(), 'portal');
+    while (s.offseason!.stage === 'portal') advanceOffseason(s);
+    expect(s.offseason!.stage).toBe('signing');
+    expect(s.recruiting!.gone).toBeUndefined();
+    advanceOffseason(s);
+    for (const t of TEAMS) expect(baseRoster(s, t.id).length).toBeLessThanOrEqual(PORTAL.rosterMax);
+    const short = TEAMS.reduce((a, t) => a + PORTAL.rosterMax - baseRoster(s, t.id).length, 0) / TEAMS.length;
+    // Placeholder freshmen fill what's left: a couple a team.
+    expect(short).toBeLessThan(3);
+    const next = advanceOffseason(s);
+    expect(next).not.toBe(s);
+    for (const t of TEAMS) expect(baseRoster(next, t.id).length).toBe(PORTAL.rosterMax);
+  }, 120_000);
+
+  it('the hold dial plans a smaller class, and releasing a commit frees a portal spot', () => {
+    const s = copy();
+    const u = s.config.userTeamId;
+    s.recruiting!.plan = undefined;
+    const before = recruitSchools(s).get(u)!.target;
+    setHold(s, portalHold(s, u) + 3);
+    expect(recruitSchools(s).get(u)!.target).toBe(before - 3);
+    setHold(s, 99);
+    expect(portalHold(s, u)).toBe(RECRUITING.holdMax);
+    const t = toStage(copy(), 'portal');
+    advanceOffseason(t);
+    const ids = releasable(t);
+    if (!ids.length) return;
+    const room = rosterRoom(buildBoard(t), u);
+    const open = openSpots(buildBoard(t), u);
+    const held = heldSpots(t, u);
+    const id = ids[ids.length - 1];
+    expect(releaseForPortal(t, id)).toBe(true);
+    expect(t.recruiting!.commits[id]).toBeUndefined();
+    const board = buildBoard(t);
+    // A commit within the plan frees a roster spot; either way the hold (and the spots open to transfers) grows.
+    expect(rosterRoom(board, u)).toBe(room + (held > heldSpots(t, u) ? 1 : 0));
+    expect(openSpots(board, u)).toBeGreaterThanOrEqual(open);
+    expect(commitsOf(t, u).open).toBe(ids.length - 1);
+    expect(releaseForPortal(t, id)).toBe(false);
+  }, 120_000);
+
+  it('an old save at signing day, before the portal, opens the portal first and signs once', () => {
+    const s = copy();
+    startOffseason(s);
+    s.config.delegate.recruiting = true;
+    while (s.offseason?.stage !== 'portal') advanceOffseason(s);
+    // Wind it back to how the old order saved it: signing day open, no portal yet.
+    s.portal = undefined;
+    s.offseason!.stage = 'signing';
+    s.offseason!.round = 0;
+    advanceOffseason(s);
+    expect(s.offseason!.stage).toBe('portal');
+    let next = s;
+    for (let i = 0; i < 10 && next.phase === 'offseason'; i++) next = advanceOffseason(next);
+    expect(next.phase).not.toBe('offseason');
+    for (const t of TEAMS) expect(baseRoster(next, t.id).length).toBe(PORTAL.rosterMax);
   }, 120_000);
 });
 

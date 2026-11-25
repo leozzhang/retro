@@ -7,7 +7,7 @@ import { teamById } from '../data/teams';
 import { VIEW_W } from '../engine/constants';
 import { groupOf } from '../season/emphasis';
 import {
-  classRanks, coachPipe, evaluation, inHomeOpen, knownWants, marketRank, nextHomeGame, offerCap, pipeLabel, recruitClass, RECRUITING,
+  classRanks, coachPipe, evaluation, inHomeOpen, knownWants, marketRank, nextHomeGame, offerCap, pipeLabel, portalHold, recruitClass, RECRUITING,
   RSTANDING_LABEL, standingOf3, statusOf, topSchools, userNeeds, visitGame, type RStanding,
 } from '../season/recruiting';
 import type { SeasonState } from '../season/types';
@@ -19,8 +19,9 @@ import { text } from './text';
 /**
  * HS recruiting (season/recruiting.ts): the BOARD your position coaches work (stars, rank, your
  * standing, his top schools, and the coach's evaluation in words), SEARCH (the national class), and
- * the CLASS (commits and signees, needs, and the national class rankings). In the offseason's signing
- * stage it's national signing day: Space runs it, then opens the portal.
+ * the CLASS (commits and signees, needs, the spots held for the portal, and the national class
+ * rankings). In the offseason's signing stage, after the portal, it's national signing day: Space runs
+ * it, then starts the next season.
  */
 
 export const RECRUIT_TABS = ['BOARD', 'SEARCH', 'CLASS'] as const;
@@ -85,6 +86,9 @@ export const FILTER_BTN = { x: VIEW_W - 108, y: CHIP_Y, w: 100, h: CHIP_H };
 export function recruitRowRect(i: number): { x: number; y: number; w: number; h: number } {
   return { x: 4, y: LIST_Y + i * LINE - 2, w: VIEW_W - 8, h: LINE };
 }
+
+/** The portal hold can change until the portal opens (it plans the class and sets the portal's spots). */
+export const holdEditable = (s: SeasonState) => s.phase !== 'offseason' || s.offseason?.stage === 'carousel' || s.offseason?.stage === 'departures';
 
 const signing = (s: SeasonState) => s.phase === 'offseason' && s.offseason?.stage === 'signing';
 const signed = (s: SeasonState) => signing(s) && (s.offseason?.round ?? 0) > 0;
@@ -152,12 +156,12 @@ export function drawRecruit(g: CanvasRenderingContext2D, s: SeasonState, v: Recr
   }
   const title = signing(s) ? `${rs.cls} CLASS: NATIONAL SIGNING DAY` : `RECRUITING THE CLASS OF ${rs.cls}`;
   text(g, title, 10, 6, { size: 8 });
-  const sub = s.config.delegate.recruiting ? 'YOUR STAFF IS RECRUITING (F: TAKE IT BACK)' : signed(s) ? 'THE CLASS IS IN. NEXT: THE TRANSFER PORTAL' : budget(s);
+  const sub = s.config.delegate.recruiting ? 'YOUR STAFF IS RECRUITING (F: TAKE IT BACK)' : signed(s) ? 'THE CLASS IS IN. NEXT: THE NEW SEASON' : budget(s);
   text(g, sub, 10, 18, { color: '#e6e6e6' });
   if (signing(s)) {
     g.fillStyle = inBox(RECRUIT_ADVANCE, v.mx, v.my) ? '#2a3a52' : '#1f2a3a';
     g.fillRect(RECRUIT_ADVANCE.x, RECRUIT_ADVANCE.y, RECRUIT_ADVANCE.w, RECRUIT_ADVANCE.h);
-    text(g, signed(s) ? 'TO THE PORTAL' : 'RUN SIGNING DAY', RECRUIT_ADVANCE.x + RECRUIT_ADVANCE.w / 2, RECRUIT_ADVANCE.y + 3, { align: 'center', color: GOLD, shadow: false });
+    text(g, signed(s) ? 'NEXT SEASON' : 'RUN SIGNING DAY', RECRUIT_ADVANCE.x + RECRUIT_ADVANCE.w / 2, RECRUIT_ADVANCE.y + 3, { align: 'center', color: GOLD, shadow: false });
   }
   const tw = VIEW_W / RECRUIT_TABS.length;
   RECRUIT_TABS.forEach((t, i) => {
@@ -328,6 +332,9 @@ function drawClass(g: CanvasRenderingContext2D, s: SeasonState, v: RecruitView):
   for (const pp of pipes.values()) for (const [st, val] of Object.entries(pp)) best.set(st, Math.max(best.get(st) ?? 0, val));
   for (const [st, val] of Object.entries(s.teamState[u]?.pipe ?? {})) best.set(st, Math.max(best.get(st) ?? 0, val));
   text(g, `PIPELINES: ${pipeLabel(Object.fromEntries(best), 4)}`, x, LIST_Y + 184, { color: ACCENT, shadow: false });
-  drawHint(g, v.note || `A/D: TAB  Q/E: GROUP  W/S: SCROLL${signing(s) ? `  SPACE: ${signed(s) ? 'TO THE PORTAL' : 'SIGNING DAY'}` : ''}  ESC: HUB`);
+  // Spots held back from the class for the transfer portal; [ and ] while the class is still forming.
+  const dial = holdEditable(s);
+  text(g, `HELD FOR PORTAL: ${portalHold(s, u)}${dial ? '  [ - ] +' : ''}`, x, LIST_Y + 198, { color: dial ? GOLD : SOFT, shadow: false });
+  drawHint(g, v.note || `A/D: TAB  Q/E: GROUP  W/S: SCROLL${dial ? '  [/]: PORTAL HOLD' : ''}${signing(s) ? `  SPACE: ${signed(s) ? 'NEXT SEASON' : 'SIGNING DAY'}` : ''}  ESC: HUB`);
 }
 

@@ -629,7 +629,6 @@ function portalReport(n: number): string[] {
     }
     const chairsBefore = allChairs(s);
     startToPortal(s);
-    recruitSigned(s, rec);
     carouselStats(s, chairsBefore, allChairs(s), market);
     if (y > 1) {
       promises.kept += s.offseason!.promises!.kept;
@@ -655,7 +654,13 @@ function portalReport(n: number): string[] {
       if (actOnLeaving(s, id, 'promise', startersNow.has(id) ? 'start' : 'snaps')) promises.made++;
     }
     const old = s;
+    // Signing day comes after the portal; the user's side is the staff's, as it was through startToPortal.
+    const ownRecruiting = s.config.delegate.recruiting;
+    s.config.delegate.recruiting = true;
     while (s.phase === 'offseason') s = advanceOffseason(s);
+    old.config.delegate.recruiting = ownRecruiting;
+    s.config.delegate.recruiting = ownRecruiting;
+    recruitSigned(old, rec);
     officeRun(old, ['carousel', 'draft', 'signing']);
     const portal = old.portal!;
     {

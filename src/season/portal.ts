@@ -14,6 +14,7 @@ import { CONFIDENCE } from './confidence';
 import { groupOf } from './emphasis';
 import { moraleOf, temperament } from './morale';
 import { latestPoll, rankIn } from './polls';
+import { heldSpots, portalHold, releaseCommit } from './recruiting';
 import type { CoachPromise, LeavingEntry, NewsItem, PortalEntrant, PortalReason, PortalState, Progress, SeasonState, TeamState } from './types';
 import { baseRoster, seasonRng, squadFor, staffFor } from './world';
 
@@ -35,8 +36,9 @@ import { baseRoster, seasonRng, squadFor, staffFor } from './world';
  * - `crackPt`: the PT factor at which a school counts toward his market; `marketPct` the market's percentile.
  * - `win`: this season, the last `history` seasons and the brand (prestige plus `titleBrand` a title).
  *   `lossAversion`: a step down from his current program's WIN counts this much extra.
- * - `signShare`: the share of a school's departures it can replace from the portal; walk-ons take the
- *   rest (a placeholder for the HS class, docs/PORTAL.md).
+ * - `signShare`: the share of the players a school lost to the portal it can replace from it, on top of
+ *   the spots its class held back (`portalHold`, season/recruiting.ts). National signing day, after the
+ *   portal, fills the rest (docs/PORTAL.md).
  * - `dev`: the position coach's teach and the program's development record.
  * - `entry`: the logistic on entering. `k` per point of market over stay; `morale`, `loyal` (the team
  *   trait), `again` (already transferred), `broken` (a broken promise), and class.
@@ -54,7 +56,6 @@ export const PORTAL = {
   origin: { win: 0.5, dev: 0.15 },
   lossAversion: 2,
   signShare: 0.5,
-  departShare: 0.15,
   ptScale: 2.5,
   crackPt: 0.5,
   marketPct: 0.85,
@@ -162,6 +163,9 @@ export interface School {
   left: number;
   gone: number;
   signed: number;
+  /** HS commits still to join, each holding a roster spot, and the spots its class held back for the portal. */
+  held: number;
+  hold: number;
 }
 
 export interface Board {
@@ -203,7 +207,7 @@ function winFactor(state: SeasonState, id: string, wp: number): number {
 const boardCache = new WeakMap<PortalState | SeasonState, { key: string; board: Board }>();
 
 const boardKey = (state: SeasonState) =>
-  state.portal ? `${state.year}:${state.portal.entrants.length}:${state.portal.entrants.filter((e) => e.out).length}` : `${state.year}:-`;
+  state.portal ? `${state.year}:${state.portal.entrants.length}:${state.portal.entrants.filter((e) => e.out).length}:${state.portal.released ?? 0}` : `${state.year}:-`;
 
 /**
  * The board: every school's chart and reputation, cached until entries or placements change it.
@@ -262,6 +266,7 @@ export function buildBoard(state: SeasonState): Board {
       id: t.id, home: TEAM_STATE[t.id] ?? 'TX', win: winFactor(state, t.id, wp.get(t.id) ?? 0.5), dev,
       room: PORTAL.roomW * (mood / Math.max(1, sq.athletes.length)), extra: PORTAL.securityW * security,
       chart, count, size, left: left.get(t.id) ?? 0, gone: state.departures?.left?.[t.id] ?? 0, signed: signed.get(t.id) ?? 0,
+      held: heldSpots(state, t.id), hold: portalHold(state, t.id),
     });
   }
   const board = { schools, players };
@@ -490,18 +495,30 @@ function autoLeaving(state: SeasonState, board: Board, team: string, odds: Map<s
   for (const pl of risk) meet(state, pl.a.id);
 }
 
-/** Roster room: the cap less everyone on the roster who isn't in the portal. */
+/** Roster room: the cap less everyone on the roster who isn't in the portal, and the HS commits still to join. */
 export function rosterRoom(board: Board, team: string): number {
-  return PORTAL.rosterMax - board.schools.get(team)!.size;
+  const s = board.schools.get(team)!;
+  return PORTAL.rosterMax - s.size - s.held;
 }
 
 /**
- * Spots open to transfers: roster room, within `signShare` of the players it lost to the portal and
- * `departShare` of those who graduated or declared. The freshman class takes the rest.
+ * Spots open to transfers: roster room, within the spots its class held back (`hold`) and `signShare`
+ * of the players it lost to the portal. National signing day fills the rest.
  */
 export function openSpots(board: Board, team: string): number {
   const s = board.schools.get(team)!;
-  return Math.min(rosterRoom(board, team), Math.ceil(PORTAL.signShare * s.left + PORTAL.departShare * s.gone) - s.signed);
+  return Math.min(rosterRoom(board, team), Math.ceil(PORTAL.signShare * s.left) + s.hold - s.signed);
+}
+
+/**
+ * The user releases an HS commit to make room for a transfer (`releaseCommit`, season/recruiting.ts):
+ * his spot opens on the roster and in the hold.
+ */
+export function releaseForPortal(state: SeasonState, id: string): boolean {
+  if (!state.portal || !releaseCommit(state, id)) return false;
+  state.portal.released = (state.portal.released ?? 0) + 1;
+  dropBoard(state);
+  return true;
 }
 
 /** Spots the school still needs for positions under their minimum, once a player at `pos` joins. */
@@ -840,11 +857,15 @@ export function rollEntries(state: SeasonState): void {
  * leave FBS; then a freshman class fills every roster to the cap, short positions first. Both are
  * placeholders until HS recruiting.
  */
+const USUAL = new Map<Position, number>(COMPOSITION);
+
 export function closePortal(state: SeasonState): void {
   const portal = state.portal!;
   const board = buildBoard(state);
   for (const e of pendingEntrants(portal).sort((a, b) => b.ovr - a.ovr)) {
-    if (rosterRoom(board, e.from) - 1 >= needAfter(board, e.from, e.pos)) {
+    // His school takes him back only where it's short of its usual count: signing day, next, fills the rest.
+    const short = (board.schools.get(e.from)!.count.get(e.pos) ?? 0) < USUAL.get(e.pos)!;
+    if (short && rosterRoom(board, e.from) - 1 >= needAfter(board, e.from, e.pos)) {
       e.out = 'return';
       tell(state, e.id, { team: e.from, kind: 'portal', text: `No offer to his liking: back to ${teamById(e.from).school}` });
       onChart(state, board, e.id, e.from);
@@ -857,7 +878,6 @@ export function closePortal(state: SeasonState): void {
     }
   }
   dropBoard(state);
-  refillFreshmen(state);
   const placed = portal.entrants.filter((e) => e.out === 'commit').length;
   state.news.push(portalNews(state, `PORTAL CLOSES: ${placed} of ${portal.entrants.length} entrants signed with a new school`, []));
 }

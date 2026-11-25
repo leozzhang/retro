@@ -49,10 +49,11 @@ import {
   slotConfirmRects, slotDeleteRect, slotRect, type MenuItem, type SettingRow, type SlotsView,
 } from '../render/menuScreen';
 import {
-  drawRecruit, FILTER_BTN, GROUP_CHIPS, groupChipRect, newRecruitView, RECRUIT_ACTIONS, RECRUIT_ADVANCE, RECRUIT_ROWS, RECRUIT_TABS, recruitActionRect,
+  drawRecruit, FILTER_BTN, GROUP_CHIPS, groupChipRect, holdEditable, newRecruitView, RECRUIT_ACTIONS, RECRUIT_ADVANCE, RECRUIT_ROWS, RECRUIT_TABS, recruitActionRect,
   recruitRowRect, recruitRows, recruitTabAt as recruitTabAt0, SEARCH_FILTERS, type RecruitView,
 } from '../render/recruitScreen';
-import { addToBoard, dropFromBoard, inHome, staffFill, toggleOffer, toggleTop, toggleVisit } from '../season/recruiting';
+import { addToBoard, dropFromBoard, inHome, releasable, setHold, staffFill, toggleOffer, toggleTop, toggleVisit, portalHold } from '../season/recruiting';
+import { prospect } from '../data/recruits';
 import { careerList, careerRowAt as careerRowAt0, careerTabAt as careerTabAt0, modeAt as modeAt0, newCareerView } from '../render/careerScreen';
 import { beginLinks, linkAt as linkAt0, overLink, type Link } from '../render/links';
 import { drawProgram, programScrollMax, programTabAt as programTabAt0, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
@@ -72,8 +73,8 @@ import { decisionAt as decisionAt0, drawWrap, newWrapView, sceneDur, type WrapVi
 import { galleryMoments } from '../render/momentGallery';
 import { engineGame, enginePart, isEngineSnap, type EngineTeamIn, type SnapWatch } from '../season/engineGame';
 import type { InjuryLevel, SeasonConfig } from '../season/types';
-import { advanceOffseason, startOffseason } from '../season/offseason';
-import { actOnLeaving, offer, pursue, setTarget, withdraw } from '../season/portal';
+import { advanceOffseason, migrateOffseason, startOffseason } from '../season/offseason';
+import { actOnLeaving, offer, pursue, releaseForPortal, setTarget, withdraw } from '../season/portal';
 import { fireAssistant, interview, offerChair, withdrawOffer } from '../season/carousel';
 import {
   CAROUSEL_ADVANCE, CAROUSEL_ROWS, CAROUSEL_TABS, carouselActionRect, carouselRowRect, carouselTabAt as carouselTabAt0, chairChipRect, drawCarousel, hiringRows,
@@ -937,6 +938,8 @@ export class Game {
     void loadSlot(slot).then((s) => {
       this.slotsView.loading = -1;
       if (!s) return;
+      // A save from before the portal moved ahead of signing day opens on the portal.
+      if (migrateOffseason(s)) saveSlot(slot, s);
       this.season = s;
       this.slot = slot;
       this.toSeason();
@@ -2305,7 +2308,7 @@ export class Game {
     const list = s ? unseenWrap(s).filter((m) => m.os && m.os !== 'opener') : [];
     if (!list.length) return false;
     const screen = this.screen;
-    this.openWrap(list, false, () => (screen === 'portal' ? (this.screen = 'portal') : this.toOffseason()));
+    this.openWrap(list, false, () => (screen === 'portal' && s!.offseason?.stage === 'portal' ? (this.screen = 'portal') : this.toOffseason()));
     return true;
   }
 
@@ -2344,7 +2347,13 @@ export class Game {
     }
     const signingDay = s.phase === 'offseason' && s.offseason?.stage === 'signing';
     if (signingDay && (input.hit('Space', 'Enter') || (pressed && inBox(RECRUIT_ADVANCE, x, y)))) {
-      advanceOffseason(s);
+      const next = advanceOffseason(s);
+      if (next !== s) {
+        this.season = next;
+        this.save();
+        this.toSeason();
+        return;
+      }
       this.save();
       if (!this.stageWrap()) this.toOffseason();
       return;
@@ -2368,6 +2377,14 @@ export class Game {
     if (input.hit('KeyF')) {
       s.config.delegate.recruiting = !s.config.delegate.recruiting;
       v.note = s.config.delegate.recruiting ? 'YOUR STAFF RECRUITS: BOARD, OFFERS AND VISITS (F: TAKE IT BACK)' : 'YOU RECRUIT';
+      this.save();
+      return;
+    }
+    if (RECRUIT_TABS[v.tab] === 'CLASS' && holdEditable(s) && input.hit('BracketLeft', 'BracketRight')) {
+      const was = portalHold(s, s.config.userTeamId);
+      setHold(s, was + (input.hit('BracketRight') ? 1 : -1));
+      const now = portalHold(s, s.config.userTeamId);
+      v.note = `HOLDING ${now} SPOT${now === 1 ? '' : 'S'} FOR THE PORTAL: THE CLASS PLANS ${now > was ? 'SMALLER' : now < was ? 'BIGGER' : 'THE SAME'}`;
       this.save();
       return;
     }
@@ -2611,12 +2628,27 @@ export class Game {
         return;
       }
       this.save();
+      if (s.offseason?.stage !== 'portal') {
+        if (!this.stageWrap()) this.toOffseason();
+        return;
+      }
       this.portalView = { ...newPortalView(s), tab: PORTAL_TABS[v.tab] === 'LEAVING' ? 0 : v.tab, chip: v.chip };
       this.stageWrap();
       return;
     }
     const which = PORTAL_TABS[v.tab];
-    if (which === 'MY ROOM') return;
+    if (which === 'MY ROOM') {
+      // X: release the lowest HS commit still to sign, for a transfer's spot.
+      const rel = releasable(s);
+      if (input.hit('KeyX') && rel.length && !s.config.delegate.portal) {
+        const p = prospect(rel[rel.length - 1])!;
+        if (releaseForPortal(s, p.id)) {
+          v.note = `RELEASED ${p.stars}* ${p.pos} ${p.a.last.toUpperCase()}: ONE MORE SPOT FOR A TRANSFER`;
+          this.save();
+        }
+      }
+      return;
+    }
     if (which === 'BOARD') {
       let chip = v.chip;
       const k = POS_CHIPS.length;

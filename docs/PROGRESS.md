@@ -1,6 +1,27 @@
 # Progress
 
-_Last updated: 2026-11-23_
+_Last updated: 2026-11-24_
+
+## Fixed: signing day filled the roster before the transfer portal (2026-11-24)
+Signing day came before the portal and filled every roster to 85. Delegated staffs signed past it (Georgia 86, App State 90), because signing day's class plan counted rising seniors and attrition a second time. `overCap` then pushed players into the portal, and the only room left came from your own entrants, so keeping players cost you the portal.
+- **New order, the real calendar's:** carousel → departures → **portal** → **national signing day** (`OFFSEASON_STAGES`). Early signees join the roster when the portal opens; verbal commits within the class planned at the early period hold spots (`heldSpots`, `RecruitingState.plan`). Signing day fills what's left, in up to 2 rounds of last offers, then placeholder freshmen, then the new season.
+- **Portal hold:** classes leave `RECRUITING.portalHold` (4) spots for transfers. `attrition` is now 1 (early entrants only); portal losses are signing day's. The user sets the hold on the recruit CLASS tab with `[`/`]` until the portal opens. Spots open to transfers are the hold plus half the school's entrants (`departShare` is gone).
+- **Release:** X on the portal's MY ROOM tab releases your lowest unsigned commit for a spot, at a cost in interest and in-state pipeline. Over-commits past the plan are cut on signing day if there's no room, and MY ROOM warns about them.
+- **The early period** signs at most the planned class. Signing day's class is the real room under the cap.
+- **Returns:** an unplaced entrant goes home only to a position under its usual count (otherwise nearly everyone went home with signing day still to come).
+- **Old saves** at signing day before the portal open on the portal (`migrateOffseason`, on load).
+- **Bug found on the way:** `estimate`'s cache key left out the coach pipeline that sharpens the read, so a stale read could carry across runs.
+- **Results** (headless, everything delegated): Georgia, Iowa and App State open the portal with 3–5 room before entries (was −1, 2, −5), and no roster is ever over 85. In `npm run season` against a HEAD baseline: starter talent by tier is unchanged within about 0.5, portal outcomes sign/home/out 38/48/14% (was 29/42/29), signees 18.2 a team (19.6), placeholder freshmen 1.5. Details in PORTAL.md and RECRUITING.md.
+- **Flags:**
+  - Entrants 10.0 a team, the bottom of the target.
+  - T4/T5 signees sit +2.2/+4.7 over their level; the recruiting test's T5 guard went from 4.5 to 5.
+  - The STAFF T1–T5 gap change is +1.51, just over its 1.5 limit.
+- **Tests:** 4 new in `recruiting.test.ts` (early period capped at the plan with room at portal open, signing day after the portal fills only real room, the hold dial and release, old-save migration). `npm test` passes (517).
+- **Not yet checked in the app:** the new MY ROOM line and X, the CLASS tab's HOLD line, and the stage strip's order.
+- **Next:**
+  - A tier lean on the hold.
+  - CPU staffs releasing commits for a better transfer.
+  - Showing over-plan commits on the CLASS tab.
 
 ## Fixed: the game froze after your punts and kickoffs (2026-11-24)
 - After the special teams revamp, every punt and kickoff the CPU kicker struck for you (fair catch, return, touchback, downed) froze on the result banner. `Game.updateKick` only stepped the kick while it wasn't over, so `KickPlay.overTime`, which moves the game on (and lets SPACE skip), never advanced. A finished kick now keeps updating. Checked in the browser: 40 punts across every outcome all move on.
