@@ -1,22 +1,41 @@
 import { teamRatings } from '../data/depth';
 import { TEAMS } from '../data/teams';
 import { clamp, gauss } from '../engine/math';
-import { played, records, type TeamRecord } from './standings';
-import type { Poll, SeasonState } from './types';
+import { played } from './standings';
+import type { Poll, SeasonGame, SeasonState } from './types';
 import { seasonRng, squadFor } from './world';
 
 /**
- * Polls by simulated voters. Each voter scores every team on its resume (record, strength of schedule,
- * margin), a preseason prior that fades, and inertia toward last week's rank, plus a personal bias,
- * then ranks its top 25. Ballots are counted Borda style (25 points for 1st, 1 for 25th).
+ * Polls by simulated voters. Each voter scores every team on its resume, game by game: a win is worth more
+ * the better the opponent, a loss costs more the worse the opponent and the wider the margin, and every game
+ * is judged by the opponent's standing now, so a loss to a team that later climbs into the top 25 costs less
+ * each week. Opponents are judged by a power rating (`powerRatings`: capped margins and the opponents' own
+ * ratings, so a conference's strength reaches all of its teams) blended with their rank in last week's poll.
+ * On top: schedule strength, average margin, a preseason prior that fades (AP), and inertia toward last
+ * week's rank, plus a personal bias, then each voter ranks a top 25. Ballots are counted Borda style.
  */
 
 export interface VoterWeights {
   voters: number;
-  /** Per win, and the cost of a loss in wins. */
-  win: number;
-  loss: number;
-  /** Per game played, times (average opponent win % - 0.5). */
+  /** A win: `winBase + winQual * quality(opp)`, quality 1 for the best team and about 0.37 for the 26th. */
+  winBase: number;
+  winQual: number;
+  /**
+   * A loss: `-(lossBase + lossBad * (1 - quality(opp)) + lossWorst * badness(opp)) * closeness`. The first share
+   * is a voter's "was it to a good team" (it saturates past the top 40 or so), the second keeps a loss to the
+   * 120th worse than one to the 50th; badness runs from 0 for the best team to 1 for the worst.
+   */
+  lossBase: number;
+  lossBad: number;
+  lossWorst: number;
+  /** Per loss past the `PILE_FROM`th, whoever it was to: voters don't rank a 5-loss team however good its schedule. */
+  lossPile: number;
+  /**
+   * How much of a loss a close one forgives: closeness runs from 1 - closeCredit (a tie at a neutral site against
+   * the best team; half that against the worst) to 1 (`MARGIN_CAP`+).
+   */
+  closeCredit: number;
+  /** Per game, times (quality(opp) - the league's mean quality): credit for playing good teams, win or lose. */
   sos: number;
   /** Times the average margin, capped at `MARGIN_CAP` and scaled to -1..1. */
   margin: number;
@@ -30,12 +49,14 @@ export interface VoterWeights {
 }
 
 export const AP_WEIGHTS: VoterWeights = {
-  voters: 62, win: 1, loss: 2, sos: 1.5, margin: 1.2, prior: 3, priorFade: 9, inertia: 4.5, noise: 0.6,
+  voters: 62, winBase: 0.6, winQual: 1.8, lossBase: 0.8, lossBad: 3, lossWorst: 1.6, closeCredit: 0.6, sos: 0.5, margin: 1,
+  lossPile: 2, prior: 3, priorFade: 9, inertia: 4.5, noise: 0.6,
 };
 
-/** The committee: no preseason prior, more weight on schedule, little inertia, and 13 members who mostly agree. */
+/** The committee: no preseason prior, more weight on who you played and lost to, little inertia, and 13 members who mostly agree. */
 export const CFP_WEIGHTS: VoterWeights = {
-  voters: 13, win: 1, loss: 1.8, sos: 2.5, margin: 0.8, prior: 0, priorFade: 1, inertia: 0.8, noise: 0.25,
+  voters: 13, winBase: 0.8, winQual: 2, lossBase: 0.7, lossBad: 3.4, lossWorst: 1.8, closeCredit: 0.6, sos: 0.8, margin: 0.6,
+  lossPile: 1, prior: 0, priorFade: 1, inertia: 0.8, noise: 0.25,
 };
 
 const MARGIN_CAP = 21;
@@ -43,6 +64,14 @@ const MARGIN_CAP = 21;
 const PRIOR_OVR = 0.75;
 const PRIOR_PRESTIGE = 0.25;
 const TOP = 25;
+const PILE_FROM = 3;
+
+/**
+ * The power rating behind every opponent's quality, in points of margin: like SRS, each team is its capped,
+ * home-adjusted margin plus its opponents' ratings, pulled toward the preseason prior as if it were `priorGames`
+ * games. `priorPts` points per preseason z-score.
+ */
+export const POWER = { priorGames: 3, priorPts: 11, homeEdge: 2.5, iterations: 30, qualDecay: 25, pollBlend: 0.5 };
 
 function priorZ(state: SeasonState): Map<string, number> {
   const raw = TEAMS.map((t) => {
@@ -54,45 +83,91 @@ function priorZ(state: SeasonState): Map<string, number> {
   return new Map(raw.map(([id, v]) => [id, (v - mean) / sd]));
 }
 
-/** Average win % of the opponents played, not counting their games against this team. */
-function sosOf(state: SeasonState, id: string, recs: Map<string, TeamRecord>): number {
-  const opps: number[] = [];
-  for (const g of played(state)) {
-    if (g.home !== id && g.away !== id) continue;
-    const opp = g.home === id ? g.away : g.home;
-    const r = recs.get(opp)!;
-    const lostToUs = g.home === id ? g.result!.home > g.result!.away : g.result!.away > g.result!.home;
-    const w = r.w - (lostToUs ? 0 : 1);
-    const l = r.l - (lostToUs ? 1 : 0);
-    opps.push(w + l > 0 ? w / (w + l) : 0.5);
-  }
-  return opps.length ? opps.reduce((a, b) => a + b, 0) / opps.length : 0.5;
+/** A game's margin for `id`, capped and with the home edge taken out (positive: played better than an even opponent). */
+function adjMargin(g: SeasonGame, id: string): number {
+  const home = g.home === id;
+  const d = home ? g.result!.home - g.result!.away : g.result!.away - g.result!.home;
+  const edge = g.neutral ? 0 : home ? -POWER.homeEdge : POWER.homeEdge;
+  return clamp(d, -MARGIN_CAP, MARGIN_CAP) + edge;
 }
 
-function marginOf(state: SeasonState, id: string): number {
-  const m: number[] = [];
-  for (const g of played(state)) {
-    if (g.home !== id && g.away !== id) continue;
-    const d = g.home === id ? g.result!.home - g.result!.away : g.result!.away - g.result!.home;
-    m.push(clamp(d, -MARGIN_CAP, MARGIN_CAP) / MARGIN_CAP);
+/** Every team's power rating from the games played so far, in points over an average team. */
+export function powerRatings(state: SeasonState, prior = priorZ(state)): Map<string, number> {
+  const games = played(state).filter((g) => prior.has(g.home) && prior.has(g.away));
+  const r = new Map(TEAMS.map((t) => [t.id, prior.get(t.id)! * POWER.priorPts]));
+  for (let it = 0; it < POWER.iterations; it++) {
+    const sum = new Map(TEAMS.map((t) => [t.id, POWER.priorGames * prior.get(t.id)! * POWER.priorPts]));
+    const n = new Map(TEAMS.map((t) => [t.id, POWER.priorGames]));
+    for (const g of games) {
+      for (const [id, opp] of [[g.home, g.away], [g.away, g.home]] as const) {
+        sum.set(id, sum.get(id)! + adjMargin(g, id) + r.get(opp)!);
+        n.set(id, n.get(id)! + 1);
+      }
+    }
+    for (const t of TEAMS) r.set(t.id, sum.get(t.id)! / n.get(t.id)!);
   }
-  return m.length ? m.reduce((a, b) => a + b, 0) / m.length : 0;
+  return r;
+}
+
+/**
+ * Each team's rank as an opponent on a resume: its power rating's rank, blended with its rank in last week's
+ * poll when it was ranked there, so a loss to a team now in the top 25 reads as a loss to a ranked team.
+ */
+export function opponentRanks(state: SeasonState, prev?: Poll, prior?: Map<string, number>): Map<string, number> {
+  const power = powerRatings(state, prior);
+  const byPower = TEAMS.map((t) => t.id).sort((a, b) => power.get(b)! - power.get(a)!);
+  return new Map(byPower.map((id, i) => {
+    const pr = rankIn(prev, id);
+    return [id, pr ? POWER.pollBlend * pr + (1 - POWER.pollBlend) * (i + 1) : i + 1];
+  }));
+}
+
+/** 1 for the best opponent, falling fast: about 0.7 for the 10th, 0.37 for the 26th, 0.14 for the 50th. */
+const quality = (rank: number) => Math.exp(-(rank - 1) / POWER.qualDecay);
+/** 0 for the best opponent, 1 for the worst. */
+const badness = (rank: number) => (rank - 1) / (TEAMS.length - 1);
+const MEAN_QUALITY = TEAMS.reduce((s, _, i) => s + quality(i + 1), 0) / TEAMS.length;
+
+/** What one played game adds to `id`'s resume, judged by the opponent's rank now. */
+export function gameValue(w: VoterWeights, g: SeasonGame, id: string, oppRank: number): number {
+  const m = adjMargin(g, id);
+  const won = (g.home === id ? g.result!.home - g.result!.away : g.result!.away - g.result!.home) > 0;
+  let v = w.sos * (quality(oppRank) - MEAN_QUALITY);
+  if (won) v += w.winBase + w.winQual * quality(oppRank);
+  else {
+    // Close losses are forgiven most against good teams: a one-score loss at No. 1 is a near miss, at No. 90 it's still a loss.
+    const closeness = 1 - w.closeCredit * (1 - clamp(-m, 0, MARGIN_CAP) / MARGIN_CAP) * (0.5 + 0.5 * quality(oppRank));
+    v -= (w.lossBase + w.lossBad * (1 - quality(oppRank)) + w.lossWorst * badness(oppRank)) * closeness;
+  }
+  return v;
 }
 
 /** Every team's resume score before voter noise. */
-function baseScores(state: SeasonState, week: number, w: VoterWeights, prev?: Poll): Map<string, number> {
-  const recs = records(state);
-  const prior = w.prior ? priorZ(state) : undefined;
+export function baseScores(state: SeasonState, week: number, w: VoterWeights, prev?: Poll): Map<string, number> {
+  const prior = priorZ(state);
+  const opp = opponentRanks(state, prev, prior);
   const fade = Math.max(0, 1 - week / w.priorFade);
   const prevRank = new Map(prev?.ranks.map((r, i) => [r.team, i + 1]));
+  const resume = new Map(TEAMS.map((t) => [t.id, 0]));
+  const margin = new Map(TEAMS.map((t) => [t.id, { sum: 0, n: 0, l: 0 }]));
+  for (const g of played(state)) {
+    for (const [id, o] of [[g.home, g.away], [g.away, g.home]] as const) {
+      if (!resume.has(id) || !opp.has(o)) continue;
+      resume.set(id, resume.get(id)! + gameValue(w, g, id, opp.get(o)!));
+      const mg = margin.get(id)!;
+      const d = g.home === id ? g.result!.home - g.result!.away : g.result!.away - g.result!.home;
+      mg.sum += clamp(d, -MARGIN_CAP, MARGIN_CAP) / MARGIN_CAP;
+      mg.n++;
+      if (d < 0) mg.l++;
+    }
+  }
   const out = new Map<string, number>();
   for (const t of TEAMS) {
-    const r = recs.get(t.id)!;
-    const gp = r.w + r.l;
-    let s = w.win * (r.w - w.loss * r.l);
-    s += w.sos * (sosOf(state, t.id, recs) - 0.5) * gp;
-    s += w.margin * marginOf(state, t.id);
-    if (prior) s += w.prior * prior.get(t.id)! * fade;
+    const mg = margin.get(t.id)!;
+    let s = resume.get(t.id)!;
+    s += w.margin * (mg.n ? mg.sum / mg.n : 0);
+    s -= w.lossPile * Math.max(0, mg.l - PILE_FROM);
+    if (w.prior) s += w.prior * prior.get(t.id)! * fade;
     const pr = prevRank.get(t.id);
     if (pr) s += w.inertia * (TOP + 1 - pr) / TOP;
     out.set(t.id, s);

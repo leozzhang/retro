@@ -7,11 +7,12 @@ import { buildSquad, healthOf, healthy, HEALTH, positionOrder, reorderPosition, 
 import { overallRaw, POS_ROLE, POSITIONS } from './data/positions';
 import { CALENDAR } from './data/season/calendar';
 import { teamById, TEAMS } from './data/teams';
-import { latestPoll, rankIn } from './season/polls';
+import { AP_WEIGHTS, gameValue, latestPoll, opponentRanks, powerRatings, rankIn } from './season/polls';
 import { champions } from './season/postseason';
 import { advanceWeek, defaultConfig, newSeason, nextSeason, seasonOver, simSeason } from './season/season';
 import { records, recordText, winner } from './season/standings';
-import { LEADER_CATEGORIES, leaders, seasonStats } from './season/stats';
+import { LEADER_CATEGORIES, leaders, seasonStats, type SeasonLine } from './season/stats';
+import { passerRating } from './season/awards';
 import type { DriveLog, InjuryLevel, SeasonState, TeamState } from './season/types';
 import { headCoachFor, squadFor, staffFor } from './season/world';
 import { DEF_SLOTS, OFF_SLOTS } from './season/grades';
@@ -1408,6 +1409,164 @@ function storyReport(seasons: SeasonState[]): string[] {
   ];
 }
 
+/**
+ * POLLS: how the AP poll treats a loss, by who it was to and by how much, whether bad losses keep teams out,
+ * the final top 25's conferences, and losses judged again as the opponent rose. Targets in docs/SEASON.md.
+ */
+function pollReport(seasons: SeasonState[]): string[] {
+  const P4 = new Set(['SEC', 'Big Ten', 'ACC', 'Big 12']);
+  type Bucket = { hi: number; drop: number; lo: number; out: number };
+  const buckets = new Map<string, Bucket>();
+  // Teams ranked 1-15 by spots dropped (out = 26), teams ranked 16-25 by the share falling out.
+  const add = (k: string, before: number, after: number) => {
+    const b = buckets.get(k) ?? buckets.set(k, { hi: 0, drop: 0, lo: 0, out: 0 }).get(k)!;
+    if (before <= 15) {
+      b.hi++;
+      b.drop += after - before;
+    } else {
+      b.lo++;
+      if (after > 25) b.out++;
+    }
+  };
+  let finals = 0;
+  let badTwice = 0;
+  let weekly = 0;
+  let weeklyBad = 0;
+  let g5 = 0;
+  let twoLossG5 = 0;
+  let fourLoss = 0;
+  let fiveLoss = 0;
+  let rejudged = 0;
+  let costThen = 0;
+  let costNow = 0;
+  for (const s of seasons) {
+    const finalAp = latestPoll(s, 'ap')!;
+    const finalOpp = opponentRanks(s, finalAp);
+    const power = powerRatings(s);
+    const powerRank = new Map(TEAMS.map((t) => t.id).sort((a, b) => power.get(b)! - power.get(a)!).map((id, i) => [id, i + 1]));
+    for (const g of s.games.filter((x) => x.result && x.week <= CALENDAR.regularWeeks)) {
+      const w = winner(g)!;
+      const l = w === g.home ? g.away : g.home;
+      const before = latestPoll(s, 'ap', g.week);
+      const after = latestPoll(s, 'ap', g.week + 1);
+      const lr = rankIn(before, l);
+      if (lr && after && after.week === g.week) {
+        const wr = rankIn(before, w);
+        const m = Math.abs(g.result!.home - g.result!.away);
+        const opp = wr && wr <= 10 ? 'to a top 10' : wr ? 'to 11-25' : 'to unranked';
+        const ar = rankIn(after, l) || 26;
+        add(`${opp}, by ${m <= 8 ? '1-8' : '9+'}`, lr, ar);
+        if (wr && wr <= 5 && m <= 8) add('to a top 5, by 1-8', lr, ar);
+      }
+      // A loss to a team unranked at kickoff that finished ranked: its cost then and at season's end.
+      if (!rankIn(before, w) && rankIn(finalAp, w)) {
+        const then = { ...s, games: s.games.filter((x) => x.week <= g.week) };
+        const prevThen = latestPoll(s, 'ap', g.week + 1);
+        rejudged++;
+        costThen -= gameValue(AP_WEIGHTS, g, l, opponentRanks(then, prevThen).get(w)!);
+        costNow -= gameValue(AP_WEIGHTS, g, l, finalOpp.get(w)!);
+      }
+    }
+    // In season: ranked teams with 2+ losses to teams outside the power top 60, as the power rating stood that week.
+    for (const p of s.polls.filter((x) => x.kind === 'ap' && x.week >= 6 && x.week <= CALENDAR.regularWeeks)) {
+      const then = { ...s, games: s.games.filter((x) => x.week <= p.week) };
+      const pw = powerRatings(then);
+      const pr = new Map(TEAMS.map((t) => t.id).sort((a, b) => pw.get(b)! - pw.get(a)!).map((id, i) => [id, i + 1]));
+      weekly++;
+      for (const r of p.ranks) {
+        const bad = then.games.filter((g) => g.result && (g.home === r.team || g.away === r.team) && winner(g) !== r.team && pr.get(winner(g)!)! > 60).length;
+        if (bad >= 2) weeklyBad++;
+      }
+    }
+    const recs = records(s);
+    for (const r of finalAp.ranks) {
+      finals++;
+      const conf = teamById(r.team).conference;
+      if (!P4.has(conf)) {
+        g5++;
+        if (recs.get(r.team)!.l >= 2) twoLossG5++;
+      }
+      if (recs.get(r.team)!.l >= 4) fourLoss++;
+      if (recs.get(r.team)!.l >= 5) fiveLoss++;
+      const bad = s.games.filter((g) => g.result && (g.home === r.team || g.away === r.team) && winner(g) !== r.team
+        && powerRank.get(winner(g)!)! > 60).length;
+      if (bad >= 2) badTwice++;
+    }
+  }
+  const n = seasons.length;
+  const order = ['to a top 10, by 1-8', 'to a top 10, by 9+', 'to 11-25, by 1-8', 'to 11-25, by 9+', 'to unranked, by 1-8', 'to unranked, by 9+', 'to a top 5, by 1-8'];
+  return [
+    '', '== POLLS ==', '',
+    'a ranked team\'s loss, in the next AP poll: ranked 1-15, spots dropped (out = 26); ranked 16-25, the share falling out',
+    ...order.filter((k) => buckets.has(k)).map((k) => {
+      const b = buckets.get(k)!;
+      return `  ${k.padEnd(22)} 1-15: ${String(b.hi).padStart(4)} losses, drop ${(b.drop / Math.max(1, b.hi)).toFixed(1).padStart(4)}   16-25: ${String(b.lo).padStart(4)} losses, out ${pctText(b.out / Math.max(1, b.lo)).padStart(6)}`;
+    }),
+    `final top 25: ${(g5 / n).toFixed(1)} outside the P4 a season (${(twoLossG5 / n).toFixed(1)} with 2+ losses); ${(badTwice / n).toFixed(1)} with 2+ losses to teams outside the power top 60 (target ~0)`,
+    `AP polls weeks 6-${CALENDAR.regularWeeks}: ${(weeklyBad / Math.max(1, weekly)).toFixed(2)} ranked teams a week with 2+ losses to teams outside the power top 60 that week (target under 0.3)`,
+    `final top 25 with 4+ losses ${(fourLoss / n).toFixed(1)} a season, 5+ ${(fiveLoss / n).toFixed(1)}`,
+    `losses to teams unranked then, ranked at the end: ${rejudged} (${(rejudged / n).toFixed(1)} a season), resume cost ${(costThen / Math.max(1, rejudged)).toFixed(2)} then vs ${(costNow / Math.max(1, rejudged)).toFixed(2)} at the end`,
+  ];
+}
+
+/**
+ * The award races over every season, against real voting (docs/SEASON.md, "Awards"): the Heisman's
+ * winners and top-5 finalists by position, the winner's team at selection, and each award winner's
+ * average line from the games before the bowls.
+ */
+function awardsReport(seasons: SeasonState[]): string[] {
+  const n = seasons.length;
+  const rows = ['', '== AWARDS ==', ''];
+  const win = new Map<string, number>();
+  const fin = new Map<string, number>();
+  let rank = 0;
+  let losses = 0;
+  const lines = new Map<string, SeasonLine[]>();
+  for (const s of seasons) {
+    const pre = { ...s, games: s.games.filter((g) => g.kind !== 'bowl' && g.kind !== 'cfp') };
+    const post = Math.min(...s.games.filter((g) => g.kind === 'bowl' || g.kind === 'cfp').map((g) => g.week));
+    const stats = seasonStats(pre);
+    const recs = records(pre);
+    const ap = latestPoll(s, 'ap', post);
+    for (const a of s.awards) {
+      const w = a.finalists[0];
+      if (!w) continue;
+      lines.set(a.id, [...(lines.get(a.id) ?? []), stats.get(w.id)!]);
+      if (a.id !== 'heisman') continue;
+      const grp = (p: string) => (p === 'TE' ? 'WR' : p === 'FB' ? 'HB' : p);
+      win.set(grp(w.pos), (win.get(grp(w.pos)) ?? 0) + 1);
+      for (const f of a.finalists) fin.set(grp(f.pos), (fin.get(grp(f.pos)) ?? 0) + 1);
+      rank += rankIn(ap, w.team) || 30;
+      losses += recs.get(w.team)!.l;
+    }
+  }
+  // 2000-2025 winners: QB 20, HB 3, WR 3 (Hunter's 2024 counted a receiver).
+  const target: Record<string, [number, number, number]> = { QB: [77, 65, 85], HB: [12, 5, 22], WR: [12, 4, 18] };
+  rows.push(`HEISMAN winners by position over ${n} seasons (real 2000-2025 share; flagged outside the band)`);
+  for (const [p, [real, lo, hi]] of Object.entries(target)) {
+    const sh = (win.get(p) ?? 0) / n;
+    const flag = n >= 10 && (sh * 100 < lo || sh * 100 > hi) ? `  <-- target ${lo}-${hi}%` : '';
+    rows.push(`  ${p.padEnd(3)} ${pctText(sh).padStart(6)}  (real ${real}%)   top-5 finalists ${pctText((fin.get(p) ?? 0) / (5 * n)).padStart(6)}${flag}`);
+  }
+  const r = rank / n;
+  const l = losses / n;
+  rows.push(`  winner's team at selection: AP #${r.toFixed(1)}, ${l.toFixed(1)} losses (real: about #3, 1 loss)${r > 8 ? '  <-- target AP #8 or better' : ''}`);
+  const avg = (xs: SeasonLine[], f: (x: SeasonLine) => number) => xs.reduce((a, x) => a + f(x), 0) / Math.max(1, xs.length);
+  const show: Record<string, (xs: SeasonLine[]) => string> = {
+    heisman: () => '',
+    obrien: (xs) => `${avg(xs, (x) => x.passYds).toFixed(0)} pass yds, ${avg(xs, (x) => x.passTd).toFixed(1)} TD, ${avg(xs, (x) => x.int).toFixed(1)} INT, rating ${avg(xs, passerRating).toFixed(0)}`,
+    walker: (xs) => `${avg(xs, (x) => x.rushYds).toFixed(0)} rush yds, ${avg(xs, (x) => x.rushTd).toFixed(1)} TD, ${(avg(xs, (x) => x.rushYds) / Math.max(1, avg(xs, (x) => x.rush))).toFixed(1)} ypc`,
+    biletnikoff: (xs) => `${avg(xs, (x) => x.rec).toFixed(0)} catches, ${avg(xs, (x) => x.recYds).toFixed(0)} yds, ${avg(xs, (x) => x.recTd).toFixed(1)} TD`,
+    groza: (xs) => {
+      const pct = avg(xs, (x) => x.fgm) / Math.max(1, avg(xs, (x) => x.fga));
+      return `${avg(xs, (x) => x.fgm).toFixed(1)}/${avg(xs, (x) => x.fga).toFixed(1)} FG (${pctText(pct)})${pct < 0.85 ? '  <-- target 85%+' : ''}`;
+    },
+  };
+  rows.push('winners\' average line, before the bowls');
+  for (const [id, xs] of lines) if (show[id]?.(xs)) rows.push(`  ${id.padEnd(12)} ${show[id](xs)}`);
+  return rows;
+}
+
 it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const n = Number(process.env.SEASONS ?? 5);
   const level = (process.env.INJURIES ?? 'normal') as InjuryLevel;
@@ -1434,10 +1593,14 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
     seasons.push(s);
   }
   conf.qbSlumps = slumped.size;
+  if (process.env.SEASON_ONLY === 'polls') {
+    writeFileSync(process.env.SEASON_OUT ?? 'season.txt', [...aggregate(seasons), ...pollReport(seasons), ...detail(seasons[0])].join('\n'));
+    return;
+  }
   const rows = [
-    ...aggregate(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
+    ...aggregate(seasons), ...pollReport(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
     ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
-    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...storyReport(seasons), ...detail(seasons[0]),
+    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...storyReport(seasons), ...awardsReport(seasons), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

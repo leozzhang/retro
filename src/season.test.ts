@@ -8,7 +8,7 @@ import { RIVALRIES } from './data/season/rivalries';
 import { teamById, TEAMS } from './data/teams';
 import { mulberry32 } from './engine/math';
 import { heismanRace } from './season/awards';
-import { latestPoll, rankIn } from './season/polls';
+import { AP_WEIGHTS, gameValue, latestPoll, opponentRanks, powerRatings, rankIn } from './season/polls';
 import { champions, seedOrder } from './season/postseason';
 import { generateSchedule } from './season/schedule';
 import { advanceWeek, defaultConfig, newSeason, simSeason } from './season/season';
@@ -173,6 +173,38 @@ describe('season', () => {
     // One seeded season: 4.9 here after confidence learned the box score (2026-11-20), over 5 before.
     expect(drops.reduce((a, b) => a + b, 0) / drops.length).toBeGreaterThan(4.5);
     expect(drops.filter((d) => d < 0).length).toBe(0);
+  });
+
+  it('polls judge a loss by the opponent, the margin and the site, as the opponent stands now', () => {
+    const game = (home: number, away: number, neutral = false) =>
+      ({ id: 'x', week: 3, home: 'a', away: 'b', kind: 'conf', neutral, result: { home, away } }) as unknown as SeasonGame;
+    const last = TEAMS.length;
+    // A one-score road loss at No. 1 is a near miss; a blowout at home to the worst team is not.
+    const nearMiss = gameValue(AP_WEIGHTS, game(27, 24), 'b', 1);
+    const badLoss = gameValue(AP_WEIGHTS, game(10, 38), 'a', last);
+    expect(nearMiss).toBeGreaterThan(badLoss + 3);
+    // The closer and the better the opponent, the cheaper the loss.
+    expect(gameValue(AP_WEIGHTS, game(27, 24), 'b', 40)).toBeGreaterThan(gameValue(AP_WEIGHTS, game(41, 17), 'b', 40));
+    expect(gameValue(AP_WEIGHTS, game(27, 24), 'b', 12)).toBeGreaterThan(gameValue(AP_WEIGHTS, game(27, 24), 'b', 60));
+    // A win over a top team is worth more than one over a bad team.
+    expect(gameValue(AP_WEIGHTS, game(24, 27), 'b', 3)).toBeGreaterThan(gameValue(AP_WEIGHTS, game(24, 27), 'b', 100) + 1);
+  });
+
+  it('polls: the power rating carries results, and a team ranked now counts as ranked on a resume', () => {
+    const s = newSeason(defaultConfig('georgia'), 5);
+    for (let w = 1; w <= 8; w++) advanceWeek(s);
+    const power = powerRatings(s);
+    const recs = records(s);
+    const avg = (ids: string[]) => ids.reduce((a, id) => a + power.get(id)!, 0) / ids.length;
+    const unbeaten = TEAMS.filter((t) => recs.get(t.id)!.l === 0 && recs.get(t.id)!.w >= 6).map((t) => t.id);
+    const winless = TEAMS.filter((t) => recs.get(t.id)!.w === 0).map((t) => t.id);
+    if (unbeaten.length && winless.length) expect(avg(unbeaten)).toBeGreaterThan(avg(winless) + 10);
+    // Whoever last week's poll ranks first reads as a top opponent, whatever the rating says.
+    const prev = latestPoll(s, 'ap')!;
+    const top = prev.ranks[0].team;
+    const byPower = TEAMS.map((t) => t.id).sort((a, b) => power.get(b)! - power.get(a)!);
+    expect(opponentRanks(s, prev).get(top)).toBeCloseTo(0.5 * 1 + 0.5 * (byPower.indexOf(top) + 1));
+    expect(opponentRanks(s, undefined).get(top)).toBe(byPower.indexOf(top) + 1);
   });
 
   it('seed order: the standard bracket', () => {

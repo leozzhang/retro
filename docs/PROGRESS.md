@@ -2,6 +2,32 @@
 
 _Last updated: 2026-11-24_
 
+## Fixed: HBs won the Heisman about half the time (2026-11-24)
+- **Why:** `production()` paid 1 point per 25 passing yards but 1 per 10 rushing yards, and the cast sim gives the starting HB every non-QB carry (the rushing leader at about 2,700–2,900 yards). Raw totals compared across positions favored backs.
+- **Now** (`season/awards.ts`, `AWARDS_TUNE`):
+  - Each position has its own value score: a QB's yards and TDs times a capped efficiency, relative to the league median; a back's rushing plus half his receiving, with a YPC factor; a receiver's yards, TDs and catches; a kicker's makes times accuracy³, with a qualifier.
+  - The Heisman scores each candidate's dominance over his own position's top 5, times the voters' prior by position, times a steep team factor.
+  - The O'Brien, Walker and Biletnikoff get lighter team factors.
+- **Results, 40 seasons:** Heisman winners QB 80% / HB 12.5% / WR 7.5% (real 77/12/12), from teams at AP #4.3. Before the efficiency factor was capped, the user's engine-played QB won 11 of 20, because engine box scores run at a passer rating of about 180 against 105 for the drive sim.
+- **The new AWARDS section in `npm run season`:** winners and finalists by position, the winner's team, and winners' average lines. Targets and flags are in SEASON.md.
+- **Not changed:** box-score stats. Rushing leaders are still inflated because the RB gets every carry. That's a later fix in `season/cast.ts`, and it would shift the rest of the report.
+
+## Fixed: polls ignored who you lost to, how close it was, and conference strength (2026-11-24)
+- **The bug:** every loss cost the same, and schedule strength was the opponents' win %. So a No. 19 team losing at No. 1 by a field goal took the same hit as losing to a 2-10 team, and often fell out. A weak conference's opponents came out near .500, so a 2-loss team there with two bad losses could stay ranked.
+- **Now** (`season/polls.ts`): each game on a resume is valued by the opponent's quality and the margin (`gameValue`). Opponents are judged by `powerRatings`, an SRS-style rating with the prior counted as 3 games, so conference strength comes through. A ranked opponent's poll rank is blended in. Every game is re-judged each week, so a loss to a team that later gets ranked costs less over time. Each loss past the 3rd costs extra (`lossPile`).
+- **The POLLS section in `npm run season`** (`SEASON_ONLY=polls` runs it alone). Before → after, 10 seasons:
+  - a top-15 team's one-score loss to a top 5: 5.7 → 2.8 spots dropped;
+  - a 16–25 team's close loss to a top 10: out 54% → 29%;
+  - losses to unranked teams cost the same or more;
+  - non-P4 teams in the final top 25: 6.9 → 4.5 a season;
+  - teams ranked with two bad losses: 1.5 → 0.5, and 0.02 a week in season.
+  - The table and flags are in SEASON.md.
+- **Flags:**
+  - More 4-loss teams in the final top 25 (5.8 a season), and 0.7 a season with 5 losses.
+  - Ranked losses per week 4.8 (real 5.5).
+- **Tests:** 2 new in `season.test.ts` (loss and win values; the power rating and the poll blend). The existing poll test still holds.
+- **Note:** `season/awards.ts` had uncommitted changes from another session; this change didn't touch it.
+
 ## Fixed: seniors in their last season flagged as transfer risks (2026-11-24)
 - The TRANSFER RISK storyline picked any unhappy player good enough to matter, without asking whether he could transfer. A senior out of eligibility (every senior who isn't taking a redshirt this season, RS seniors included) graduates in departures before the portal opens, so the warning could never come true. Those players are now skipped (`seniorsLeaving`, the same rule departures use), and an open risk on one, say after a planned redshirt falls through, closes as IN HIS FINAL SEASON. moments.test.ts now checks that no transfer risk is a player who graduated.
 
