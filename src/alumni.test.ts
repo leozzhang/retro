@@ -123,7 +123,7 @@ describe('alumni', () => {
     expect(tiers.legend ?? 0).toBeLessThan(tiers.starter ?? 0);
     for (const p of list) {
       const t = legacyTier(s, p);
-      expect(!!epithet(s, p)).toBe(t === 'star' || t === 'legend' || t === 'hof');
+      expect(!!epithet(s, p)).toBe(t === 'legend' || t === 'hof');
     }
     const rb = recordBook(list, 'rushYds');
     expect(rb.season.length).toBeGreaterThan(0);

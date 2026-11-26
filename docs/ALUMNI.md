@@ -40,7 +40,7 @@ Every player the user has coached, past and present, kept as a **plaque**. The c
 
 The score adds up starter seasons (10), rotation seasons (3), starts (0.6 each), peak overall over 75 (1.2 a point), award wins (45), finalist finishes (14) and the draft by round (40 for the 1st down to 8). Over two Georgia seasons: 52 on the roll, 38 lettermen, 26 starters, 14 stars and 2 legends. The STARTER and STAR frames need a season as the starter, because a deep roster's backups rate in the 90s too.
 
-**Nicknames** (`epithet`) go to stars and up only. They're fixed by id: "THE <HOMETOWN> <NOUN>", with a position noun that starts with the town's letter when one exists. A long town name gives "<LAST NAME> THE <NOUN>". A walk-on star is THE WALK-ON WONDER, and a 2-star signee THE <TOWN> SLEEPER.
+**Nicknames** (`epithet`) go to legends and the Hall of Fame only. They're fixed by id: "THE <HOMETOWN> <NOUN>", with a position noun that starts with the town's letter when one exists. A long town name gives "<LAST NAME> THE <NOUN>". A walk-on legend is THE WALK-ON WONDER, and a 2-star signee THE <TOWN> SLEEPER.
 
 ## The page
 - **ROLL:** the list (number, name, position, years, peak overall; the tier color on the left edge, a star for the Hall of Fame, green for current players) and the plaque. Filters are chips: click to step forward, right-click to step back. They are SHOW (PLAYED by default, FORMER, CURRENT, EVERYONE), POS by group, YEAR, FROM (origin), HOF, and SORT (legacy with the Hall first, peak, starts, newest, yards, name). `/` or a click on the box searches names, hometowns and nicknames.

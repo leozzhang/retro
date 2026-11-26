@@ -255,12 +255,12 @@ function hash(s: string): number {
 }
 
 /**
- * A star's nickname, from his hometown, position and path: "THE TYLER TORNADO". A noun that starts
- * with his town's letter wins. Stars and up only; fixed by his id, so it never changes.
+ * A legend's nickname, from his hometown, position and path: "THE TYLER TORNADO". A noun that starts
+ * with his town's letter wins. Legends and the Hall of Fame only; fixed by his id, so it never changes.
  */
 export function epithet(state: SeasonState, p: AlumPlaque): string {
   const tier = legacyTier(state, p);
-  if (tier !== 'star' && tier !== 'legend' && tier !== 'hof') return '';
+  if (tier !== 'legend' && tier !== 'hof') return '';
   const city = p.home.split(',')[0].toUpperCase();
   if (p.origin === 'walkon') return 'THE WALK-ON WONDER';
   if (p.stars <= 2 && p.origin === 'signed') return `THE ${city.length <= 12 ? city : 'SMALL-TOWN'} SLEEPER`;
