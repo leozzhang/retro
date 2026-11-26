@@ -60,9 +60,14 @@ function marketText(state: SeasonState, p: Prospect, rank: number, u: string): s
   return top[0] ? `YOU'RE NO. ${rank}. ${SCHOOL(top[0])} LEADS` : `YOU'RE NO. ${rank} FOR HIM`;
 }
 
-/** The plates a commitment scene shows: his school and the others in his top 3. */
+/**
+ * The plates a commitment scene shows: his school and the others in his top 3. The scene only plays for
+ * a recruitment the user follows, which stays open down to his top `RSTORY.out` (and a week past it), so
+ * the user's hat is always on the table: it takes the third plate when the user isn't in his top 3.
+ */
 function plates(state: SeasonState, p: Prospect, chosen: string, u: string): MomentRow[] {
-  const others = topSchools(state, p, 4).filter((t) => t !== chosen).slice(0, 2);
+  let others = topSchools(state, p, 4).filter((t) => t !== chosen).slice(0, 2);
+  if (chosen !== u && !others.includes(u)) others = [...others.slice(0, 1), u];
   // His school lands in a spot drawn from his id (no rng), so the order never gives it away.
   const order = [...others];
   order.splice(hashString(`plate:${p.id}`) % (others.length + 1), 0, chosen);
