@@ -57,7 +57,7 @@ import { prospect } from '../data/recruits';
 import { careerList, careerRowAt as careerRowAt0, careerTabAt as careerTabAt0, modeAt as modeAt0, newCareerView } from '../render/careerScreen';
 import { beginLinks, linkAt as linkAt0, overLink, type Link } from '../render/links';
 import { drawProgram, programScrollMax, programTabAt as programTabAt0, programTabCount, PROGRAM_TABS, type ProgramView } from '../render/programScreen';
-import { newAlumniView, updateAlumni } from '../render/alumniScreen';
+import { alumniCaptures, newAlumniView, updateAlumni } from '../render/alumniScreen';
 import { drawOffice, OFFICE_TABS, officeScrollMax, officeTabAt as officeTabAt0, type OfficeView } from '../render/officeScreen';
 import { achievement, levelOf, newRoom, roomName, sampleOffice, seeOffice } from '../season/achievements';
 import { ROOMS } from '../data/office';
@@ -2055,8 +2055,8 @@ export class Game {
     v.mx = v.career.mx = x;
     v.my = v.career.my = y;
     const alumniTab = PROGRAM_TABS.indexOf('ALUMNI');
-    // Typing a search takes every key, Esc included.
-    if (v.tab === alumniTab && v.alumni.typing) {
+    // Typing a search or an open dropdown takes every key and click, Esc included.
+    if (v.tab === alumniTab && alumniCaptures(v.alumni)) {
       if (updateAlumni(s, v.alumni, input)) this.save();
       return;
     }

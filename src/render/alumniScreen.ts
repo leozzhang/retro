@@ -32,6 +32,9 @@ export interface AlumniView {
   sort: number;
   search: string;
   typing: boolean;
+  /** The dropdown open on the filter bar, and the option under the keys in it. */
+  open?: Pick;
+  pick: number;
   sel?: string;
   /** Rows scrolled past; -1 scrolls to `sel` on the first draw. */
   scroll: number;
@@ -46,14 +49,16 @@ export interface AlumniView {
 }
 
 type Act =
-  | { k: 'mode'; i: number } | { k: 'chip'; f: Chip } | { k: 'row'; id: string } | { k: 'hof'; id: string }
-  | { k: 'cat'; i: number } | { k: 'num'; n: number } | { k: 'open'; id: string } | { k: 'search' };
+  | { k: 'mode'; i: number } | { k: 'drop'; f: Pick } | { k: 'opt'; f: Pick; i: number } | { k: 'hofOnly' }
+  | { k: 'row'; id: string } | { k: 'hof'; id: string } | { k: 'cat'; i: number } | { k: 'num'; n: number }
+  | { k: 'open'; id: string } | { k: 'search' } | { k: 'clear' } | { k: 'menu' };
 type Hit = { x: number; y: number; w: number; h: number; act: Act };
-type Chip = 'show' | 'group' | 'year' | 'origin' | 'hof' | 'sort';
+/** The filter bar's dropdowns. */
+type Pick = 'show' | 'group' | 'year' | 'origin' | 'sort';
 
 const MODES = ['ROLL', 'RECORDS', 'NUMBERS', 'TIMELINE'];
 const SHOWS = ['PLAYED', 'FORMER', 'CURRENT', 'EVERYONE'];
-const ORIGINS = ['ALL', 'SIGNED', 'INHERITED', 'TRANSFER', 'WALK-ON'] as const;
+const ORIGINS = ['ANY', 'SIGNED', 'INHERITED', 'TRANSFER', 'WALK-ON'] as const;
 const ORIGIN_KEY = [undefined, 'signed', 'inherited', 'transfer', 'walkon'] as const;
 const SORTS = ['LEGACY', 'PEAK', 'STARTS', 'NEWEST', 'YARDS', 'NAME'];
 
@@ -71,8 +76,9 @@ export const TIER_COLOR: Record<LegacyTier, string> = {
 };
 
 const TOP = 34;
-const CHIP_Y = 50;
-const BODY = 66;
+const BAR_Y = 51;
+const BAR_H = 12;
+const BODY = 68;
 const BOTTOM = 342;
 const L_X = 6;
 const L_W = 246;
@@ -85,16 +91,26 @@ const LIST_ROWS = Math.floor((BOTTOM - BODY - 24) / ROW_H);
 /** A fresh view; on a player (from a link), the roll shows everyone so he's on it. */
 export function newAlumniView(sel?: string): AlumniView {
   return {
-    mode: 0, show: sel ? 3 : 0, group: -1, year: 0, origin: 0, hofOnly: false, sort: 0, search: '', typing: false, sel, scroll: sel ? -1 : 0,
+    mode: 0, show: sel ? 3 : 0, group: -1, year: 0, origin: 0, hofOnly: false, sort: 0, search: '', typing: false, pick: 0, sel, scroll: sel ? -1 : 0,
     cat: 0, num: -1, col: -1, mx: 0, my: 0, hits: [],
   };
 }
 
-export const ALUMNI_HINT = 'V VIEW  W/S PLAYER  / SEARCH  F HALL OF FAME  CLICK A FILTER (RIGHT: BACK)  ESC BACK';
+export const ALUMNI_HINT = 'V VIEW  W/S PLAYER  / SEARCH  F HALL OF FAME  CLICK A FILTER TO PICK  ESC BACK';
 const TYPING_HINT = 'TYPE A NAME OR HOMETOWN  BACKSPACE DELETE  ENTER OR ESC DONE';
+const MENU_HINT = 'CLICK OR W/S AND ENTER: PICK  ESC OR CLICK AWAY: CLOSE';
 
 export function alumniHint(v: AlumniView): string {
-  return v.typing ? TYPING_HINT : ALUMNI_HINT;
+  if (v.typing) return TYPING_HINT;
+  if (v.open) return MENU_HINT;
+  return v.mode === 0 ? ALUMNI_HINT : v.mode === 1 ? 'V VIEW  W/S CATEGORY  CLICK A NAME: HIS PLAQUE  ESC BACK'
+    : v.mode === 2 ? 'V VIEW  WASD OR CLICK: NUMBER  CLICK A NAME: HIS PLAQUE  ESC BACK'
+    : 'V VIEW  A/D OR WHEEL: YEARS  CLICK A NAME: HIS PLAQUE  ESC BACK';
+}
+
+/** True while the tab takes every key (a search being typed, a dropdown open), Esc included. */
+export function alumniCaptures(v: AlumniView): boolean {
+  return v.typing || !!v.open;
 }
 
 // ------------------------------------------------------------ the list
@@ -160,6 +176,25 @@ export function updateAlumni(s: SeasonState, v: AlumniView, input: Input): boole
     v.scroll = 0;
     if (!input.mouse.pressed) return false;
   }
+  if (v.open) {
+    const n = options(s, v, v.open).labels.length;
+    const step = (input.hit('KeyS', 'ArrowDown') ? 1 : 0) - (input.hit('KeyW', 'ArrowUp') ? 1 : 0);
+    if (step) v.pick = (v.pick + step + n) % n;
+    if (input.hit('Enter', 'NumpadEnter', 'Space')) {
+      choose(s, v, v.open, v.pick);
+      return false;
+    }
+    if (input.hit('Escape', 'Backspace')) {
+      v.open = undefined;
+      return false;
+    }
+    if (!input.mouse.pressed && !input.mouse.rpressed) return false;
+    const h = noteHit(x, y, [...v.hits].reverse().find((b) => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h));
+    // A click on an option picks it; anywhere else closes the menu (its own field included).
+    if (h?.act.k === 'opt') choose(s, v, h.act.f, h.act.i);
+    else if (h?.act.k !== 'menu') v.open = undefined;
+    return false;
+  }
   if (input.hit('KeyV')) setMode(v, (v.mode + 1) % MODES.length);
   if (input.hit('Slash')) {
     setMode(v, 0);
@@ -195,14 +230,22 @@ export function updateAlumni(s: SeasonState, v: AlumniView, input: Input): boole
     const step = (input.hit('KeyD', 'ArrowRight') ? 1 : 0) - (input.hit('KeyA', 'ArrowLeft') ? 1 : 0) + input.mouse.wheel;
     if (step) v.col = Math.max(0, v.col + step);
   }
-  if (!input.mouse.pressed && !input.mouse.rpressed) return saved;
-  const back = input.mouse.rpressed;
+  if (!input.mouse.pressed) return saved;
   const h = noteHit(x, y, [...v.hits].reverse().find((b) => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h));
   if (!h) return saved;
   const a = h.act;
   if (a.k !== 'search') v.typing = false;
   if (a.k === 'mode') setMode(v, a.i);
-  else if (a.k === 'chip') cycle(s, v, a.f, back ? -1 : 1);
+  else if (a.k === 'drop') {
+    v.open = a.f;
+    v.pick = options(s, v, a.f).at;
+  } else if (a.k === 'hofOnly') {
+    v.hofOnly = !v.hofOnly;
+    v.scroll = 0;
+  } else if (a.k === 'clear') {
+    v.search = '';
+    v.scroll = 0;
+  }
   else if (a.k === 'row') v.sel = a.id;
   else if (a.k === 'hof') {
     toggleHof(s, a.id);
@@ -217,26 +260,34 @@ export function updateAlumni(s: SeasonState, v: AlumniView, input: Input): boole
 function setMode(v: AlumniView, i: number): void {
   v.mode = i;
   v.typing = false;
+  v.open = undefined;
 }
 
 /** The roll on one player, the filters cleared so he's on it. */
 function openOn(s: SeasonState, v: AlumniView, id: string): void {
-  Object.assign(v, { mode: 0, show: 3, group: -1, year: 0, origin: 0, hofOnly: false, search: '', sel: id, typing: false });
+  Object.assign(v, { mode: 0, show: 3, group: -1, year: 0, origin: 0, hofOnly: false, search: '', sel: id, typing: false, open: undefined });
   const i = filtered(s, v).findIndex((p) => p.id === id);
   v.scroll = Math.max(0, i - Math.floor(LIST_ROWS / 2));
 }
 
-function cycle(s: SeasonState, v: AlumniView, f: Chip, d: number): void {
-  const wrapI = (i: number, n: number) => (i + n) % n;
-  if (f === 'show') v.show = wrapI(v.show + d, SHOWS.length);
-  else if (f === 'group') v.group = wrapI(v.group + 1 + d, LINE_GROUPS.length + 1) - 1;
-  else if (f === 'origin') v.origin = wrapI(v.origin + d, ORIGINS.length);
-  else if (f === 'sort') v.sort = wrapI(v.sort + d, SORTS.length);
-  else if (f === 'hof') v.hofOnly = !v.hofOnly;
-  else {
-    const yrs = [0, ...seasonsOf(alumniList(s))];
-    v.year = yrs[wrapI(Math.max(0, yrs.indexOf(v.year)) + d, yrs.length)];
-  }
+/** A dropdown's choices and the one in force. */
+function options(s: SeasonState, v: AlumniView, f: Pick): { labels: string[]; at: number } {
+  if (f === 'show') return { labels: SHOWS, at: v.show };
+  if (f === 'group') return { labels: ['ALL', ...LINE_GROUPS.map((x) => x.label)], at: v.group + 1 };
+  if (f === 'origin') return { labels: [...ORIGINS], at: v.origin };
+  if (f === 'sort') return { labels: SORTS, at: v.sort };
+  const yrs = seasonsOf(alumniList(s));
+  return { labels: ['ALL', ...yrs.map(String)], at: v.year ? yrs.indexOf(v.year) + 1 : 0 };
+}
+
+/** Picks a dropdown's option and closes it. */
+function choose(s: SeasonState, v: AlumniView, f: Pick, i: number): void {
+  if (f === 'show') v.show = i;
+  else if (f === 'group') v.group = i - 1;
+  else if (f === 'origin') v.origin = i;
+  else if (f === 'sort') v.sort = i;
+  else v.year = i ? seasonsOf(alumniList(s))[i - 1] : 0;
+  v.open = undefined;
   v.scroll = 0;
 }
 
@@ -248,13 +299,149 @@ function hit(v: AlumniView, x: number, y: number, w: number, h: number, act: Act
 
 const over = (v: AlumniView, x: number, y: number, w: number, h: number) => v.mx >= x && v.mx < x + w && v.my >= y && v.my < y + h;
 
-function button(g: CanvasRenderingContext2D, v: AlumniView, label: string, x: number, y: number, on: boolean, act: Act, w = label.length * 8 + 10): number {
-  const hov = over(v, x, y, w, 12);
-  g.fillStyle = on ? '#2c3b52' : hov ? '#1f2a3a' : '#18202c';
-  g.fillRect(x, y, w, 12);
-  text(g, label, x + w / 2, y + 2, { align: 'center', color: on ? GOLD : hov ? '#ffffff' : SOFT, shadow: false });
-  hit(v, x, y, w, 12, act);
-  return x + w + 4;
+/** The views: tabs on a rule, the open one gold and underlined. */
+function tabs(g: CanvasRenderingContext2D, v: AlumniView): void {
+  g.fillStyle = '#1f2a3a';
+  g.fillRect(L_X, TOP + 13, VIEW_W - 12, 1);
+  let x = L_X;
+  MODES.forEach((m, i) => {
+    const w = m.length * 8 + 12;
+    const on = v.mode === i;
+    const hov = !on && over(v, x, TOP, w, 14);
+    if (hov) {
+      g.fillStyle = '#18202c';
+      g.fillRect(x, TOP, w, 13);
+    }
+    text(g, m, x + w / 2, TOP + 3, { align: 'center', color: on ? GOLD : hov ? '#ffffff' : SOFT, shadow: on ? undefined : false });
+    if (on) {
+      g.fillStyle = GOLD;
+      g.fillRect(x + 2, TOP + 12, w - 4, 2);
+    }
+    hit(v, x, TOP, w, 14, { k: 'mode', i });
+    x += w + 4;
+  });
+}
+
+/** A small down arrow, 5 wide. */
+function caretDown(g: CanvasRenderingContext2D, x: number, y: number, col: string): void {
+  g.fillStyle = col;
+  g.fillRect(x, y, 5, 1);
+  g.fillRect(x + 1, y + 1, 3, 1);
+  g.fillRect(x + 2, y + 2, 1, 1);
+}
+
+/** A box's outline. */
+function outline(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, col: string): void {
+  g.fillStyle = col;
+  g.fillRect(x, y, w, 1);
+  g.fillRect(x, y + h - 1, w, 1);
+  g.fillRect(x, y, 1, h);
+  g.fillRect(x + w - 1, y, 1, h);
+}
+
+/** Where each dropdown sits on the bar, for the menu to open under it. */
+const fieldAt: Partial<Record<Pick, { x: number; w: number }>> = {};
+
+/**
+ * One dropdown: a dim label, then a box with the choice and an arrow. Gold when it narrows the roll
+ * (or changes the order). Returns the next x.
+ */
+function field(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView, f: Pick, label: string, x: number, live: boolean): number {
+  text(g, label, x, BAR_Y + 2, { color: over(v, x, BAR_Y, label.length * 8, BAR_H) ? SOFT : DIM, shadow: false });
+  const bx = x + label.length * 8 + 3;
+  const { labels, at } = options(s, v, f);
+  const chars = Math.max(...(f === 'year' ? ['ALL', '2026'] : labels).map((l) => l.length));
+  const w = chars * 8 + 20;
+  const open = v.open === f;
+  const hov = over(v, x, BAR_Y, bx + w - x, BAR_H);
+  g.fillStyle = open ? '#22324a' : hov ? '#1f2a3a' : '#121922';
+  g.fillRect(bx, BAR_Y, w, BAR_H);
+  outline(g, bx, BAR_Y, w, BAR_H, open ? ACCENT : live ? '#6b5a1e' : '#2a3648');
+  text(g, labels[at], bx + 5, BAR_Y + 2, { color: live ? GOLD : '#ffffff', shadow: false });
+  caretDown(g, bx + w - 10, BAR_Y + 5, open ? ACCENT : SOFT);
+  // The label opens it too.
+  hit(v, x, BAR_Y, bx + w - x, BAR_H, open ? { k: 'menu' } : { k: 'drop', f });
+  fieldAt[f] = { x: bx, w };
+  return bx + w + 9;
+}
+
+/** The open dropdown's list, over everything, in columns when it runs long. */
+function drawMenu(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView): void {
+  const f = v.open;
+  const at = f && fieldAt[f];
+  if (!f || !at) return;
+  const { labels, at: cur } = options(s, v, f);
+  const RH = 13;
+  const per = Math.max(1, Math.floor((BOTTOM - BAR_Y - BAR_H - 8) / RH));
+  const cols = Math.ceil(labels.length / per);
+  const rows = Math.ceil(labels.length / cols);
+  const cw = Math.max(at.w, Math.max(...labels.map((l) => l.length)) * 8 + 22);
+  const w = cols * cw + 4;
+  const x = Math.min(at.x, VIEW_W - 6 - w);
+  const y = BAR_Y + BAR_H + 1;
+  const h = rows * RH + 4;
+  g.fillStyle = 'rgba(0,0,0,0.5)';
+  g.fillRect(x + 3, y + 3, w, h);
+  g.fillStyle = '#0f1620';
+  g.fillRect(x, y, w, h);
+  outline(g, x, y, w, h, ACCENT);
+  hit(v, x, y, w, h, { k: 'menu' });
+  labels.forEach((l, i) => {
+    const ox = x + 2 + Math.floor(i / rows) * cw;
+    const oy = y + 2 + (i % rows) * RH;
+    const hov = over(v, ox, oy, cw, RH);
+    if (hov || i === v.pick) {
+      g.fillStyle = hov ? '#2c3b52' : '#1f2a3a';
+      g.fillRect(ox, oy, cw, RH);
+    }
+    if (i === cur) {
+      g.fillStyle = GOLD;
+      g.fillRect(ox + 4, oy + 5, 3, 3);
+    }
+    text(g, l, ox + 12, oy + 3, { color: i === cur ? GOLD : hov ? '#ffffff' : '#cfd6df', shadow: false });
+    hit(v, ox, oy, cw, RH, { k: 'opt', f, i });
+  });
+}
+
+/** The roll's bar: the filters on the left, the sort on the right. */
+function filterBar(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView): void {
+  let x = L_X;
+  x = field(g, s, v, 'show', 'SHOW', x, v.show !== 0);
+  x = field(g, s, v, 'group', 'POS', x, v.group >= 0);
+  x = field(g, s, v, 'year', 'YEAR', x, !!v.year);
+  x = field(g, s, v, 'origin', 'FROM', x, !!v.origin);
+  // The Hall of Fame only: a checkbox.
+  const hw = 4 * 8 + 15;
+  const hov = over(v, x, BAR_Y, hw, BAR_H);
+  g.fillStyle = hov ? '#1f2a3a' : '#121922';
+  g.fillRect(x, BAR_Y, 11, BAR_H);
+  outline(g, x, BAR_Y, 11, BAR_H, v.hofOnly ? '#6b5a1e' : '#2a3648');
+  if (v.hofOnly) star(g, x + 2, BAR_Y + 3, GOLD);
+  text(g, 'HALL', x + 15, BAR_Y + 2, { color: v.hofOnly ? GOLD : hov ? '#ffffff' : SOFT, shadow: false });
+  hit(v, x, BAR_Y, hw, BAR_H, { k: 'hofOnly' });
+  // The sort, set apart at the right.
+  const sw = 'SORT'.length * 8 + 3 + 6 * 8 + 20;
+  const sx = VIEW_W - 6 - sw;
+  g.fillStyle = '#2a3648';
+  g.fillRect(sx - 8, BAR_Y, 1, BAR_H);
+  field(g, s, v, 'sort', 'SORT', sx, false);
+}
+
+/** The search box: / or a click to type, the X to clear it. */
+function searchBox(g: CanvasRenderingContext2D, v: AlumniView, x: number, w: number): void {
+  const y = TOP;
+  const h = 12;
+  g.fillStyle = v.typing ? '#22324a' : over(v, x, y, w, h) ? '#1f2a3a' : '#121922';
+  g.fillRect(x, y, w, h);
+  outline(g, x, y, w, h, v.typing ? ACCENT : '#2a3648');
+  const caret = v.typing && Math.floor(Date.now() / 400) % 2 === 0 ? '_' : '';
+  text(g, v.search || v.typing ? `${v.search}${caret}` : '/ SEARCH NAME, TOWN', x + 5, y + 2, { color: v.search || v.typing ? '#ffffff' : DIM, shadow: false });
+  hit(v, x, y, w, h, { k: 'search' });
+  if (v.search) {
+    const cx = x + w - 12;
+    text(g, 'X', cx + 2, y + 2, { color: over(v, cx, y, 12, h) ? RED : SOFT, shadow: false });
+    hit(v, cx, y, 12, h, { k: 'clear' });
+  }
 }
 
 /** A five-point star in pixels, 7 wide. */
@@ -267,35 +454,28 @@ function star(g: CanvasRenderingContext2D, x: number, y: number, col: string): v
 export function drawAlumni(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView): void {
   v.hits = [];
   const list = alumniList(s);
-  let x = L_X;
-  MODES.forEach((m, i) => (x = button(g, v, m, x, TOP, v.mode === i, { k: 'mode', i })));
-  const former = list.filter((p) => p.exit && played(p)).length;
-  const legends = list.filter((p) => legacyTier(s, p) === 'legend').length;
-  const hof = list.filter((p) => isHof(s, p.id)).length;
-  text(g, `${former} LETTERMEN GONE  ${legends} LEGENDS  ${hof} IN THE HALL`, VIEW_W - 8, TOP + 2, { align: 'right', color: SOFT, shadow: false });
+  if (v.mode !== 0) v.open = undefined;
+  tabs(g, v);
+  if (v.mode === 0) searchBox(g, v, VIEW_W - 6 - 196, 196);
+  else {
+    const former = list.filter((p) => p.exit && played(p)).length;
+    const legends = list.filter((p) => legacyTier(s, p) === 'legend').length;
+    const hof = list.filter((p) => isHof(s, p.id)).length;
+    text(g, `${former} LETTERMEN GONE  ${legends} LEGENDS  ${hof} IN THE HALL`, VIEW_W - 8, TOP + 3, { align: 'right', color: SOFT, shadow: false });
+  }
   if (v.mode === 1) drawRecords(g, s, v, list);
   else if (v.mode === 2) drawNumbers(g, s, v, list);
   else if (v.mode === 3) drawTimeline(g, s, v, list);
-  else drawRoll(g, s, v);
+  else {
+    drawRoll(g, s, v);
+    drawMenu(g, s, v);
+  }
 }
 
 // ------------------------------------------------------------ ROLL
 
 function drawRoll(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView): void {
-  let x = L_X;
-  x = button(g, v, `SHOW ${SHOWS[v.show]}`, x, CHIP_Y, v.show !== 0, { k: 'chip', f: 'show' });
-  x = button(g, v, `POS ${v.group < 0 ? 'ALL' : LINE_GROUPS[v.group].label}`, x, CHIP_Y, v.group >= 0, { k: 'chip', f: 'group' });
-  x = button(g, v, `YEAR ${v.year || 'ALL'}`, x, CHIP_Y, !!v.year, { k: 'chip', f: 'year' });
-  x = button(g, v, `FROM ${ORIGINS[v.origin]}`, x, CHIP_Y, !!v.origin, { k: 'chip', f: 'origin' });
-  x = button(g, v, 'HOF', x, CHIP_Y, v.hofOnly, { k: 'chip', f: 'hof' });
-  x = button(g, v, `SORT ${SORTS[v.sort]}`, x, CHIP_Y, v.sort !== 0, { k: 'chip', f: 'sort' });
-  // The search box: / or a click to type.
-  const sw = VIEW_W - 6 - x;
-  g.fillStyle = v.typing ? '#22324a' : over(v, x, CHIP_Y, sw, 12) ? '#1f2a3a' : '#10161f';
-  g.fillRect(x, CHIP_Y, sw, 12);
-  const caret = v.typing && Math.floor(Date.now() / 400) % 2 === 0 ? '_' : '';
-  text(g, v.search || v.typing ? `${v.search}${caret}` : '/ SEARCH', x + 4, CHIP_Y + 2, { color: v.search || v.typing ? '#ffffff' : DIM, shadow: false });
-  hit(v, x, CHIP_Y, sw, 12, { k: 'search' });
+  filterBar(g, s, v);
 
   const list = filtered(s, v);
   if (!list.some((p) => p.id === v.sel)) v.sel = list[0]?.id;
@@ -582,7 +762,7 @@ function drawPlaque(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView, 
 
 function drawRecords(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView, list: AlumPlaque[]): void {
   const since = seasonsOf(list)[0];
-  text(g, since ? `THE PROGRAM'S RECORDS SINCE YOU ARRIVED IN ${since}` : 'NO SEASONS ON THE BOOKS YET', L_X, CHIP_Y + 2, { color: SOFT, shadow: false });
+  text(g, since ? `THE PROGRAM'S RECORDS SINCE YOU ARRIVED IN ${since}` : 'NO SEASONS ON THE BOOKS YET', L_X, BAR_Y + 2, { color: SOFT, shadow: false });
   RECORD_CATS.forEach((c, i) => {
     const y = BODY + i * 24;
     const sel = i === v.cat;
@@ -624,7 +804,7 @@ function drawRecords(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView,
 function drawNumbers(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView, list: AlumPlaque[]): void {
   const lin = numberLineage(list);
   if (v.num < 0) v.num = [...lin.entries()].sort((a, b) => Math.max(...b[1].map((x) => x.p.score)) - Math.max(...a[1].map((x) => x.p.score)))[0]?.[0] ?? 0;
-  text(g, 'EVERY NUMBER AND WHO WORE IT', L_X, CHIP_Y + 2, { color: SOFT, shadow: false });
+  text(g, 'EVERY NUMBER AND WHO WORE IT', L_X, BAR_Y + 2, { color: SOFT, shadow: false });
   const cw = 24;
   const ch = 26;
   const rank: Record<LegacyTier, number> = { roll: 0, letterman: 1, starter: 2, star: 3, legend: 4, hof: 5 };
@@ -691,8 +871,8 @@ function drawTimeline(g: CanvasRenderingContext2D, s: SeasonState, v: AlumniView
   if (v.col < 0) v.col = Math.max(0, years.length - cols);
   v.col = Math.min(v.col, Math.max(0, years.length - cols));
   const shown = years.slice(v.col, v.col + cols);
-  text(g, 'THE STARTERS, YEAR BY YEAR', L_X, CHIP_Y + 2, { color: SOFT, shadow: false });
-  if (years.length > cols) text(g, `A/D OR WHEEL: ${shown[0]}-${shown[shown.length - 1]} OF ${years[0]}-${years[years.length - 1]}`, VIEW_W - 8, CHIP_Y + 2, { align: 'right', color: DIM, shadow: false });
+  text(g, 'THE STARTERS, YEAR BY YEAR', L_X, BAR_Y + 2, { color: SOFT, shadow: false });
+  if (years.length > cols) text(g, `A/D OR WHEEL: ${shown[0]}-${shown[shown.length - 1]} OF ${years[0]}-${years[years.length - 1]}`, VIEW_W - 8, BAR_Y + 2, { align: 'right', color: DIM, shadow: false });
   shown.forEach((yr, j) => text(g, String(yr), lx + j * cw + cw / 2, BODY, { align: 'center', color: yr === s.year && s.phase !== 'offseason' ? GREEN : ACCENT, shadow: false }));
   const rh = 26;
   LINE_GROUPS.forEach((grp, i) => {
