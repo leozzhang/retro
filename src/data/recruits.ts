@@ -1,7 +1,7 @@
 import type { Athlete } from './athletes';
 import { CITIES, REGION, TALENT, TEAM_STATE } from './fbs/geo';
 import { overallRaw, type Position } from './positions';
-import { COMPOSITION, LEVEL_SD, rollFreshman } from './rosterGen';
+import { COMPOSITION, jerseyFor, LEVEL_SD, rollFreshman } from './rosterGen';
 import { TEAMS } from './teams';
 import { clamp, gauss, hashString, mulberry32 } from '../engine/math';
 
@@ -164,6 +164,8 @@ function rollProspect(cls: number, salt: string, n: number): { id: string; a: At
   const shift = fbs ? RECRUITS.tierShift[team.profile.tier - 1] : -RECRUITS.extraUnder;
   const pos = pickPos(rng());
   const a = rollFreshman(team.profile, id, pos, 'recruit', shift, LEVEL_SD * RECRUITS.spread);
+  // His high school number, on its own stream: what he asks for when he signs.
+  a.num = jerseyFor(id, pos);
   const level = overallRaw(a.r, pos);
   const N = RECRUITS.noise;
   const st = a.hometown.state;

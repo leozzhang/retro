@@ -477,6 +477,8 @@ export interface CareerSeason {
   /** His class that season, as `classLabel` prints it ('RS SO'). */
   cls: string;
   role: CareerRole;
+  /** The jersey he wore, when it isn't his generated one (joiners, transfers). */
+  num?: number;
   gp?: number;
   gs?: number;
   /** His overall at the start and end of the season. */

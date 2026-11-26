@@ -2,6 +2,11 @@
 
 _Last updated: 2026-11-25_
 
+## Fixed: alumni showed #0 for many players, and jerseys read like random numbers (2026-11-25)
+- **Cause:** freshmen, walk-ons and signed recruits get their number on joining (`TeamState.roster.in`), and their generated record says 0. Once one left, his roster entry went with it, so a plaque built without an earlier copy (every save from before the alumni store, and the office's draft jersey) fell back to #0.
+- **Fix:** career rows keep the jersey for joiners and anyone not wearing his generated one (`CareerSeason.num`); `jerseyOf` reads roster, then rows, then the generated record. Plaques already frozen at #0 are repaired on sync with a seeded stand-in.
+- **More realistic numbers** (`JERSEY`, `pickJersey` in `data/rosterGen.ts`; ROSTERS.md step 11): weighted bands by position, single digits leaning to the best players, no FB at #0 or OT in the single digits (the old fallback took any number 0-99), sharing only across offense and defense. Recruits bring a high school number and ask for it; transfers keep theirs if free. Generated numbers are on their own stream: ratings and the season report are unchanged apart from timing. Existing saves show new numbers for players from the generated rosters.
+
 ## New: THE LETTERMEN, the user's alumni (2026-11-25)
 - Every player the user has coached, past and present, is kept as a plaque (`season/alumni.ts`, `SeasonState.alumni`): origin (signed, inherited, transfer, walk-on), a row per season, overall arc, calling card, honors, curated story lines, and exit (graduated, declared, drafted with round, pick and city, transferred, left FBS). It's frozen when he leaves. Display only: the season report is byte-identical apart from timing.
 - Legacy tiers set the plaque's frame: letterman, bronze STARTER, silver STAR, gold LEGEND, and the black-and-gold HALL OF FAME with a glint. The Hall of Fame is a free toggle (`SeasonState.hof`). Stars and up get a nickname ("THE FRESNO FLASH").

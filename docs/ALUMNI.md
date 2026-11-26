@@ -25,7 +25,7 @@ Every player the user has coached, past and present, kept as a **plaque**. The c
 - Current players are refreshed on every sync with their archived rows only. The page lays the live season on top (`alumniList`, cached by week and phase).
 - A player who has played a season for the user and is no longer on the roster is frozen with his exit and never rebuilt.
 - The sync runs as a season completes (after `archiveSeason`), after departures, after the portal closes, before the next season starts, and whenever the page is opened. It's idempotent, and it backfills saves from before the store existed.
-- A former player's number comes from his last refresh as a current player. A backfilled transfer-in takes his generated number.
+- A former player's number comes from his last refresh as a current player, else his career rows (`CareerSeason.num`, kept for joiners and anyone not in his generated number; `jerseyOf` in `career.ts`). A plaque frozen at #0 by a save from before rows kept numbers (freshmen, walk-ons and recruits get theirs on joining, and their generated record says 0) is repaired on sync with a seeded stand-in in his position's bands.
 - Size: about 400 bytes a plaque, so 25–30 a season, about 12 KB of JSON a season.
 
 ## Legacy and frames (`ALUMNI`)

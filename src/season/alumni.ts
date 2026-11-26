@@ -3,8 +3,8 @@ import { athleteName, generatedAthlete } from '../data/depth';
 import { overall, overallBreakdown, type Position } from '../data/positions';
 import { prospect } from '../data/recruits';
 import { RATING_INFO } from '../data/ratings';
-import { parseWalkOn } from '../data/rosterGen';
-import { careerGains, careerOf, careerRows, careerTotals } from './career';
+import { joinYear, parseWalkOn } from '../data/rosterGen';
+import { careerGains, careerOf, careerRows, careerTotals, jerseyOf } from './career';
 import { applyDelta } from './progression';
 import type { StatKey } from './stats';
 import type { AlumPlaque, AlumSeason, CareerSeason, SeasonState, StoryEvent } from './types';
@@ -50,7 +50,7 @@ function rowsWith(rows: CareerSeason[], team: string, num: number, prev?: AlumPl
     if (r.gp) out.gp = r.gp;
     if (r.gs) out.gs = r.gs;
     if (r.st && Object.keys(r.st).length) out.st = r.st;
-    const n = prev?.rows.find((x) => x.year === r.year)?.num ?? num;
+    const n = r.num ?? prev?.rows.find((x) => x.year === r.year)?.num ?? num;
     if (n !== num) out.num = n;
     return out;
   });
@@ -102,6 +102,12 @@ function curate(state: SeasonState, id: string, team: string): AlumPlaque['lines
   return picked.map(({ e }) => ({ year: e.year, ...(e.week !== undefined ? { week: e.week } : {}), kind: e.kind, text: e.text }));
 }
 
+/**
+ * A plaque frozen with the #0 of a joiner's generated record (freshmen, walk-ons and recruits get their
+ * number on joining, and saves from before career rows kept it lost it when they left).
+ */
+const lostNumber = (p: AlumPlaque) => p.num === 0 && joinYear(p.id) !== undefined && !p.rows.some((r) => r.num !== undefined);
+
 /** A plaque from what the career store knows. `a` is him as he is now, if he's still on a roster. */
 export function buildPlaque(state: SeasonState, id: string, team: string, o: { a?: Athlete; prev?: AlumPlaque; live?: boolean } = {}): AlumPlaque | undefined {
   const { a, prev } = o;
@@ -109,7 +115,7 @@ export function buildPlaque(state: SeasonState, id: string, team: string, o: { a
   if (!base) return undefined;
   const all = a && o.live ? careerRows(state, a, team) : careerOf(state, id)?.seasons ?? [];
   const mine = all.filter((r) => r.team === team);
-  const num = a?.num ?? prev?.num ?? base.num;
+  const num = a?.num ?? (prev && !lostNumber(prev) ? prev.num : undefined) ?? jerseyOf(state, id, team) ?? base.num;
   const rows = rowsWith(all, team, num, prev);
   const first = mine[0];
   const p: AlumPlaque = {
@@ -151,6 +157,8 @@ export function syncAlumni(state: SeasonState): void {
     if (p?.rows.length) store[a.id] = p;
     else delete store[a.id];
   }
+  // Repair the frozen plaques that lost their number.
+  for (const p of Object.values(store)) if (p.exit && lostNumber(p)) p.num = jerseyOf(state, p.id, team) ?? p.num;
   for (const [id, c] of Object.entries(state.careers ?? {})) {
     if (on.has(id) || store[id]?.exit || !c.seasons.some((r) => r.team === team)) continue;
     const p = buildPlaque(state, id, team, { prev: store[id] });

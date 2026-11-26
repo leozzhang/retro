@@ -4,9 +4,9 @@ import { REACT } from './carousel';
 import { GROUPS, type Group } from '../data/coaches';
 import { athleteName, generatedAthlete, originTeam } from '../data/depth';
 import { REGION, TEAM_STATE } from '../data/fbs/geo';
-import { overall, POSITIONS, type Position } from '../data/positions';
+import { overall, overallRaw, POSITIONS, type Position } from '../data/positions';
 import { prospect } from '../data/recruits';
-import { COMPOSITION, freeNumber, freshmanId, joinYear, parseWalkOn, STARTERS } from '../data/rosterGen';
+import { COMPOSITION, freshmanId, joinYear, parseWalkOn, pickJersey, prestigeIn, STARTERS } from '../data/rosterGen';
 import { TEAMS, teamById } from '../data/teams';
 import { clamp, gauss, hashString, mulberry32 } from '../engine/math';
 import { tell } from './career';
@@ -735,11 +735,14 @@ function moveAthlete(state: SeasonState, id: string, from: string, to: string): 
   const a = generatedAthlete(id)!;
   const fr = (state.teamState[from] ??= {});
   const tt = (state.teamState[to] ??= {});
-  const taken = baseRoster(state, to).map((x) => x.num);
+  const taken = baseRoster(state, to);
+  // He keeps his number if it's free at his new school.
+  const was = baseRoster(state, from).find((x) => x.id === id) ?? a;
+  const num = pickJersey(seasonRng(state, 'portal', 'num', id), a.pos, taken, { prestige: prestigeIn(taken, overallRaw(was.r, was.pos)), want: was.num });
   dropFrom(fr, id);
   const r2 = (tt.roster ??= {});
   if (r2.out?.includes(id)) r2.out = r2.out.filter((x) => x !== id);
-  else (r2.in ??= []).push({ id, num: freeNumber(seasonRng(state, 'portal', 'num', id), a.pos, taken) });
+  else (r2.in ??= []).push({ id, num });
   // Progress and health travel; confidence halves and morale starts fresh.
   const p: Progress = fr.progress?.[id] ?? { xp: 0, lvl: 0, d: {} };
   delete fr.progress?.[id];
@@ -893,7 +896,7 @@ export function refillFreshmen(state: SeasonState): void {
     if (roster.length >= PORTAL.rosterMax) continue;
     const count = new Map<Position, number>();
     for (const a of roster) count.set(a.pos, (count.get(a.pos) ?? 0) + 1);
-    const taken = roster.map((a) => a.num);
+    const taken: { num: number; pos: Position }[] = [...roster];
     const ts = (state.teamState[t.id] ??= {});
     const r = (ts.roster ??= {});
     const rng = seasonRng(state, 'portal', 'freshman', t.id);
@@ -901,8 +904,8 @@ export function refillFreshmen(state: SeasonState): void {
       const short = POSITIONS.find((p) => (count.get(p) ?? 0) < MIN_COUNT[p]);
       const pos = short ?? COMPOSITION.map(([p, c]) => [p, c - (count.get(p) ?? 0)] as const).sort((a, b) => b[1] - a[1])[0][0];
       const id = freshmanId(t.id, state.year + 1, pos, n);
-      const num = freeNumber(rng, pos, taken);
-      taken.push(num);
+      const num = pickJersey(rng, pos, taken, { prestige: 0.1 });
+      taken.push({ num, pos });
       (r.in ??= []).push({ id, num });
       count.set(pos, (count.get(pos) ?? 0) + 1);
     }

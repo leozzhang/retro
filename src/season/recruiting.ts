@@ -3,7 +3,7 @@ import { athleteName } from '../data/depth';
 import { CITIES, REGION, TALENT, TEAM_STATE } from '../data/fbs/geo';
 import { OVR_WEIGHTS, overall, POSITIONS, type Position } from '../data/positions';
 import { prospect, recruitPool, recruitSalt, WANTS, type Prospect, type Want } from '../data/recruits';
-import { COMPOSITION, freeNumber, freshmanLevel, STARTERS } from '../data/rosterGen';
+import { COMPOSITION, freshmanLevel, pickJersey, STARTERS } from '../data/rosterGen';
 import { CALENDAR } from '../data/season/calendar';
 import { templateValue } from '../data/athletes';
 import type { RatingKey } from '../data/ratings';
@@ -1275,7 +1275,7 @@ export function joinRosters(state: SeasonState): void {
     for (const [st, v] of Object.entries(ts.pipe ?? {})) if (!fade) pipe[st] = v;
     else if (v * R.pipe.decay >= 0.02) pipe[st] = round3(v * R.pipe.decay);
     const staff = staffFor(state, t.id);
-    const taken = baseRoster(state, t.id).map((a) => a.num);
+    const taken: { num: number; pos: Position }[] = [...baseRoster(state, t.id)];
     const r = (ts.roster ??= {});
     for (const p of signees) {
       const st = p.a.hometown.state;
@@ -1283,8 +1283,9 @@ export function joinRosters(state: SeasonState): void {
       const coach = staff[groupOf(p.pos)].id;
       const cp = ((state.coaches ??= {})[coach] ??= {});
       (cp.pipe ??= {})[st] = round3(Math.min(1, (cp.pipe[st] ?? 0) + R.pipe.grow / 2));
-      const num = freeNumber(seasonRng(state, 'recruit', 'num', p.id), p.pos, taken);
-      taken.push(num);
+      // Five-stars choose first among the class's numbers; his high school number if it's free.
+      const num = pickJersey(seasonRng(state, 'recruit', 'num', p.id), p.pos, taken, { prestige: (p.stars - 1) / 4, want: p.a.num });
+      taken.push({ num, pos: p.pos });
       (r.in ??= []).push({ id: p.id, num });
       (ts.mo ??= {})[p.id] = round3(temperament(p.a).base);
       tell(state, p.id, { team: t.id, kind: 'signed', text: `Signs with ${t.school} as a ${p.stars}-star ${p.pos} from ${p.a.hometown.city}, ${p.a.hometown.state}` });

@@ -1,5 +1,6 @@
 import { coachName } from '../data/coaches';
 import { athleteName, generatedAthlete, starters } from '../data/depth';
+import { jerseyOf } from './career';
 import { TEAM_STATE } from '../data/fbs/geo';
 import { anchorsOf, ROOMS, SLOT_FALLBACK, type Anchor, type SlotKind } from '../data/office';
 import { prospect } from '../data/recruits';
@@ -630,7 +631,7 @@ export const STATE_NAME: Record<string, string> = {
 };
 
 function jerseyItem(s: SeasonState, p: DraftPick, year: number): Found {
-  const num = s.teamState[p.team]?.roster?.in?.find((e) => e.id === p.id)?.num ?? generatedAthlete(p.id)?.num ?? 0;
+  const num = jerseyOf(s, p.id, p.team) ?? 0;
   return { key: `jersey:${p.id}`, year, team: p.team, data: { name: p.name, pos: p.pos, num, pick: p.pick, city: p.city } };
 }
 

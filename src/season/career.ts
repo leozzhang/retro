@@ -1,6 +1,7 @@
 import { classLabel, DEV_LABEL, type Athlete } from '../data/athletes';
 import { athleteName, generatedAthlete } from '../data/depth';
 import { overall } from '../data/positions';
+import { jerseyFor, joinYear } from '../data/rosterGen';
 import type { RatingKey } from '../data/ratings';
 import { teamById, TEAMS } from '../data/teams';
 import type { GameGrade } from './grades';
@@ -162,6 +163,7 @@ function seasonRow(state: SeasonState, a: Athlete, team: string, st: Partial<Rec
     year: state.year, team, cls: classLabel(a), role,
     ovr0: overall(applyDelta(base.r, prior.d), base.pos), ovr1: overall(applyDelta(base.r, p?.d ?? {}), base.pos),
   };
+  if (a.num !== base.num || !numbered(a.id)) row.num = a.num;
   if (gp) row.gp = gp;
   if (gs) row.gs = gs;
   if (Object.keys(d).length) row.d = d;
@@ -169,6 +171,23 @@ function seasonRow(state: SeasonState, a: Athlete, team: string, st: Partial<Rec
   if (lvl) row.lvl = lvl;
   if (Object.keys(st).length) row.st = st;
   return row;
+}
+
+/** Whether his generated record carries his number (a generated roster's player), not one given on joining. */
+const numbered = (id: string) => joinYear(id) === undefined;
+
+/**
+ * The number he wore for `team`: his roster entry while he's there, else his last season's row there,
+ * else his generated number; a seeded stand-in for a player who joined in a save from before rows
+ * kept numbers (his generated record holds none).
+ */
+export function jerseyOf(state: SeasonState, id: string, team: string): number | undefined {
+  const on = state.teamState[team]?.roster?.in?.find((e) => e.id === id);
+  if (on) return on.num;
+  const base = generatedAthlete(id);
+  if (!base) return undefined;
+  const rows = careerOf(state, id)?.seasons.filter((r) => r.team === team) ?? [];
+  return rows[rows.length - 1]?.num ?? (numbered(id) ? base.num : jerseyFor(id, base.pos));
 }
 
 /** The season so far as a row, before it's archived (built on demand, never stored). */

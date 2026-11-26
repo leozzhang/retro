@@ -5,6 +5,8 @@ import { packSeason, unpackSeason } from './season/save';
 import { defaultConfig, newSeason, simSeason } from './season/season';
 import type { SeasonState } from './season/types';
 import { baseRoster } from './season/world';
+import { JERSEY, joinYear } from './data/rosterGen';
+import { TEAMS } from './data/teams';
 
 const config = { ...defaultConfig('georgia'), length: 'open' as const, delegate: { depthChart: true, gamePlan: true, portal: true } };
 const USER = 'georgia';
@@ -55,6 +57,45 @@ describe('alumni', () => {
     expect(origins.has('inherited')).toBe(true);
     expect(origins.has('signed')).toBe(true);
     for (const p of list.filter((x) => x.origin === 'transfer')) expect(p.from).toBeTruthy();
+  });
+
+  it('jerseys: joiners keep their number after they leave, and a plaque that lost it to #0 is repaired', () => {
+    const s = load();
+    const ts = s.teamState[USER];
+    // A joiner with an archived season leaves (as a transfer out would).
+    const e = ts.roster!.in!.find((x) => joinYear(x.id) !== undefined && s.careers![x.id]?.seasons.some((r) => r.team === USER))!;
+    expect(e).toBeDefined();
+    ts.roster!.in = ts.roster!.in!.filter((x) => x.id !== e.id);
+    delete s.alumni![e.id];
+    syncAlumni(s);
+    expect(s.alumni![e.id].num).toBe(e.num);
+    // A save from before rows kept numbers: the backfill froze him at the generated record's 0.
+    const p = s.alumni![e.id];
+    p.num = 0;
+    p.exit ??= { kind: 'transfer', year: s.year };
+    for (const r of p.rows) delete r.num;
+    for (const r of s.careers![e.id].seasons) delete r.num;
+    syncAlumni(s);
+    expect(s.alumni![e.id].num).not.toBe(0);
+    expect(JERSEY.bands[p.pos].some(([lo, hi]) => s.alumni![e.id].num >= lo && s.alumni![e.id].num <= hi)).toBe(true);
+  });
+
+  it('jerseys: every number in its position bands, almost no same-side duplicates', () => {
+    const s = load();
+    const OFF = new Set(['QB', 'HB', 'FB', 'WR', 'TE', 'OT', 'OG', 'C']);
+    let same = 0;
+    for (const t of TEAMS) {
+      const seen = new Map<number, string[]>();
+      for (const a of baseRoster(s, t.id)) {
+        expect(JERSEY.bands[a.pos].some(([lo, hi]) => a.num >= lo && a.num <= hi)).toBe(true);
+        (seen.get(a.num) ?? seen.set(a.num, []).get(a.num)!).push(a.pos);
+      }
+      for (const ps of seen.values()) {
+        const o = ps.filter((x) => OFF.has(x)).length;
+        if (o > 1 || ps.length - o > 1) same++;
+      }
+    }
+    expect(same).toBeLessThan(TEAMS.length / 10);
   });
 
   it('sync is idempotent and backfills a save from before the store', () => {

@@ -74,24 +74,123 @@ const GROWTH: Record<ClassYear, number> = { FR: 10, SO: 6, JR: 3, SR: 1 };
 const DEV_MULT: Record<DevTrait, number> = { normal: 0.8, impact: 1.1, star: 1.45, elite: 1.9 };
 const RATING_SD = 2.5;
 
-const NUM_RANGES: Record<Role, [number, number][]> = {
+/**
+ * The old jersey draw, kept only so a generated roster consumes its stream exactly as before (every
+ * rating and name after it depends on that). The number it picks is thrown away; `assignJerseys`
+ * numbers the roster on a stream of its own.
+ */
+const LEGACY_RANGES: Record<Role, [number, number][]> = {
   QB: [[1, 19]], RB: [[0, 9], [20, 49]], WR: [[0, 19], [80, 89]], TE: [[80, 89], [40, 49]], OL: [[50, 79]],
   DL: [[90, 99], [40, 59]], LB: [[0, 9], [30, 59]], CB: [[0, 39]], S: [[0, 39]],
   K: [[1, 49], [90, 99]], P: [[1, 49], [90, 99]],
 };
-
-function pickNumber(rng: Rng, role: Role, used: Set<number>): number {
-  const ranges = NUM_RANGES[role];
+function legacyDraw(rng: Rng, role: Role, used: Set<number>): void {
+  const ranges = LEGACY_RANGES[role];
   for (let i = 0; i < 60; i++) {
     const [lo, hi] = pick(rng, ranges);
     const n = lo + Math.floor(rng() * (hi - lo + 1));
     if (!used.has(n)) {
       used.add(n);
-      return n;
+      return;
     }
   }
-  // College rosters share numbers between offense and defense; take any.
-  return Math.floor(rng() * 100);
+  rng();
+}
+
+type Band = [lo: number, hi: number, weight: number];
+/**
+ * Jersey numbers the way college programs hand them out, by position: [lo, hi, weight] bands. Single
+ * digits and the teens go to quarterbacks, skill players, backers, edge rushers and DBs; the line
+ * wears 50-79 and the 90s; backs, tight ends and specialists the 20s-40s and 80s. Bands under 10 are
+ * the prestige numbers (zero among them): `prestige` bends them toward a roster's best players.
+ */
+export const JERSEY = {
+  bands: {
+    QB: [[1, 9, 0.5], [10, 19, 0.5]],
+    HB: [[0, 9, 0.35], [20, 39, 0.55], [40, 49, 0.1]],
+    FB: [[30, 49, 0.75], [20, 29, 0.25]],
+    WR: [[0, 9, 0.35], [10, 19, 0.4], [80, 89, 0.25]],
+    TE: [[80, 89, 0.55], [40, 49, 0.25], [10, 19, 0.2]],
+    OT: [[50, 79, 1]], OG: [[50, 79, 1]], C: [[50, 79, 1]],
+    DE: [[90, 99, 0.45], [40, 59, 0.3], [10, 19, 0.15], [1, 9, 0.1]],
+    DT: [[90, 99, 0.55], [50, 69, 0.35], [40, 49, 0.1]],
+    OLB: [[0, 9, 0.25], [10, 19, 0.2], [30, 59, 0.55]],
+    MLB: [[0, 9, 0.15], [10, 19, 0.15], [30, 59, 0.7]],
+    CB: [[0, 9, 0.35], [10, 29, 0.55], [30, 39, 0.1]],
+    FS: [[0, 9, 0.25], [10, 39, 0.75]],
+    SS: [[0, 9, 0.25], [10, 39, 0.75]],
+    K: [[10, 49, 0.6], [90, 99, 0.3], [1, 9, 0.1]],
+    P: [[10, 49, 0.6], [90, 99, 0.3], [1, 9, 0.1]],
+  } as Record<Position, Band[]>,
+  /** A band under 10's weight at prestige 0 (a walk-on) and 1 (the roster's best player). */
+  prestige: [0.25, 2.5] as [number, number],
+  /** Draws for a number nobody wears, then for one worn only on the other side of the ball. */
+  tries: 40,
+};
+
+const SIDE: Record<Position, 'O' | 'D' | 'S'> = {
+  QB: 'O', HB: 'O', FB: 'O', WR: 'O', TE: 'O', OT: 'O', OG: 'O', C: 'O',
+  DE: 'D', DT: 'D', OLB: 'D', MLB: 'D', CB: 'D', FS: 'D', SS: 'D', K: 'S', P: 'S',
+};
+
+/** Who already wears what: a roster's numbers and positions. */
+type Worn = Iterable<{ num: number; pos: Position }>;
+
+/**
+ * A jersey for a player at `pos` joining `roster`, from his position's bands only. A number nobody
+ * wears, drawn by the bands' weights; with none drawn, any free one in his bands; with his bands full,
+ * one worn only on the other side of the ball (college rosters share numbers between offense and
+ * defense). `want` (his old or high school number) is kept when nobody wears it.
+ */
+export function pickJersey(rng: Rng, pos: Position, roster: Worn, o: { prestige?: number; want?: number } = {}): number {
+  const bands = JERSEY.bands[pos];
+  const holders = new Map<number, Position[]>();
+  for (const x of roster) {
+    const h = holders.get(x.num);
+    if (h) h.push(x.pos);
+    else holders.set(x.num, [x.pos]);
+  }
+  const free = (n: number) => !holders.has(n);
+  const w = o.want;
+  if (w !== undefined && free(w) && bands.some(([lo, hi]) => w >= lo && w <= hi)) return w;
+  const [p0, p1] = JERSEY.prestige;
+  const lean = p0 + (p1 - p0) * clamp(o.prestige ?? 0.5, 0, 1);
+  const odds: [Band, number][] = bands.map((b) => [b, b[2] * (b[1] < 10 ? lean : 1)]);
+  const draw = () => {
+    const [lo, hi] = weighted(rng, odds);
+    return lo + Math.floor(rng() * (hi - lo + 1));
+  };
+  for (let i = 0; i < JERSEY.tries; i++) {
+    const n = draw();
+    if (free(n)) return n;
+  }
+  const all = bands.flatMap(([lo, hi]) => Array.from({ length: hi - lo + 1 }, (_, k) => lo + k));
+  const open = all.filter(free);
+  if (open.length) return pick(rng, open);
+  const shared = all.filter((n) => holders.get(n)!.every((q) => SIDE[q] !== SIDE[pos]));
+  return shared.length ? pick(rng, shared) : draw();
+}
+
+/** Prestige from where an overall ranks on a roster: 1 above everyone, 0 below everyone. */
+export function prestigeIn(roster: { r: Ratings; pos: Position }[], ovr: number): number {
+  if (!roster.length) return 0.5;
+  return roster.filter((x) => overallRaw(x.r, x.pos) < ovr).length / roster.length;
+}
+
+/** A generated roster's jerseys, on their own stream: the best players choose first and lean to the single digits. */
+function assignJerseys(p: TeamProfile, athletes: Athlete[]): void {
+  const rng = mulberry32(hashString(`jersey:${p.id}`));
+  const order = athletes.map((a) => ({ a, ovr: overallRaw(a.r, a.pos) })).sort((x, y) => y.ovr - x.ovr);
+  const worn: { num: number; pos: Position }[] = [];
+  order.forEach(({ a }, i) => {
+    a.num = pickJersey(rng, a.pos, worn, { prestige: 1 - i / Math.max(1, order.length - 1) });
+    worn.push(a);
+  });
+}
+
+/** A seeded stand-in jersey for a player whose number was never kept (a save from before career rows held it). */
+export function jerseyFor(id: string, pos: Position): number {
+  return pickJersey(mulberry32(hashString(`jersey:${id}`)), pos, [], { prestige: 0.5 });
 }
 
 function weighted<T>(rng: Rng, items: [T, number][]): T {
@@ -277,7 +376,7 @@ export function generateAthletes(p: TeamProfile): Athlete[] {
       id: `${p.id}-${athletes.length}`,
       first,
       last,
-      num: pickNumber(rng, role, used),
+      num: (legacyDraw(rng, role, used), 0),
       pos: s.pos,
       archetype,
       year: s.year,
@@ -315,6 +414,7 @@ export function generateAthletes(p: TeamProfile): Athlete[] {
     a.potential = Math.round(clamp(ovr + growth[i], ovr, 99));
     a.stars = starsFor(a.potential, a.dev);
   });
+  assignJerseys(p, athletes);
   return athletes;
 }
 
@@ -450,8 +550,4 @@ export function rollFreshman(p: TeamProfile, id: string, pos: Position, key: str
   };
 }
 
-/** A free jersey for a player joining a roster, seeded so the pick is repeatable. */
-export function freeNumber(rng: Rng, pos: Position, taken: Iterable<number>): number {
-  return pickNumber(rng, POS_ROLE[pos], new Set(taken));
-}
 

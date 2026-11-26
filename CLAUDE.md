@@ -124,7 +124,7 @@ Controls are listed in [README.md](README.md).
   - alumni: `ALUMNI` (the legacy score, the tiers' bars, story lines kept; `season/alumni.ts`)
   - storylines: `MOMENTS` (`season/moments.ts`), `STORY` (`season/storylines.ts`), `RSTORY` (`season/recruitStories.ts`), `TSTORY` (`season/teamStories.ts`)
   - the coach's office: `OFFICE` (thresholds) and each def's `levels` (`season/achievements.ts`), `ROOMS`, `SLOT_SIZE` (`data/office.ts`)
-  - transfer portal: `PORTAL`, `MIN_COUNT` (`season/portal.ts`); careers: `CAREER` (`season/career.ts`); walk-ons `WALK_ON`, placeholder freshmen `makeFreshman` (`data/rosterGen.ts`)
+  - transfer portal: `PORTAL`, `MIN_COUNT` (`season/portal.ts`); careers: `CAREER` (`season/career.ts`); walk-ons `WALK_ON`, placeholder freshmen `makeFreshman`, jersey bands `JERSEY` (`data/rosterGen.ts`)
   - departures: `DEPARTURES` (`season/departures.ts`), `DRAFT` (`season/draft.ts`); offseason growth `OFFSEASON` (`season/progression.ts`)
   - recruiting: `RECRUITS` (the class's size, calibration, composite noise, stars, makeup; `data/recruits.ts`), `RECRUITING` (`season/recruiting.ts`)
   - blocking anchor `ANCHOR_STR` (`data/ratings.ts`); overall weights `OVR_WEIGHTS` (`data/positions.ts`); rating templates and archetypes (`data/athletes.ts`); roster levels `CLASS_ADJ`, `LEVEL_SD`, `STANDOUT_LEVEL`, `UNIT_STEP`, `GROWTH` (`data/rosterGen.ts`); team weights `TEAM_WEIGHTS` (`data/depth.ts`)
