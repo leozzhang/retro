@@ -419,6 +419,14 @@ export interface LoggedPlay {
   lev?: number;
   /** The weekly emphases' edge the drive sim gave this snap or kick (season/emphasis.ts). Missing is 0. */
   em?: number;
+  /**
+   * Who really did it, by athlete id, on a snap played on the field (a played game's snaps, the user's and the
+   * CPU's): the ball's target or carrier, the defender who made the play (the interception, sack or fumble), and
+   * the tackler. The grades give the rep to him instead of casting it (season/grades.ts). Missing: cast.
+   */
+  to?: string;
+  by?: string;
+  tkl?: string;
 }
 
 /** One possession: the offense's snaps and kicks (the kickoff after a score belongs to the scoring team). */

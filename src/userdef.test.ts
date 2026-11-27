@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildStaff, dcAdjust } from './data/coaches';
-import { buildSquad, onField } from './data/depth';
+import { buildSquad, onField, starters } from './data/depth';
+import { gradeGame, HITS, TAG } from './season/grades';
+import type { DriveLog } from './season/types';
 import { defIdentity } from './data/identity';
 import { ocBook, ocStyle } from './data/offStyles';
 import { teamById, type Team } from './data/teams';
@@ -304,5 +306,34 @@ describe('PLAY DEFENSE, pass 4: position and the adjustment', () => {
       n++;
     }
     expect(n).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('PLAY DEFENSE in a dynasty: the grades read who made the play', () => {
+  const home = buildSquad(teamById('alabama'));
+  const away = buildSquad(teamById('georgia'));
+  const d = starters(home);
+  const o = starters(away);
+  const share = { alabama: 0.5, georgia: 0.5 };
+  // A drive of picks by the FS, then runs he tackles, as a played game logs them (`Game.cpuMade`).
+  const log = (made: boolean): DriveLog[] => [{
+    off: 'georgia',
+    plays: [
+      ...Array.from({ length: 40 }, () => ({ gain: 0, down: 2, toGo: 8, pass: true, int: true, turnover: true, ...(made ? { to: o.X.id, by: d.FS.id } : {}) })),
+      ...Array.from({ length: 40 }, () => ({ gain: 3, down: 1, toGo: 10, pass: false, ...(made ? { to: o.RB.id, tkl: d.FS.id } : {}) })),
+    ],
+  }];
+
+  it('a pick and a tackle made on the field are his, and the ball went to the man who had it', () => {
+    const cast = gradeGame(home, away, log(false), share, mulberry32(9));
+    const real = gradeGame(home, away, log(true), share, mulberry32(9));
+    const fs = real.get(d.FS.id)!;
+    // Every pick is his (the interceptor's cth tag), and every run's tackle (hits).
+    expect(fs.tags.cth).toBeCloseTo(40 * TAG.int, 6);
+    expect(fs.hits).toBeCloseTo(40 * HITS.tackle, 6);
+    expect(real.get(d.CB1.id)?.tags.cth ?? 0).toBe(0);
+    expect(cast.get(d.FS.id)!.tags.cth ?? 0).toBeLessThan(40 * TAG.int);
+    // The ball went where it really went.
+    expect(real.get(o.RB.id)!.hits).toBeCloseTo(40 * HITS.carry, 6);
   });
 });

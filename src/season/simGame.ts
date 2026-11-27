@@ -178,9 +178,15 @@ export function creditSnaps(s: BoxSide, d: DriveSim, plays: SimPlay[], snaps: Dr
  * A simulated drive's snaps as a progression log, with the try and kickoff after a score. A drive played
  * through the engine passes its credit (`engineCredit`), so each snap says what it was: pass, sack, pick.
  */
-export function driveLog(off: string, plays: SimPlay[], d: DriveSim, ot = false, credit?: DriveCredit['snaps']): DriveLog {
+/**
+ * A drive's log for the grades. `made`: who really did each snap, for a drive played on the field
+ * (`LoggedPlay.to`, `by`, `tkl`), aligned with `plays`.
+ */
+export function driveLog(
+  off: string, plays: SimPlay[], d: DriveSim, ot = false, credit?: DriveCredit['snaps'], made?: (Pick<LoggedPlay, 'to' | 'by' | 'tkl'> | undefined)[],
+): DriveLog {
   const out: LoggedPlay[] = plays.map((p, i) => {
-    const l: LoggedPlay = { gain: p.gain, down: p.down, toGo: p.toGo };
+    const l: LoggedPlay = { gain: p.gain, down: p.down, toGo: p.toGo, ...made?.[i] };
     const c = credit?.[i];
     if (c && c.kind !== 'kneel') l.pass = c.pass;
     if (c?.kind === 'sack') l.sack = true;

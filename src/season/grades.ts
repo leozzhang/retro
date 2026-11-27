@@ -278,6 +278,18 @@ const D: (Man | null)[] = new Array(DEF_SLOTS.length).fill(null);
 const RO: (Rep | null)[] = new Array(OFF_SLOTS.length).fill(null);
 const RD: (Rep | null)[] = new Array(DEF_SLOTS.length).fill(null);
 
+/** The seat (an index) and man of athlete `id` among a side's seats, or null: who did it on a snap played on the field. */
+function seatOf(seats: (Seat | null)[], id: string | undefined): [number, Man] | null {
+  if (!id) return null;
+  for (let i = 0; i < seats.length; i++) {
+    const s = seats[i];
+    if (!s) continue;
+    if (s.starter.a.id === id) return [i, s.starter];
+    for (const [m] of s.subs) if (m.a.id === id) return [i, m];
+  }
+  return null;
+}
+
 function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): void {
   const pass = p.pass ?? rng() < off.passShare;
   const s = successful(p) ? 1 : -1;
@@ -288,6 +300,14 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): vo
   fill(D, def.def, rng, !!mop?.includes(def.team));
   RO.fill(null);
   RD.fill(null);
+  // A snap played on the field (`LoggedPlay.to`, `by`, `tkl`): the men who really did it are on and have its reps.
+  // Every draw below is still made, so the rest of the game grades as it would have.
+  const to = seatOf(off.off, p.to);
+  const by = seatOf(def.def, p.by);
+  const tk = seatOf(def.def, p.tkl);
+  if (to) O[to[0]] = to[1];
+  if (by) D[by[0]] = by[1];
+  if (tk) D[tk[0]] = tk[1];
   off.totals.off++;
   def.totals.def++;
   const gapO = (i: number) => (D[VS_OFF[i]] ? O[i]!.ovr - D[VS_OFF[i]]!.ovr : 0);
@@ -312,7 +332,8 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): vo
     }
     const targets = sack ? [] : TARGET_IDX.filter(([i]) => O[i]).map(([i, w]) => [i, w * (O[i]!.ovr / 75) ** 2] as const);
     if (targets.length) {
-      const t = pickWeighted(targets, rng);
+      const cast = pickWeighted(targets, rng);
+      const t = to && targets.some(([i]) => i === to[0]) ? to[0] : cast;
       const tags: [RatingKey, number][] = [['cth', TAG.catch], ['rte', TAG.catch]];
       const rep = draw(gapO(t), 1, GRADES.key, tags);
       if (int) rep.win = false;
@@ -321,11 +342,13 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): vo
       // A catch gets him tackled, usually by his cover man.
       if (rep.win) {
         O[t]!.g.hits += HITS.catch;
-        const cm = D[VS_OFF[t]];
+        const cm = tk ? tk[1] : D[VS_OFF[t]];
         if (cm) cm.g.hits += HITS.tackle;
       }
       // His cover man wins when the ball isn't caught, and deep balls are the free safety's half the time.
-      const covers = [VS_OFF[t], ...(p.gain >= 20 && D[FS] && rng() < 0.5 ? [FS] : [])];
+      // A pick made on the field is the interceptor's.
+      const deep = p.gain >= 20 && D[FS] && rng() < 0.5;
+      const covers = int && by ? [by[0]] : [VS_OFF[t], ...(deep ? [FS] : [])];
       for (const c of covers) {
         const cm = D[c];
         if (!cm || RD[c]) continue;
@@ -335,7 +358,8 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): vo
       }
     }
   } else {
-    const carrier = O[QB] && rng() < off.qbRun ? QB : RB;
+    const cast = O[QB] && rng() < off.qbRun ? QB : RB;
+    const carrier = to ? to[0] : cast;
     if (O[carrier]) {
       const tags: [RatingKey, number][] = [];
       if (s > 0 && p.gain >= 8 && rng() < 0.5) {
@@ -347,7 +371,8 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): vo
     }
     const tacklers = TACKLER_IDX.filter(([j]) => D[j]);
     if (tacklers.length) {
-      const t = pickWeighted(tacklers, rng);
+      const picked = pickWeighted(tacklers, rng);
+      const t = tk ? tk[0] : picked;
       // The tackler is graded against the ball carrier.
       const gap = D[t]!.ovr - (O[carrier]?.ovr ?? D[t]!.ovr);
       if (!RD[t]) RD[t] = draw(gap, -1, GRADES.key, [['tkl', TAG.stop]]);
@@ -371,8 +396,10 @@ function snap(p: LoggedPlay, off: Cast, def: Cast, rng: Rng, mop?: string[]): vo
   // A sack goes to a rusher who beat his man.
   if (sack) {
     const beaten = OL.filter((i) => RO[i] && !RO[i]!.win && PAIR_OFF[i] >= 0 && D[PAIR_OFF[i]]);
-    if (beaten.length) {
-      const j = PAIR_OFF[beaten[Math.floor(rng() * beaten.length)]];
+    const cast = beaten.length ? PAIR_OFF[beaten[Math.floor(rng() * beaten.length)]] : -1;
+    // A sack made on the field is the sacker's (a blitzer too).
+    const j = by ? by[0] : cast;
+    if (j >= 0 && RD[j]) {
       const rusher = RD[j]!;
       rusher.tags = [...rusher.tags, ['rsh', TAG.sack]];
       D[j]!.g.hits += HITS.sack;

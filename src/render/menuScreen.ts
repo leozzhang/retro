@@ -244,6 +244,10 @@ export interface SettingRow {
   label: string;
   value: string;
   help: string;
+  /** The header over the rows from here on (the dynasty settings' groups). */
+  section?: string;
+  /** Drawn dim: the setting has no effect as the others stand (PLAY DEFENSE under a SUMMARY of CPU DRIVES). */
+  dim?: boolean;
 }
 
 const SET_X = 120;
@@ -251,48 +255,138 @@ const SET_W = VIEW_W - 2 * SET_X;
 const SET_Y = 88;
 const SET_H = 15;
 const SET_STEP = 17;
+/** A section's header in the dynasty settings' list. */
+const SET_HEAD = 13;
+/** The dynasty settings' scrolling window: the rows scroll inside it, the help line and button stay put below. */
+const SET_VIEW = { y: SET_Y, h: 158 };
 
+/** A row of the sound page (a fixed list, no scrolling). */
 export function settingRect(i: number): Box {
   return { x: SET_X, y: SET_Y + i * SET_STEP, w: SET_W, h: SET_H };
 }
 
-/** The < and > on a setting row. */
-export function settingArrows(i: number): { prev: Box; next: Box } {
-  const r = settingRect(i);
+/** The < and > on a setting row (`settingRect`, or a dynasty settings row's `settingRowRect`). */
+export function settingArrows(i: number | Box): { prev: Box; next: Box } {
+  const r = typeof i === 'number' ? settingRect(i) : i;
   return { prev: { x: r.x + r.w - 196, y: r.y, w: 20, h: r.h }, next: { x: r.x + r.w - 24, y: r.y, w: 20, h: r.h } };
 }
 
-/** `hub`: the dynasty's SETTINGS page (changes save as they're made) instead of a new dynasty's. */
-export function drawSettings(g: CanvasRenderingContext2D, t: Team, slot: number, rows: SettingRow[], sel: number, mx: number, my: number, hub = false): void {
+/** Each row's top in the list (a header goes before the first row of each section), and the list's height. */
+function settingLayout(rows: SettingRow[]): { ys: number[]; heads: { y: number; label: string }[]; height: number } {
+  const ys: number[] = [];
+  const heads: { y: number; label: string }[] = [];
+  let y = 0;
+  rows.forEach((r, i) => {
+    if (r.section && r.section !== rows[i - 1]?.section) {
+      heads.push({ y, label: r.section });
+      y += SET_HEAD;
+    }
+    ys.push(y);
+    y += SET_STEP;
+  });
+  return { ys, heads, height: y - (SET_STEP - SET_H) };
+}
+
+/** How far the dynasty settings' list scrolls at most. */
+export function settingMaxScroll(rows: SettingRow[]): number {
+  return Math.max(0, settingLayout(rows).height - SET_VIEW.h);
+}
+
+/** The scroll that shows row `sel` (with its section's header when it's the first row), moving as little as it can. */
+export function settingScrollTo(rows: SettingRow[], sel: number, scroll: number): number {
+  const L = settingLayout(rows);
+  const y = L.ys[sel] ?? 0;
+  const head = L.heads.find((h) => h.y + SET_HEAD === y);
+  const top = head ? head.y : y;
+  let s = scroll;
+  if (top < s) s = top;
+  if (y + SET_H > s + SET_VIEW.h) s = y + SET_H - SET_VIEW.h;
+  return Math.max(0, Math.min(settingMaxScroll(rows), s));
+}
+
+/** A dynasty settings row on screen at `scroll`, or null when it's out of the window (a click there misses it). */
+export function settingRowRect(rows: SettingRow[], i: number, scroll: number): Box | null {
+  const y = SET_VIEW.y + settingLayout(rows).ys[i] - scroll;
+  if (y + SET_H <= SET_VIEW.y || y >= SET_VIEW.y + SET_VIEW.h) return null;
+  return { x: SET_X, y, w: SET_W, h: SET_H };
+}
+
+/** Whether a point is in the dynasty settings' scrolling window. */
+export function inSettingView(x: number, y: number): boolean {
+  return x >= SET_X && x < SET_X + SET_W + 10 && y >= SET_VIEW.y && y < SET_VIEW.y + SET_VIEW.h;
+}
+
+/**
+ * `hub`: the dynasty's SETTINGS page (changes save as they're made) instead of a new dynasty's. The rows are
+ * grouped under section headers and scroll in a window (`scroll`, kept on the picked row by `settingScrollTo`);
+ * `note` is a line under the help (a setting another one pulled down).
+ */
+export function drawSettings(
+  g: CanvasRenderingContext2D, t: Team, slot: number, rows: SettingRow[], sel: number, mx: number, my: number, hub = false, scroll = 0, note = '',
+): void {
   g.fillStyle = t.colors.primary;
   g.fillRect(SET_X, 64, SET_W, 20);
   text(g, `${t.school.toUpperCase()} ${t.mascot.toUpperCase()}`.slice(0, 40), SET_X + 8, 70);
   text(g, `SLOT ${slot}`, SET_X + SET_W - 8, 70, { align: 'right', color: '#e6e6e6' });
+  const L = settingLayout(rows);
+  g.save();
+  g.beginPath();
+  g.rect(SET_X - 2, SET_VIEW.y, SET_W + 14, SET_VIEW.h);
+  g.clip();
+  for (const h of L.heads) {
+    const y = SET_VIEW.y + h.y - scroll;
+    text(g, h.label, SET_X + 2, y + 3, { size: 6, color: ACCENT, shadow: false });
+    g.fillStyle = '#2a3546';
+    g.fillRect(SET_X + 4 + h.label.length * 6 + 4, y + 5, SET_W - (h.label.length * 6 + 10), 1);
+  }
   rows.forEach((row, i) => {
-    const r = settingRect(i);
+    const r = { x: SET_X, y: SET_VIEW.y + L.ys[i] - scroll, w: SET_W, h: SET_H };
+    if (r.y + SET_H <= SET_VIEW.y || r.y >= SET_VIEW.y + SET_VIEW.h) return;
     const hot = i === sel;
+    const live = inSettingView(mx, my);
     g.fillStyle = hot ? CARD_HOT : 'rgba(20,27,38,0.9)';
     g.fillRect(r.x, r.y, r.w, r.h);
     if (hot) {
       g.fillStyle = GOLD;
       g.fillRect(r.x, r.y, 3, r.h);
     }
-    text(g, row.label, r.x + 12, r.y + 4, { color: hot ? GOLD : '#ffffff' });
-    const a = settingArrows(i);
-    text(g, '<', a.prev.x + 10, r.y + 4, { align: 'center', color: inBox(a.prev, mx, my) ? GOLD : ACCENT });
-    text(g, row.value, (a.prev.x + a.next.x + 20) / 2, r.y + 4, { align: 'center', color: '#ffffff' });
-    text(g, '>', a.next.x + 10, r.y + 4, { align: 'center', color: inBox(a.next, mx, my) ? GOLD : ACCENT });
+    text(g, row.label, r.x + 12, r.y + 4, { color: row.dim ? DIM : hot ? GOLD : '#ffffff' });
+    const a = settingArrows(r);
+    text(g, '<', a.prev.x + 10, r.y + 4, { align: 'center', color: live && inBox(a.prev, mx, my) ? GOLD : row.dim ? DIM : ACCENT });
+    text(g, row.value, (a.prev.x + a.next.x + 20) / 2, r.y + 4, { align: 'center', color: row.dim ? DIM : '#ffffff' });
+    text(g, '>', a.next.x + 10, r.y + 4, { align: 'center', color: live && inBox(a.next, mx, my) ? GOLD : row.dim ? DIM : ACCENT });
   });
-  const y = SET_Y + rows.length * SET_STEP + 6;
-  if (rows[sel]) text(g, rows[sel].help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });
+  g.restore();
+  // The scrollbar, and fades where there's more above or below.
+  const max = settingMaxScroll(rows);
+  if (max > 0) {
+    const bx = SET_X + SET_W + 6;
+    g.fillStyle = '#1a2230';
+    g.fillRect(bx, SET_VIEW.y, 3, SET_VIEW.h);
+    const th = Math.max(16, Math.round((SET_VIEW.h * SET_VIEW.h) / L.height));
+    g.fillStyle = SOFT;
+    g.fillRect(bx, SET_VIEW.y + Math.round(((SET_VIEW.h - th) * scroll) / max), 3, th);
+    // A little arrow (drawn: the pixel font has none) where there's more above or below.
+    const arrow = (y: number, up: boolean) => {
+      g.fillStyle = SOFT;
+      for (let k = 0; k < 3; k++) g.fillRect(bx + 1 - k, y + (up ? k : 2 - k), 1 + 2 * k, 1);
+    };
+    if (scroll > 0) arrow(SET_VIEW.y - 5, true);
+    if (scroll < max) arrow(SET_VIEW.y + SET_VIEW.h + 2, false);
+  }
+  // The picked row's help: a line, and a second after a newline (what another setting does to it).
+  const y = SET_VIEW.y + SET_VIEW.h + 10;
+  const [help, more] = (rows[sel]?.help ?? '').split('\n');
+  text(g, help, VIEW_W / 2, y, { align: 'center', color: SOFT, shadow: false });
+  if (more) text(g, more, VIEW_W / 2, y + 11, { align: 'center', color: ACCENT, shadow: false });
+  if (note) text(g, note, VIEW_W / 2, y + 22, { align: 'center', color: GOLD, shadow: false });
   if (hub) {
     goButton(g, 'DONE', inBox(GO_BTN, mx, my));
-    drawHint(g, 'W/S: SETTING   A/D: CHANGE   V: SOUND   ENTER / ESC: BACK TO THE HUB');
+    drawHint(g, 'W/S: SETTING   A/D: CHANGE   WHEEL: SCROLL   V: SOUND   ESC: BACK');
     return;
   }
-  if (y + 40 < GO_BTN.y) text(g, 'MORE OPTIONS ARE COMING', VIEW_W / 2, y + 30, { align: 'center', color: DIM, shadow: false });
   goButton(g, 'START DYNASTY', inBox(GO_BTN, mx, my));
-  drawHint(g, 'W/S: SETTING   A/D: CHANGE   ENTER: START   ESC: BACK');
+  drawHint(g, 'W/S: SETTING   A/D: CHANGE   WHEEL: SCROLL   ENTER: START   ESC: BACK');
 }
 
 // ------------------------------------------------------------ sound (the title's SETTINGS)

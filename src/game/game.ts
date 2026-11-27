@@ -46,7 +46,7 @@ import {
   type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
-  drawAudioSettings, drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, EXHIBITION_LINE2_Y, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
+  drawAudioSettings, drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, EXHIBITION_LINE2_Y, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, inSettingView, settingArrows, settingMaxScroll, settingRect, settingRowRect, settingScrollTo,
   slotConfirmRects, slotDeleteRect, slotRect, type MenuItem, type SettingRow, type SlotsView,
 } from '../render/menuScreen';
 import {
@@ -104,7 +104,7 @@ import { SCOUT_TIERS } from '../season/scouting';
 import { driveLog } from '../season/simGame';
 import { engineCredit } from '../season/cast';
 import { newStory, type DriveCredit, type GameStory, type StoryDrive } from '../season/story';
-import type { DriveLog, GameResult, KeyLevel, Moment, OfficeState, SeasonGame, SeasonState } from '../season/types';
+import type { DriveLog, GameResult, LoggedPlay, KeyLevel, Moment, OfficeState, SeasonGame, SeasonState } from '../season/types';
 import type { SimPlay as LiveSimPlay } from './rules';
 import { cueShow, drawShow, drawShowStill, keyShow, prefetchShow, showFocus, updateShow, type KeyShow, type ShowCtx } from './highlights';
 import { WATCH_LEVELS, KEY_PLAYS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
@@ -228,83 +228,85 @@ type DriveFrame = Pick<StoryDrive, 'off' | 'half' | 'left' | 'qSecs' | 'score' |
  * sets, and which option a dynasty has now (the hub's SETTINGS page). A new setting is one more entry.
  */
 const SETTINGS: {
+  /** The group it's listed under (the page scrolls: `drawSettings`). */
+  section: string;
   label: string; help: string; options: string[]; start: number; apply: (c: SeasonConfig, i: number) => void; read: (c: SeasonConfig) => number;
   /** Set when the dynasty starts: shown on the hub's page, but fixed. */
   newOnly?: boolean;
 }[] = [
   {
-    label: 'INJURIES', help: 'HOW OFTEN PLAYERS GET HURT', options: INJURY_OPTIONS.map((o) => o.toUpperCase()), start: 0,
-    apply: (c, i) => (c.injuries = INJURY_OPTIONS[i]),
-    read: (c) => INJURY_OPTIONS.indexOf(c.injuries ?? 'normal'),
-  },
-  {
-    label: 'GAME LENGTH', help: 'QUARTER LENGTH IN THE GAMES YOU PLAY',
+    section: 'GAME DAY', label: 'GAME LENGTH', help: 'QUARTER LENGTH IN THE GAMES YOU PLAY',
     options: QUARTER_OPTIONS.map((q, i) => `${QUARTER_LABELS[i]} ${q}:00`), start: QUARTER_OPTIONS.indexOf(DEFAULT_QUARTER),
     apply: (c, i) => (c.quarter = QUARTER_OPTIONS[i]),
     read: (c) => Math.max(0, QUARTER_OPTIONS.indexOf(c.quarter ?? DEFAULT_QUARTER)),
   },
   {
-    label: 'SIM GAMES', help: 'SIMULATED GAMES AND QUARTERS: THE RESULT, THE KEY PLAYS, OR EVERY SNAP',
-    options: ['RESULT ONLY', ...KEY_LABELS, 'EVERY SNAP'], start: 0,
-    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, sim: WATCH_LEVELS[i] }),
-    read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).sim),
-  },
-  {
-    label: 'CPU DRIVES', help: 'IN GAMES YOU PLAY: A SUMMARY, THE KEY PLAYS OF EACH CPU DRIVE, OR EVERY SNAP',
-    options: ['SUMMARY', ...KEY_LABELS, 'EVERY SNAP'], start: 2,
-    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: WATCH_LEVELS[i] }),
-    read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).defense),
-  },
-  {
-    label: 'PLAY DEFENSE', help: 'PLAY ONE DEFENDER ON THE CPU DRIVES YOU SEE: NEVER, THE BIG SNAPS, OR EVERY SNAP. NO HIGHER THAN CPU DRIVES',
-    options: ['OFF', 'BIG PLAYS', 'EVERY SNAP'], start: 0,
-    apply: (c, i) => (c.liveDefense = LIVE_DEF[i]),
-    read: (c) => Math.max(0, LIVE_DEF.indexOf(c.liveDefense ?? 'off')),
-  },
-  {
-    label: 'DEFENSE IQ', help: 'HOW MUCH THE CPU DEFENSE LEARNS YOUR OFFENSE DURING A GAME',
-    options: IQ_OPTIONS, start: 1,
-    apply: (c, i) => (c.defIq = IQ_OPTIONS[i]),
-    read: (c) => IQ_OPTIONS.indexOf(c.defIq ?? 'NORMAL'),
-  },
-  {
-    label: 'RUN ASSIST', help: 'LANES SHOWN TO THE RUNNER: ALWAYS, UNTIL THE HANDOFF, OR NEVER',
-    options: ASSIST_OPTIONS, start: 0,
-    apply: (c, i) => (c.runAssist = ASSIST_OPTIONS[i]),
-    read: (c) => ASSIST_OPTIONS.indexOf(c.runAssist ?? 'FULL'),
-  },
-  {
-    label: 'KICKS', help: 'PUNTS AND KICKOFFS: WATCH THEM (SPACE SKIPS), OR JUMP TO THE RESULT',
+    section: 'GAME DAY', label: 'KICKS', help: 'PUNTS AND KICKOFFS: WATCH THEM (SPACE SKIPS), OR JUMP TO THE RESULT',
     options: ['WATCH', 'RESULT ONLY'], start: 0,
     apply: (c, i) => (c.kicks = i === 1 ? 'result' : 'watch'),
     read: (c) => (c.kicks === 'result' ? 1 : 0),
   },
   {
-    label: 'SLOW AIM', help: 'SLOW MOTION WHILE AIMING A PASS',
+    section: 'GAME DAY', label: 'SLOW AIM', help: 'SLOW MOTION WHILE AIMING A PASS',
     options: ['OFF', 'ON'], start: 0,
     apply: (c, i) => (c.aimSlow = i === 1),
     read: (c) => (c.aimSlow ? 1 : 0),
   },
   {
-    label: 'DISGUISES', help: 'THE CPU DEFENSE SHOWS ONE COVERAGE AND SPINS TO ANOTHER AT THE SNAP',
-    options: ['ON', 'OFF'], start: 0,
-    apply: (c, i) => (c.disguises = i === 0),
-    read: (c) => (c.disguises === false ? 1 : 0),
+    section: 'GAME DAY', label: 'RUN ASSIST', help: 'LANES SHOWN TO THE RUNNER: ALWAYS, UNTIL THE HANDOFF, OR NEVER',
+    options: ASSIST_OPTIONS, start: 0,
+    apply: (c, i) => (c.runAssist = ASSIST_OPTIONS[i]),
+    read: (c) => ASSIST_OPTIONS.indexOf(c.runAssist ?? 'FULL'),
   },
   {
-    label: 'READ HELP', help: 'THE PRESNAP READ OVER THE FIELD: THE WHOLE LOOK, THE SHELL ONLY, OR NOTHING',
+    section: 'GAME DAY', label: 'READ HELP', help: 'THE PRESNAP READ OVER THE FIELD: THE WHOLE LOOK, THE SHELL ONLY, OR NOTHING',
     options: READ_OPTIONS, start: 0,
     apply: (c, i) => (c.readHelp = READ_OPTIONS[i]),
     read: (c) => READ_OPTIONS.indexOf(c.readHelp ?? 'FULL'),
   },
   {
-    label: 'WEEK WRAP', help: 'AFTER EACH WEEK: ALL ITS MOMENTS, THE BIG ONES, OR NONE',
+    section: 'DEFENSE', label: 'CPU DRIVES', help: 'IN GAMES YOU PLAY: A SUMMARY, THE KEY PLAYS OF EACH CPU DRIVE, OR EVERY SNAP',
+    options: ['SUMMARY', ...KEY_LABELS, 'EVERY SNAP'], start: 2,
+    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: WATCH_LEVELS[i] }),
+    read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).defense),
+  },
+  {
+    section: 'DEFENSE', label: 'PLAY DEFENSE', help: 'PLAY ONE DEFENDER ON CPU DRIVES: NEVER, THE BIG SNAPS, OR EVERY SNAP',
+    options: ['OFF', 'BIG PLAYS', 'EVERY SNAP'], start: 0,
+    apply: (c, i) => (c.liveDefense = LIVE_DEF[i]),
+    read: (c) => Math.max(0, LIVE_DEF.indexOf(c.liveDefense ?? 'off')),
+  },
+  {
+    section: 'DEFENSE', label: 'DEFENSE IQ', help: 'HOW MUCH THE CPU DEFENSE LEARNS YOUR OFFENSE DURING A GAME',
+    options: IQ_OPTIONS, start: 1,
+    apply: (c, i) => (c.defIq = IQ_OPTIONS[i]),
+    read: (c) => IQ_OPTIONS.indexOf(c.defIq ?? 'NORMAL'),
+  },
+  {
+    section: 'DEFENSE', label: 'DISGUISES', help: 'THE CPU DEFENSE SHOWS ONE COVERAGE AND SPINS TO ANOTHER AT THE SNAP',
+    options: ['ON', 'OFF'], start: 0,
+    apply: (c, i) => (c.disguises = i === 0),
+    read: (c) => (c.disguises === false ? 1 : 0),
+  },
+  {
+    section: 'SIMULATION', label: 'SIM GAMES', help: 'SIMULATED GAMES AND QUARTERS: THE RESULT, THE KEY PLAYS, OR EVERY SNAP',
+    options: ['RESULT ONLY', ...KEY_LABELS, 'EVERY SNAP'], start: 0,
+    apply: (c, i) => (c.keyPlays = { ...c.keyPlays, sim: WATCH_LEVELS[i] }),
+    read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).sim),
+  },
+  {
+    section: 'SIMULATION', label: 'INJURIES', help: 'HOW OFTEN PLAYERS GET HURT', options: INJURY_OPTIONS.map((o) => o.toUpperCase()), start: 0,
+    apply: (c, i) => (c.injuries = INJURY_OPTIONS[i]),
+    read: (c) => INJURY_OPTIONS.indexOf(c.injuries ?? 'normal'),
+  },
+  {
+    section: 'DYNASTY', label: 'WEEK WRAP', help: 'AFTER EACH WEEK: ALL ITS MOMENTS, THE BIG ONES, OR NONE',
     options: WRAP_OPTIONS.map((o) => o.toUpperCase()), start: 1,
     apply: (c, i) => (c.wrap = WRAP_OPTIONS[i]),
     read: (c) => WRAP_OPTIONS.indexOf(c.wrap ?? 'big'),
   },
   {
-    label: 'HISTORY', help: 'REAL PROGRAM HISTORY TO 2025, OR EVERY TEAM STARTS FROM NOTHING',
+    section: 'DYNASTY', label: 'HISTORY', help: 'REAL PROGRAM HISTORY TO 2025, OR EVERY TEAM STARTS FROM NOTHING',
     options: ['REAL', 'FRESH START'], start: 0, newOnly: true,
     apply: (c, i) => (c.history = i === 1 ? 'fresh' : 'real'),
     read: (c) => (c.history === 'fresh' ? 1 : 0),
@@ -502,6 +504,9 @@ export class Game {
   private newTeamIdx = this.userIdx;
   private settingIdx = SETTINGS.map((r) => r.start);
   private settingSel = 0;
+  /** The dynasty settings list's scroll (view px), and a note under its help for a moment (`settingsInput`). */
+  private settingScroll = 0;
+  private settingNote: { text: string; until: number } | null = null;
   /** Mouse on the menus, for hover, and whether it moved this step. */
   private menuMouse = { x: 0, y: 0 };
   private mouseMoved = false;
@@ -1159,12 +1164,87 @@ export class Game {
     if (!next) return;
     this.settingIdx = SETTINGS.map((r) => r.start);
     this.settingSel = 0;
+    this.settingScroll = 0;
+    this.settingNote = null;
     this.screen = 'newSettings';
   }
 
-  /** `hub`: a started dynasty, where the settings fixed at the start can't change. */
+  /**
+   * `hub`: a started dynasty, where the settings fixed at the start can't change. CPU DRIVES' help says it caps
+   * PLAY DEFENSE, and PLAY DEFENSE's says how far CPU DRIVES lets it go (dim when it can't be on at all).
+   */
   private settingRows(hub = false): SettingRow[] {
-    return SETTINGS.map((r, i) => ({ label: r.label, value: r.options[this.settingIdx[i]], help: hub && r.newOnly ? 'SET WHEN THE DYNASTY STARTED: IT CAN\'T CHANGE NOW' : r.help }));
+    const cap = liveDefCap(WATCH_LEVELS[this.settingIdx[DRIVES_ROW]]);
+    return SETTINGS.map((r, i) => {
+      let help = hub && r.newOnly ? 'SET WHEN THE DYNASTY STARTED: IT CAN\'T CHANGE NOW' : r.help;
+      let dim = false;
+      if (i === DRIVES_ROW) help += '\nPLAY DEFENSE CAN\'T GO HIGHER THAN THIS';
+      if (i === LIVE_ROW) {
+        if (cap === 'off') {
+          help += '\nNEEDS CPU DRIVES ABOVE SUMMARY: A SNAP YOU PLAY IS A SNAP SHOWN';
+          dim = true;
+        } else if (cap === 'key') help += '\nEVERY SNAP NEEDS CPU DRIVES ON EVERY SNAP';
+      }
+      return { section: r.section, label: r.label, value: r.options[this.settingIdx[i]], help, dim };
+    });
+  }
+
+  /**
+   * W/S, A/D, the wheel and clicks on a dynasty settings page (new or the hub's). `changed` is told each row
+   * changed (and PLAY DEFENSE when CPU DRIVES pulled it down). The list scrolls to keep the picked row in view.
+   */
+  private settingsInput(input: Input, hub: boolean, changed: (row: number) => void): void {
+    const m = input.mouse;
+    const n = SETTINGS.length;
+    const rows = this.settingRows(hub);
+    const sel0 = this.settingSel;
+    let follow = false;
+    if (input.hit('KeyW', 'ArrowUp')) {
+      this.settingSel = (this.settingSel + n - 1) % n;
+      follow = true;
+    }
+    if (input.hit('KeyS', 'ArrowDown')) {
+      this.settingSel = (this.settingSel + 1) % n;
+      follow = true;
+    }
+    const change = (row: number, d: number) => {
+      if (hub && SETTINGS[row].newOnly) return;
+      const k = SETTINGS[row].options.length;
+      this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
+      const before = this.settingIdx[LIVE_ROW];
+      this.fitLiveDef(row, d);
+      changed(row);
+      if (row !== LIVE_ROW && this.settingIdx[LIVE_ROW] !== before) {
+        changed(LIVE_ROW);
+        this.settingNote = { text: `PLAY DEFENSE LOWERED TO ${SETTINGS[LIVE_ROW].options[this.settingIdx[LIVE_ROW]]}`, until: performance.now() + 2500 };
+      }
+    };
+    if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
+    if (input.hit('KeyD', 'ArrowRight')) change(this.settingSel, 1);
+    if (m.wheel) this.settingScroll = Math.max(0, Math.min(settingMaxScroll(rows), this.settingScroll + m.wheel * 17));
+    if (m.pressed && inSettingView(m.x, m.y)) {
+      for (let i = 0; i < n; i++) {
+        const r = settingRowRect(rows, i, this.settingScroll);
+        if (!r || !inRect(m.x, m.y, r)) continue;
+        // A click picks the card (its help shows); only the arrows of the picked card change it.
+        const picked = this.settingSel === i;
+        this.settingSel = i;
+        follow = true;
+        if (!picked) continue;
+        const a = settingArrows(r);
+        if (inRect(m.x, m.y, a.prev)) change(i, -1);
+        else if (inRect(m.x, m.y, a.next)) change(i, 1);
+      }
+    }
+    if (follow) this.settingScroll = settingScrollTo(rows, this.settingSel, this.settingScroll);
+    // The note is about the row it was made on.
+    if (this.settingSel !== sel0) this.settingNote = null;
+  }
+
+  /** The note under the settings' help, while it lasts. */
+  private settingNoteText(): string {
+    const n = this.settingNote;
+    return n && performance.now() < n.until ? n.text : '';
   }
 
   /** The new dynasty's settings: W/S or a click picks a row, A/D or the picked row's arrows change it; Enter starts the dynasty. */
@@ -1174,30 +1254,8 @@ export class Game {
       this.screen = 'newTeam';
       return;
     }
-    const n = SETTINGS.length;
-    if (input.hit('KeyW', 'ArrowUp')) this.settingSel = (this.settingSel + n - 1) % n;
-    if (input.hit('KeyS', 'ArrowDown')) this.settingSel = (this.settingSel + 1) % n;
-    const change = (row: number, d: number) => {
-      const k = SETTINGS[row].options.length;
-      this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
-      this.fitLiveDef(row, d);
-    };
-    if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
-    if (input.hit('KeyD', 'ArrowRight')) change(this.settingSel, 1);
-    let start = input.hit('Enter', 'Space');
-    if (m.pressed) {
-      if (inRect(m.x, m.y, GO_BTN)) start = true;
-      for (let i = 0; i < n; i++) {
-        if (!inRect(m.x, m.y, settingRect(i))) continue;
-        // A click picks the card (its help shows); only the arrows of the picked card change it.
-        const picked = this.settingSel === i;
-        this.settingSel = i;
-        if (!picked) continue;
-        const a = settingArrows(i);
-        if (inRect(m.x, m.y, a.prev)) change(i, -1);
-        else if (inRect(m.x, m.y, a.next)) change(i, 1);
-      }
-    }
+    this.settingsInput(input, false, () => {});
+    const start = input.hit('Enter', 'Space') || (m.pressed && inRect(m.x, m.y, GO_BTN));
     if (!start) return;
     const config: SeasonConfig = { ...defaultConfig(TEAMS[this.newTeamIdx].id), length: 'open' };
     SETTINGS.forEach((r, i) => r.apply(config, this.settingIdx[i]));
@@ -1795,6 +1853,8 @@ export class Game {
     this.settingIdx = SETTINGS.map((r) => Math.max(0, r.read(c)));
     this.fitLiveDef(DRIVES_ROW, 0);
     this.settingSel = 0;
+    this.settingScroll = 0;
+    this.settingNote = null;
     this.screen = 'settings';
   }
 
@@ -1810,32 +1870,12 @@ export class Game {
       this.toAudio('settings');
       return;
     }
-    const n = SETTINGS.length;
-    if (input.hit('KeyW', 'ArrowUp')) this.settingSel = (this.settingSel + n - 1) % n;
-    if (input.hit('KeyS', 'ArrowDown')) this.settingSel = (this.settingSel + 1) % n;
-    const change = (row: number, d: number) => {
-      if (SETTINGS[row].newOnly) return;
-      const k = SETTINGS[row].options.length;
-      this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
-      this.fitLiveDef(row, d);
+    let dirty = false;
+    this.settingsInput(input, true, (row) => {
       SETTINGS[row].apply(c, this.settingIdx[row]);
-      SETTINGS[LIVE_ROW].apply(c, this.settingIdx[LIVE_ROW]);
-      this.save();
-    };
-    if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
-    if (input.hit('KeyD', 'ArrowRight')) change(this.settingSel, 1);
-    if (m.pressed) {
-      for (let i = 0; i < n; i++) {
-        if (!inRect(m.x, m.y, settingRect(i))) continue;
-        // A click picks the card (its help shows); only the arrows of the picked card change it.
-        const picked = this.settingSel === i;
-        this.settingSel = i;
-        if (!picked) continue;
-        const a = settingArrows(i);
-        if (inRect(m.x, m.y, a.prev)) change(i, -1);
-        else if (inRect(m.x, m.y, a.next)) change(i, 1);
-      }
-    }
+      dirty = true;
+    });
+    if (dirty) this.save();
   }
 
   // ------------------------------------------------------------ team page
@@ -3811,7 +3851,7 @@ export class Game {
           this.applied = applyTry(this.drive, play.outcome);
           this.storyTry(play, this.applied.userPoints);
         } else {
-          this.logSnap(play.playDef.kind !== 'run', play.outcome);
+          this.logSnap(play.playDef.kind !== 'run', play.outcome, play);
           this.creditSnap(play, play.outcome);
           this.observeSnap(play, play.outcome);
           this.applied = applyOutcome(this.drive, play.outcome);
@@ -4098,7 +4138,7 @@ export class Game {
 
   private otCpuDone(period: number, second: boolean, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, shown: DriveShown): void {
     const { sim, plays, credit, snaps } = r;
-    this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, true, credit.snaps)));
+    this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, true, credit.snaps, this.cpuMade(plays, snaps))));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
     // otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
     const td = sim.result === 'TOUCHDOWN';
@@ -4222,6 +4262,28 @@ export class Game {
 
   private cpuCredited(sim: EngineDrive, plays: SimPlay[], snaps: (EngineSnap | undefined)[]): { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] } {
     return { sim, plays, credit: this.cpuCredit(plays, snaps), snaps };
+  }
+
+  /**
+   * Who really made each snap of a CPU drive, by athlete id, for the grades (`LoggedPlay.to`, `by`, `tkl`): a snap
+   * the user played live is his man's, as the AI's are its own.
+   */
+  private cpuMade(plays: SimPlay[], snaps: (EngineSnap | undefined)[]): (Pick<LoggedPlay, 'to' | 'by' | 'tkl'> | undefined)[] {
+    const on = this.liveBox?.cpu.on ?? starters(this.cpuSquad);
+    const dOn = this.liveBox?.user.on ?? starters(this.userSquad);
+    return plays.map((p, i) => {
+      const s = snaps[i];
+      if (!s || p.fg || p.punt || p.kneel || p.spike) return undefined;
+      const out: Pick<LoggedPlay, 'to' | 'by' | 'tkl'> = {};
+      const to = on[(s.thrown ? (s.complete ? s.carrier : s.target) : s.carrier) ?? '']?.id;
+      const take = s.type === 'int' || s.type === 'pick6' || s.lostFumble;
+      const by = dOn[(take ? s.takeaway : s.type === 'sack' ? s.tackler : null) ?? '']?.id;
+      const tkl = by ? undefined : dOn[s.tackler ?? '']?.id;
+      if (to) out.to = to;
+      if (by) out.by = by;
+      if (tkl) out.tkl = tkl;
+      return out;
+    });
   }
 
   private cpuCredit(plays: SimPlay[], snaps: (EngineSnap | undefined)[]): DriveCredit {
@@ -4409,10 +4471,26 @@ export class Game {
     this.showNotices('kickoff');
   }
 
-  /** A season game logs the user's snaps for the progression grades: the gain, pass or run, and what ended it. */
-  private logSnap(pass: boolean, o: PlayOutcome): void {
+  /**
+   * A season game logs the user's snaps for the progression grades: the gain, pass or run, what ended it, and
+   * (from `play`) who had the ball and which CPU defender picked it, sacked him or tackled him (`LoggedPlay.to`).
+   */
+  private logSnap(pass: boolean, o: PlayOutcome, play?: Play): void {
     if (!this.liveDrives) return;
     const d = this.drive;
+    const made: Pick<LoggedPlay, 'to' | 'by' | 'tkl'> = {};
+    const box = this.liveBox;
+    if (play && box) {
+      const mine = (p: Player | null | undefined) => (p && p.side === 'off' ? box.user.on[p.slot]?.id : undefined);
+      const theirs = (p: Player | null | undefined) => (p && p.side === 'def' ? box.cpu.on[p.slot]?.id : undefined);
+      const to = mine(play.ballMan);
+      const picked = o.type === 'int' || o.type === 'pick6' ? theirs(play.carrier) : undefined;
+      const by = picked ?? (o.type === 'sack' ? theirs(play.tackler) : undefined);
+      const tkl = by ? undefined : theirs(play.tackler);
+      if (to) made.to = to;
+      if (by) made.by = by;
+      if (tkl) made.tkl = tkl;
+    }
     const gain = Math.round((o.type === 'td' ? OPP_GOAL : o.spot) - d.los);
     const int = o.type === 'int' || o.type === 'pick6';
     this.liveDrives[0].plays.push({
@@ -4421,6 +4499,7 @@ export class Game {
       ...(int ? { int: true, turnover: true } : {}),
       ...(gain >= 20 ? { explosive: true } : {}),
       ...(this.snapLev ? { lev: this.snapLev } : {}),
+      ...made,
     });
   }
 
@@ -5137,7 +5216,7 @@ export class Game {
         this.tosLog.push([q, secs, this.sideOf(by)]);
       }
     }
-    this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, false, credit.snaps)));
+    this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, false, credit.snaps, this.cpuMade(plays, snaps))));
     const told: StoryDrive = {
       off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
       start, result: sim.result, points: sim.points, plays, credit, live: true,
@@ -5893,11 +5972,11 @@ export class Game {
         break;
       case 'newSettings':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'NEW DYNASTY');
-        drawSettings(g, user, this.slot, this.settingRows(), this.settingSel, x, y);
+        drawSettings(g, user, this.slot, this.settingRows(), this.settingSel, x, y, false, this.settingScroll, this.settingNoteText());
         break;
       case 'settings':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'DYNASTY SETTINGS', 'CHANGES SAVE AS YOU MAKE THEM');
-        drawSettings(g, user, this.slot, this.settingRows(true), this.settingSel, x, y, true);
+        drawSettings(g, user, this.slot, this.settingRows(true), this.settingSel, x, y, true, this.settingScroll, this.settingNoteText());
         break;
       case 'audio':
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'SETTINGS', 'SOUND AND CREDITS');

@@ -1,6 +1,13 @@
 # Progress
 
-_Last updated: 2026-11-26_
+_Last updated: 2026-11-27_
+
+## PLAY DEFENSE in the dynasty, and a scrollable settings page (2026-11-27)
+- **Dynasty games:** the CPU drives already ran through the shared path, with `SeasonConfig.liveDefense`. Checked end to end in the browser (two dynasty games through `advanceWeek`: FULL + BIG PLAYS, then EVERY SNAP + EVERY SNAP): key plays in order, box score and drive logs agree, each snap logged once, the week and the game page written, settings saved across a reload. docs/USERDEF.md, "In the dynasty".
+- **Bug fixed, grades and XP:** the grades cast the tackler, sacker and interceptor at random, so a pick or sack made by the user's man (or by anyone, on a played snap) could be graded as someone else's. A played game now logs who did it (`LoggedPlay.to`, `by`, `tkl`), and `gradeGame` gives those men the reps. The user's own offensive snaps log the ball carrier and the CPU defender too. Simulated games are unchanged, so the season report is too. docs/PROGRESSION.md.
+- **Settings page:** grouped under GAME DAY, DEFENSE, SIMULATION and DYNASTY, scrolling in a fixed window (W/S, the wheel, a scrollbar). The rows had run into the START button. PLAY DEFENSE's cap is shown: dimmed under a SUMMARY, help lines for both rows, a note when CPU DRIVES pulls it down.
+- Tests: src/userdef.test.ts, the grades read who made the play.
+- **Next:** the simulated engine games (`engineGame`) could log who did it too, for the same reason; that moves the season report's progression rows, so run `npm run season` with it.
 
 ## PLAY DEFENSE vs CPU DRIVES: what's shown and what's played (2026-11-27)
 **The bug:** with PLAY DEFENSE on, the snaps he didn't play ran headless, and CPU DRIVES' shows were queued only after the drive. So with EVERY SNAP plus BIG PLAYS, he played 3rd down live, then watched 1st and 2nd down replayed after it. PLAY DEFENSE could also be set higher than CPU DRIVES, for example EVERY SNAP with a SUMMARY.

@@ -36,6 +36,7 @@ Each snap, every player on the field gets one grade: his result at his job (a wi
   - A sack tags the rusher who beat his lineman (`rsh`). Both grades come from their rep as usual.
   - An interception is a loss for the passer and the target and a win for the cover man (`cth`).
   - On a deep ball the free safety shares the coverage half the time.
+- **Who really did it (played games, 2026-11-27).** The sims cast the target, the carrier, the tackler and the sacker by weight. A snap played on the field (the user's, and the CPU's engine drives in a game he plays, PLAY DEFENSE or not) logs the real ones by athlete id (`LoggedPlay.to`, `by`, `tkl`; `Game.cpuMade` and `logSnap`). The grades put those men on the field for the snap and give them the reps: the interceptor gets the pick's `cth`, the sacker the `rsh` sack tag (a blitzer too), the tackler the tackle and its hit. The cast's draws are still made, so the rest of the game grades much as before. Simulated games are unchanged.
 - **Kickers:** a field goal is graded against the drive sim's make odds at that distance and an XP against 0.97. Punts and kickoffs are graded against the expected result of the matchup with the other team's kicker or punter.
 - **Fair by position:** the same curve and the same expectation apply everywhere, so at any matchup the average snap grades 0 at every position. Position never decides how fast someone levels.
 - **Who's on the field:** the 11-personnel offense and the nickel defense, from the depth chart.

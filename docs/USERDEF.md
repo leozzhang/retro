@@ -29,6 +29,19 @@ The snaps he doesn't play:
   - Nothing is shown after a snap that came later.
   - The drive's `perDrive` cap holds across the pieces, and his own snaps don't count against it.
 
+## In the dynasty (2026-11-27)
+A dynasty game plays CPU drives through the same path as an exhibition (`cpuDrive` → `playCpuDrive` → `cpuDriveDone`), with the settings from `SeasonConfig` (`liveDefense`, `keyPlays.defense`). Checked end to end in the browser (a game at FULL + BIG PLAYS and one at EVERY SNAP + EVERY SNAP, through `advanceWeek`):
+- **Box score and story:** `cpuCredit` → `engineCredit` with the game's lineups (`liveBox`), so a pick or sack by the man he played is that athlete's. `creditCpuDrive` and the game page read it.
+- **Grades and XP:** each snap is logged once (`onPlay`), played, watched or headless; spikes are dropped as always (`driveLog`). The grades used to cast the tackler, sacker and interceptor at random, so a pick he made could go to another defender's XP. Now a played game logs who really did it (`LoggedPlay.to`, `by`, `tkl`; `Game.cpuMade`) and the grades give those men the reps (docs/PROGRESSION.md, "Who really did it"). Injuries read the same hits.
+- **Timeouts:** his T reaches `sim.tos`, then `tosLog` and `GameResult.tos`.
+- **Always headless:** SIM GAME, PLAY GAME's simulated quarters before the one he takes over in, and CPU two-point tries.
+- **Old saves:** a missing `liveDefense` is OFF; one over the cap plays at the cap.
+
+**The settings page** (render/menuScreen.ts `drawSettings`, game.ts `settingsInput`): the rows sit under GAME DAY, DEFENSE, SIMULATION and DYNASTY and scroll in a fixed window (W/S follows the picked row, the wheel scrolls, a scrollbar and arrows show there's more). CPU DRIVES and PLAY DEFENSE are next to each other under DEFENSE:
+- CPU DRIVES' help says PLAY DEFENSE can't go higher than it.
+- Under a SUMMARY, PLAY DEFENSE is dimmed and its help says it needs CPU DRIVES above SUMMARY. At the key-play levels its help says EVERY SNAP needs CPU DRIVES on EVERY SNAP.
+- Lowering CPU DRIVES past PLAY DEFENSE pulls it down and says so in gold under the help ("PLAY DEFENSE LOWERED TO BIG PLAYS").
+
 ## Controls
 | | |
 | --- | --- |
