@@ -2,6 +2,29 @@
 
 _Last updated: 2026-11-26_
 
+## PLAY DEFENSE, pass 3: manual and assisted, the ball meter, a sure dive (2026-11-27)
+Changes from play feedback (docs/USERDEF.md, "Pass 3"):
+- **Manual means manual.** The AI plays your man until you first touch WASD or Shift. After that, an idle stick stands him still.
+- **Aim assist** (`USER_DEF.assist`): a held key bends onto the nearest target in its cone: the carrier's intercept, a scrambling QB, a found ball, a receiver. A key well off every target is exact, so cuts stay instant.
+- **The ball meter** replaces the blue and gold rings. It's a small kick meter over his head, up only for a ball coming to him (`Play.ballMeter`). Space and E only count while it's up.
+- **The dive** fires on SPACE with the carrier in reach, buffered 0.2 s. It homes on him and is decided by the CPU's own contact roll (`contactOdds`, shared with `checkTackles`). `USER_DEF.dive` (0.55) is gone.
+
+Checks:
+- Tests: 4 new in src/userdef.test.ts:
+  - idle after taking him stands still;
+  - the assist bends a near key and leaves a far one;
+  - the meter gates SPACE and E;
+  - the dive reaches 95%+ and tackles at the CPU odds.
+- The full suite passes. The moments season test timed out once while the reports ran alongside it, and passed on rerun.
+- `npm run drives` is identical but for the timing line, and `npm run balance` is byte-identical, both against HEAD.
+- `npm run userdef` (48 drives): FLAGS none.
+- In the browser (DEFENSE DRILL):
+  - the meter shows on balls his way and freezes on a press;
+  - the idle stick read 0.00 yd/s on every rep;
+  - the dive lays out on the carrier.
+
+**Next:** play it and tune the assist's cones and `meterSpan` by feel. Watch the tackle rate of a steering FS or MLB.
+
 ## Fixed: man corners shown off lined up across the field (2026-11-26)
 - **Symptom:** in 2 Man Under, Cover 1 Robber and other man calls, CB1 and CB2 sometimes started across the field from their man, sprinted over at the snap and left him open.
 - **Cause:** the presnap disguise that shows man corners "off" (`disguiseSpot`, `g.corners === 'off'`) put each corner over the widest receiver on his slot's fixed side (CB1 toward y = 0, CB2 the far side), not over his own man. On a flipped formation his man was on the other side.

@@ -44,7 +44,8 @@ export class BotInput {
  * How the oracle plays him:
  * - `assign`: hands off, the AI's snap (the plumbing check: identical to no user at all)
  * - `hawk`: his assignment until the throw, then `latency` s later to the ball's landing spot, eyes on it,
- *   and PLAY BALL on the sweet spot
+ *   and PLAY BALL on the sweet spot (only counted with the ball meter up: a ball coming to him)
+ * - every policy, once it has steered (`Play.defManual`), chases a carrier and dives the moment he's in reach
  * - `jump`: sits on the receiver nearest him from the snap (where he'll be, `jumpLead` s on), eyes on the QB,
  *   then the hawk's ball
  * - `shadow`: runs with the receiver nearest him (as he was `latency` s ago), then the hawk's ball
@@ -91,6 +92,14 @@ export class DefBot {
         this.pressed = true;
         inp.hits.add('Space');
       }
+      return inp.asInput();
+    }
+    if (play.phase === 'run') {
+      // Once he's his, he's the bot's to the whistle: after the carrier (the assist takes the angle), SPACE in reach.
+      const c = play.carrier;
+      if (!play.defManual || !c || c.side !== 'off' || c === d) return inp.asInput();
+      inp.ax = stick({ x: c.pos.x - d.pos.x, y: c.pos.y - d.pos.y });
+      if (play.diveReach()) inp.hits.add('Space');
       return inp.asInput();
     }
     if (play.phase !== 'live' && play.phase !== 'snap') return inp.asInput();

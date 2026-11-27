@@ -38,7 +38,7 @@ export const MAN_TRAIL = { lead: 0.5 };
  * How far ahead (seconds) a scrimmage pursuer leads the ball carrier, so deep defenders take an angle
  * instead of chasing. Kick coverage keeps the shorter default lead.
  */
-const PURSUIT_LEAD = 2;
+export const PURSUIT_LEAD = 2;
 /** Past this far beyond the LOS the carrier is in the open field, and pursuers take the intercept angle. */
 const OPEN_FIELD = 5;
 /** How far inside the sideline route waypoints stop (`buildRoute`), and a continuing route turns upfield. */
@@ -130,7 +130,7 @@ export function pursue(p: Player, c: Player, speedMul = 1, lead = 1.2, intercept
   p.want = seek(p, add(c.pos, scale(c.vel, t)), sp, 0.1);
 }
 /** The intercept is solved for this share of his top speed, so he takes an angle he can hold. */
-const PURSUIT_ANGLE = 0.92;
+export const PURSUIT_ANGLE = 0.92;
 
 /** Seconds until a chaser from `from` at `speed` can meet a target at `at` moving at `vel`; null if never. */
 export function interceptTime(from: Vec, at: Vec, vel: Vec, speed: number): number | null {

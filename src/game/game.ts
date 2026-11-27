@@ -119,7 +119,7 @@ import { KickPlay } from './kickPlay';
 import { AUTO_INPUT } from './autopilot';
 import { CpuKicker, forecast, kickoffCall, puntCall, returnCall, windAlong, type KickContext, type KickForecast } from './cpuKicker';
 import { KICKOFF_FROM, kickCaption, kickoffRun, puntRun, returnerOf, SAFETY_KICK_FROM, type EngineKick, type KickRun } from './engineKick';
-import { HARD_COUNT, Play, USER_DEF, type DefFx } from './playState';
+import { HARD_COUNT, Play, type DefFx } from './playState';
 import { zoneSpot } from '../sim/ai';
 import type { Player } from '../sim/player';
 import { personnelOf, resolvePlay } from './resolvePlay';
@@ -321,18 +321,19 @@ const REEL_CROP = 0.42;
  */
 const RUN_ZOOM = { x: 1.3, y: 1.9, slow: 0.7 };
 /**
- * PLAY DEFENSE's feel (docs/USERDEF.md): the live snap in slow motion (`slow`), slower still with the ball in the
- * air and his eyes on it (`ballSlow`); the field spread a little about the QB and your man (`spreadX`, `spreadY`);
+ * PLAY DEFENSE's feel (docs/USERDEF.md): the live snap in slow motion (`slow`), slower still with a ball in the
+ * air coming to him (`ballSlow`, while the ball meter is up); the field spread a little about the QB and your man (`spreadX`, `spreadY`);
  * the hit-stop (`hitStop` s of game time frozen) and the shake (`shake` px, `shakeTime` s) on a play you make;
- * the timing ring (`ringNear` yd from the ball's spot, `ringIn` px around his feet, `ringRate` px a second
- * of flight); the QB's vision cone (`cone`: its length in yd, its half-width from `wide` to `tight` degrees
+ * the ball meter over his head (`meter`: `w` by `h` px, its middle `y` px over his feet, `fade` s in); the QB's vision cone (`cone`: its length in yd, its half-width from `wide` to `tight` degrees
  * and its lag from `lagLo` to `lagHi` s by your man's `prc` 40 to 99, `fade` s in and out); the verdict
  * shown `verdictTime` s.
  */
+/** The DEFENSE DRILL's offense calls only these: throws a defender can play (no runs, screens or RPOs). */
+const DRILL_FAMILIES: readonly string[] = ['quick', 'dropback', 'shot', 'pa', 'boot'];
 const DEF_FEEL = {
   slow: 0.75, ballSlow: 0.55, spreadX: 1.15, spreadY: 1.3,
   hitStop: 0.12, shake: 3, shakeTime: 0.25,
-  ringNear: 7, ringIn: 9, ringRate: 32,
+  meter: { w: 34, h: 4, y: 40, fade: 0.1 },
   cone: { len: 24, wide: 22, tight: 7, lagLo: 0.35, lagHi: 0.05, fade: 0.15 },
   verdictTime: 1.3,
 };
@@ -572,6 +573,8 @@ export class Game {
   /** The screen shake left (s) and its size (px). */
   private shakeT = 0;
   private shakeAmp = 0;
+  /** When the ball meter came up (game time), for its fade in; -1 while it is down. */
+  private meterAt = -1;
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
@@ -687,8 +690,7 @@ export class Game {
     if (slow && this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
     if (this.screen === 'defense' && this.defLive?.stage === 'live') {
       const p = this.defLive.run?.play;
-      const d = p?.defControlled;
-      return p && d && p.phase === 'air' && p.time >= d.findAt ? DEF_FEEL.ballSlow : DEF_FEEL.slow;
+      return p?.ballMeter() ? DEF_FEEL.ballSlow : DEF_FEEL.slow;
     }
     return 1;
   }
@@ -4471,12 +4473,16 @@ export class Game {
   /**
    * The DEFENSE DRILL (temporary): the exhibition's teams, then CPU snaps one after another from random
    * situations (down, distance, spot, hash, score and clock), every one played by the user. No drives, no
-   * offense, nothing kept. ESC goes back to the exhibition screen.
+   * offense, nothing kept. ESC goes back to the exhibition screen. Passes only (`DRILL_FAMILIES`: no runs,
+   * screens or RPOs), to test playing the ball.
    */
   private startDrill(): void {
     this.startGame();
     this.notices = [];
     this.drill = { reps: 0 };
+    const cpu = this.cpuOff!;
+    const book = cpu.oc.book.filter((p) => DRILL_FAMILIES.includes(p.tags.family));
+    const off: EngineSide = book.length ? { ...cpu, oc: { ...cpu.oc, book } } : cpu;
     const rng = driveStream(this.rng);
     const self = this;
     function* reps(): Generator<SnapReq, EngineDrive, SnapBack> {
@@ -4493,7 +4499,7 @@ export class Game {
         const lev = leverage(down, 100 - yard, late && Math.abs(lead) <= 8);
         self.drill!.reps++;
         yield {
-          off: self.cpuOff!, def: self.userDef!, drive, sit, rng, brain: self.userDc, t: 0, lev,
+          off, def: self.userDef!, drive, sit, rng, brain: self.userDc, t: 0, lev,
           opts: { lev, ocBrain: self.cpuOc, homeId: self.homeId, ...(situationTempo(sit) === 'hurry' ? { hurry: true } : {}) },
         };
       }
@@ -4763,10 +4769,9 @@ export class Game {
     };
     if (L.stage === 'live') {
       this.drawCone(g, L, play);
-      this.drawBallRing(g, play);
       // A carrier he can lay out for: SPACE.
       const c = play.carrier;
-      if (d && c && c.side === 'off' && play.phase === 'run' && !d.down && !play.defLunge && Math.hypot(c.pos.x - d.pos.x, c.pos.y - d.pos.y) <= USER_DEF.diveFrom) {
+      if (c && play.diveReach()) {
         const blink = Math.floor(this.t * 6) % 2 === 0;
         ring(c, blink ? '#ff5a5a' : '#ffb0a0', 9);
       }
@@ -4819,6 +4824,7 @@ export class Game {
         g.fillRect(x - 1, ey, 3, 3);
       }
     }
+    if (L.stage === 'live') this.drawBallMeter(g, play);
   }
 
   /**
@@ -4868,36 +4874,50 @@ export class Game {
   }
 
   /**
-   * The timing ring (docs/USERDEF.md): once his eyes are on a ball coming down near him, a ring closes on his
-   * feet and meets the sweet band `USER_DEF.lead` before it lands: gold, PLAY BALL's window; blue, SWAT's.
+   * The ball meter (docs/USERDEF.md, `Play.ballMeter`): a little kick meter over his head, up only for a ball
+   * coming to him. The needle sweeps to the middle `USER_DEF.lead` before the ball's down: the gold core is
+   * PLAY BALL's window (SPACE), the green around it SWAT's (E), both by his hands and narrower for a ball he
+   * hasn't found. A press freezes the needle where it was, colored by how it landed.
    */
-  private drawBallRing(g: CanvasRenderingContext2D, play: Play): void {
+  private drawBallMeter(g: CanvasRenderingContext2D, play: Play): void {
     const d = play.defControlled;
-    const land = play.ballTarget;
-    if (!d || d.down || play.phase !== 'air' || !land || play.pitch || play.time < d.findAt) return;
-    const F = DEF_FEEL;
-    if (Math.hypot(land.x - d.pos.x, land.y - d.pos.y) > F.ringNear) return;
+    const m = play.ballMeter();
+    if (!d || !m) {
+      this.meterAt = -1;
+      return;
+    }
+    if (this.meterAt < 0) this.meterAt = this.t;
+    const M = DEF_FEEL.meter;
     const s = this.cam.toScreen(d.pos.x, d.pos.y);
-    const x = Math.round(s.x);
-    const y = Math.round(s.y);
-    const tl = play.ballTimeLeft() - USER_DEF.lead;
-    const ell = (r: number, color: string, w = 1) => {
-      if (r <= 0.5) return;
-      g.strokeStyle = color;
-      g.lineWidth = w;
-      g.beginPath();
-      g.ellipse(x, y, r, r * 0.42, 0, 0, Math.PI * 2);
-      g.stroke();
+    const X = Math.round(s.x - M.w / 2);
+    const Y = Math.round(s.y - M.y);
+    const at = (e: number) => X + Math.round(((e + 1) / 2) * M.w);
+    g.save();
+    g.globalAlpha = clamp((this.t - this.meterAt) / M.fade, 0, 1);
+    g.fillStyle = 'rgba(8,10,14,0.85)';
+    g.fillRect(X - 1, Y - 1, M.w + 2, M.h + 2);
+    g.fillStyle = '#7a2c2c';
+    g.fillRect(X, Y, M.w, M.h);
+    const band = (half: number, color: string) => {
+      const l = at(-Math.min(1, half));
+      const r = at(Math.min(1, half));
+      g.fillStyle = color;
+      g.fillRect(l, Y, Math.max(1, r - l), M.h);
     };
-    const sw = play.ballWindow('swat') * F.ringRate;
-    const pb = play.ballWindow('play') * F.ringRate;
-    // The bands: SWAT's wide and pale, PLAY BALL's narrow and gold.
-    ell(F.ringIn, 'rgba(120,190,255,0.35)', Math.max(1, sw * 2));
-    ell(F.ringIn, 'rgba(255,210,63,0.75)', Math.max(1, pb * 2));
-    if (play.defBall) return;
-    const r = F.ringIn + tl * F.ringRate;
-    const hot = Math.abs(tl) * F.ringRate <= pb;
-    ell(r, hot ? '#ffd23f' : Math.abs(tl) * F.ringRate <= sw ? '#9ad7ff' : '#ffffff', hot ? 2 : 1);
+    band(m.swat, '#4fbf5f');
+    band(m.play, '#ffd23f');
+    const e = m.pressed ?? m.e;
+    let col = '#ffffff';
+    if (m.pressed !== null) {
+      const off = Math.abs(m.pressed);
+      const win = m.kind === 'play' ? m.play : m.swat;
+      col = off <= win ? (m.kind === 'play' ? '#ffd23f' : '#7dff7d') : '#ff5a5a';
+    }
+    g.fillStyle = 'rgba(8,10,14,0.9)';
+    g.fillRect(at(e) - 2, Y - 3, 4, M.h + 6);
+    g.fillStyle = col;
+    g.fillRect(at(e) - 1, Y - 2, 2, M.h + 4);
+    g.restore();
   }
 
   /** The verdict on his play at the ball: the timing (PERFECT, GOOD, EARLY, LATE, by how much) and what came of it. */
@@ -4940,11 +4960,10 @@ export class Game {
       return;
     }
     // What he can do right now.
-    const c = play.carrier;
-    const near = !!d && !!c && c.side === 'off' && play.phase === 'run' && Math.hypot(c.pos.x - d.pos.x, c.pos.y - d.pos.y) <= USER_DEF.diveFrom;
-    if (play.phase === 'air' && d && play.time >= d.findAt && !play.defBall) drawHint(g, 'SPACE: PLAY THE BALL   E: SWAT IT   (ON THE GOLD RING)');
-    else if (play.phase === 'air' && d && !play.defBall) drawHint(g, 'BALL IN THE AIR: SHIFT TO FIND IT');
-    else if (near && !play.defLunge) drawHint(g, 'SPACE: LAY OUT FOR HIM');
+    const meter = play.ballMeter();
+    if (meter && !play.defBall) drawHint(g, 'SPACE ON THE GOLD: PLAY THE BALL   E ON THE GREEN: SWAT IT');
+    else if (play.phase === 'air' && d && !play.defBall && !meter) drawHint(g, 'BALL IN THE AIR: GO GET TO IT');
+    else if (play.diveReach()) drawHint(g, 'SPACE: TACKLE HIM');
     else if (!play.thrown && play.carrier === play.qb && !play.defEyes()) drawHint(g, 'WASD: MOVE   SHIFT: READ THE QB   T: TIMEOUT');
     else drawHint(g, 'WASD: MOVE   SHIFT: LOOK   T: TIMEOUT');
   }

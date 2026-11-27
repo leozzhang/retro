@@ -21,10 +21,10 @@ The snaps the user doesn't play run headless. They're shown by the CPU DRIVES wa
 | --- | --- |
 | Pick (before the snap) | Q/E or W/S, or click; the back seven, top of the screen to the bottom. The one he played last is picked first. A dashed line shows his job: his man, his zone's spot (ringed), or the QB for a blitz or spy. The second header line names it |
 | Snap | Space |
-| Move | WASD at his top speed. Hold nothing and the AI plays him |
-| LOOK | Shift: his head around to the QB (to the ball once it's thrown). Backing away from the QB while looking, he moves at `backpedal` of his speed. Shift alone: the AI keeps playing his job with his eyes on the QB (backpedaling), so you can read the QB's vision cone while he drops |
-| Ball in the air | Space plays the ball, E swats it; one press a throw |
-| Diving tackle | Space within 1.7 yd of the carrier |
+| Move | WASD at his top speed, aim-assisted (below). Until you first touch WASD or Shift the AI plays him; from then on he's yours to the whistle, and holding nothing stands him still |
+| LOOK | Shift: his head around to the QB (to the ball once it's thrown). Backing away from the QB while looking, he moves at `backpedal` of his speed. Shift alone turns his head; he doesn't move |
+| Ball in the air | Only on a ball coming to him (the meter over his head): Space plays the ball, E swats it; one press a throw |
+| Diving tackle | Space with the carrier in reach (ringed red): he lays out and homes on him; up to 0.2 s early still counts |
 | Blocked | WASD picks the shoulder he fights toward (`d.goal`); the block engine decides the shed |
 | Timeout | T asks for the user's timeout at the whistle (T again cancels) |
 
@@ -43,6 +43,33 @@ The snaps the user doesn't play run headless. They're shown by the CPU DRIVES wa
 - **Sound:** a whoosh on the jump, the swat and the lunge (`swipe`), a hit on a breakup, the turf on a miss. The popups' cases are in game/sounds.ts.
 - **Prompts:** the hint line says what he can do right now: read the QB, play the ball or swat it on the gold ring, find the ball, lay out for the carrier.
 
+## Pass 3 (2026-11-27): manual, assisted, the meter, a sure dive
+- **Manual means manual.** The AI plays him until the user first touches WASD or Shift (`Play.defManual`). After that, an idle stick stands him still (on a block, an idle stick lets the AI fight it). An untouched snap is still the AI's, draw for draw.
+- **Aim assist** (`USER_DEF.assist`, `Play.assist`). Only while a key is held. Its targets are:
+  - the carrier's pursuit intercept, at the AI's own angle (`interceptTime`, `PURSUIT_ANGLE`, `PURSUIT_LEAD`);
+  - a scrambling or blitzed QB, the same way;
+  - a found ball's landing spot;
+  - in coverage, each receiver within `range` (12 yd), `trail` (0.3 s) ahead of where he is now. His man gets the wider `manCone`.
+
+  The key bends all the way onto the target inside `full` (24°) and fades back to the key itself at the cone's edge (36°, 42° for his man). The keys are 45° apart, so every heading is a key away. A key well off every target is exact, so cutting off a route or reversing is instant. Within `close` (1.5 yd) of a receiver he matches the receiver's speed rather than overrunning him. Acceleration and turning are still his ratings (`stepPlayer`).
+- **The ball meter** (`Play.ballMeter`, drawn by `Game.drawBallMeter`; it replaces the timing ring).
+  - A little kick meter over his head, up only for a ball **coming to him**: it lands within his reach plus how far he can run before it's down (capped at 12 yd), or it's going to his man. Once up, it stays up for that throw.
+  - The needle crosses the middle `lead` before the ball lands, `meterSpan` (0.35 s) from the middle to an end.
+  - The gold core is PLAY BALL's window, the green around it SWAT's. Both are by his hands, and narrower for a ball he hasn't found.
+  - A press freezes the needle, colored by how it landed.
+  - Space and E in flight count only while it's up. Bullet time (`ballSlow`) runs while it's up.
+  - The contest is still a roll on his ratings (`catchOdds` with the call's multipliers).
+- **The dive** (`diveReach`, `startLunge`, `stepLunge`).
+  - In reach means within `diveFrom` (3.2 yd) and catchable inside the lunge (`lunge` 0.38 s at `lungeSpeed` 1.15×). A carrier running away from him at his speed isn't in reach.
+  - The lunge homes on the carrier and reaches him at the CPU dive's range (`DIVE_TACKLE.range`). Decided dives get there 95%+ of the time.
+  - On contact it's the CPU's own roll (`contactOdds`, shared with `checkTackles`): `tackleChance`, the hips bonus, the juke. His tackling and nothing else; `USER_DEF.dive` is gone.
+  - A miss is a stumble (0.6 s), as a juked tackler's.
+- **The report after pass 3** (48 drives): FLAGS none.
+  - The hawk is still about even with the AI: −0.04 to +0.10 at CB1 and FS, −0.14 to +0.21 at MLB.
+  - Freelancing at CB1 or FS still costs 0.2–1.1 points a drive.
+  - An MLB shadowing or jumping is up to 0.2 points a drive better than the AI, inside the 0.3 flag.
+  - A steering FS or MLB makes about 0.6 tackles a drive against the AI's 0.3–0.4, because he chases every carrier and dives. His box score stays under the 2.5× farming flag. Watch this if the dive's reach grows.
+
 ## The balance principle: the read is yours, the body is his
 Every AI knowledge limit is a timer that only gates the AI's decisions: `reactAt`, `fitAt`, `findAt`, `MAN_TRAIL`'s lag, `RUN_TELL`. A human steering `want` directly skips all of them. Following the precedent of the user's QB and runner, ratings limit **execution**, never **what the user sees**:
 1. **Reaction is the human's own.** A human's perceive-and-react time (0.2–0.3 s and a frame) sits in the AI's band (0.15–0.5 s by `mcv`/`zcv`/`prc`). There's no artificial delay; `npm run userdef` measures it.
@@ -56,8 +83,8 @@ Every AI knowledge limit is a timer that only gates the AI's decisions: `reactAt
    | SWAT | 0.12–0.22 s | ×1.35, ×0.35 | ×0.8, ×0.5 |
 
    Nothing pressed is the AI's contest. The multipliers go into `catchOdds` (`Contender.skillMul`, `intMul`); undefined leaves the math bit-identical. A timed PLAY BALL that ends in a pick is his pick.
-5. **The body is his ratings.** Same acceleration (`accelOf`) and top speed (`SPEED`). There's no jog/sprint/stamina split, since AI defenders always run full. Tackles stay automatic by proximity (`checkTackles`). Steering, he makes no automatic diving tackle; that's his button, at `dive` (0.55) of a tackle, and a miss leaves him down.
-6. **Idle is the AI.** With nothing held, nothing the user's code touches runs. src/userdef.test.ts holds a bot with its hands off to the engine's drive, tape and all.
+5. **The body is his ratings.** Same acceleration (`accelOf`) and top speed (`SPEED`). There's no jog/sprint/stamina split, since AI defenders always run full. Tackles stay automatic by proximity (`checkTackles`). Steering, he makes no automatic diving tackle; that's his button (pass 3: at the CPU's contact odds).
+6. **Untouched is the AI.** Until the first key, nothing the user's code touches runs (after it, an idle stick stands him still). src/userdef.test.ts holds a bot with its hands off to the engine's drive, tape and all.
 7. **The offense answers for free.** `CpuQb` reads the live field, so he doesn't throw into a defender camping in a lane. His targets weight what's working this game (`qbCtx`, `targetPull`), so a corner who keeps shutting his man down sees fewer balls.
 
 ## Stats and progression

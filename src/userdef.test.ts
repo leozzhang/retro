@@ -11,7 +11,11 @@ import { STEP } from './engine/constants';
 import { rosterRead } from './game/offModel';
 import type { DriveClock } from './game/rules';
 import { bigSnap } from './game/situation';
-import { botDrive, DefBot, type BotPolicy } from './game/userDefBot';
+import { botDrive, BotInput, DefBot, type BotPolicy } from './game/userDefBot';
+import { isEligible } from './sim/player';
+import { THROWS } from './sim/ball';
+import { CATCH_REACH } from './sim/catching';
+import type { Play } from './game/playState';
 import { catchOdds } from './sim/catching';
 
 /** PLAY DEFENSE (docs/USERDEF.md): the user on a defender, played through the same engine. */
@@ -106,5 +110,122 @@ describe('PLAY DEFENSE', () => {
     expect(bigSnap({ ...s, yardsToGoal: 8 }, 0, false)).toBe(true);
     expect(bigSnap({ ...s, secsLeft: 20 }, 0, false)).toBe(true);
     expect(bigSnap(s, 0.6, false)).toBe(true);
+  });
+});
+
+/** The first snap of drive `seed` as a `SnapRun`, the user on `slot`, snapped. */
+function firstSnap(seed: number, slot: string): SnapRun {
+  const q = driveSteps(off, def, 25, mulberry32(seed), clock, opts()).next().value as Exclude<ReturnType<ReturnType<typeof driveSteps>['next']>['value'], EngineDrive>;
+  const run = new SnapRun(q.off, q.def, q.drive, q.sit, q.rng, q.brain, q.opts);
+  run.play.defControlled = run.play.def.find((p) => p.slot === slot) ?? null;
+  run.snap();
+  return run;
+}
+
+const deg = (v: { x: number; y: number }) => (Math.atan2(v.y, v.x) * 180) / Math.PI;
+
+describe('PLAY DEFENSE, pass 3: manual, assisted, the meter and the dive', () => {
+  it('once he has taken the stick, an idle stick stands him still', () => {
+    let checked = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const run = firstSnap(seed, 'FS');
+      const d = run.play.defControlled!;
+      const inp = new BotInput();
+      for (let i = 0; i < 90 && !run.done(); i++) {
+        inp.reset();
+        if (i < 8) inp.ax = { x: 0, y: 1 };
+        run.step(inp.asInput());
+        if (i === 89 && !d.down && !d.engagedBy.length && run.play.phase !== 'over' && !run.play.defLunge && !run.play.defCommit) {
+          expect(Math.hypot(d.vel.x, d.vel.y)).toBeLessThan(0.3);
+          checked++;
+        }
+      }
+      expect(run.play.defManual).toBe(true);
+    }
+    expect(checked).toBeGreaterThan(3);
+  });
+
+  it('the assist bends a key that is near a target onto it, and leaves a key well off it alone', () => {
+    const run = firstSnap(3, 'FS');
+    const play: Play = run.play;
+    const d = play.defControlled!;
+    const recv = play.off.filter((o) => isEligible(o) && o !== play.qb);
+    for (const o of recv) o.pos = { x: 0, y: 0 };
+    const o = recv[0];
+    const a = (20 * Math.PI) / 180;
+    o.pos = { x: d.pos.x + Math.cos(a) * 6, y: d.pos.y + Math.sin(a) * 6 };
+    o.vel = { x: 0, y: 0 };
+    d.manTarget = null;
+    const assist = (play as unknown as { assist: (d: unknown, s: { x: number; y: number }, sp: number) => { dir: { x: number; y: number } } }).assist.bind(play);
+    expect(deg(assist(d, { x: 1, y: 0 }, 7).dir)).toBeCloseTo(20, 0);
+    expect(deg(assist(d, { x: 0, y: -1 }, 7).dir)).toBeCloseTo(-90, 5);
+    expect(deg(assist(d, { x: Math.SQRT1_2, y: -Math.SQRT1_2 }, 7).dir)).toBeCloseTo(-45, 5);
+  });
+
+  it('SPACE and E in flight count only on a ball coming to him (the meter)', () => {
+    let far = 0;
+    let near = 0;
+    for (let seed = 1; seed <= 40 && (far < 3 || near < 3); seed++) {
+      for (const where of ['far', 'near'] as const) {
+        const run = firstSnap(seed, 'CB1');
+        const inp = new BotInput();
+        while (!run.done() && run.play.phase !== 'air') run.step(inp.asInput());
+        const play = run.play;
+        if (play.phase !== 'air' || play.pitch || !play.ballTarget || play.ballTimeLeft() < 0.2) break;
+        const d = play.defControlled!;
+        d.manTarget = null;
+        d.engagedBy = [];
+        (play as unknown as { defMeter: boolean }).defMeter = false;
+        const land = play.ballTarget;
+        d.pos = where === 'near' ? { x: land.x, y: land.y } : { x: land.x - 30, y: land.y > 26 ? land.y - 25 : land.y + 25 };
+        if (where === 'far') expect(Math.hypot(d.pos.x - land.x, d.pos.y - land.y)).toBeGreaterThan(CATCH_REACH * THROWS[play.thrownKind].reach + 12);
+        inp.hits.add('Space');
+        run.step(inp.asInput());
+        if (where === 'far') {
+          expect(play.defBall).toBeNull();
+          expect(play.ballMeter()).toBeNull();
+          far++;
+        } else {
+          expect(play.defBall?.kind).toBe('play');
+          near++;
+        }
+      }
+    }
+    expect(far).toBeGreaterThanOrEqual(3);
+    expect(near).toBeGreaterThanOrEqual(3);
+  });
+
+  it('a dive in reach all but always gets to him, and tackles at the CPU contact odds', () => {
+    let tries = 0;
+    let whiffs = 0;
+    let contact = 0;
+    let tackles = 0;
+    let odds = 0;
+    for (let seed = 1; seed <= 120 && contact < 150; seed++) {
+      for (const slot of ['MLB', 'FS', 'CB1']) {
+        const g = driveSteps(off, def, 25, mulberry32(seed), clock, opts());
+        let s = g.next();
+        while (!s.done) {
+          const q = s.value;
+          const run = new SnapRun(q.off, q.def, q.drive, q.sit, q.rng, q.brain, q.opts);
+          run.play.defControlled = run.play.def.find((p) => p.slot === slot) ?? null;
+          const bot = new DefBot('shadow', 0.2);
+          run.snap();
+          while (!run.done()) run.step(bot.step(run.play));
+          const t = run.play.defDives;
+          tries += t.tries;
+          whiffs += t.whiffs;
+          contact += t.contact;
+          tackles += t.tackles;
+          odds += t.odds;
+          s = g.next({ r: run.result() });
+        }
+      }
+    }
+    expect(tries).toBeGreaterThan(50);
+    // Of the dives that were decided (not beaten to him by a teammate's tackle), all but a few got to him.
+    expect(contact / (contact + whiffs)).toBeGreaterThan(0.95);
+    const sd = Math.sqrt(odds * (1 - odds / contact));
+    expect(Math.abs(tackles - odds)).toBeLessThan(3.5 * sd);
   });
 });

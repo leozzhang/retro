@@ -8,7 +8,7 @@ import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, STEP } from '../engine/constant
 import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
-import { ANTIC, cutKeep, eyesOf, facingQB, FIND, isRusher, KEY, matchZones, PREVENT, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
+import { ANTIC, cutKeep, eyesOf, facingQB, FIND, interceptTime, isRusher, KEY, matchZones, PREVENT, PURSUIT_ANGLE, PURSUIT_LEAD, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
 import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
 import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
@@ -152,12 +152,20 @@ export const DIVE_TACKLE = { range: 1.7, closing: 1.0, odds: 0.55, down: 1.0, pa
  *   it for a ball he hasn't seen (`readyAt`). Timed (`on`) or not (`off`), each scales his contest skill and
  *   his pick odds (sim/catching.ts `skillMul`, `intMul`). A PLAY BALL that misses and is caught leaves him on
  *   the turf `whiff` s (the YAC is the price of the gamble).
- * - `dive`: a diving tackle he lays out for himself (SPACE within `diveFrom` yd): he flies `lunge` s at
- *   `lungeSpeed` × his top speed at where the carrier's going; on contact it's `dive` of a tackle, and a lunge
- *   that finds nobody leaves him down (WHIFF)
+ * - the dive (SPACE with the carrier in reach): he lays out, homing on the carrier for `lunge` s at
+ *   `lungeSpeed` × his top speed. In reach means within `diveFrom` yd and catchable inside the lunge, so it all
+ *   but always makes contact; contact is the CPU's own tackle roll (`contactOdds`), his tackling and nothing
+ *   else. A SPACE up to `diveBuffer` s before he's in reach still fires. A miss is a stumble, as a juked tackler's
  * - the feel (pass 2): a PLAY BALL is a jump, `leapSpeed` of his speed until the ball's down or `leapTime`;
  *   a SWAT a chop, `swatSpeed` for `swatTime`. The verdict is PERFECT inside `perfect` of the half-window,
  *   GOOD inside it, else EARLY or LATE. A tackle at `bigHit` yd/s of closing speed is a BIG HIT
+ * - the ball meter (pass 3, `Play.ballMeter`): only for a ball coming to him, a needle that crosses the middle
+ *   `lead` s before it lands, `meterSpan` s from the middle to an end. SPACE and E in flight count only while it's up
+ * - aim assist (pass 3, `assist`): once he's the user's (`defManual`) an idle stick stands him still; a held
+ *   stick within `cone`° (his man: `manCone`°) of a target (the carrier's or a scrambling QB's intercept, a found
+ *   ball's spot, a receiver `trail` s ahead within `range` yd) runs him at it, all the way within `full`° (the
+ *   keys are 45° apart, so every heading is a key away) and fading to the stick at the cone's edge; outside every
+ *   cone it's the stick exactly. Within `close` yd of a receiver he matches his speed
  */
 export const USER_DEF = {
   backpedal: 0.8,
@@ -169,9 +177,9 @@ export const USER_DEF = {
     swat: { on: { skill: 1.35, int: 0.35 }, off: { skill: 0.8, int: 0.5 } },
   },
   whiff: 0.7,
-  dive: 0.55,
-  diveFrom: 2.6,
-  lunge: 0.32,
+  diveFrom: 3.2,
+  diveBuffer: 0.2,
+  lunge: 0.38,
   lungeSpeed: 1.15,
   leapSpeed: 0.4,
   leapTime: 0.55,
@@ -179,6 +187,8 @@ export const USER_DEF = {
   swatTime: 0.3,
   perfect: 0.4,
   bigHit: 7,
+  meterSpan: 0.35,
+  assist: { full: 24, cone: 36, manCone: 42, range: 12, trail: 0.3, close: 1.5 },
 };
 
 /** What the user's defender just did, for the game's feedback (sound, hit-stop, shake); display only. */
@@ -386,8 +396,14 @@ export class Play {
   defControlled: Player | null = null;
   /** The view is mirrored: the user's stick is flipped in x. */
   defFlip = false;
-  /** He's taken the stick this snap: from then on his eyes are the user's (LOOK), not the AI's. */
+  /** He's taken the stick this snap: from then on he's the user's (an idle stick stands him still) and so are his eyes (LOOK). */
   defManual = false;
+  /** The ball meter's up this throw (`ballMeter`): once a ball's shown coming to him, it stays up till it's down. */
+  private defMeter = false;
+  /** His dives this snap: laid out, made contact, found nobody, made the tackle, and the sum of his odds on contact (the tests read it). */
+  defDives = { tries: 0, contact: 0, whiffs: 0, tackles: 0, odds: 0 };
+  /** When SPACE was last pressed on a live carrier, for the dive's buffer (`USER_DEF.diveBuffer`). */
+  private defDiveAt = -Infinity;
   /** LOOK held this step. */
   defLook = false;
   /** PLAY BALL or SWAT, pressed in flight: which and when; and how it went at the ball. */
@@ -1853,8 +1869,9 @@ export class Play {
     const moving = ax.x !== 0 || ax.y !== 0;
     this.defLook = look;
     if (moving || look) this.defManual = true;
-    if (this.phase === 'air' && !this.defBall && !d.down && !d.engagedBy.length) {
-      // Up for it, or the chop: committed either way (`USER_DEF`).
+    if (this.phase === 'air' && !this.defMeter && this.ballComing(d)) this.defMeter = true;
+    if (this.phase === 'air' && this.defMeter && !this.defBall && !d.down && !d.engagedBy.length) {
+      // Up for it, or the chop: committed either way (`USER_DEF`). Only on a ball coming to him (the meter).
       if (input.hit('Space')) {
         this.defBall = { kind: 'play', t: this.time };
         const t = Math.min(USER_DEF.leapTime, this.ballTimeLeft() + 0.12);
@@ -1869,7 +1886,11 @@ export class Play {
       }
     }
     const c = this.carrier;
-    if (this.phase === 'run' && c && c.side === 'off' && c !== d && !this.defLunge && input.hit('Space')) this.startLunge(d, c);
+    if (this.phase === 'run' && c && c.side === 'off' && c !== d && !this.defLunge) {
+      // SPACE on a carrier: he lays out the moment he's in reach (pressed a beat early still counts).
+      if (input.hit('Space')) this.defDiveAt = this.time;
+      if (this.time - this.defDiveAt <= USER_DEF.diveBuffer + 1e-9 && this.startLunge(d, c)) this.defDiveAt = -Infinity;
+    }
     if (this.defLunge) {
       this.stepLunge(d);
       return;
@@ -1880,21 +1901,107 @@ export class Play {
       d.want = moving ? scale(norm(ax), maxSpeed(d) * keep) : scale(d.vel, keep);
       return;
     }
-    if (d.down || d.stun > 0 || (!moving && !look)) return;
+    if (!this.defManual || d.down || d.stun > 0) return;
     if (d.engagedBy.length) {
+      // On a block the stick picks the shoulder he fights to; idle, the AI fights it.
       if (moving) d.goal = add(d.pos, scale(norm(ax), 4));
       return;
     }
-    const toQb = norm(sub(this.qb.pos, d.pos));
+    // His from here: no stick, no movement (LOOK alone just turns his head).
     if (!moving) {
-      // LOOK alone: the AI plays his job, his eyes on the QB, backpedaling (slower) when it takes him away from him.
-      const v = len(d.want);
-      if (c !== d && v > 0.5 && (d.want.x * toQb.x + d.want.y * toQb.y) / v < -0.3) d.want = scale(d.want, USER_DEF.backpedal);
+      d.want = { x: 0, y: 0 };
       return;
     }
-    const dir = norm(ax);
-    const away = c !== d && dir.x * toQb.x + dir.y * toQb.y < -0.3;
-    d.want = scale(dir, maxSpeed(d) * (look && away ? USER_DEF.backpedal : 1));
+    const toQb = norm(sub(this.qb.pos, d.pos));
+    const stick = norm(ax);
+    const away = c !== d && stick.x * toQb.x + stick.y * toQb.y < -0.3;
+    const sp = maxSpeed(d) * (look && away ? USER_DEF.backpedal : 1);
+    const a = this.assist(d, stick, sp);
+    d.want = a.want ?? scale(a.dir, sp);
+  }
+
+  /**
+   * Aim assist (`USER_DEF.assist`): the stick bent toward the target it's pointing nearest, if one's inside the
+   * cone, else the stick exactly. `want` when he's close on a receiver: he matches him instead of overrunning.
+   */
+  private assist(d: Player, stick: Vec, sp: number): { dir: Vec; want?: Vec } {
+    const A = USER_DEF.assist;
+    const cands: { at: Vec; cone: number; mirror?: Player }[] = [];
+    const chase = (t: Player) => {
+      const hit = interceptTime(d.pos, t.pos, t.vel, sp * PURSUIT_ANGLE);
+      const lead = hit !== null ? Math.min(hit, PURSUIT_LEAD) : clamp(dist(d.pos, t.pos) / Math.max(1, sp), 0, PURSUIT_LEAD) * 0.85;
+      cands.push({ at: add(t.pos, scale(t.vel, lead)), cone: A.cone });
+    };
+    const c = this.carrier;
+    if (this.phase === 'run') {
+      if (c && c.side === 'off' && c !== d) chase(c);
+    } else if (this.phase === 'air') {
+      if (this.ballTarget && !this.pitch && this.time >= d.findAt) cands.push({ at: this.ballTarget, cone: A.cone });
+    } else if (this.phase === 'live' || this.phase === 'snap') {
+      if (this.scramble || d.assign?.kind === 'rush' || d.assign?.kind === 'spy') chase(this.qb);
+      for (const o of this.off) {
+        if (!isEligible(o) || o === this.qb || o.down || dist(o.pos, d.pos) > A.range) continue;
+        cands.push({ at: add(o.pos, scale(o.vel, A.trail)), cone: o === d.manTarget ? A.manCone : A.cone, mirror: o });
+      }
+    }
+    const sa = Math.atan2(stick.y, stick.x);
+    let best: (typeof cands)[number] | null = null;
+    let bestOff = 0;
+    let bestFit = Infinity;
+    for (const k of cands) {
+      const dx = k.at.x - d.pos.x;
+      const dy = k.at.y - d.pos.y;
+      if (dx * dx + dy * dy < 1e-4) continue;
+      let off = Math.atan2(dy, dx) - sa;
+      off = Math.atan2(Math.sin(off), Math.cos(off));
+      const fit = Math.abs(off) / ((k.cone * Math.PI) / 180);
+      if (fit < 1 && fit < bestFit) {
+        bestFit = fit;
+        bestOff = off;
+        best = k;
+      }
+    }
+    if (!best) return { dir: stick };
+    // All the way to it inside `full`, fading to the stick at the cone's edge.
+    const full = Math.min(A.full, best.cone * 0.8) / best.cone;
+    const ang = sa + bestOff * (bestFit <= full ? 1 : (1 - bestFit) / (1 - full));
+    const dir = { x: Math.cos(ang), y: Math.sin(ang) };
+    const m = best.mirror;
+    const gap = dist(best.at, d.pos);
+    if (m && gap < A.close) {
+      // On his hip: run with him, closing what's left.
+      const w = add(m.vel, scale(norm(sub(best.at, d.pos)), gap * 3));
+      const l = len(w);
+      return { dir, want: l > sp ? scale(w, sp / l) : w };
+    }
+    return { dir };
+  }
+
+  /**
+   * A ball coming to him (the meter's rule): it lands where he can get to it by the time it's down, give or take
+   * his reach, or it's going to his man.
+   */
+  private ballComing(d: Player): boolean {
+    if (this.phase !== 'air' || this.pitch || !this.ballTarget || d.down || d.engaged || d.engagedBy.length) return false;
+    if (this.intended && this.intended === d.manTarget) return true;
+    const reach = CATCH_REACH * (this.passTipped ? 1 : THROWS[this.thrownKind].reach);
+    return dist(d.pos, this.ballTarget) <= reach + Math.min(maxSpeed(d) * this.ballTimeLeft() * 0.85, USER_DEF.assist.range);
+  }
+
+  /**
+   * The ball meter over his head (`USER_DEF.meterSpan`), for a ball coming to him: the needle `e` (-1..1, the
+   * middle `USER_DEF.lead` before it lands), PLAY BALL's and SWAT's half-windows on the same scale, and where
+   * he pressed (null until he does). Null when no ball's coming his way.
+   */
+  ballMeter(): { e: number; play: number; swat: number; pressed: number | null; kind: 'play' | 'swat' | null } | null {
+    const d = this.defControlled;
+    if (!d || this.phase !== 'air' || this.pitch || !this.ballTarget) return null;
+    if (!this.defMeter && !this.ballComing(d)) return null;
+    const S = USER_DEF.meterSpan;
+    const left = this.ballTimeLeft();
+    const at = (t: number) => clamp((t - (this.time + left - USER_DEF.lead)) / S, -1, 1);
+    const b = this.defBall;
+    return { e: at(this.time), play: this.ballWindow('play') / S, swat: this.ballWindow('swat') / S, pressed: b ? at(b.t) : null, kind: b?.kind ?? null };
   }
 
   /**
@@ -1925,32 +2032,70 @@ export class Play {
     return { skillMul: m.skill, intMul: m.int };
   }
 
-  /** He lays out for the carrier (`USER_DEF.dive`): a lunge at where he's going, decided on contact. */
-  private startLunge(d: Player, c: Player): void {
-    if (d.down || d.stun > 0 || d.engagedBy.length || d.engaged || c.down || dist(d.pos, c.pos) > USER_DEF.diveFrom) return;
+  /**
+   * The carrier's in his reach for a dive: within `USER_DEF.diveFrom` and catchable inside the lunge at its
+   * speed (a man running away from him at his own speed isn't), and he's free to go.
+   */
+  diveReach(): boolean {
+    const d = this.defControlled;
+    const c = this.carrier;
+    if (!d || !c || c.side !== 'off' || c === d || this.phase !== 'run' || this.defLunge) return false;
+    if (d.down || d.stun > 0 || d.engagedBy.length || d.engaged || c.down || dist(d.pos, c.pos) > USER_DEF.diveFrom) return false;
     const U = USER_DEF;
-    const to = add(c.pos, scale(c.vel, U.lunge * 0.6));
+    const sp = maxSpeed(d) * U.lungeSpeed;
+    const r = DIVE_TACKLE.range;
+    for (let t = 0; t <= U.lunge * 0.85; t += 0.02) if (dist(add(c.pos, scale(c.vel, t)), d.pos) <= r + sp * t) return true;
+    return false;
+  }
+
+  /** He lays out for the carrier (`USER_DEF`): a lunge homing on him, decided on contact. False if he isn't in reach. */
+  private startLunge(d: Player, c: Player): boolean {
+    if (!this.diveReach()) return false;
+    const U = USER_DEF;
+    const to = add(c.pos, scale(c.vel, U.lunge * 0.5));
     d.vel = scale(norm(sub(to, d.pos)), maxSpeed(d) * U.lungeSpeed);
     d.tackleCd = U.lunge + 0.05; // no auto tackle in the air: the lunge decides it
     this.defLunge = { until: this.time + U.lunge, done: false };
     setPose(d, 'dive', U.lunge + 0.3);
     this.defFx.push('lunge');
+    this.defDives.tries++;
+    return true;
   }
 
   private stepLunge(d: Player): void {
     const L = this.defLunge!;
-    d.want = d.vel;
     const c = this.carrier;
-    if (!L.done && c && c.side === 'off' && !c.down && dist(d.pos, c.pos) <= TACKLE_RANGE + 0.35) {
+    const U = USER_DEF;
+    if (c && c.side === 'off' && !c.down) {
+      // Homing: at where he'll be when the lunge gets there.
+      const t = clamp(dist(d.pos, c.pos) / (maxSpeed(d) * U.lungeSpeed), 0, Math.max(0, L.until - this.time));
+      d.vel = scale(norm(sub(add(c.pos, scale(c.vel, t)), d.pos)), maxSpeed(d) * U.lungeSpeed);
+    }
+    d.want = d.vel;
+    if (!L.done && c && c.side === 'off' && !c.down && dist(d.pos, c.pos) <= DIVE_TACKLE.range) {
       L.done = true;
-      if (this.rng() < tackleChance(d.r.tkl, c.r.elu, c.r.str) * USER_DEF.dive) {
+      // The CPU's own roll on contact: his tackling against the carrier, nothing else.
+      const { odds, juked } = this.contactOdds(d, c);
+      const p = odds * (juked ? jukeTackleMul(c.r.elu) : 1);
+      this.defDives.contact++;
+      this.defDives.odds += p;
+      if (this.rng() < p) {
+        this.defDives.tackles++;
         this.defLunge = null;
         this.tackled(c, d);
         return;
       }
-    }
-    if (this.time >= L.until || L.done || this.phase !== 'run') {
       this.defLunge = null;
+      knockDown(d, 0.6);
+      d.tackleCd = 1.6;
+      if (juked) c.juke = 0;
+      this.popup(juked ? 'MADE HIM MISS!' : 'WHIFF', juked ? c.pos : d.pos, juked ? '#7dff7d' : '#ff9a5a');
+      this.defFx.push('whiff');
+      return;
+    }
+    if (this.time >= L.until || this.phase !== 'run') {
+      this.defLunge = null;
+      if (this.phase === 'run') this.defDives.whiffs++;
       knockDown(d, DIVE_TACKLE.down);
       d.tackleCd = DIVE_TACKLE.down + 0.6;
       if (this.phase === 'run') {
@@ -1958,6 +2103,17 @@ export class Play {
         this.defFx.push('whiff');
       }
     }
+  }
+
+  /**
+   * A tackler's odds on contact with the carrier, as `checkTackles` rolls them (before an arm tackle's share
+   * and the juke): his tackling against the carrier's, easier on a receiver still turning out of his catch.
+   * `juked`: caught mid-cut by a man in front of him or level.
+   */
+  private contactOdds(t: Player, c: Player): { odds: number; juked: boolean } {
+    const juked = c.juke > 0 && (t.pos.x - c.pos.x) * (c.side === 'off' ? 1 : -1) > -0.5;
+    const base = tackleChance(t.r.tkl, c.r.elu, c.r.str);
+    return { odds: c.hips ? 1 - (1 - base) * AT_CATCH.miss : base, juked };
   }
 
   /** The user's defender has his eyes on the QB (LOOK, or facing him): he can read the QB's (the vision cone). */
@@ -2263,11 +2419,11 @@ export class Play {
       if (d > (!arm ? TACKLE_RANGE : this.runBlocking() ? RUN_CONTROL.armReach : TACKLE_RANGE * 0.8)) continue;
       // A run-blocked defender's reach depends on how much of the block he's won (`armOdds`); pass pro's is flat.
       const armOdds = arm ? (this.runBlocking() ? runArmOdds(t) : ARM_TACKLE) * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
-      // Caught mid-cut by a man in front of him (or level): he bit on it.
-      const juked = !arm && c.juke > 0 && (t.pos.x - c.pos.x) * (c.side === 'off' ? 1 : -1) > -0.5;
-      // A receiver still turning out of his catch (`hips`) is the easiest man to wrap up: he misses less often.
-      const base = tackleChance(t.r.tkl, c.r.elu, c.r.str);
-      const odds = !arm && c.hips ? 1 - (1 - base) * AT_CATCH.miss : base;
+      // Caught mid-cut by a man in front of him (or level): he bit on it. A receiver still turning out of his
+      // catch (`hips`) is the easiest man to wrap up: he misses less often (`contactOdds`).
+      const co = this.contactOdds(t, c);
+      const juked = !arm && co.juked;
+      const odds = arm ? tackleChance(t.r.tkl, c.r.elu, c.r.str) : co.odds;
       // Wrapped up: anyone else who gets to him finishes it (`CONTACT.finish`).
       if (c.wrap > 0 && t !== c.wrapBy) {
         if (this.rng() < CONTACT.finish * armOdds) {
