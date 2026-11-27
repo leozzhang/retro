@@ -1,3 +1,4 @@
+import { newsYears } from '../season/program';
 import { coachName, COACH_ROLES, parseCoachId, type CoachRole, type RatingName } from '../data/coaches';
 import { ocBook, ocStyle, signatures, STYLES } from '../data/offStyles';
 import { teamById } from '../data/teams';
@@ -95,7 +96,8 @@ export const staffRows = (): CoachRole[] => COACH_ROLES;
 
 /** This offseason's coaching news, newest first. */
 export function leagueRows(s: SeasonState): NewsItem[] {
-  return s.news.filter((n) => n.kind === 'carousel').reverse();
+  const years = newsYears(s);
+  return s.news.filter((n, i) => n.kind === 'carousel' && years[i] === s.year).reverse();
 }
 
 const fromText = (from: string) => {

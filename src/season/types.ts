@@ -119,6 +119,8 @@ export interface GameResult {
   live?: boolean;
   /** Its scoring plays and biggest other plays, in order (season/gamePlays.ts). Missing in games from before they were kept. */
   plays?: GamePlay[];
+  /** The timeouts called in regulation, in order: quarter, seconds left in it, and 0 home or 1 away (game/timeouts.ts). Missing is none. */
+  tos?: [q: number, secs: number, side: 0 | 1][];
 }
 
 /**
@@ -190,6 +192,11 @@ export interface NewsItem {
   teams: string[];
   /** The game it's about (`SeasonGame.id`), for a link to its page. */
   game?: string;
+  /**
+   * The season it belongs to, when it's the offseason's news copied into the next season's opening
+   * news (season/offseason.ts `toNextSeason`). Missing is this season (`newsYears` reads old saves).
+   */
+  year?: number;
 }
 
 /**

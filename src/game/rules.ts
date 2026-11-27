@@ -3,6 +3,7 @@ import { CONF, leverage, unitEdge, type UnitConf } from '../data/confidence';
 import { clamp, gauss, type Rng } from '../engine/math';
 import { explosiveFactor, kickEdge, snapEdge, turnoverFactor, type DriveMods } from '../season/emphasis';
 import { desperate, fourthDown, kickNow, SITUATION, spikeNow, tempo, type Situation } from './situation';
+import { TIMEOUTS, timeoutAt, type DriveTimeout, type TimeoutPair } from './timeouts';
 
 /** 'fumble' = botched exchange or pitch, recovered by the offense (spotted like a tackle). */
 export type OutcomeType = 'tackle' | 'oob' | 'incomplete' | 'td' | 'int' | 'pick6' | 'sack' | 'safety' | 'fumble';
@@ -241,6 +242,9 @@ export interface DriveSim {
   endYard: number;
   /** Game-clock seconds the drive used. */
   secs: number;
+  /** With `DriveClock.timeouts`: what each side has left after the drive, and the timeouts called in it. */
+  timeouts?: TimeoutPair;
+  tos?: DriveTimeout[];
 }
 
 export interface DriveClock {
@@ -272,6 +276,11 @@ export interface DriveClock {
   qSecs?: number;
   /** Overtime: the offense has the period's first or second possession. */
   ot?: 'first' | 'second';
+  /**
+   * Timeouts left, the offense's and the defense's, for the situation path (game/timeouts.ts): either side
+   * stops the clock after an in-bounds snap when it should. Missing is none, and the drive plays as before.
+   */
+  timeouts?: TimeoutPair;
 }
 
 const NO_CLOCK: DriveClock = { timeLeft: Infinity, hurry: false, milk: false };
@@ -281,6 +290,7 @@ export function snapSituation(clock: DriveClock, down: number, toGo: number, yar
   return {
     down, toGo, yardsToGoal: 100 - yard, secsLeft: clock.timeLeft + (clock.pastBreak ?? 0) - secs, qSecs: clock.qSecs ?? 900,
     finalHalf: clock.finalHalf ?? true, lead: clock.lead ?? 0, ot: clock.ot,
+    ...(clock.timeouts ? { offTO: clock.timeouts.off, defTO: clock.timeouts.def } : {}),
   };
 }
 
@@ -308,6 +318,10 @@ export interface SimPlay {
   heave?: boolean;
   /** A spike to stop the clock (`spikeNow`): a down for the time. */
   spike?: boolean;
+  /** A timeout stopped the clock after this snap, by the offense or the defense (game/timeouts.ts). */
+  timeout?: 'off' | 'def';
+  /** Timeouts left before the snap, the offense's and the defense's, where the drive kept them (the replays' scorebug). */
+  tol?: [number, number];
   /**
    * The snap moved the chains (`movesChains`), set where it was played on the field: its gain and distance
    * are rounded apart, so `gain >= toGo` can be wrong by a fraction of a yard. Read it with `converted`.
@@ -402,11 +416,20 @@ export function simulateDrive(
   let toGo = 10;
   let plays = 0;
   let secs = 0;
+  // Timeouts left as the drive goes (the situation path only), and the ones called.
+  const to = clock.timeouts && clock.lead !== undefined ? { ...clock.timeouts } : null;
+  const tos: DriveTimeout[] = [];
+  // Each snap carries the timeouts left before it.
+  const emit = to && onPlay ? (p: SimPlay): void => {
+    p.tol = [to.off, to.def];
+    onPlay(p);
+  } : onPlay;
   const done = (points: number, result: DriveSim['result'], end = yard): DriveSim => ({
     points, result, plays, yards: end - start, endYard: end, secs: Math.min(secs, clock.timeLeft),
+    ...(to ? { timeouts: { ...to }, tos } : {}),
   });
   // The situation this snap, when the offense knows the score (`clock.lead`).
-  const sitNow = (): Situation | null => clock.lead === undefined ? null : snapSituation(clock, down, toGo, yard, secs);
+  const sitNow = (): Situation | null => clock.lead === undefined ? null : snapSituation(to ? { ...clock, timeouts: to } : clock, down, toGo, yard, secs);
   const pace = clock.pace ?? 1;
   while (plays < 25) {
     if (secs >= clock.timeLeft) return done(0, 'END OF HALF');
@@ -416,7 +439,7 @@ export function simulateDrive(
       // Victory formation: kneel until the clock runs out.
       while (secs < clock.timeLeft) {
         plays++;
-        onPlay?.({ gain: -1, explosive: false, turnover: false, down, toGo, yard, t: secs, lev: 0, kneel: true });
+        emit?.({ gain: -1, explosive: false, turnover: false, down, toGo, yard, t: secs, lev: 0, kneel: true });
         yard -= 1;
         toGo += 1;
         down++;
@@ -433,14 +456,14 @@ export function simulateDrive(
       const [lo, hi] = DRIVE_SIM.heaveTdRange;
       const r = rng();
       if (r < clamp(DRIVE_SIM.heaveTd + diff * DRIVE_SIM.heaveTdPerPoint, lo, hi)) {
-        onPlay?.({ gain: 100 - yard, explosive: true, turnover: false, down, toGo, ...at, lev, heave: true });
+        emit?.({ gain: 100 - yard, explosive: true, turnover: false, down, toGo, ...at, lev, heave: true });
         return done(7, 'TOUCHDOWN', 100);
       }
       if (r > 1 - DRIVE_SIM.heaveInt) {
-        onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, ...at, lev, heave: true });
+        emit?.({ gain: 0, explosive: false, turnover: true, down, toGo, ...at, lev, heave: true });
         return done(0, 'TURNOVER');
       }
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, ...at, lev, heave: true });
+      emit?.({ gain: 0, explosive: false, turnover: false, down, toGo, ...at, lev, heave: true });
       if (++down > 4) return done(0, 'DOWNS');
       continue;
     }
@@ -450,14 +473,29 @@ export function simulateDrive(
     secs += cost.secs;
     // In bounds with the clock running: spike the next snap if the clock has to stop (`spikeNow`), lining up
     // to spike in place of a no-huddle call. Decided on the mean line-up, so only a spike draws.
+    // Or a timeout first, by either side (`timeoutAfter`), read at the whistle: the snap costs `playSecs`.
     const spike = (): void => {
-      if (!sit || cost.stopped || clock.quarterBreak || plays >= 25) return;
+      if (!sit || plays >= 25) return;
       const S = DRIVE_SIM.spikeRunSecs;
       const after = sitNow()!;
+      // No timeout once the snap ran out the drive's time (the half, or the quarter break of a partial sim).
+      if (to && secs < clock.timeLeft) {
+        // A timeout stops a running clock at the whistle, so the snap costs only its `playSecs`.
+        const whistle = cost.stopped ? after : { ...after, secsLeft: after.secsLeft + cost.secs - TIMEOUTS.playSecs };
+        const who = timeoutAt(whistle, !cost.stopped, rng);
+        if (who) {
+          if (!cost.stopped) secs += TIMEOUTS.playSecs - cost.secs;
+          to[who]--;
+          tos.push({ side: who, t: secs });
+          last.timeout = who;
+          return;
+        }
+      }
+      if (cost.stopped || clock.quarterBreak) return;
       if (!spikeNow({ ...after, secsLeft: after.secsLeft + cost.secs - S[0] })) return;
       secs += clamp(S[0] + gauss(rng) * S[1], S[2], S[3]) - cost.secs;
       plays++;
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, lev: 0, spike: true });
+      emit?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, lev: 0, spike: true });
       secs += 1;
       down++;
     };
@@ -465,11 +503,12 @@ export function simulateDrive(
     const em = mods ? snapEdge(mods, down, toGo, yard) : 0;
     const emp = em ? { em } : {};
     if (rng() < DRIVE_SIM.turnover * (mods ? turnoverFactor(mods, down, toGo, yard) : 1)) {
-      onPlay?.({ gain: 0, explosive: false, turnover: true, down, toGo, ...at, lev, ...emp });
+      emit?.({ gain: 0, explosive: false, turnover: true, down, toGo, ...at, lev, ...emp });
       return done(0, 'TURNOVER');
     }
     const [gain, explosive] = simGain((conf ? diff + unitEdge(conf.off - conf.def, lev) : diff) + em, rng, mods ? explosiveFactor(mods, down, toGo, yard) : 1);
-    onPlay?.({ gain, explosive, turnover: false, down, toGo, ...at, lev, ...emp });
+    const last: SimPlay = { gain, explosive, turnover: false, down, toGo, ...at, lev, ...emp };
+    emit?.(last);
     yard += gain;
     toGo -= gain;
     if (yard >= 100) return done(7, 'TOUCHDOWN', 100);
@@ -487,11 +526,11 @@ export function simulateDrive(
       const fgLev = leverage(down, 100 - yard, conf?.late ?? false, fgDist);
       const kEm = mods ? kickEdge(mods, fgDist) : 0;
       const made = rng() < fgOdds(fgDist, (conf ? unitEdge(conf.k, fgLev) : 0) + kEm);
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
+      emit?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, fg: { dist: fgDist, made }, lev: fgLev, ...(kEm ? { em: kEm } : {}) });
       return done(made ? 3 : 0, made ? 'FIELD GOAL' : 'MISSED FG');
     };
     const punt = (): DriveSim => {
-      onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
+      emit?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
       return done(0, 'PUNT');
     };
     const next = sitNow();
@@ -522,7 +561,7 @@ export function simulateDrive(
       return punt();
     }
   }
-  onPlay?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
+  emit?.({ gain: 0, explosive: false, turnover: false, down, toGo, yard, t: secs, punt: true, lev: 0 });
   return done(0, 'PUNT');
 }
 

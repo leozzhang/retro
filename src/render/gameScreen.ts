@@ -81,8 +81,24 @@ export function gameReelAt(x: number, y: number, n: number): number {
 
 export const gameOf = (s: SeasonState, id: string): SeasonGame | undefined => s.games.find((g) => g.id === id);
 
+/** A PLAYS row: a key play, or a timeout (`GameResult.tos`) by side, 0 home or 1 away. */
+type PlayRow = GamePlay | { q: number; time: number; side: 0 | 1 };
+
+/** The game's key plays with its timeouts laid in where they fell (a quarter's clock runs down). */
+export function playRows(game: SeasonGame): PlayRow[] {
+  const rows: PlayRow[] = [...(game.result?.plays ?? [])];
+  for (const [q, time, side] of game.result?.tos ?? []) {
+    const at = rows.findIndex((r) => r.q > q || (r.q === q && r.time < time));
+    rows.splice(at < 0 ? rows.length : at, 0, { q, time, side });
+  }
+  return rows;
+}
+
+const isTimeout = (r: PlayRow): r is { q: number; time: number; side: 0 | 1 } => 'side' in r;
+
 export function gameScrollMax(s: SeasonState, v: GameView): number {
-  const n = gameOf(s, v.game)?.result?.plays?.length ?? 0;
+  const game = gameOf(s, v.game);
+  const n = game ? playRows(game).length : 0;
   return v.tab === 2 ? Math.max(0, n - PLAY_ROWS) : 0;
 }
 
@@ -98,7 +114,7 @@ function card(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: n
 const plain = (t: string, n: number): string[] => wrapSpans(t, [], n).map((l) => l.t);
 
 /** "Q3 4:12", "OT", "2OT". */
-export function playClock(p: GamePlay): string {
+export function playClock(p: { q: number; time: number }): string {
   if (p.q > 4) return p.q === 5 ? 'OT' : `${p.q - 4}OT`;
   return `Q${p.q} ${Math.floor(p.time / 60)}:${String(p.time % 60).padStart(2, '0')}`;
 }
@@ -364,9 +380,9 @@ function drawBox(g: CanvasRenderingContext2D, game: SeasonGame): void {
 // ------------------------------------------------------------ PLAYS
 
 function drawPlays(g: CanvasRenderingContext2D, game: SeasonGame, v: GameView): void {
-  const plays = game.result!.plays ?? [];
+  const plays = playRows(game);
   const W = VIEW_W - 12;
-  card(g, L_X, TOP, W, BOTTOM - TOP, 'SCORING AND KEY PLAYS', plays.length > PLAY_ROWS ? `${v.scroll + 1}-${Math.min(plays.length, v.scroll + PLAY_ROWS)} OF ${plays.length}` : '');
+  card(g, L_X, TOP, W, BOTTOM - TOP, game.result?.tos?.length ? 'SCORING PLAYS, KEY PLAYS AND TIMEOUTS' : 'SCORING AND KEY PLAYS', plays.length > PLAY_ROWS ? `${v.scroll + 1}-${Math.min(plays.length, v.scroll + PLAY_ROWS)} OF ${plays.length}` : '');
   if (!plays.length) {
     text(g, 'NO PLAY-BY-PLAY FOR THIS GAME', L_X + 8, TOP + 22, { color: DIM, shadow: false });
     return;
@@ -375,6 +391,13 @@ function drawPlays(g: CanvasRenderingContext2D, game: SeasonGame, v: GameView): 
   const h = teamById(game.home).abbr.toUpperCase();
   plays.slice(v.scroll, v.scroll + PLAY_ROWS).forEach((p, i) => {
     const y = TOP + 22 + i * 11;
+    if (isTimeout(p)) {
+      const team = teamById(p.side === 0 ? game.home : game.away);
+      text(g, playClock(p), L_X + 8, y, { color: DIM, shadow: false });
+      text(g, team.abbr.toUpperCase(), L_X + 80, y, { color: DIM, shadow: false });
+      text(g, `TIMEOUT, ${team.school.toUpperCase()}`, L_X + 128, y, { color: DIM, shadow: false });
+      return;
+    }
     const off = teamById(p.off).abbr.toUpperCase();
     text(g, playClock(p), L_X + 8, y, { color: DIM, shadow: false });
     text(g, off, L_X + 80, y, { color: SOFT, shadow: false });

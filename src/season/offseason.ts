@@ -1,6 +1,7 @@
 import { syncAlumni } from './alumni';
 import { TEAMS } from '../data/teams';
 import { checkOffice } from './achievements';
+import { newsYears } from './program';
 import { nextSeason } from './season';
 import { carouselRound, openCarousel } from './carousel';
 import { openDepartures, runDepartures } from './departures';
@@ -27,6 +28,9 @@ export const LAST_ROUND = 2;
 export function startOffseason(state: SeasonState): void {
   if (state.phase !== 'complete' || state.config.length !== 'open') return;
   state.phase = 'offseason';
+  // Last offseason's news, copied into this season's opening, is stale now: this offseason makes its own.
+  const years = newsYears(state);
+  state.news = state.news.filter((_, i) => years[i] === state.year);
   state.offseason = { stage: OFFSEASON_STAGES[0], round: 1, promises: judgePromises(state) };
   openCarousel(state);
 }
@@ -127,7 +131,7 @@ function toNextSeason(state: SeasonState): SeasonState {
   // The coaching changes, the draft, signing day and the user's portal stories open the new year's news.
   const mine: NewsItem[] = state.news
     .filter((n) => n.kind === 'carousel' || n.kind === 'draft' || (n.kind === 'portal' && n.teams.includes(user)) || (n.kind === 'recruiting' && n.teams.includes(user) && n.week === state.week))
-    .map((n) => ({ ...n, week: 0 }));
+    .map((n) => ({ ...n, week: 0, year: n.year ?? state.year }));
   next.news.push(...mine);
   return next;
 }

@@ -16,6 +16,7 @@ import type { Tape } from '../game/tape';
 import { newOcBrain, ocHalftime, type OcBrain } from '../game/ocBrain';
 import { rosterRead, type FilmBook } from '../game/offModel';
 import { OVERTIME, PAT, userStartAfter, xpOdds, type DriveClock, type SimPlay } from '../game/rules';
+import { afterDrive, TIMEOUTS, type GameTimeout } from '../game/timeouts';
 import { goForTwo, type Situation } from '../game/situation';
 import { engineCredit } from './cast';
 import { gamePlays, type Against } from './gamePlays';
@@ -134,6 +135,8 @@ interface ESide extends BoxSide, Lineup {
   dcBrain: DefBrain | null;
   ocBrain: OcBrain | null;
   noDisguise: boolean;
+  /** Timeouts left this half (game/timeouts.ts). */
+  to: number;
 }
 
 const seedOf = (rng: Rng) => (rng() * 2 ** 31) >>> 0;
@@ -158,6 +161,7 @@ function sideOf(t: EngineTeamIn): Omit<ESide, 'dcBrain' | 'ocBrain'> {
     id: t.squad.team.id, squad: t.squad, ...full, full, twos: null, mop: false, input: t,
     cast: mulberry32(0), tl: blankTeamLine(), lines: new Map(),
     noDisguise: t.disguises === false,
+    to: TIMEOUTS.perHalf,
   };
 }
 
@@ -202,6 +206,8 @@ function sides(a: EngineTeamIn, b: EngineTeamIn, rng: Rng): [ESide, ESide] {
 class Run {
   readonly story: GameStory;
   readonly against: Against = new Map();
+  /** The timeouts called (`GameResult.tos`). */
+  readonly tos: GameTimeout[] = [];
   constructor(
     readonly rng: Rng, readonly home: ESide, readonly away: ESide, readonly opts: EngineGameOpts, story: GameStory, readonly qSecs: number,
   ) {
@@ -305,7 +311,7 @@ class Run {
     const ek = engineKickoff(this.kickSide(k), this.kickSide(r), driveStream(this.rng), {
       from, record: this.opts.record, homeId: this.home.id, sit: { lead: k.tl.points - r.tl.points, secsLeft: left, finalHalf: half >= 1 },
     });
-    const play: SimPlay = { gain: 0, explosive: false, turnover: ek.kickStart !== null, down: 1, toGo: 0, yard: from, t: 0, lev: 0, punt: true };
+    const play: SimPlay = { gain: 0, explosive: false, turnover: ek.kickStart !== null, down: 1, toGo: 0, yard: from, t: 0, lev: 0, punt: true, tol: [k.to, r.to] };
     const sk = this.tellKick(k, r, ek, 'kickoff', play, half, left);
     if (ek.recvTd) {
       this.story.drives.push({
@@ -425,6 +431,7 @@ class Run {
       }
       this.halftime();
       nextQuarter(clock);
+      this.home.to = this.away.to = TIMEOUTS.perHalf;
       off = other(first);
       start = 25;
       kickedBy = first;
@@ -464,8 +471,10 @@ class Run {
       this.garbage(off, dfn, half, left);
       const dc: DriveClock = {
         timeLeft: cut ? clock.time : left, hurry: false, milk: false, pace, quarterBreak: cut, pastBreak: cut ? left - clock.time : 0, lead, finalHalf: q >= 3, qSecs: clock.qSecs,
+        timeouts: { off: off.to, def: dfn.to },
       };
       const { e, told, log } = this.drive(off, dfn, start, dc, half, left);
+      afterDrive(e, off, dfn, off === this.home, half, left, clock.qSecs, this.tos);
       if (cut && e.result === 'END OF HALF') {
         advanceSim(clock, e.secs);
         next = { kind: 'cpu', start: e.endYard, mid: true };
@@ -578,6 +587,7 @@ export function engineGame(home: EngineTeamIn, away: EngineTeamIn, rng: Rng, opt
   return {
     home: h.tl.points, away: a.tl.points, ot, box: run.box(),
     plays: gamePlays({ ...story, home: h.id, away: a.id }, { [h.id]: h.on, [a.id]: a.on }, run.against),
+    ...(run.tos.length ? { tos: run.tos } : {}),
   };
 }
 
@@ -601,6 +611,6 @@ export function enginePart(
   }
   return {
     quarter: r.quarter, time: r.time, user: u.tl.points, cpu: c.tl.points, next, box: run.box(),
-    story, against: run.against,
+    story, against: run.against, timeouts: { user: u.to, cpu: c.to }, tos: run.tos,
   };
 }

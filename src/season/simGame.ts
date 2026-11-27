@@ -4,6 +4,7 @@ import { athleteName, starters, teamConf, teamRatings, type Squad } from '../dat
 import { clamp, gauss, mulberry32, type Rng } from '../engine/math';
 import { advanceSim, newClock, timeLeftInHalf, nextQuarter } from '../game/clock';
 import { OVERTIME, simTwoPoint, simulateDrive, userStartAfter, type DriveClock, type DriveConf, type DriveSim, type SimPlay } from '../game/rules';
+import { afterDrive, TIMEOUTS, type GameTimeout } from '../game/timeouts';
 import { CAST, castDrive, QB_RUN_SHARE, type Lineup } from './cast';
 import { driveMods, type TeamMods } from './emphasis';
 import { autoGamePlan, type GamePlan } from './staff';
@@ -49,6 +50,8 @@ interface Side extends BoxSide {
   conf: UnitConf;
   /** This week's emphases (season/emphasis.ts), if any group isn't on standard. */
   mods?: TeamMods;
+  /** Timeouts left this half (game/timeouts.ts). */
+  to: number;
 }
 
 export function blankTeamLine(): TeamLine {
@@ -72,6 +75,7 @@ function side(squad: Squad, plan: GamePlan, edge: number, cast: Rng, mods?: Team
     conf: teamConf(squad),
     tl: blankTeamLine(),
     lines: new Map(),
+    to: TIMEOUTS.perHalf,
   };
 }
 
@@ -300,19 +304,24 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
   // Always told, for the game page's plays: telling draws no random numbers.
   const story = opts.story ?? newStory(h.id, a.id);
   const firstHalf = rng() < 0.5 ? h : a;
+  const tos: GameTimeout[] = [];
   for (let half = 0; half < 2; half++) {
     let off = half === 0 ? firstHalf : firstHalf === h ? a : h;
     let start = 25;
     let left = HALF_SECS;
+    h.to = a.to = TIMEOUTS.perHalf;
     while (left > 0) {
       const dfn = off === h ? a : h;
       const lead = off.tl.points - dfn.tl.points;
-      const clock: DriveClock = { timeLeft: left, hurry: false, milk: false, pace, lead, finalHalf: half === 1, qSecs: HALF_SECS / 2 };
+      const clock: DriveClock = {
+        timeLeft: left, hurry: false, milk: false, pace, lead, finalHalf: half === 1, qSecs: HALF_SECS / 2, timeouts: { off: off.to, def: dfn.to },
+      };
       const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
       // The fourth quarter is the last 900 seconds of the second half.
       const close = half === 1 && left <= 900 && lateAndClose(4, lead);
       const [d, plays] = drive(off, dfn, off.off - script, start, rng, clock, opts.drives, driveConf(off, dfn, close));
       credit(off, dfn, d, plays, clock, tell(story, off, dfn, d, plays, start, half, left, HALF_SECS / 2));
+      afterDrive(d, off, dfn, off === h, half, left, HALF_SECS / 2, tos);
       left -= d.secs;
       if (d.result === 'END OF HALF') break;
       start = userStartAfter(d, rng);
@@ -325,6 +334,7 @@ export function simGame(home: Squad, away: Squad, rng: Rng, opts: SimOptions = {
     box: { home: h.tl, away: a.tl, players: [...h.lines.values(), ...a.lines.values()] },
     // By the game's own ids (a caller's story may not name them).
     plays: gamePlays({ ...story, home: h.id, away: a.id }, { [h.id]: h.on, [a.id]: a.on }),
+    ...(tos.length ? { tos } : {}),
   };
 }
 
@@ -350,6 +360,9 @@ export interface PartResult {
   box: BoxScore;
   /** The simulated stretch drive by drive (`opts.story` when given), for the live game's to go on from. */
   story: GameStory;
+  /** Timeouts each side has left this half at the hand-off, and the ones called so far (game/timeouts.ts). */
+  timeouts: { user: number; cpu: number };
+  tos: GameTimeout[];
 }
 
 export interface PartOptions {
@@ -382,6 +395,7 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
   let start = 25;
   let scored = false;
   let next: LiveNext | null = null;
+  const tos: GameTimeout[] = [];
   while (!next) {
     if (clock.quarter >= toQuarter) {
       if (off === u) next = { kind: 'user', start };
@@ -396,10 +410,12 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
     const cut = (toQuarter === 2 || toQuarter === 4) && q === toQuarter - 1;
     const dc: DriveClock = {
       timeLeft: cut ? clock.time : left, hurry: false, milk: false, pace, quarterBreak: cut, pastBreak: cut ? left - clock.time : 0, lead, finalHalf: q >= 3, qSecs,
+      timeouts: { off: off.to, def: dfn.to },
     };
     const script = GAME_SIM.script * clamp(lead, -GAME_SIM.scriptCap, GAME_SIM.scriptCap);
     const [d, plays] = drive(off, dfn, off.off - script, start, rng, dc, opts.drives, driveConf(off, dfn, lateAndClose(q, lead)));
     credit(off, dfn, d, plays, dc, tell(story, off, dfn, d, plays, start, q <= 2 ? 0 : 1, left, qSecs));
+    afterDrive(d, off, dfn, (off === u) === userHome, q <= 2 ? 0 : 1, left, qSecs, tos);
     if (cut && d.result === 'END OF HALF') {
       advanceSim(clock, d.secs);
       next = { kind: off === u ? 'user' : 'cpu', start: d.endYard, mid: true };
@@ -414,6 +430,7 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
         off = c;
         start = 25;
         scored = false;
+        u.to = c.to = TIMEOUTS.perHalf;
       }
       continue;
     }
@@ -425,7 +442,7 @@ export function simPart(user: Squad, cpu: Squad, userHome: boolean, qMin: number
   return {
     quarter: clock.quarter, time: clock.time, user: u.tl.points, cpu: c.tl.points, next,
     box: { home: userHome ? u.tl : c.tl, away: userHome ? c.tl : u.tl, players: lines },
-    story,
+    story, timeouts: { user: u.to, cpu: c.to }, tos,
   };
 }
 

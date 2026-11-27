@@ -2,7 +2,8 @@ import type { Team } from '../data/teams';
 import { Camera } from '../engine/camera';
 import { FIELD_W, OPP_GOAL, OWN_GOAL } from '../engine/constants';
 import { drawField } from '../render/field';
-import { drawBanner, drawHint, drawScorebug } from '../render/hud';
+import { drawBanner, drawHint, drawScorebug, type TimeoutPips } from '../render/hud';
+import { TIMEOUTS } from './timeouts';
 import { drawKickPlay } from '../render/kickRenderer';
 import { drawLines, drawPlay, drawTape } from '../render/renderer';
 import { getBallSprite } from '../render/sprites';
@@ -66,6 +67,9 @@ export interface KeyShow {
   over: number;
   before: { user: number; cpu: number };
   after: { user: number; cpu: number };
+  /** Timeouts left before the snap and after it (a timeout called at its whistle), when the snap kept them (`SimPlay.tol`). */
+  toBefore?: TimeoutPips;
+  toAfter?: TimeoutPips;
   clock: string;
   /** The show's own camera, mirrored when the CPU has the ball so it attacks left, as in a played game. */
   cam: Camera;
@@ -96,6 +100,16 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: T
     ? { user: before.user + (kp[ctx.user.id] ?? 0), cpu: before.cpu + (kp[ctx.cpu.id] ?? 0) }
     : { user: before.user + (userBall ? pts : 0), cpu: before.cpu + (userBall ? 0 : pts) };
   const c = storyClock(d, k.play.t);
+  // The scorebug's timeout pips, from the snap's own count: one fewer for whoever called one at its whistle.
+  const tol = k.play.tol;
+  const max = c.quarter > 4 ? TIMEOUTS.perOt : TIMEOUTS.perHalf;
+  const pips = (o: number, df: number): TimeoutPips => (userBall ? { user: o, cpu: df, max } : { user: df, cpu: o, max });
+  const to = tol
+    ? {
+      toBefore: pips(tol[0], tol[1]),
+      toAfter: pips(tol[0] - (k.play.timeout === 'off' ? 1 : 0), tol[1] - (k.play.timeout === 'def' ? 1 : 0)),
+    }
+    : {};
   // Cut straight to the new spot: the camera starts there rather than panning from the last play.
   const cam = new Camera();
   cam.mirror = !userBall;
@@ -103,7 +117,7 @@ export function keyShow(k: KeyPlay, ctx: ShowCtx, seed: number, opts: { tape?: T
   cam.snap();
   return {
     k, userBall, search, setup: null, play: null, fgSetup: null, kick: null,
-    phase: tape ? 'set' : 'find', t: 0, over: 0, before, after, clock: c.quarter > 4 ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
+    phase: tape ? 'set' : 'find', t: 0, over: 0, before, after, ...to, clock: c.quarter > 4 ? quarterName(c.quarter) : `${quarterName(c.quarter)} ${mmss(c.time)}`, cam,
     tape, label: opts.label ?? (ordinary(k) ? 'LIVE' : 'KEY PLAY'), ...(opts.note ? { note: opts.note } : {}),
   };
 }
@@ -283,7 +297,9 @@ export function drawShow(g: CanvasRenderingContext2D, sh: KeyShow, ctx: ShowCtx,
   const kind = sh.k.kind;
   const down = sh.k.drive.try ? 'TWO-POINT TRY' : kind === 'kickoff' ? 'KICKOFF' : kind === 'xp' || kind === 'xpMiss' ? 'EXTRA POINT' : kind === 'punt' ? `PUNT ON ${downText(p)}` : downText(p);
   const situation = `${down}  ${spotLabel(p.yard, off.abbr, def.abbr)}`;
-  drawScorebug(g, ctx.user, ctx.cpu, captioned ? sh.after : sh.before, sh.clock, situation, `${off.abbr} ${sh.k.kick ? 'KICKING' : 'OFFENSE'}`);
+  drawScorebug(g, ctx.user, ctx.cpu, captioned ? sh.after : sh.before, sh.clock, situation, `${off.abbr} ${sh.k.kick ? 'KICKING' : 'OFFENSE'}`, captioned ? sh.toAfter : sh.toBefore);
+  // A timeout at the whistle, in the caption's corner.
+  if (captioned && sh.k.play.timeout) text(g, `TIMEOUT: ${(sh.k.play.timeout === 'off') === sh.userBall ? ctx.user.abbr : ctx.cpu.abbr}`, 8, 64, { size: 8, color: '#9ad7ff' });
   text(g, sh.label, 8, 40, { size: 8, color: '#ffd23f' });
   if (sh.note) text(g, sh.note, 8, 52, { size: 8, color: '#9ad7ff' });
   if (captioned) {

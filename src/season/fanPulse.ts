@@ -3,6 +3,7 @@ import { RIVALRIES } from '../data/season/rivalries';
 import { teamById, type Team } from '../data/teams';
 import { hashString } from '../engine/math';
 import { heismanRace } from './awards';
+import { winOdds } from './simGame';
 import { securityOf } from './carousel';
 import { HOT_SEAT } from './coach';
 import { storySignals } from './fanStories';
@@ -74,11 +75,36 @@ export const PULSE = {
   qbHot: 0.15,
   qbCold: 0.1,
   qbPicks: 3,
+  /**
+   * The fans' bar: the pregame odds' wins blended with the program's last `recentYears` seasons (the
+   * latest weighs most), `history` of the way. A program that won 11 the last two years expects 11.
+   * A recent win share of `standard`+ that the season keeps up with (within `standardSlack`) is
+   * "the standard", not a surprise.
+   */
+  history: 0.6,
+  recentYears: 3,
+  standard: 0.7,
+  standardSlack: 0.05,
+  /**
+   * The fade: a hot start of `fadeStart`+ wins, or an AP peak of `fadePeak` or better that's fallen
+   * `fadeDrop`+ spots (or out), with `fadeLosses`+ losses since and no more wins than losses.
+   */
+  fadeStart: 5,
+  fadePeak: 10,
+  fadeDrop: 12,
+  fadeLosses: 3,
+  /**
+   * An upset loss: ranked and beaten by a team unranked or `upsetGap`+ spots lower at kickoff, or
+   * favored by `upsetOdds`+ (winOdds on today's rosters). It lingers past its week at `badOdds`+.
+   */
+  upsetGap: 6,
+  upsetOdds: 0.72,
+  badOdds: 0.82,
 };
 
 /** Which group each signal belongs to, by its key (before any `:`). */
 const GROUP: Record<string, Group> = {
-  results: 'results', bar: 'results',
+  results: 'results', bar: 'results', fade: 'results',
   race: 'race', conf: 'race',
   coach: 'coach', seat: 'coach', steady: 'coach', bigGames: 'coach', bowlRun: 'coach',
   qb: 'players', heisman: 'players', injury: 'players',
@@ -113,6 +139,12 @@ export interface Ctx {
   /** 'WAS' once the season is over, 'IS' while it's played. */
   was: string;
   xw: number;
+  /** Wins over what the fans expected (`fanBar`): the odds and the last few seasons. */
+  fx: number;
+  /** The last few seasons' win share, when there are any. */
+  recent?: number;
+  /** The season fell apart after a hot start or a high ranking (`fadeOf`). */
+  fade?: Fade;
   ten: Tenure;
   /** 'COACH X' or 'YOUR STAFF'. */
   hc: string;
@@ -155,10 +187,13 @@ export function fanPulse(state: SeasonState, id: string): Pulse {
     pts.push({ key, group, score: clamp(score, -1, 1), weight, text, tone: score > 0.15 ? 'hope' : score < -0.15 ? 'worry' : 'calm', ...(teams?.length ? { teams } : {}) });
   };
   const past = pastSeasons(state, id, false).filter((r) => r.year < state.year || (over && r.year === state.year));
+  const xw = state.teamState[id]?.xw ?? 0;
+  const before = past.filter((r) => r.year < state.year);
+  const bar = fanBar(before, rec, xw);
   const ctx: Ctx = {
     state, id, t, tier: t.profile.tier, rec, recs, recTxt: recordText(rec), gp: rec.w + rec.l, over, pre: rec.w + rec.l === 0 && !over, was: over ? 'WAS' : 'IS',
-    xw: state.teamState[id]?.xw ?? 0, ten, hc: ten.user ? 'YOUR STAFF' : `COACH ${ten.name}`, start: coachStart(state, id, ten),
-    past, last: past.filter((r) => r.year < state.year).pop(), tro: trophies(state, id), rank: rankIn(latestPoll(state, 'ap'), id), say,
+    xw, fx: bar.fx, recent: bar.recent, fade: fadeOf(state, id), ten, hc: ten.user ? 'YOUR STAFF' : `COACH ${ten.name}`, start: coachStart(state, id, ten),
+    past, last: before.at(-1), tro: trophies(state, id), rank: rankIn(latestPoll(state, 'ap'), id), say,
   };
   coreSignals(ctx);
   storySignals(ctx);
@@ -217,18 +252,128 @@ function qbRank(state: SeasonState, stats: Map<string, SeasonLine>, l: SeasonLin
   return effs.filter((x) => x < e).length / (effs.length - 1);
 }
 
+/**
+ * What the fans expected of this season, against what it is: the pregame odds' wins (`w - xw`) blended
+ * with the last few seasons' win share. `fx` is wins over that bar.
+ */
+export function fanBar(before: SeasonRow[], rec: TeamRecord, xw: number): { fx: number; recent?: number } {
+  const gp = rec.w + rec.l;
+  if (!gp) return { fx: 0 };
+  const rows = before.filter((r) => r.w + r.l > 0).slice(-PULSE.recentYears);
+  let recent: number | undefined;
+  if (rows.length) {
+    let sum = 0;
+    let wt = 0;
+    rows.forEach((r, i) => {
+      sum += (i + 1) * (r.w / (r.w + r.l));
+      wt += i + 1;
+    });
+    recent = sum / wt;
+  }
+  // Over the odds is xw; over the recent seasons' pace is w - gp × recent.
+  return { fx: recent === undefined ? xw : (1 - PULSE.history) * xw + PULSE.history * (rec.w - gp * recent), recent };
+}
+
+export interface Fade {
+  /** The record at the high point, and the AP rank there (0 when the high point was the start). */
+  at: string;
+  peak: number;
+  /** AP rank now (0 unranked), and the record since the high point. */
+  now: number;
+  w: number;
+  l: number;
+}
+
+/** This season's results, in order, as one team saw them. */
+export function teamResults(state: SeasonState, id: string) {
+  return state.games
+    .filter((g) => g.result && (g.home === id || g.away === id))
+    .sort((a, b) => a.week - b.week)
+    .map((g) => {
+      const us = g.home === id ? g.result!.home : g.result!.away;
+      const them = g.home === id ? g.result!.away : g.result!.home;
+      return { g, us, them, opp: g.home === id ? g.away : g.home, won: us > them };
+    });
+}
+
+/**
+ * Did the season fall apart? A hot start (`fadeStart`+ straight wins to open) or an AP high point
+ * (`fadePeak` or better, since fallen `fadeDrop`+ spots or out), then `fadeLosses`+ losses and no
+ * more wins than losses since. Expectations built over a season, then lost.
+ */
+export function fadeOf(state: SeasonState, id: string): Fade | undefined {
+  const res = teamResults(state, id);
+  const rec = (n: number) => `${res.slice(0, n).filter((r) => r.won).length}-${res.slice(0, n).filter((r) => !r.won).length}`;
+  const since = (n: number) => ({ w: res.slice(n).filter((r) => r.won).length, l: res.slice(n).filter((r) => !r.won).length });
+  const now = rankIn(latestPoll(state, 'ap'), id);
+  let start = 0;
+  while (start < res.length && res[start].won) start++;
+  if (start >= PULSE.fadeStart) {
+    const s = since(start);
+    if (s.l >= PULSE.fadeLosses && s.w <= s.l) return { at: rec(start), peak: 0, now, ...s };
+  }
+  // The AP high point this season (the preseason poll counts: a preseason No. 4 at 6-5 has let them down).
+  let peak = 0;
+  let week = -1;
+  for (const p of state.polls) {
+    if (p.kind !== 'ap' || p.week > state.week) continue;
+    const r = rankIn(p, id);
+    if (r && (!peak || r < peak)) [peak, week] = [r, p.week];
+  }
+  if (!peak || peak > PULSE.fadePeak || (now && now < peak + PULSE.fadeDrop)) return undefined;
+  const n = res.filter((r) => r.g.week <= week).length;
+  const s = since(n);
+  return s.l >= PULSE.fadeLosses && s.w <= s.l ? { at: rec(n), peak, now, ...s } : undefined;
+}
+
+/**
+ * A loss that was an upset: the pregame odds on today's rosters (0 when it wasn't one). A ranked team
+ * beaten by one unranked or `upsetGap`+ spots lower is at least `upsetOdds`.
+ */
+export function upsetOdds(state: SeasonState, id: string, g: SeasonState['games'][number]): number {
+  if (!g.result) return 0;
+  const home = g.home === id;
+  if ((home ? g.result.home : g.result.away) > (home ? g.result.away : g.result.home)) return 0;
+  const opp = home ? g.away : g.home;
+  const poll = latestPoll(state, 'ap', g.week);
+  const [us, them] = [rankIn(poll, id), rankIn(poll, opp)];
+  const p = winOdds(squadFor(state, g.home), squadFor(state, g.away), g.neutral);
+  const odds = home ? p : 1 - p;
+  const ranked = !!us && (!them || them - us >= PULSE.upsetGap);
+  if (ranked) return Math.max(odds, PULSE.upsetOdds);
+  return odds >= PULSE.upsetOdds ? odds : 0;
+}
+
 /** The season as it stands: the record, the coach's year, the QB, the stars, the polls, the rivalry, recruiting. */
 function coreSignals(c: Ctx): void {
-  const { state, id, t, tier, rec, recTxt, gp, over, pre, was, xw, ten, hc, past, last, tro, rank, say } = c;
+  const { state, id, t, tier, rec, recTxt, gp, over, pre, was, fx, recent, fade, ten, hc, past, last, tro, rank, say } = c;
   const champ = state.bracket?.champion === id;
 
-  // ---- results against what was expected
+  // ---- results against what was expected: the odds, and what the last few years taught fans to expect
   if (gp >= 2) {
-    if (xw >= PULSE.wayAhead) say('results', 0.9, 3, [`NOBODY SAW ${recTxt} COMING. THIS ${was} A SPECIAL YEAR.`, `${recTxt} ${was} WAY BETTER THAN ANYONE DARED HOPE.`, `${recTxt}. FANS KEEP PINCHING THEMSELVES.`]);
-    else if (xw >= PULSE.ahead) say('results', 0.5, 2.5, [`${recTxt} AND PLAYING AHEAD OF EXPECTATIONS.`, `THEY'VE WON GAMES THEY WEREN'T SUPPOSED TO. ${recTxt}.`, `${recTxt}: THE PRESEASON PICKS LOOK WRONG, IN A GOOD WAY.`]);
-    else if (xw <= -PULSE.wayAhead) say('results', -0.9, 3, [`${recTxt}? THIS ROSTER ${was} BETTER THAN THAT.`, `FANS EXPECTED FAR MORE THAN ${recTxt}.`, `${recTxt} WITH THIS TALENT? SOMETHING IS WRONG.`]);
-    else if (xw <= -PULSE.ahead) say('results', -0.5, 2.5, [`A COUPLE OF GAMES THEY SHOULD HAVE WON GOT AWAY. ${recTxt}.`, `${recTxt} FEELS LIKE IT SHOULD BE BETTER.`, `${recTxt}, AND FANS CAN NAME THE GAMES THAT SLIPPED AWAY.`]);
+    const pace = rec.w / gp;
+    // A program that has been winning big expects to: keeping it up is the standard, not a surprise.
+    const standard = recent !== undefined && recent >= PULSE.standard && pace >= recent - PULSE.standardSlack && fx > -PULSE.ahead;
+    const stepBack = recent !== undefined && recent >= PULSE.standard && pace < recent - 0.1;
+    if (fade) {
+      // Said by the fade below; a good record on paper doesn't feel like one.
+    } else if (standard && gp >= 6 && pace > recent! + PULSE.standardSlack) say('results', 0.6, 2.5, [`${recTxt}, EVEN BETTER THAN THE LAST FEW YEARS. THE BAR KEEPS RISING.`, `${recTxt}. FANS EXPECTED A BIG YEAR, AND THIS ${was} BIGGER.`]);
+    else if (standard) say('results', 0.45, 2.2, [`${recTxt} AGAIN. WINNING BIG IS THE STANDARD NOW.`, `${recTxt}: ANOTHER BIG YEAR, RIGHT ON SCHEDULE.`, `${recTxt}. FANS EXPECTED A BIG YEAR, AND THEY'RE GETTING ONE.`]);
+    else if (fx >= PULSE.wayAhead) say('results', 0.9, 3, [`NOBODY SAW ${recTxt} COMING. THIS ${was} A SPECIAL YEAR.`, `${recTxt} ${was} WAY BETTER THAN ANYONE DARED HOPE.`, `${recTxt}. FANS KEEP PINCHING THEMSELVES.`]);
+    else if (fx >= PULSE.ahead) say('results', 0.5, 2.5, [`${recTxt} AND PLAYING AHEAD OF EXPECTATIONS.`, `THEY'VE WON GAMES THEY WEREN'T SUPPOSED TO. ${recTxt}.`, `${recTxt}: THE PRESEASON PICKS LOOK WRONG, IN A GOOD WAY.`]);
+    else if (fx <= -PULSE.wayAhead) say('results', -0.9, 3, stepBack ? [`${recTxt}? AFTER THE LAST FEW YEARS, THAT'S A COLLAPSE.`, `FANS GOT USED TO WINNING. ${recTxt} IS A SHOCK.`] : [`${recTxt}? THIS ROSTER ${was} BETTER THAN THAT.`, `FANS EXPECTED FAR MORE THAN ${recTxt}.`, `${recTxt} WITH THIS TALENT? SOMETHING IS WRONG.`]);
+    else if (fx <= -PULSE.ahead) say('results', -0.5, 2.5, stepBack ? [`${recTxt} IS A STEP BACK FROM THE LAST FEW YEARS.`, `${recTxt}. FANS GOT USED TO BETTER THAN THIS.`] : [`A COUPLE OF GAMES THEY SHOULD HAVE WON GOT AWAY. ${recTxt}.`, `${recTxt} FEELS LIKE IT SHOULD BE BETTER.`, `${recTxt}, AND FANS CAN NAME THE GAMES THAT SLIPPED AWAY.`]);
     else say('results', 0.05, 0.8, [`${recTxt}: ABOUT WHERE MOST FANS THOUGHT THEY'D BE.`, `${recTxt}. NO BIG SURPRISES EITHER WAY.`]);
+    if (fade) {
+      const fell = fade.peak ? `NO. ${fade.peak}` : fade.at;
+      const where = fade.now ? `NO. ${fade.now}` : 'UNRANKED';
+      const sting = -0.55 - 0.08 * (fade.l - PULSE.fadeLosses) - (fade.peak && fade.peak <= 5 ? 0.1 : 0) - (!fade.peak && fade.at.endsWith('-0') ? 0.05 : 0);
+      say('fade', sting, 3.2, over
+        ? [`${fade.at} AND DREAMING, THEN ${recTxt}. IT FEELS LIKE A LOST YEAR.`, `STARTED ${fade.at}, FINISHED ${recTxt}. THE COLLAPSE STILL STINGS.`, `${recTxt} AFTER ${fade.at}. FANS WANTED SO MUCH MORE.`]
+        : fade.peak
+          ? [`FROM ${fell} TO ${where}. THE SEASON IS SLIPPING AWAY.`, `${fell} IN THE COUNTRY A FEW WEEKS AGO. NOW ${recTxt}. WHAT HAPPENED?`, `${count(fade.l)} LOSSES SINCE THEY WERE ${fell}. FANS FEEL CHEATED.`]
+          : [`${fade.at} TO ${recTxt}. THE COLLAPSE HAS FANS SICK.`, `THEY WERE ${fade.at}. NOW ${recTxt}. WHAT HAPPENED?`, `FROM ${fade.at} AND DREAMING TO ${recTxt} AND WONDERING.`]);
+    }
     // What the record means at a place like this.
     if (tier <= 2 && rec.l >= 3) say('bar', -0.6, tier === 1 ? 2.5 : 1.5, [`${count(rec.l)} LOSSES IS A LOST YEAR AT A PROGRAM LIKE THIS.`, `${count(rec.l)} LOSSES. THAT DOESN'T FLY HERE.`]);
     if (tier >= 4 && rec.w >= 6) say('bar', 0.6, 2, [`BOWL ELIGIBLE! THAT'S A BIG DEAL AROUND HERE.`, `${rec.w} WINS: A BOWL TRIP IS ON THE WAY.`]);
@@ -237,8 +382,8 @@ function coreSignals(c: Ctx): void {
 
   // ---- the head coach
   const sec = securityOf(state, id);
-  const behind = gp >= 3 && xw <= -PULSE.ahead;
-  const ahead = gp >= 3 && xw >= PULSE.ahead;
+  const behind = gp >= 3 && (fx <= -PULSE.ahead || !!fade);
+  const ahead = gp >= 3 && fx >= PULSE.ahead && !fade;
   if (ten.year === 1 && !pre) {
     if (behind) say('coach', -0.7, 2.5, [`YEAR ONE UNDER ${hc} HAS BEEN ROUGH. THE HONEYMOON IS OVER.`, `THE NEW REGIME WAS SUPPOSED TO MEAN BETTER THAN THIS.`, `FANS WANTED A FRESH START. ${hc} HASN'T DELIVERED ONE YET.`]);
     else if (ahead) say('coach', 0.7, 2.5, [`${hc} HAS THEM PLAYING HARD IN YEAR ONE. FANS ARE BUYING IN.`, `YEAR ONE UNDER ${hc} IS AHEAD OF SCHEDULE.`, `THE HIRE OF ${hc} LOOKS BETTER EVERY WEEK.`]);
@@ -328,7 +473,22 @@ function coreSignals(c: Ctx): void {
       const opp = g.home === id ? g.away : g.home;
       const or = rankIn(latestPoll(state, 'ap', g.week), opp);
       const o = teamById(opp).school.toUpperCase();
-      if (them - us >= 24) say('last', -0.55, 1.5, [`THAT ${them}-${us} LOSS TO ${o} WAS UGLY.`, `FANS LEFT EARLY IN THE ${them}-${us} LOSS TO ${o}.`, `${them}-${us} TO ${o}. NOBODY WANTS TO TALK ABOUT IT.`], [opp]);
+      const up = upsetOdds(state, id, g);
+      if (up) {
+        const ur = rankIn(latestPoll(state, 'ap', g.week), id);
+        const sting = -0.65 - 0.6 * Math.max(0, up - PULSE.upsetOdds) - (tier <= 2 ? 0.1 : 0);
+        // A long shot gone wrong is a shock; a ranked team tripping is a letdown.
+        const shock = up >= PULSE.badOdds;
+        say('last', sting, tier <= 2 ? 3 : 2.6, shock ? [
+          ur && !or ? `NO. ${ur} AND BEATEN BY UNRANKED ${o}, ${them}-${us}. FANS ARE STUNNED.` : `LOST TO ${o}?! ${them}-${us}. FANS ARE STILL IN SHOCK.`,
+          `${them}-${us} TO ${o}. THAT ONE SHOULD NEVER HAPPEN.`,
+          `AN UPSET LOSS TO ${o}. THE MESSAGE BOARDS ARE ON FIRE.`,
+        ] : [
+          ur && !or ? `NO. ${ur} AND BEATEN BY UNRANKED ${o}. FANS ARE FUMING.` : `${them}-${us} TO ${o}: A GAME THEY SHOULD HAVE WON.`,
+          `THE ${them}-${us} LOSS TO ${o} HAS FANS GRUMBLING.`,
+          `LOSING TO ${o} WASN'T IN THE PLAN. FANS ARE STEAMED.`,
+        ], [opp]);
+      } else if (them - us >= 24) say('last', -0.55, 1.5, [`THAT ${them}-${us} LOSS TO ${o} WAS UGLY.`, `FANS LEFT EARLY IN THE ${them}-${us} LOSS TO ${o}.`, `${them}-${us} TO ${o}. NOBODY WANTS TO TALK ABOUT IT.`], [opp]);
       else if (us > them && or && (!rank || or < rank)) say('last', 0.6, 1.7, [`BEAT NO. ${or} ${o}! THE WHOLE TOWN IS BUZZING.`, `STORMED PAST NO. ${or} ${o}. WHAT A WEEKEND.`], [opp]);
     }
   }

@@ -8,6 +8,7 @@
 import { buildStaff, dcAdjust, ocAdjust, type Coach } from './data/coaches';
 import { offIdentity } from './data/offIdentity';
 import { coverOf, ML_OC, newOcBrain, ocHalftime, type OcBrain } from './game/ocBrain';
+import { TIMEOUTS } from './game/timeouts';
 import { buildSquad, onField, teamConf, teamRatings, type Squad } from './data/depth';
 import { defIdentity } from './data/identity';
 import { ocBook, ocStyle, type OffStyle } from './data/offStyles';
@@ -161,10 +162,14 @@ function playGame(h: Ctx, a: Ctx, kind: 'engine' | 'sim', rng: Rng, arm: Arm = {
     let off = half === 0 ? firstHalf : firstHalf === h ? a : h;
     let start = 25;
     let left = DRIVES.halfSecs;
+    // Timeouts left this half (game/timeouts.ts), both paths alike.
+    const to = new Map([[h, TIMEOUTS.perHalf], [a, TIMEOUTS.perHalf]]);
     while (left > 0) {
       const dfn = off === h ? a : h;
       const lead = pts.get(off)! - pts.get(dfn)!;
-      const clock: DriveClock = { timeLeft: left, hurry: false, milk: false, pace, lead, finalHalf: half === 1, qSecs: DRIVES.halfSecs / 2 };
+      const clock: DriveClock = {
+        timeLeft: left, hurry: false, milk: false, pace, lead, finalHalf: half === 1, qSecs: DRIVES.halfSecs / 2, timeouts: { off: to.get(off)!, def: to.get(dfn)! },
+      };
       const plays: SimPlay[] = [];
       let d: DriveSim;
       let defPoints = 0;
@@ -183,6 +188,10 @@ function playGame(h: Ctx, a: Ctx, kind: 'engine' | 'sim', rng: Rng, arm: Arm = {
       drives.push({ gap: off.off - dfn.def, adj: ocAdjust(off.oc) - dcAdjust(dfn.dc), ocAdj: ocAdjust(off.oc), dcAdj: dcAdjust(dfn.dc), off, def: dfn, style: off.style, dcStyle: dfn.dcStyle, sim: d, defPoints, plays, snaps, half });
       pts.set(off, pts.get(off)! + d.points);
       pts.set(dfn, pts.get(dfn)! + defPoints);
+      if (d.timeouts) {
+        to.set(off, d.timeouts.off);
+        to.set(dfn, d.timeouts.def);
+      }
       left -= d.secs;
       if (d.result === 'END OF HALF') break;
       if (defPoints === 7) {

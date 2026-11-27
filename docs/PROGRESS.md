@@ -1,6 +1,65 @@
 # Progress
 
-_Last updated: 2026-11-25_
+_Last updated: 2026-11-26_
+
+## Fixed: two first overall picks in one offseason; fans read the season like fans (2026-11-26)
+- **Draft news twice.** The offseason's carousel and draft news is copied into the next season's opening news. That copy had no year, so the program page dated last year's draft to this season, and during the next offseason the two drafts showed side by side. The copies now carry their year (`NewsItem.year`), and `newsYears` infers it for old saves. The program page dates them right, the chronicle doesn't keep them twice, and the next offseason's start drops them. The hub's offseason NEWS and the carousel's league list skip them on old saves. See PROGRAM.md.
+- **Fan pulse expectations** (display only). The fans' bar now blends the odds with the last 3 seasons (`fanBar`, `PULSE.history`), so a third straight 11-win year is "the standard", not "nobody saw this coming". A season that falls apart after a 5-0+ start or an AP top-10 peak (`fade`) leads the talk, and the record line goes quiet. A fresh upset loss (`upsetOdds`: favored by 72%+, or ranked and beaten by an unranked team or one 6+ spots lower) has its own heavy line in place of silence. Tests in src/program.test.ts.
+
+## New: timeouts (2026-11-26)
+FBS rules: 3 a team a half and 1 an overtime period. A timeout stops the clock until the next snap. Full details in docs/TIMEOUTS.md.
+- **You:** T on the call screen, at the line, or before a field goal, extra point or punt. The pause is untimed: the clocks freeze, the call screen stays usable (tabs, stars, flip, subs), and a card shows the clock, down, score, both teams' pips and a coaching line. Space or calling a play resumes with :25 on the play clock. With none left, T flashes NO TIMEOUTS LEFT. In the two-minute drill the call line says "X TO SPIKE IT, T FOR A TIMEOUT (n LEFT)".
+- **The scorebug** shows the pips under each team's abbreviation: on the field, on every banner, and on every replay.
+- **Replays:** CPU drives, key plays, simulated stretches and the postgame highlights each read the count off their snap (`SimPlay.tol`, both teams' timeouts left before it). A snap with a timeout at its whistle dims the pip under its caption and says "TIMEOUT: UGA".
+- **The CPU and your staff:** one rule set in `game/timeouts.ts`, used by:
+  - the CPU defense on your snaps;
+  - its offense, and your staff on defense, in the engine's CPU drives;
+  - SIM GAME and the sim-ahead (`engineGame`, `enginePart`);
+  - CPU-vs-CPU (`simGame`, `simPart`);
+  - `npm run drives`.
+
+  The clock rules:
+  - a trailing defense saves time late in the final half, unless the kneel ends it anyway;
+  - the two-minute offense takes timeouts on 3rd and 4th down and inside 0:40, and spikes earlier;
+  - either side uses them at the end of the 1st half;
+  - plus rare timeouts not about the clock (3rd and short, the goal line, a look to sort out). These are why a game simmed to the 4th can hand you fewer than three.
+- **The coaching reads them:**
+  - A leader kneels only when it ends the game even against the defense's timeouts (`kneelBurn`).
+  - A trailing offense counts its held timeouts as time when deciding late punts and field goals (`possessionsAfter`).
+- **Inherited counts:** a partial sim hands the live game what the half has left (`PartResult.timeouts`).
+- **The record:** `GameResult.tos` (quarter, clock, side). The game page's PLAYS tab lays the timeouts in among the key plays.
+- **Fixed on the way:** an engine drive whose clock ran out on 3rd down "punted" on 4th, and the punt was never played. It now ends END OF HALF.
+- **Unchanged:** without `DriveClock.timeouts`, every drive plays and draws exactly as before (legacy path, balance harness, film room).
+- **Measured** (against a HEAD baseline):
+  - `npm run balance` is byte-identical.
+  - `npm run season`, 5 seasons:
+
+    | Row | Before | After | Real FBS |
+    | --- | --- | --- | --- |
+    | Points a team | 25.8 | 26.9 | 26.5 |
+    | One-score games | 37.8% | 35.9% | 38% |
+    | Won by 28+ | 18.1% | 21.0% | 18.9% |
+    | Won by 35+ | 10.4% | 12.3% | 10% |
+    | Overtime | 3.3% | 4.1% | 5% |
+
+  - USER GAMES `sched`: engine 28+ 25.0% → 25.5%, one-score 28% → 27% (noise).
+  - The new TIMEOUTS section: 2.4 a team a game (1.2 each half), 68% of them in a half's last 4:00. Going into the 4th: 79.5% of teams have 3 left, 18.3% have 2, 2.1% have 1.
+  - `npm run drives`: about 6% more drives in both arms. Engine points a drive went 1.63 → 1.54 and the drive sim's 2.14 → 2.17, so the gap widened a little (60 games, noisy).
+- **Flag, not tuned:** the margin rows moved the wrong way. A random-pairs check (3,000 `simGame`s each way) puts it on the clock rules: stopping the clock late in halves buys extra possessions, about a point a team, and margins grow with them. The timeouts not about the clock, and the credit for timeouts held, barely move it. The drive sim's pace was fit to real FBS scores without timeouts, so it had absorbed their absence. Re-fit `DRIVE_SIM`/`GAME_SIM` pace with timeouts on (a calibration pass of its own).
+- **Tests:** `src/timeouts.test.ts` (13). Three fixtures moved:
+  - The engine kick tests' seeds now run kicks back for touchdowns at 1/11/18 (seeds 4 and 6 no longer do).
+  - The `simPart` pacing tolerance went from 0.75 to 1.25 drives. Timeouts add 0.3–0.5 a team: 4.45/6.06/7.84 against 4.13/5.68/7.28 without them. `logic.test.ts`'s legacy pacing check is unchanged.
+- **Checked in the browser** (headless Chrome over CDP):
+  - T freezes both clocks, shows the card, and takes a pip.
+  - Space resumes at :25.
+  - T at the line goes back to the huddle.
+  - The CPU's timeout notice ("BAMA wants the ball back") leads into the paused call screen.
+  - Late CPU drives show "TIMEOUTS: YOUR STAFF n".
+  - A CPU drive's replay shows 3/3 before the snap and 2/3 once your staff's timeout lands.
+- **The full suite:** 540 pass. Each full run times out one to three season-length tests (coaching, injuries, defBrain, moments, a different set each time). All four files pass when run alone, as PROGRESS notes from before.
+- **Not checked by hand:** the game page's PLAYS rows (only a unit test of the ordering), a full played dynasty game, and the overtime timeout.
+- **Next:** icing the kicker (it needs a real effect on the meter or confidence), and whether the exhibition's "~5 DRIVES" labels should move up now that timeouts add possessions.
+
 
 ## Fixed: alumni showed #0 for many players, and jerseys read like random numbers (2026-11-25)
 - **Cause:** freshmen, walk-ons and signed recruits get their number on joining (`TeamState.roster.in`), and their generated record says 0. Once one left, his roster entry went with it, so a plaque built without an earlier copy (every save from before the alumni store, and the office's draft jersey) fell back to #0.

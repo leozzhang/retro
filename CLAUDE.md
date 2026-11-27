@@ -49,7 +49,7 @@ Controls are listed in [README.md](README.md).
   - `lineup.ts`: the user's in-game substitutions, a lineup laid over the depth chart for one game (`withLineup` in `data/depth.ts`), with the panel `render/subsScreen.ts`; the grades read the subs off `DriveLog.subs`. See [docs/SUBS.md](docs/SUBS.md)
   - `kickPlay.ts`: the `KickPlay` class (FG/XP, punts, kickoffs) and the special-teams AI: the return looks, onside kicks, the rugby rollout and run option, bad snaps, roughing; `cpuKicker.ts`: the kicker on punts and kickoffs (the user calls the type, the CPU kicker aims and strikes it), the ST coaches' calls and looks by situation, the call cards' forecasts; `engineKick.ts` `KickRun`: a CPU kick stepped live (the CPU's punts and kickoffs to the user, mirrored) or headless (engine games). See [docs/KICKING.md](docs/KICKING.md)
   - `rules.ts`: down and distance, scoring, kick spots, CPU drive sim
-  - `clock.ts`: game and play clock rules
+  - `clock.ts`: game and play clock rules; `timeouts.ts`: timeouts, 3 a half, for every path (the user's T and the untimed pause, the CPU's and the user's staff's by the clock and score, the sims' record `GameResult.tos`). See [docs/TIMEOUTS.md](docs/TIMEOUTS.md)
   - `wind.ts`: per-game wind and its quarterly drift
   - `game.ts`: screens (main menu, exhibition setup, dynasty save slots, new dynasty school and settings (`SETTINGS`, also the hub's SETTINGS page), roster, season hub with PLAY GAME's choices, play call with PAT and kickoff modes, play, kick, notices, final). A season game's final screen writes the score back with `advanceWeek`; `save()` writes the dynasty's slot
   - game pages and the postgame: every game's key plays (`season/gamePlays.ts`), the stars of the game (`season/gameStars.ts`), the page (`render/gameScreen.ts`), tapes of the user's snaps for the postgame highlights (`game/tape.ts`). See [docs/GAMES.md](docs/GAMES.md)
@@ -107,6 +107,7 @@ Controls are listed in [README.md](README.md).
   - audio: `MUSIC` (the playlist's no-repeat window, fades), `CROWD` (the bed, reactions, hush), `SFX` gains (`data/audio.ts`)
   - touchdown celebrations (display only, no rng): `CELEBRATE` (`sim/celebrate.ts`), poses and `POSE_LIFT` (`render/sprites.ts`), the tape's `scoreTail` (`game/tape.ts`)
   - quarter lengths `QUARTER_OPTIONS`, `QUARTER_DRIVES`; the accelerated clock `SNAP_AT`, `HURRY_AT` (`game/clock.ts`)
+  - timeouts: `TIMEOUTS` (the clock rules, the ones not about the clock `admin`; `game/timeouts.ts`), what they're worth to the kneel and possessions `SITUATION.kneelStop`, `toSave` (`game/situation.ts`)
   - `LEG_SPEED`, `AIR_DRAG`, `WIND_SCALE`, `kickErrorSd`; the kick timing meter `METER_HALF`, `MISTIME_DIR`, `MISTIME_CURVE`, `GREEN_BASE`, `GREEN_KAC` (`sim/kicking.ts`)
   - `MUFF`, `FG_BLOCK_BASE`, `RETURN_BLOCK_EDGE`, `ST_SPEED_GAP`, `DIVE_RANGE`, `FG_STRIKE`, `PUNT_GETOFF`, `FAIR_CATCH_RANGE`, `FAIR_CATCH_TRUST`, `BAD_SNAP`, `RUGBY`, `ROUGH`, `ONSIDE` (`game/kickPlay.ts`); the CPU kicker `CPU_KICK` and the ST coaches' calls `CPU_KICK_CALL` (`game/cpuKicker.ts`); `SHANK`, `PUNT_BOOST`, `TEE_BOOST` (`sim/kicking.ts`); each call's `aim` (`data/specialTeams.ts`); see docs/KICKING.md
   - sprint: `SPRINT_TIME`, `SPRINT_RECOVER` (`game/playState.ts`), scaled by `endurance` (`sim/player.ts`)

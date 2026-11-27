@@ -1,3 +1,4 @@
+import { newsYears } from '../season/program';
 import { CONFERENCES } from '../data/fbs/profile';
 import { teamRatings } from '../data/depth';
 import { teamById } from '../data/teams';
@@ -731,8 +732,10 @@ function newsLines(s: SeasonState, sub: number): { l: RichLine; c: string }[] {
   const week = newsWeek(s, sub);
   const lines: { l: RichLine; c: string }[] = [];
   const u = s.config.userTeamId;
-  for (const n of [...s.news].reverse()) {
-    if (n.week !== week) continue;
+  // An old save's offseason still holds last offseason's news copied forward: not this offseason's.
+  const years = newsYears(s);
+  for (const [i, n] of [...s.news.entries()].reverse()) {
+    if (n.week !== week || (s.phase === 'offseason' && years[i] < s.year)) continue;
     const c = n.teams.includes(u) ? GOLD : n.kind === 'upset' ? '#ff9a5a' : n.kind === 'heisman' ? ACCENT : n.kind === 'injury' ? RED : n.kind === 'portal' ? '#c9a0ff' : n.kind === 'carousel' ? '#8fd4ff' : '#ffffff';
     newsRich(s, n, NEWS_CHARS).forEach((l) => lines.push({ l, c }));
   }

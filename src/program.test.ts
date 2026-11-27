@@ -4,9 +4,9 @@ import { TEAM_HISTORY } from './data/fbs/history';
 import { RIVALRIES } from './data/season/rivalries';
 import { TEAMS, teamById } from './data/teams';
 import { findSpans, wrapSpans } from './render/links';
-import { fanPulse, PULSE, pulseLabel } from './season/fanPulse';
-import { simOffseason } from './season/offseason';
-import { bowlGame, coachStart, coachTenure, newsWeight, pastSeasons, rivalrySeries, trophies } from './season/program';
+import { fanBar, fanPulse, PULSE, pulseLabel } from './season/fanPulse';
+import { simOffseason, startToPortal } from './season/offseason';
+import { bowlGame, coachStart, coachTenure, newsWeight, newsYears, pastSeasons, rivalrySeries, teamNews, trophies } from './season/program';
 import { records } from './season/standings';
 import { advanceWeek, defaultConfig, newSeason, simSeason } from './season/season';
 import type { SeasonState } from './season/types';
@@ -129,7 +129,77 @@ describe('program history', () => {
   });
 });
 
+describe('offseason news carried forward', () => {
+  it('keeps one draft a year: last offseason\'s copies are dated and dropped when the next opens', () => {
+    const s = season();
+    simSeason(s);
+    const next = simOffseason(s);
+    const carried = next.news.filter((n) => n.kind === 'draft');
+    expect(carried.length).toBeGreaterThan(0);
+    expect(carried.every((n) => n.year === s.year)).toBe(true);
+    // An old save's copies have no year: its carousel and draft news reads the same.
+    const years = newsYears(next);
+    const legacy = newsYears({ ...next, news: next.news.map(({ year: _, ...n }) => n) });
+    next.news.forEach((n, i) => (n.kind === 'draft' || n.kind === 'carousel') && expect(legacy[i]).toBe(years[i]));
+    const first = carried.find((n) => /first overall/.test(n.text))!;
+    const label = teamNews(next, first.teams[0]).filter((h) => /first overall/.test(h.text));
+    expect(label.map((h) => h.year)).toEqual([s.year]);
+    simSeason(next);
+    startToPortal(next);
+    const ys = newsYears(next);
+    expect(ys.every((y) => y === next.year)).toBe(true);
+    expect(next.news.filter((n) => /first overall/.test(n.text)).length).toBe(1);
+    // The program page: this offseason's pick, and last year's from the chronicle, each once.
+    for (const id of new Set([first.teams[0], next.news.find((n) => /first overall/.test(n.text))!.teams[0]])) {
+      const firsts = teamNews(next, id).filter((h) => /first overall/.test(h.text));
+      expect(new Set(firsts.map((h) => h.year)).size).toBe(firsts.length);
+    }
+  }, LONG);
+});
+
 describe('fan pulse', () => {
+  it('holds a program that keeps winning to its own standard', () => {
+    const row = (w: number, l: number) => ({ year: 0, conf: 'ACC', w, l, cw: 0, cl: 0 });
+    const rec = { w: 11, l: 1 } as Parameters<typeof fanBar>[1];
+    // Three wins over the odds alone would be a shock; after 11-2 and 11-1 it's what fans expected.
+    expect(fanBar([], rec, 3).fx).toBeGreaterThanOrEqual(PULSE.wayAhead);
+    const bar = fanBar([row(11, 2), row(11, 1)], rec, 3);
+    expect(bar.fx).toBeLessThan(PULSE.wayAhead);
+    expect(bar.recent).toBeGreaterThan(PULSE.standard);
+    // The same 11-1 after losing seasons is a surprise.
+    expect(fanBar([row(4, 8), row(5, 7)], rec, 3).fx).toBeGreaterThan(bar.fx);
+  });
+
+  it('sours on a hot start that falls apart, and on a fresh upset', () => {
+    const s = season();
+    for (let i = 0; i < 11; i++) advanceWeek(s);
+    const mine = s.games.filter((g) => g.result && (g.home === USER || g.away === USER)).sort((a, b) => a.week - b.week);
+    expect(mine.length).toBeGreaterThanOrEqual(9);
+    const set = (g: (typeof mine)[number], won: boolean) => {
+      const r = g.result!;
+      const [hi, lo] = [Math.max(r.home, r.away), Math.min(r.home, r.away)];
+      const homeWins = (g.home === USER) === won;
+      [r.home, r.away] = homeWins ? [hi, lo] : [lo, hi];
+      if (r.home === r.away) r.home += homeWins ? 3 : -3;
+    };
+    const n = mine.length;
+    mine.forEach((g, i) => set(g, i < n - 4));
+    const p = fanPulse(s, USER);
+    const fade = p.all.find((x) => x.key === 'fade');
+    expect(fade?.tone).toBe('worry');
+    expect(p.points.some((x) => x.key === 'fade')).toBe(true);
+    expect(p.all.some((x) => x.key === 'results' && x.tone === 'hope')).toBe(false);
+    expect(p.mood).toBeLessThan(0);
+    // An upset last week leads the talk.
+    mine.forEach((g, i) => set(g, i !== n - 1));
+    s.teamState[USER].xw = 0;
+    const last = mine[n - 1];
+    const q = fanPulse(s, USER).all.find((x) => x.key === 'last');
+    const opp = last.home === USER ? last.away : last.home;
+    if (teamById(opp).profile.tier > teamById(USER).profile.tier) expect(q?.tone).toBe('worry');
+  }, LONG);
+
+
   it('is deterministic and worded', () => {
     const s = season();
     for (let i = 0; i < 5; i++) advanceWeek(s);
@@ -141,7 +211,8 @@ describe('fan pulse', () => {
   }, LONG);
 
   it('turns on a first-year coach who is losing, and lifts for a QB who broke out', () => {
-    const s = season();
+    // A fresh start: no past seasons, so the fans' bar is the odds alone.
+    const s = season('fresh');
     for (let i = 0; i < 6; i++) advanceWeek(s);
     s.teamState[USER].xw = -2.2;
     const bad = fanPulse(s, USER);

@@ -1234,6 +1234,39 @@ function gamePages(seasons: SeasonState[]): string[] {
 
 
 /**
+ * TIMEOUTS (docs/TIMEOUTS.md): timeouts a team a game, by half, the share inside each half's last 4:00
+ * (the clock rules) and how many a team has left going into the 4th quarter. Shown, not tuned.
+ */
+function timeoutsReport(seasons: SeasonState[]): string[] {
+  let games = 0;
+  let n = 0;
+  const half = [0, 0];
+  let late = 0;
+  const left4 = [0, 0, 0, 0];
+  for (const s of seasons) {
+    for (const g of s.games) {
+      const r = g.result;
+      if (!r || r.live) continue;
+      games++;
+      const tos = r.tos ?? [];
+      n += tos.length;
+      for (const [q, secs] of tos) {
+        half[q <= 2 ? 0 : 1]++;
+        if ((q === 2 || q === 4) && secs <= 240) late++;
+      }
+      // By the 3rd quarter's timeouts used: index 0 has all three left.
+      for (const side of [0, 1]) left4[tos.filter((t) => t[0] === 3 && t[2] === side).length]++;
+    }
+  }
+  const teams = games * 2;
+  return [
+    '', '== TIMEOUTS ==', '',
+    `per team a game ${(n / teams).toFixed(2)}  (1st half ${(half[0] / teams).toFixed(2)}, 2nd ${(half[1] / teams).toFixed(2)}); in a half's last 4:00 ${pctText(late / Math.max(1, n))}`,
+    `left going into the 4th  3: ${pctText(left4[0] / teams)}  2: ${pctText(left4[1] / teams)}  1: ${pctText(left4[2] / teams)}  0: ${pctText(left4[3] / teams)}`,
+  ];
+}
+
+/**
  * USER GAMES (docs/ENGINEDRIVES.md, phase 4): the user's simulated games are played through the engine
  * (`engineGame`); everyone else's stay on the drive sim. The same matchups both ways, neutral site, by the
  * overall gap: favorite win %, and per team points, yards, the pass share of them, plays, completion,
@@ -1600,7 +1633,7 @@ it.runIf(process.env.npm_lifecycle_event === 'season')('season report', () => {
   const rows = [
     ...aggregate(seasons), ...pollReport(seasons), `time per season ${(simMs / n / 1000).toFixed(2)} s simulating (${((Date.now() - t0) / n / 1000).toFixed(2)} s with the report's sampling)`,
     ...progression(seasons), ...injuries(seasons, level, banged), ...confidence(seasons, conf), ...farming(level), ...morale(mor),
-    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...storyReport(seasons), ...awardsReport(seasons), ...detail(seasons[0]),
+    ...portalReport(n), ...coaches(), ...partialSim(), ...userGames(), ...gamePages(seasons), ...timeoutsReport(seasons), ...storyReport(seasons), ...awardsReport(seasons), ...detail(seasons[0]),
   ];
   writeFileSync(process.env.SEASON_OUT ?? 'season.txt', rows.join('\n'));
 }, 600_000);

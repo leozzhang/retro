@@ -240,8 +240,8 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
   it('kicks are played: kickoffs and punts move the ball, in order between the drives, and a return touchdown is a score', () => {
     let tds = 0;
     let muffs = 0;
-    // Seeds 4 and 6 have kicks run back for touchdowns, 12 a muff recovered by the kicking team.
-    for (const seed of [1, 2, 3, 4, 6, 12]) {
+    // Seeds 1, 11 and 18 have kicks run back for touchdowns, 12 a muff recovered by the kicking team.
+    for (const seed of [1, 2, 3, 11, 12, 18]) {
       const story = newStory('georgia', 'alabama');
       const r = engineGame(team('georgia'), team('alabama'), mulberry32(seed), { story });
       const kicks = story.kicks ?? [];
@@ -272,7 +272,8 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
     const [h, a] = [team('georgia'), team('alabama')];
     const story = newStory('georgia', 'alabama');
     const watch: SnapWatch = new Map();
-    engineGame(h, a, mulberry32(6), { story, watch, record: true });
+    // Seed 1 has one kick run back for a touchdown.
+    engineGame(h, a, mulberry32(1), { story, watch, record: true });
     const side = (t: typeof h, home: boolean) => ({ team: t.squad.team, roster: onField(t.squad), home, dc: t.dc });
     const ctx = { user: h.squad.team, cpu: a.squad.team, userSide: side(h, true), cpuSide: side(a, false), userPass: 0.5, cpuPass: 0.5 };
     const picks = pickGame(story, 'all');

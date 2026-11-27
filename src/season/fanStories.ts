@@ -4,7 +4,7 @@ import { TEAM_STATE } from '../data/fbs/geo';
 import { prospect } from '../data/recruits';
 import { RIVALRIES } from '../data/season/rivalries';
 import { TEAMS, teamById } from '../data/teams';
-import { count, type Ctx } from './fanPulse';
+import { count, PULSE, upsetOdds, type Ctx } from './fanPulse';
 import { latestPoll, rankIn } from './polls';
 import { bowlGame, coachStart, coachTenure, pastSeasons, rivalrySeries, splitRecord } from './program';
 import type { SeasonState } from './types';
@@ -343,7 +343,7 @@ function texture(c: Ctx): void {
   const home = res.filter((r) => r.home);
   if (home.length >= 4 && home.every((r) => r.won)) say('home', 0.35, 1, [`UNBEATEN AT HOME. THE STADIUM IS A FORTRESS.`, `${count(home.length)}-0 AT HOME. NOBODY WINS HERE.`]);
   // The loss that lingers, and the win that does.
-  const bad = res.find((r) => !r.won && teamById(r.opp).profile.tier >= tier + S.badTiers);
+  const bad = res.find((r) => !r.won && (teamById(r.opp).profile.tier >= tier + S.badTiers || upsetOdds(state, id, r.g) >= PULSE.badOdds));
   if (bad && bad.g.week < state.week - 1) say('badLoss', -0.5, tier === 1 ? 2 : 1.5, [`THE LOSS TO ${school(bad.opp)} STILL HAUNTS.`, `NOBODY HAS FORGOTTEN LOSING TO ${school(bad.opp)}.`], [bad.opp]);
   const big = res.filter((r) => r.won && r.orank && r.orank <= 5).sort((a, b) => a.orank - b.orank)[0];
   if (big && big.g.week < state.week - 1) say('bigWin', 0.55, 1.6, [`BEATING NO. ${big.orank} ${school(big.opp)} IS THE MEMORY OF THE YEAR.`, `FANS STILL REPLAY THE WIN OVER NO. ${big.orank} ${school(big.opp)}.`], [big.opp]);

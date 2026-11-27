@@ -382,9 +382,23 @@ export function newsWeight(n: Pick<NewsItem, 'kind' | 'text' | 'teams'>, team: s
   }
 }
 
+/** The kinds an old save copied forward from the offseason, with no `year` on them. */
+const CARRIED = new Set<NewsItem['kind']>(['carousel', 'draft']);
+
+/**
+ * The season each of `state.news` belongs to. The offseason's news copied into the next season's
+ * opening carries its year; an old save's copies don't, so there a carousel or draft item at week 0
+ * ahead of the season's first games' news is last year's (those kinds are only made in the offseason;
+ * the summer's recruiting news can come before the copies).
+ */
+export function newsYears(state: SeasonState): number[] {
+  const first = state.news.findIndex((n) => n.week > 0 && n.kind !== 'recruiting');
+  return state.news.map((n, i) => n.year ?? ((first < 0 || i < first) && n.week === 0 && CARRIED.has(n.kind) ? state.year - 1 : state.year));
+}
+
 /**
  * The season is over and the next begins: keep each team's big news from it. The offseason's news
- * that `advanceOffseason` copies forward is kept once, under the season it followed.
+ * copied forward from the season before was kept under that season, so it's skipped here.
  */
 export function archiveChronicle(prev: SeasonState, next: SeasonState): void {
   const out: Record<string, ChronItem[]> = {};
@@ -393,7 +407,9 @@ export function archiveChronicle(prev: SeasonState, next: SeasonState): void {
     if (kept.length) out[id] = kept;
   }
   const by = new Map<string, ChronItem[]>();
-  for (const n of prev.news) {
+  const years = newsYears(prev);
+  for (const [i, n] of prev.news.entries()) {
+    if (years[i] < prev.year) continue;
     for (const id of new Set(n.teams)) {
       const w = newsWeight(n, id);
       if (w < PROGRAM.keepWeight) continue;
@@ -427,12 +443,14 @@ export interface Headline {
  * by age: this week's upset outranks last year's.
  */
 export function teamNews(state: SeasonState, id: string, ranked = false): Headline[] {
+  const years = newsYears(state);
   const now: Headline[] = state.news
-    .filter((n) => n.teams.includes(id))
-    .map((n) => ({ year: state.year, week: n.week, text: n.text, w: newsWeight(n, id), kind: n.kind, teams: n.teams }));
-  const seen = new Set(now.map((h) => h.text));
+    .map((n, i) => ({ year: years[i], week: n.week, text: n.text, w: newsWeight(n, id), kind: n.kind, teams: n.teams }))
+    .filter((h) => h.teams.includes(id));
+  // Last offseason's news copied forward is in the chronicle too, kept once.
+  const seen = new Set(now.map((h) => `${h.year}:${h.text}`));
   const old: Headline[] = (state.chronicle?.[id] ?? [])
-    .filter((c) => !seen.has(c.text))
+    .filter((c) => !seen.has(`${c.year}:${c.text}`))
     .map((c) => ({ year: c.year, week: c.week, text: c.text, w: c.w, kind: c.kind, teams: [id] }));
   const all = [...now.reverse(), ...old.reverse()];
   // The newest first: this season's in reverse order, then each past season's latest first.

@@ -20,6 +20,9 @@ export interface Situation {
   lead: number;
   /** Overtime: whether the offense has the period's first or second possession. */
   ot?: 'first' | 'second';
+  /** Timeouts left, the offense's and the defense's (game/timeouts.ts). Missing is none. */
+  offTO?: number;
+  defTO?: number;
 }
 
 /**
@@ -40,6 +43,9 @@ export interface Situation {
  *   bounds, throw it away. `spikeSecs`: with the clock running and `clockOut` on, spike it on 1st or 2nd
  *   down inside this; `spikeKickSecs`: spike to kick a field goal that helps inside this, through 3rd
  *   down. `spikeMin`: no spike with less than this left (one snap is all there is).
+ * - `kneelStop`: what a kneel takes off the clock when the defense calls a timeout after it.
+ * - `toSave`: seconds a timeout the offense still holds is worth to its possessions left (it can stop the
+ *   clock on the other team's drive, so punting late still leaves time).
  */
 export const SITUATION = {
   fgMax: 52,
@@ -63,6 +69,8 @@ export const SITUATION = {
   spikeSecs: 45,
   spikeKickSecs: 30,
   spikeMin: 4,
+  kneelStop: 3,
+  toSave: 35,
 };
 
 /** Field goal distance from the line of scrimmage. */
@@ -76,7 +84,7 @@ export function possessionsAfter(s: Situation): number {
   if (s.ot === 'second') return 0;
   if (s.ot === 'first') return 1;
   if (!s.finalHalf) return 99;
-  return Math.floor(s.secsLeft / SITUATION.cycleSecs);
+  return Math.floor((s.secsLeft + (s.offTO ?? 0) * SITUATION.toSave) / SITUATION.cycleSecs);
 }
 
 /** Whether three points now does the offense any good: it ties or leads, or there's time to score the rest. */
@@ -126,13 +134,23 @@ export function goForTwo(s: Situation): boolean {
   return s.lead > 0 ? TWO_POINT.ahead.includes(s.lead) : TWO_POINT.behind.includes(-s.lead);
 }
 
+/**
+ * The most a kneel-out from this down can take off the clock: each kneel after this one runs the play clock
+ * out, except the ones the defense stops with a timeout (`defTO` of them at most).
+ */
+export function kneelBurn(down: number, defTO = 0): number {
+  const n = Math.max(0, 4 - down);
+  const k = Math.min(Math.max(0, defTO), n);
+  return (n - k) * SITUATION.kneelSecs + k * SITUATION.kneelStop + 5;
+}
+
 /** The offense's tempo this snap. Overtime is untimed. */
 export function tempo(s: Situation): 'normal' | 'hurry' | 'milk' | 'kneel' {
   if (s.ot) return 'normal';
   const S = SITUATION;
   if (s.finalHalf && s.lead > 0) {
     // Snaps left before a turnover on downs, each running the play clock out.
-    if (s.secsLeft <= (4 - s.down) * S.kneelSecs + 5) return 'kneel';
+    if (s.secsLeft <= kneelBurn(s.down, s.defTO)) return 'kneel';
     if (s.secsLeft <= s.qSecs) return 'milk';
     return 'normal';
   }

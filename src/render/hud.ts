@@ -6,8 +6,16 @@ function readable(bg: string, fg: string): string {
   return bg.toLowerCase() === fg.toLowerCase() ? '#ffffff' : fg;
 }
 
+/** Each team's timeouts left (`max` a half, or one an overtime period), as pips on the scorebug. */
+export interface TimeoutPips {
+  user: number;
+  cpu: number;
+  max: number;
+}
+
 export function drawScorebug(
   g: CanvasRenderingContext2D, user: Team, cpu: Team, score: { user: number; cpu: number }, clock: string, center: string, right: string,
+  to?: TimeoutPips,
 ): void {
   g.fillStyle = 'rgba(8,10,14,0.88)';
   g.fillRect(0, 0, VIEW_W, 16);
@@ -22,6 +30,14 @@ export function drawScorebug(
     if (poss) {
       g.fillStyle = '#ffd23f';
       g.fillRect(x + 46, 6, 3, 3);
+    }
+    if (to) {
+      // Timeouts left: bright pips, the used ones dim.
+      const left = poss ? to.user : to.cpu;
+      for (let i = 0; i < to.max; i++) {
+        g.fillStyle = i < left ? '#ffd23f' : 'rgba(0,0,0,0.45)';
+        g.fillRect(x + 5 + i * 8, 13, 6, 2);
+      }
     }
     x += 80;
   }
@@ -87,4 +103,47 @@ export function drawClutch(g: CanvasRenderingContext2D, who: string, label: stri
   g.fillStyle = '#ffd23f';
   g.fillRect(x, 32, w, 2);
   text(g, s, x + 5, 22, { size: 8, color: conf >= 0.2 ? '#7dff9a' : conf <= -0.2 ? '#ff5a5a' : '#ffffff' });
+}
+
+/** What the timeout card shows (`drawTimeoutPanel`). */
+export interface TimeoutCard {
+  /** Who called it: "YOUR TIMEOUT" or the CPU's. */
+  title: string;
+  color: string;
+  /** The quarter and clock, the down, distance and spot, the score. */
+  lines: string[];
+  /** The coaching line: what the clock and the score say. */
+  advice: string;
+  you: { abbr: string; left: number };
+  them: { abbr: string; left: number };
+  max: number;
+}
+
+/** A timeout's card over the field, between the scorebug and the play-call panel: the clocks are stopped until play resumes. */
+export function drawTimeoutPanel(g: CanvasRenderingContext2D, c: TimeoutCard): void {
+  // Clear of the DC's note (just over the call panel) and the play clock (top right).
+  const x = 8;
+  const y = 18;
+  const w = 340;
+  const h = 58;
+  g.fillStyle = 'rgba(8,10,14,0.9)';
+  g.fillRect(x, y, w, h);
+  g.fillStyle = c.color;
+  g.fillRect(x, y, w, 2);
+  text(g, c.title, x + 6, y + 5, { color: c.color });
+  text(g, 'CLOCKS STOPPED', x + w - 6, y + 5, { align: 'right', color: '#8fa0b8', shadow: false });
+  c.lines.forEach((l, i) => text(g, l, x + 6, y + 16 + i * 10, { color: '#e6e6e6', shadow: false }));
+  const py = y + 16 + c.lines.length * 10;
+  let px = x + 6;
+  for (const t of [c.you, c.them]) {
+    const label = `${t.abbr} TIMEOUTS`;
+    text(g, label, px, py, { color: '#cfd6df', shadow: false });
+    px += Math.ceil(textWidth(g, label, 8)) + 6;
+    for (let i = 0; i < c.max; i++) {
+      g.fillStyle = i < t.left ? '#ffd23f' : '#2a3446';
+      g.fillRect(px + i * 9, py + 2, 7, 4);
+    }
+    px += c.max * 9 + 16;
+  }
+  text(g, c.advice, x + 6, py + 11, { color: '#ffd23f', shadow: false });
 }

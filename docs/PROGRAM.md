@@ -69,7 +69,8 @@ Everything here is **display only**. The sim never reads the history, the chroni
 The real 2021–25 seasons don't have these, so rivalry streaks and big-game records count from the dynasty's first season.
 
 **Core signals** (`fanPulse.ts`):
-- **results:** wins over the pregame odds (`TeamState.xw`, kept for the staffs' scouting): ±0.7 is clearly ahead or behind, ±1.6 far ahead or behind. Also what the record means at the program's tier: three losses at a T1, bowl eligibility at a T4–T5.
+- **results:** wins over what the fans expected (`fanBar`): 40% the pregame odds (`TeamState.xw`, kept for the staffs' scouting) and 60% (`PULSE.history`) the pace of the last 3 seasons, the latest weighted most. ±0.7 is clearly ahead or behind, ±1.6 far ahead or behind. A program that has been winning big (a recent win share of 0.7+, `PULSE.standard`) and keeps it up is "the standard": a hopeful line, not "nobody saw this coming" ("even better than the last few years" from 6 games when it's ahead of that pace). Falling 10+ points under a winning recent pace reads as a step back. With no past seasons the bar is the odds alone. Also what the record means at the program's tier: three losses at a T1, bowl eligibility at a T4–T5.
+- **fade** (results group): the season falling apart (`fadeOf`). Either a hot start of 5+ straight wins, or an AP high point of No. 10 or better (the preseason poll counts) that has since fallen 12+ spots or out of the poll. Then 3+ losses and no more wins than losses. A fade replaces the record line, outweighs it (weight 3.2) and turns the coach's ahead into behind: 8-0 to 8-4 is a letdown however good 8-4 is on paper.
 - **coach:** the head coach's tenure crossed with results.
   - Year one: honeymoon over, or ahead of schedule.
   - Years 2–3: still not turning the corner.
@@ -83,7 +84,7 @@ The real 2021–25 seasons don't have these, so rivalry streaks and big-game rec
 - **injury:** a starter lost for the season (more for a QB).
 - **race:** national champion, playoff field, CFP top 12, AP top 5, preseason rank, unranked T1–T2 in the preseason, conference title game, unbeaten in conference.
 - **rival:** this season's rivalry game, with the streak when it's 2+.
-- **last:** last week's blowout loss by 24+, or a win over a better-ranked team.
+- **last:** last week's upset loss, then a blowout loss by 24+, or a win over a better-ranked team. An upset (`upsetOdds`): favored by 72%+ (`winOdds` on today's rosters), or ranked and beaten by a team unranked or 6+ spots lower (the news's upset rule). It's weighed heaviest of the season's texture (2.6, or 3 at a T1–T2), so a fresh upset leads the talk. Losses at 82%+ (`PULSE.badOdds`) are a shock; the rest are a letdown. Past its week, a loss at 82%+ also counts as the lingering bad loss.
 - **trend:** wins up or down 4+ over the last three seasons; still riding a title from the last two years; last year's playoff run.
 - **drought:** a conference title drought, 10+ years at a T1 and 15+ at a T2. The real history gives the year but not the league, so the conference is named only when the record shows the title was won in it. Also a run of 3+ losing seasons (T3+).
 - **class:** a top-10 recruiting class; a T1 class outside the top 25; a top-30 class at a T3+.
@@ -116,7 +117,7 @@ The real 2021–25 seasons don't have these, so rivalry streaks and big-game rec
   - a winning or losing run of 4+, or still unbeaten after 6
   - a top- or bottom-8 offense or defense in points a game
   - unbeaten at home (4+ games)
-  - a loss to a team 2+ tiers lower, said once it's no longer last week's news
+  - a loss to a team 2+ tiers lower, or one they were favored to win by 82%+, said once it's no longer last week's news
   - a win over a top-5 team, also said once it's no longer last week's news
 - **History** (the real history plus the dynasty):
   - a national title drought of 25+ years, or none ever at a T1
@@ -170,3 +171,6 @@ The real 2021–25 seasons don't have these, so rivalry streaks and big-game rec
 - Links on the portal, recruiting, carousel and departures screens.
 - More pulse signals: senior leaders leaving; real rivalry series records before 2026 (the dynasty's own games only, by choice for now); pro careers (the game only knows the draft).
 - The pulse doesn't feed morale or recruiting. It's flavor only, by design for now.
+
+## The offseason's news, carried forward
+The offseason's carousel and draft news (and the user's portal and signing-day stories) are copied into the next season's opening news (`toNextSeason`), with the year they happened (`NewsItem.year`). `newsYears` reads the year of each item. Old saves don't store a year on their copies, so for them a carousel or draft item at week 0 ahead of the season's first games' news counts as last year's. The program page dates these items by that year. The chronicle skips them, since they were kept under their own season. The next offseason's start drops them, so one offseason never shows two drafts.

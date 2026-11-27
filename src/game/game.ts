@@ -31,7 +31,8 @@ import { loadReel, TitleReel } from './titleReel';
 import { newRecorder, pickReel, recordFrame, TAPE, tapeScore, type Tape, type TapeRecorder } from './tape';
 import { drawGame, GAME_TABS, gameReelAt as gameReelAt0, gameScrollMax, gameTabAt as gameTabAt0, type GameView, type ReelThumb } from '../render/gameScreen';
 import { drawField, makeCrowd } from '../render/field';
-import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo } from '../render/hud';
+import { drawBanner, drawClutch, drawHint, drawPlayClock, drawScorebug, drawTempo, drawTimeoutPanel } from '../render/hud';
+import { adminOdds, defenseTimeout, halfClock, TIMEOUTS, type GameTimeout } from './timeouts';
 import { drawKickPlay, drawWind } from '../render/kickRenderer';
 import { drawLines, drawPlay, type RunAssist } from '../render/renderer';
 import { drawRoster, rosterPages } from '../render/rosterScreen';
@@ -112,7 +113,7 @@ import { text, textWidth } from '../render/text';
 import {
   adminStop, advanceSim, afterPlay, clockText, inOvertime, inTwoMinute, mmss, newClock, nextQuarter, penaltySpot, playClockText,
   DEFAULT_QUARTER, QUARTER_DRIVES, QUARTER_LABELS, QUARTER_OPTIONS, quarterName, readyForPlay, runoffAtSnap, snapClock, tickBetween, tickLive,
-  timeLeftInHalf, KNEEL_SECS, SPIKE_SECS, type Clock, type Tempo,
+  timeLeftInHalf, timeoutStop, KNEEL_SECS, PLAY_CLOCK_ADMIN, SPIKE_SECS, type Clock, type Tempo,
 } from './clock';
 import { KickPlay } from './kickPlay';
 import { AUTO_INPUT } from './autopilot';
@@ -251,6 +252,8 @@ interface Notice {
   /** Scorebug state when the notice was queued (later notices may already have advanced the clock and score). */
   clock?: string;
   score?: { user: number; cpu: number };
+  /** Timeouts left then. */
+  to?: { user: number; cpu: number };
   /** A key play shown on the field in place of the banner (game/highlights.ts). */
   show?: KeyShow;
   /** A line over the banner: the user's DC on a CPU drive. */
@@ -445,6 +448,13 @@ export class Game {
   /** The quarter the hurry-up last switched itself on in, so the user can switch it back off. */
   private autoHurryQ = 0;
   private drive: Drive = startDrive(25);
+  /** Timeouts left this half (one each overtime period; game/timeouts.ts), and the game's record of them (`GameResult.tos`). */
+  private to = { user: TIMEOUTS.perHalf, cpu: TIMEOUTS.perHalf };
+  private tosLog: GameTimeout[] = [];
+  /** A timeout is on: the clocks are stopped on the call screen until the user resumes (Space, or calling a play). */
+  private timeout: { by: 'user' | 'cpu'; clock: boolean } | null = null;
+  /** Seconds left on the call screen's "NO TIMEOUTS LEFT". */
+  private toFlash = 0;
   private play: Play | null = null;
   private kick: KickPlay | null = null;
   /** The kicker on the user's punts and kickoffs (the user calls them; field goals and extra points stay the user's). */
@@ -1132,6 +1142,9 @@ export class Game {
     this.clock = newClock(this.seasonGame ? this.season?.config.quarter ?? DEFAULT_QUARTER : QUARTER_OPTIONS[this.qIdx]);
     this.tempo = 'normal';
     this.autoHurryQ = 0;
+    this.to = { user: TIMEOUTS.perHalf, cpu: TIMEOUTS.perHalf };
+    this.tosLog = [];
+    this.timeout = null;
     this.drive = this.freshDrive(25);
     this.wind = newWind(this.rng);
     this.windQuarter = 1;
@@ -1234,6 +1247,9 @@ export class Game {
     this.score = { user: r.user, cpu: r.cpu };
     this.clock.quarter = r.quarter;
     this.clock.time = r.time;
+    // The half's timeouts the simulated stretch left (halftime refills them).
+    this.to = { ...r.timeouts };
+    this.tosLog = [...r.tos];
     adminStop(this.clock);
     this.queueShows(pickGame(story, this.keyLevel('sim')), watch);
     const to = ['', '', 'THE 2ND QUARTER', 'HALFTIME', 'THE 4TH QUARTER'][from];
@@ -2853,6 +2869,7 @@ export class Game {
     // The highlights: the game's biggest plays, the user's own on tape (game/tape.ts).
     const reel = this.liveBox ? pickReel(this.liveBox.story, (p: LiveSimPlay) => this.tapes.has(p), this.user.id) : [];
     if (this.liveBox) result.plays = liveGamePlays(this.liveBox);
+    if (this.tosLog.length) result.tos = this.tosLog;
     this.liveBox = null;
     this.seasonGame = null;
     // The film this game leaves for next week's DC (game/offModel.ts).
@@ -2896,15 +2913,108 @@ export class Game {
 
   // ------------------------------------------------------------ play call
 
-  /** The user's offense's situation this snap, for the CPU defense's call. */
-  private userSituation(): Situation {
+  /** The user's offense's situation this snap (or at `d`), for the CPU defense's call. */
+  private userSituation(d: Drive = this.drive): Situation {
     const c = this.clock;
     const ot = inOvertime(c);
     return {
-      down: this.drive.down, toGo: this.drive.firstDownX - this.drive.los, yardsToGoal: OPP_GOAL - this.drive.los,
+      down: d.down, toGo: d.firstDownX - d.los, yardsToGoal: OPP_GOAL - d.los,
       secsLeft: ot ? Infinity : timeLeftInHalf(c), qSecs: c.qSecs, finalHalf: c.quarter >= 3, lead: this.score.user - this.score.cpu,
       ot: ot && this.ot ? (this.ot.turn === 1 ? 'second' : 'first') : undefined,
+      offTO: this.to.user, defTO: this.to.cpu,
     };
+  }
+
+  // ------------------------------------------------------------ timeouts
+
+  /** Home is side 0 in the game's record. */
+  private sideOf(by: 'user' | 'cpu'): 0 | 1 {
+    return (by === 'user') === (this.homeId === this.user.id) ? 0 : 1;
+  }
+
+  /** `by` calls a timeout: the clock stops until the snap, and the call screen pauses until the user resumes. */
+  private callTimeout(by: 'user' | 'cpu', clock = false): void {
+    this.to[by] = Math.max(0, this.to[by] - 1);
+    timeoutStop(this.clock);
+    if (!inOvertime(this.clock)) this.tosLog.push([this.clock.quarter, Math.round(this.clock.time), this.sideOf(by)]);
+    this.timeout = { by, clock };
+  }
+
+  /** T: the user's timeout, if there's one left (else the call screen says so). True when it was called. */
+  private userTimeout(): boolean {
+    if (this.timeout || this.watchOnly) return false;
+    if (this.to.user <= 0) {
+      this.toFlash = 1.6;
+      return false;
+    }
+    this.callTimeout('user');
+    return true;
+  }
+
+  /** The timeout is over: the play clock starts at 25. */
+  private endTimeout(): void {
+    if (!this.timeout) return;
+    this.timeout = null;
+    this.clock.play = PLAY_CLOCK_ADMIN;
+  }
+
+  /**
+   * At the whistle of the user's snap (`a`, applied): the CPU defense may call a timeout, as every sim decides
+   * it. Trailing late with the clock running, to save time (`defenseTimeout`); now and then for a look to sort
+   * out (`adminOdds`).
+   */
+  private cpuTimeoutAfter(a: Applied): void {
+    if (a.change.kind !== 'none' || inOvertime(this.clock) || this.to.cpu <= 0 || this.clock.time <= 0 || this.watchOnly) return;
+    const s = this.userSituation(a.drive);
+    if (this.clock.mode === 'run' && defenseTimeout(s)) this.callTimeout('cpu', true);
+    else if (this.rng() < adminOdds(s).def) this.callTimeout('cpu');
+    // The snap's replay shows it, as a sim's snap does.
+    if (this.timeout?.by === 'cpu' && this.lastSnap) this.lastSnap.timeout = 'def';
+  }
+
+  /** The notice for a timeout just called. */
+  private timeoutNotice(by: 'user' | 'cpu'): void {
+    const left = this.to[by];
+    const team = by === 'user' ? this.user.abbr : this.cpu.abbr;
+    this.notify({
+      title: `TIMEOUT: ${team}`, sub: `${left === 1 ? '1 timeout' : `${left} timeouts`} left this ${inOvertime(this.clock) ? 'period' : 'half'}. The clock is stopped at ${clockText(this.clock)}`,
+      extra: by === 'cpu' && this.timeout?.clock ? `${this.cpu.abbr} wants the ball back with time on the clock` : '', color: '#9ad7ff',
+    });
+  }
+
+  /** The coaching line on the timeout card: what the clock and the score say. */
+  private timeoutAdvice(): string {
+    const s = this.userSituation();
+    if (s.ot) return 'OVERTIME: NO CLOCK. ONE TIMEOUT A PERIOD';
+    if (situationTempo(s) === 'kneel') return 'VICTORY FORMATION ENDS IT: K TO KNEEL';
+    if (s.finalHalf && s.lead < 0) {
+      const scores = Math.ceil(-s.lead / 8);
+      return `DOWN ${-s.lead}: ${scores === 1 ? 'ONE SCORE' : `${scores} SCORES`} NEEDED, ${mmss(s.secsLeft)} LEFT`;
+    }
+    if (s.finalHalf && s.lead > 0) return `UP ${s.lead}. ${this.cpu.abbr} CAN STOP THE CLOCK ${this.to.cpu === 1 ? 'ONCE' : `${this.to.cpu} TIMES`}`;
+    if (!s.finalHalf && s.secsLeft <= 120) return `${mmss(s.secsLeft)} TO THE HALF`;
+    return 'CALL THE NEXT PLAY WHEN READY';
+  }
+
+  /** The timeout card over the field. */
+  private renderTimeout(g: CanvasRenderingContext2D): void {
+    const by = this.timeout!.by;
+    const d = this.drive;
+    const lead = this.score.user - this.score.cpu;
+    drawTimeoutPanel(g, {
+      title: by === 'user' ? 'YOUR TIMEOUT' : `TIMEOUT: ${this.cpu.abbr}`, color: by === 'user' ? '#ffd23f' : '#9ad7ff',
+      lines: [
+        `${clockText(this.clock)}   ${this.callMode === 'pat' ? 'POINT AFTER' : `${downDistance(d)} AT THE ${fieldLabel(d.los)}`}`,
+        `${this.user.abbr} ${this.score.user}  ${this.cpu.abbr} ${this.score.cpu}   ${lead > 0 ? `UP ${lead}` : lead < 0 ? `DOWN ${-lead}` : 'TIED'}`,
+      ],
+      advice: this.timeoutAdvice(),
+      you: { abbr: this.user.abbr, left: this.to.user }, them: { abbr: this.cpu.abbr, left: this.to.cpu }, max: this.toMax(),
+    });
+  }
+
+  /** Timeouts a team gets now: a half's, or an overtime period's. */
+  private toMax(): number {
+    return inOvertime(this.clock) ? TIMEOUTS.perOt : TIMEOUTS.perHalf;
   }
 
   /** The user's side of a punt or kickoff for the special-teams coaches (game/cpuKicker.ts). */
@@ -3085,8 +3195,9 @@ export class Game {
   }
 
   private updateCall(dt: number, input: Input): void {
-    // The clocks run while the user subs: a slow change is a delay of game (docs/SUBS.md).
-    if (this.tickBetweenPlays(dt)) {
+    if (this.toFlash > 0) this.toFlash -= dt;
+    // The clocks run while the user subs: a slow change is a delay of game (docs/SUBS.md). In a timeout they don't.
+    if (!this.timeout && this.tickBetweenPlays(dt)) {
       this.subs = null;
       return;
     }
@@ -3094,6 +3205,12 @@ export class Game {
       this.updateSubs(input);
       return;
     }
+    // T: a timeout. Space ends one.
+    if (this.timeout && input.hit('Space')) {
+      this.endTimeout();
+      return;
+    }
+    if (!this.timeout && this.callMode !== 'kickoff' && input.hit('KeyT') && this.userTimeout()) return;
     if (!this.watchOnly && (input.hit('KeyU') || (input.mouse.pressed && inBox(SUBS_CHIP, input.mouse.x, input.mouse.y)))) {
       input.mouse.pressed = false;
       this.subs = newSubsView(this.callMode === 'kickoff' ? 'def' : 'off');
@@ -3130,6 +3247,7 @@ export class Game {
     if (this.callMode === 'normal' && !this.ot && !this.drive.try) {
       const clockPlay = input.hit('KeyK') ? 'kneel' : input.hit('KeyX') ? 'spike' : null;
       if (clockPlay) {
+        this.endTimeout();
         this.startClockPlay(clockPlay);
         return;
       }
@@ -3164,6 +3282,7 @@ export class Game {
     if (chosen >= 0) {
       input.mouse.pressed = false; // the click that picks a kick must not start its aim
       const c = cards[chosen];
+      if (c.kind !== 'twoPt') this.endTimeout();
       if (c.kind === 'play') this.startPlay(c.def);
       else if (c.kind === 'kick') this.startKick(c.def);
       else if (c.kind === 'kneel' || c.kind === 'spike') this.startClockPlay(c.kind);
@@ -3394,12 +3513,14 @@ export class Game {
     this.creditClockSnap(kind, o);
     const a = applyOutcome(d, o);
     afterPlay(this.clock, o.type, false);
+    this.cpuTimeoutAfter(a);
     this.storySnapResult(a);
     this.applied = a;
     this.notify({
       title: kneel ? 'KNEEL DOWN' : 'SPIKE', sub: kneel ? 'Victory formation. The clock keeps running' : 'Ball spiked. The clock is stopped',
       extra: a.change.kind === 'none' ? downDistance(a.drive) : '', color: '#9ad7ff',
     });
+    if (this.timeout?.by === 'cpu') this.timeoutNotice('cpu');
     if (a.change.kind !== 'none') {
       this.handleChange(a);
       return;
@@ -3489,6 +3610,12 @@ export class Game {
         this.audHover = -1;
       }
       play.clockLeft = this.clock.play;
+      // T: a timeout from the line, back to the huddle (it saves a delay of game too).
+      if (!this.audibleOpen && input.hit('KeyT') && this.userTimeout()) {
+        this.play = null;
+        this.toCall(this.callMode);
+        return;
+      }
       if (this.audibleOpen) {
         if (this.updateAudible(input)) return;
       } else if (input.hit('KeyM') && !play.shifting()) play.startMotion();
@@ -3536,6 +3663,7 @@ export class Game {
           this.applied = applyOutcome(this.drive, play.outcome);
           afterPlay(this.clock, play.outcome.type, this.applied.headline === 'FIRST DOWN');
           if (play.outcome.type === 'td') adminStop(this.clock); // a score stops the clock
+          else this.cpuTimeoutAfter(this.applied);
         }
         this.score.user += this.applied.userPoints;
         this.score.cpu += this.applied.cpuPoints;
@@ -3561,6 +3689,13 @@ export class Game {
       if (input.hit('Escape', 'Backspace')) {
         this.screen = 'call'; // back to the call screen; the play clock keeps running
         this.kick = null;
+        return;
+      }
+      // T: a timeout before the kick (the kicking team's), back to the call screen.
+      if (kp.unit !== 'kickoff' && !this.kicker?.started && input.hit('KeyT') && this.userTimeout()) {
+        this.kick = null;
+        this.kicker = null;
+        this.toCall(this.callMode);
         return;
       }
       // The CPU kicker goes once the look has been on screen a moment (SPACE goes now).
@@ -3636,7 +3771,11 @@ export class Game {
       case 'none':
         this.drive = a.drive;
         if (this.clock.time <= 0) this.periodOver();
-        else this.toCall();
+        else if (this.timeout?.by === 'cpu') {
+          // The CPU stopped the clock at the whistle.
+          this.timeoutNotice('cpu');
+          this.showNotices('call');
+        } else this.toCall();
         return;
       case 'pat':
         // The try happens even with no time left.
@@ -3752,6 +3891,7 @@ export class Game {
     const userToss = this.rng() < 0.5;
     this.ot = { userFirst: !userToss, turn: 0 };
     this.clock.quarter = 5;
+    this.to = { user: TIMEOUTS.perOt, cpu: TIMEOUTS.perOt };
     // Untimed from here: the game clock only has to stay off zero.
     this.clock.time = this.clock.qSecs;
     adminStop(this.clock);
@@ -3792,7 +3932,10 @@ export class Game {
       this.otNext();
       return;
     }
-    const otClock: DriveClock = { timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first' };
+    // Timeouts go in for the replays' pips: nobody calls one in an untimed period.
+    const otClock: DriveClock = {
+      timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first', timeouts: { off: this.to.cpu, def: this.to.user },
+    };
     const { sim, plays, credit, snaps } = this.engineCpu(OVERTIME.start, otClock);
     this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, true, credit.snaps)));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
@@ -4002,6 +4145,7 @@ export class Game {
     }
     ot.turn = 0;
     this.clock.quarter++;
+    this.to = { user: TIMEOUTS.perOt, cpu: TIMEOUTS.perOt };
     adminStop(this.clock);
     const p = this.otPeriods();
     const rule = p >= OVERTIME.shootout ? 'Two-point plays from the 3 until a team leads' : 'Teams must go for two after a touchdown';
@@ -4040,6 +4184,7 @@ export class Game {
       if (theirs.length) this.notify({ title: `${this.cpu.abbr} OFFENSE ADJUSTS`, sub: theirs[0], extra: theirs.slice(1).join('. '), color: '#ffd23f' });
     }
     nextQuarter(this.clock);
+    this.to = { user: TIMEOUTS.perHalf, cpu: TIMEOUTS.perHalf };
     this.showNotices('kickoff');
   }
 
@@ -4082,7 +4227,7 @@ export class Game {
     const turnover = snap.kind === 'int';
     const p: LiveSimPlay = {
       gain: turnover ? 0 : gain, explosive: gain >= 20, turnover, down: d.down, toGo: Math.round(d.firstDownX - d.los), yard: Math.round(d.los - OWN_GOAL), t: 0,
-      lev: this.snapLev, first: movesChains(d, o),
+      lev: this.snapLev, first: movesChains(d, o), tol: [this.to.user, this.to.cpu],
     };
     const slotOf = (a: Athlete) => [...Object.entries(on), ...Object.entries(dOn)].find(([, x]) => x === a)?.[0];
     storyUserSnap(this.liveBox, this.snapAt ?? this.atNow(), p, userCredit(snap, slotOf, play.playDef.kind !== 'run'));
@@ -4125,7 +4270,7 @@ export class Game {
     creditUserSnap(this.liveBox, snap);
     const p: LiveSimPlay = {
       gain, explosive: false, turnover: false, down: d.down, toGo: Math.round(d.firstDownX - d.los), yard: Math.round(d.los - OWN_GOAL), t: 0, lev: 0,
-      ...(kind === 'kneel' ? { kneel: true } : { spike: true }),
+      tol: [this.to.user, this.to.cpu], ...(kind === 'kneel' ? { kneel: true } : { spike: true }),
     };
     const slotOf = (a: Athlete) => Object.entries(on).find(([, x]) => x === a)?.[0];
     storyUserSnap(this.liveBox, this.snapAt ?? this.atNow(), p, userCredit(snap, slotOf, kind === 'spike'));
@@ -4204,8 +4349,21 @@ export class Game {
     const c = this.clock;
     const left = timeLeftInHalf(c);
     const diff = this.score.cpu - this.score.user;
-    const dc: DriveClock = { timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs };
+    // Their timeouts on offense, and the user's staff calling the user's on defense (game/timeouts.ts).
+    const dc: DriveClock = {
+      timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs, timeouts: { off: this.to.cpu, def: this.to.user },
+    };
     const { sim, plays, credit, snaps } = this.engineCpu(start, dc);
+    const called = { user: 0, cpu: 0 };
+    if (sim.timeouts) {
+      this.to = { user: sim.timeouts.def, cpu: sim.timeouts.off };
+      for (const t of sim.tos ?? []) {
+        const by = t.side === 'off' ? 'cpu' : 'user';
+        called[by]++;
+        const [q, secs] = halfClock(c.quarter <= 2 ? 0 : 1, left - t.t, c.qSecs);
+        this.tosLog.push([q, secs, this.sideOf(by)]);
+      }
+    }
     this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, false, credit.snaps)));
     const told: StoryDrive = {
       off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user },
@@ -4219,9 +4377,10 @@ export class Game {
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += told.points;
     const said = this.userDc ? headline(this.userDc, playName) : null;
+    const toLine = [called.user ? `YOUR STAFF ${called.user}` : '', called.cpu ? `${this.cpu.abbr} ${called.cpu}` : ''].filter(Boolean).join(', ');
     const notice = this.notify({
       title: `${this.cpu.abbr} DRIVE: ${sim.result}`,
-      sub: `${sim.plays} plays, ${sim.yards} yards, ${mmss(sim.secs)}`,
+      sub: `${sim.plays} plays, ${sim.yards} yards, ${mmss(sim.secs)}${toLine ? `. TIMEOUTS: ${toLine}` : ''}`,
       extra: '',
       ...(said ? { note: `YOUR DC: ${ourLine(said)}` } : {}),
     });
@@ -4273,6 +4432,7 @@ export class Game {
   private notify(n: Notice): Notice {
     n.clock = clockText(this.clock);
     n.score = { ...this.score };
+    n.to = { ...this.to };
     this.notices.push(n);
     return n;
   }
@@ -4491,7 +4651,9 @@ export class Game {
     const center = this.watchOnly ? 'FINAL' : this.cpuKick ? `${this.cpu.abbr} ${this.cpuKick.unit === 'punt' ? 'PUNTS' : 'KICKS OFF'}` : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
     const right = this.watchOnly ? 'SIMULATED' : this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
     const shown = this.screen === 'notice' ? this.notices[0] : undefined;
-    drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockText(this.clock), center, right);
+    drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockText(this.clock), center, right, {
+      ...(shown?.to ?? this.to), max: this.toMax(),
+    });
     const huddle =
       this.screen === 'call' || (this.screen === 'play' && this.play?.phase === 'presnap') ||
       (this.screen === 'kick' && this.kick?.phase === 'presnap' && !this.cpuKick);
@@ -4509,6 +4671,7 @@ export class Game {
 
     if (this.screen === 'call') {
       this.renderCall(g);
+      if (this.timeout && !this.subs) this.renderTimeout(g);
       if (!this.watchOnly) drawSubsChip(g, !this.subs && inBox(SUBS_CHIP, this.menuMouse.x, this.menuMouse.y));
       if (this.subs) {
         const kickoff = this.callMode === 'kickoff';
@@ -4735,6 +4898,8 @@ export class Game {
       : 'CHOOSE A PLAY';
     const tip = hc
       ? (hc.kind === 'twoPt' ? 'Run any play from the 3. Score for two.' : hc.kind === 'kneel' || hc.kind === 'spike' ? CLOCK_TIP[hc.kind] : hc.def.tip).toUpperCase()
+      : this.toFlash > 0 ? 'NO TIMEOUTS LEFT'
+      : this.timeout ? 'TIMEOUT: CALL A PLAY OR SPACE TO BREAK THE HUDDLE'
       : this.subNote ?? this.clockHint() ?? fallback;
     text(g, tip, VIEW_W / 2, CALL_Y + 6, { size: 8, align: 'center', color: '#ffd23f' });
     if (this.dcNote && this.callMode === 'normal') this.drawDcNote(g, CALL_Y - 16);
@@ -4789,7 +4954,8 @@ export class Game {
     const paging = pages > 1 ? `  W/S PAGE ${Math.min(this.page, pages - 1) + 1}/${pages}` : '';
     drawHint(
       g,
-      plays
+      this.timeout ? `SPACE: BACK TO THE LINE  1-${cards.length} CALL A PLAY  Q/E TAB  U SUBS`
+      : plays
         ? `1-${cards.length} PLAY  Q/E TAB  A/D FORMATION${paging}  F FLIP${this.flipCall ? ' (ON)' : ''}`
         : tabs.length ? `CLICK A CARD OR 1-${cards.length}   Q/E: SWITCH TABS` : `CLICK A CARD OR 1-${cards.length}`,
     );
@@ -4800,7 +4966,10 @@ export class Game {
     if (this.callMode !== 'normal' || this.ot || this.drive.try) return null;
     const s = this.userSituation();
     if (situationTempo(s) === 'kneel') return 'VICTORY FORMATION: K TO KNEEL IT OUT';
-    if (this.clock.mode === 'run' && s.down < 4 && clockOut(s)) return 'CLOCK RUNNING: X TO SPIKE IT';
+    if (this.clock.mode === 'run' && clockOut(s)) {
+      const to = this.to.user > 0 ? `T FOR A TIMEOUT (${this.to.user} LEFT)` : 'NO TIMEOUTS LEFT';
+      return s.down < 4 ? `CLOCK RUNNING: X TO SPIKE IT, ${to}` : `CLOCK RUNNING: ${to}`;
+    }
     return null;
   }
 

@@ -80,7 +80,9 @@ describe('highlights', () => {
         simPart(uga, bama, true, q, 5, mulberry32(seed), { plans, story });
         drives += story.drives.length;
       }
-      expect(Math.abs(drives / n / 2 - QUARTER_DRIVES[i])).toBeLessThan(0.75);
+      // Timeouts (game/timeouts.ts) stop the clock late in halves and buy about 0.3-0.5 possessions a team
+      // (measured 4.45 / 6.06 / 7.84 against 4.13 / 5.68 / 7.28 without them), so the label is looser here.
+      expect(Math.abs(drives / n / 2 - QUARTER_DRIVES[i])).toBeLessThan(1.25);
     });
   });
 

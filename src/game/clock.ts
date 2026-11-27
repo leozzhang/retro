@@ -56,8 +56,8 @@ export function tickBetween(c: Clock, dt: number): void {
 /**
  * Accelerated clock, just before the snap: with the clock running, the play clock (and the game
  * clock with it) runs down to the tempo's snap mark (or a clock play's, `KNEEL_AT`, `SPIKE_AT`). A
- * stopped clock costs nothing. It always leaves a second, so it never takes away a snap (there are no
- * timeouts yet); a kneel then runs out the rest. Returns the seconds burned.
+ * stopped clock costs nothing (after a timeout, too). It always leaves a second, so it never takes away
+ * a snap; a kneel then runs out the rest. Returns the seconds burned.
  */
 export function runoffAtSnap(c: Clock, tempo: Tempo | 'kneel' | 'spike'): number {
   if (c.mode !== 'run' || inOvertime(c)) return 0;
@@ -98,6 +98,12 @@ export function afterPlay(c: Clock, type: OutcomeType, firstDown: boolean): void
   else if (type === 'oob') c.mode = late ? 'untilSnap' : 'untilReady';
   else if (firstDown && late) c.mode = 'untilReady';
   else c.mode = 'run';
+}
+
+/** A timeout: the game clock stops until the next snap, and the play clock starts again at 25 when play resumes. */
+export function timeoutStop(c: Clock): void {
+  c.mode = 'untilSnap';
+  c.play = PLAY_CLOCK_ADMIN;
 }
 
 /** Stop the clock with a 25-second play clock (change of possession, penalty, new period). */
