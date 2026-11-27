@@ -35,7 +35,7 @@ The snaps the user doesn't play run headless. They're shown by the CPU DRIVES wa
   - Look-offs: a QB with `awr` 80+ opens to the other side 45% of the time for 0.45 s, on a stream of their own.
   - When you see it: only while your man's eyes are on the QB (`Play.defEyes()`: LOOK, or squared up to him), before the throw. A little eye over his head says he's reading.
   - How clearly, by his `prc` (`DEF_FEEL.cone`): its half-width from 22° (prc 40) to 7° (99), its opacity, and how late it follows the QB's real eyes (0.35 s to 0.05 s). A rookie sees a wide, faint, late wedge; a veteran a tight, crisp one.
-- **The timing ring.** Once his eyes are on a ball coming down within 7 yd of him, two bands sit around his feet: pale blue is SWAT's window, gold PLAY BALL's (`Play.ballWindow`, the same math as the contest). A ring closes on them and meets the middle `USER_DEF.lead` before the ball lands, gold while it's inside PLAY BALL's band. No look, no ring.
+- **The timing ring** (replaced by the ball meter in pass 3, and its two bands by one in pass 4).
 - **Commitments.** PLAY BALL is a jump: the arms-up `leap` pose, `leapSpeed` (0.4) of his speed until the ball's down. SWAT is a chop: the new `swat` pose, `swatSpeed` (0.7) for `swatTime` (0.3 s). A mistimed jump that's caught leaves him on the turf.
 - **The dive** is a lunge (`startLunge`): the `dive` pose at `lungeSpeed` × his speed toward where the carrier is going, for `lunge` s. It's decided on contact (`tackleChance` × `dive`); a lunge that finds nobody is a WHIFF and leaves him down. A blinking red ring marks a carrier in range (`diveFrom`, 2.6 yd).
 - **The verdict.** PERFECT, GOOD, EARLY or LATE, by how many ms off the sweet spot, with what came of it (PICKED OFF!, BROKEN UP, CAUGHT). A pick or breakup freezes the play for `hitStop` and shakes the screen. A pick or breakup timed by him is credited to him.
@@ -55,7 +55,7 @@ The snaps the user doesn't play run headless. They're shown by the CPU DRIVES wa
 - **The ball meter** (`Play.ballMeter`, drawn by `Game.drawBallMeter`; it replaces the timing ring).
   - A little kick meter over his head, up only for a ball **coming to him**: it lands within his reach plus how far he can run before it's down (capped at 12 yd), or it's going to his man. Once up, it stays up for that throw.
   - The needle crosses the middle `lead` before the ball lands, `meterSpan` (0.35 s) from the middle to an end.
-  - The gold core is PLAY BALL's window, the green around it SWAT's. Both are by his hands, and narrower for a ball he hasn't found.
+  - The bands (pass 4: one gold window for both calls, its bright core PERFECT) are by his hands, and narrower for a ball he hasn't found.
   - A press freezes the needle, colored by how it landed.
   - Space and E in flight count only while it's up. Bullet time (`ballSlow`) runs while it's up.
   - The contest is still a roll on his ratings (`catchOdds` with the call's multipliers).
@@ -70,19 +70,41 @@ The snaps the user doesn't play run headless. They're shown by the CPU DRIVES wa
   - An MLB shadowing or jumping is up to 0.2 points a drive better than the AI, inside the 0.3 flag.
   - A steering FS or MLB makes about 0.6 tackles a drive against the AI's 0.3–0.4, because he chases every carrier and dives. His box score stays under the 2.5× farming flag. Watch this if the dive's reach grows.
 
+## Pass 4 (2026-11-27): one window; position decides PLAY BALL or SWAT
+- **One bar.** The meter has a single gold window for both calls, with a bright PERFECT core. SPACE goes for the pick and E swats it down.
+- **The edge** (`Play.ballEdge`, `USER_DEF.edge`, taken at the press, −1 to +1).
+  - The base is his closeness to where the ball comes down against the receiver's. Both are carried on at their speed to the arrival, scored by `reachScore` with 1 yd of slack and the `^0.6` curve the contest uses.
+  - Undercutting him (on the thrower's side of the receiver by `under` 0.5 yd), it's `underKeep` (half) of the base plus `underBonus` (0.45).
+  - A step on him (level or ahead, running with him) adds `stepBonus` (0.15).
+  - There's no cue on screen: you read it off the field. The verdict names it afterwards: UNDERCUT (0.4 or more), A STEP (0.1 or more), EVEN, TRAILING (under −0.2).
+- **The call's odds** (`callOdds`, `USER_CALL`), at average hands and a perfect press, linear between the anchors:
+
+  | Call | Good (edge ≥ +0.5): INT / catch | Even (0) | Trailing (≤ −0.5) |
+  | --- | --- | --- | --- |
+  | PLAY BALL (SPACE) | 50% / 12% | 18% / 52% | 4% / 75% |
+  | SWAT (E) | 6% / 5% | 3% / 12% | 1% / 25% |
+
+  Each call has its own job. SWAT forces an incompletion three times in four even from behind the receiver. PLAY BALL picks it off from a good spot, is a coin flip from an even one, and gets caught over him from behind. With a pick worth about 3 catches, the better call switches near even: go for it when ahead, swat it when trailing. The first table (before the 2026-11-27 retune) made SPACE the better call everywhere.
+
+  - An incompletion is the rest.
+  - His hands scale the pick (×0.75 to ×1.2), and the receiver's catch in traffic scales the catch (×0.8 to ×1.2).
+  - A receiver who can't get to it catches less, and other defenders at the ball cut the catch as a crowd does.
+  - GOOD rather than PERFECT costs 0.15 of edge.
+  - A mistimed PLAY BALL plays the trailing row, and a catch over him leaves him on the turf. A mistimed SWAT is the AI's contest.
+- **The adjustment** (`canHome`, `homeSpot`).
+  - In reach of the spot at the press (his reach plus `homeSpeed` × his speed × the time left), he takes himself to the ball for the commitment.
+  - PLAY BALL takes it `homeFront` yd in front of the receiver.
+  - The odds come from the edge at the press, so the adjustment only makes the picture match.
+  - A pick comes down in his hands. A breakup is his chop (SWAT) or a hand on it (PLAY BALL), and the ball pops off him (`startDeflect`, sim/ball.ts).
+
 ## The balance principle: the read is yours, the body is his
 Every AI knowledge limit is a timer that only gates the AI's decisions: `reactAt`, `fitAt`, `findAt`, `MAN_TRAIL`'s lag, `RUN_TELL`. A human steering `want` directly skips all of them. Following the precedent of the user's QB and runner, ratings limit **execution**, never **what the user sees**:
 1. **Reaction is the human's own.** A human's perceive-and-react time (0.2–0.3 s and a frame) sits in the AI's band (0.15–0.5 s by `mcv`/`zcv`/`prc`). There's no artificial delay; `npm run userdef` measures it.
 2. **No extra information.** No route lines, no landing marker, no offensive play name (the scorebug's right side says DEFENSE). The CPU attacks right to left on a mirrored camera, as on the CPU's kicks.
 3. **Knowledge lives in the contact math.** Once the user has touched the stick or LOOK (`Play.defManual`), his eyes are his own (`updateEyes`): 1 with LOOK held or facing the QB or ball, else 0. At the throw he finds the ball only if he's looking (`findAt`); in flight, the moment he looks. So `readyAt` and every catch contest and tip still read whether he saw it. A man defender trailing with his back turned who never looks plays the ball blind.
-4. **Ball skills are a timed commitment** (`USER_DEF` in game/playState.ts). The sweet spot is `lead` (0.2 s) before the ball arrives, within a half-window by his hands (`cth` 60%, `prc` 40%), shrunk to `blindWindow` of it for a ball he hasn't seen:
-
-   | Call | Half-window | Timed: contest skill, pick odds | Mistimed: contest skill, pick odds |
-   | --- | --- | --- | --- |
-   | PLAY BALL | 0.05–0.11 s | ×1.0, ×2.2 | ×0.45, ×0.3; caught anyway, he's down `whiff` (0.7 s) |
-   | SWAT | 0.12–0.22 s | ×1.35, ×0.35 | ×0.8, ×0.5 |
-
-   Nothing pressed is the AI's contest. The multipliers go into `catchOdds` (`Contender.skillMul`, `intMul`); undefined leaves the math bit-identical. A timed PLAY BALL that ends in a pick is his pick.
+4. **Ball skills are a timed call, paid by position** (pass 4; `USER_DEF` in game/playState.ts, `USER_CALL` in sim/catching.ts).
+   - **Timing:** one window for both calls. The sweet spot is `lead` (0.2 s) before the ball arrives, within a half-window of 0.07–0.14 s by his hands (`cth` 60%, `prc` 40%), shrunk to `blindWindow` of it for a ball he hasn't seen.
+   - **Position:** the edge he pressed from (`Play.ballEdge`) sets the odds of the call (`callOdds`). Nothing pressed, or a mistimed SWAT, is the AI's contest, untouched. A call by him that ends in a pick or a breakup is credited to him.
 5. **The body is his ratings.** Same acceleration (`accelOf`) and top speed (`SPEED`). There's no jog/sprint/stamina split, since AI defenders always run full. Tackles stay automatic by proximity (`checkTackles`). Steering, he makes no automatic diving tackle; that's his button (pass 3: at the CPU's contact odds).
 6. **Untouched is the AI.** Until the first key, nothing the user's code touches runs (after it, an idle stick stands him still). src/userdef.test.ts holds a bot with its hands off to the engine's drive, tape and all.
 7. **The offense answers for free.** `CpuQb` reads the live field, so he doesn't throw into a defender camping in a lane. His targets weight what's working this game (`qbCtx`, `targetPull`), so a corner who keeps shutting his man down sees fewer balls.
@@ -108,7 +130,7 @@ A live snap goes back into the drive's loop as the same `SnapResult` a headless 
 
 ## The report: `npm run userdef` (~1 min; `USERDEF_PAIRS`, `USERDEF_DRIVES`, `USERDEF_OUT`)
 An oracle plays the user's defender with perfect information and a reaction time (0.15, 0.25 and 0.35 s), at CB1, FS and MLB. The same matchups and seeds are played with the bot's hands off (the AI row). Policies:
-- `hawk`: his assignment until the throw, then to the landing spot, looking, with PLAY BALL on the sweet spot
+- `hawk`: his assignment until the throw, then to the landing spot, looking, and on the sweet spot PLAY BALL or SWAT, whichever is worth more from his edge (a pick worth `BOT.pickWorth` catches)
 - `jump`: sits on the receiver nearest him (where he'll be 0.6 s on), eyes on the QB, then the hawk's ball
 - `shadow`: runs with the receiver nearest him, then the hawk's ball
 

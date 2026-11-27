@@ -20,9 +20,6 @@ export interface Contender {
   hot?: number;
   /** Receiver only: 0..1, how far he had to stretch for it (`PLACEMENT`: a reach, a dive). */
   lunge?: number;
-  /** Defender only: the user's timed PLAY BALL or SWAT on him (game/playState.ts `USER_DEF`): × his contest skill, × his pick odds. */
-  skillMul?: number;
-  intMul?: number;
 }
 
 /**
@@ -121,8 +118,8 @@ function defSkill(d: Contender, exp: number): { pos: number; skill: number; intB
   const intBase = clamp(0.08 + 0.5 * dPos * (dHands / 100), 0, 0.7) * dReady;
   return {
     pos: clamp(d.pos, 0, 1),
-    skill: d.skillMul === undefined ? skill : skill * d.skillMul,
-    intBase: d.intMul === undefined ? intBase : Math.min(0.9, intBase * d.intMul),
+    skill,
+    intBase,
   };
 }
 
@@ -166,10 +163,43 @@ export function catchOdds(o: Contender | null, defs: Contender | Contender[] | n
   return { catch: pc, int: Math.min(1 - pc, (1 - pc) * intBase * 0.4 * (1 + JUMP.int * jump)) };
 }
 
-export function resolveCatch(o: Contender | null, d: Contender | Contender[] | null, rng: Rng, jump = 0): CatchResult {
+/**
+ * The user's call on the ball (docs/USERDEF.md, PLAY DEFENSE): what a timed PLAY BALL or SWAT is worth by his
+ * position at the press (`edge`, -1 trailing to +1 undercutting; `Play.ballEdge`), at average hands and a
+ * perfect press. INT and catch at the anchors `good` (edge `at` or more), `even` (0) and `bad` (-`at` or
+ * less), linear between; an incompletion is the rest. PLAY BALL is the gamble: picks from a good spot, a coin
+ * flip from an even one, caught over him from a bad one. SWAT is the knock-down: an incompletion 3 times in 4
+ * even from behind him, and seldom a pick. With a pick worth about 3 catches the better call turns over at
+ * about even (`DefBot`'s choice). His hands scale the pick (`intHands`, by `cth` 60% /
+ * `prc` 40% from `handsLo` to `handsHi`), the receiver's catch in traffic the catch (`catchHands`), and a
+ * receiver who can't get there (`pos` under `oFull`) catches less.
+ */
+export const USER_CALL = {
+  at: 0.5,
+  play: { good: { int: 0.5, catch: 0.12 }, even: { int: 0.18, catch: 0.52 }, bad: { int: 0.04, catch: 0.75 } },
+  swat: { good: { int: 0.06, catch: 0.05 }, even: { int: 0.03, catch: 0.12 }, bad: { int: 0.01, catch: 0.25 } },
+  intHands: [0.75, 1.2], catchHands: [0.8, 1.2], handsLo: 50, handsHi: 95, oFull: 0.5,
+};
+
+/** The user's timed call's odds (`USER_CALL`): `d` his hands, `o` the receiver at the ball (null: nobody to catch it), `crowd` the other defenders' weight. */
+export function callOdds(kind: 'play' | 'swat', edge: number, d: { cth: number; prc?: number }, o: { pos: number; cth: number; cit?: number } | null, crowd = 0): { catch: number; int: number } {
+  const U = USER_CALL;
+  const row = U[kind];
+  const e = clamp(edge / U.at, -1, 1);
+  const pick = (k: 'int' | 'catch') => (e >= 0 ? lerp(row.even[k], row.good[k], e) : lerp(row.even[k], row.bad[k], -e));
+  const k = (r: number) => clamp((r - U.handsLo) / (U.handsHi - U.handsLo), 0, 1);
+  let int = pick('int') * lerp(U.intHands[0], U.intHands[1], k(d.cth * 0.6 + (d.prc ?? d.cth) * 0.4));
+  let pc = o ? pick('catch') * lerp(U.catchHands[0], U.catchHands[1], k(o.cit ?? o.cth)) * Math.min(1, clamp(o.pos, 0, 1) / U.oFull) : 0;
+  pc *= Math.max(0, 1 - CROWD.hands * crowd);
+  pc = clamp(pc, 0, 1);
+  int = clamp(int, 0, 1 - pc);
+  return { catch: pc, int };
+}
+
+export function resolveCatch(o: Contender | null, d: Contender | Contender[] | null, rng: Rng, jump = 0, override?: { catch: number; int: number }): CatchResult {
   const ds = d === null ? [] : Array.isArray(d) ? d : [d];
   if (!o && !ds.length) return 'miss';
-  const odds = catchOdds(o, ds, jump);
+  const odds = override ?? catchOdds(o, ds, jump);
   const r = rng();
   if (r < odds.catch) return 'catch';
   if (r < odds.catch + odds.int) return 'int';

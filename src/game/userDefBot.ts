@@ -5,6 +5,7 @@ import { driveSteps, SnapRun, type EngineDrive, type EngineOpts, type EngineSide
 import { dist, type Vec } from '../engine/math';
 import { isEligible, type Player } from '../sim/player';
 import { USER_DEF, type Play } from './playState';
+import { callOdds } from '../sim/catching';
 
 /**
  * Scripted users for PLAY DEFENSE (docs/USERDEF.md): an input that a script fills (`BotInput`), and the oracle
@@ -44,14 +45,15 @@ export class BotInput {
  * How the oracle plays him:
  * - `assign`: hands off, the AI's snap (the plumbing check: identical to no user at all)
  * - `hawk`: his assignment until the throw, then `latency` s later to the ball's landing spot, eyes on it,
- *   and PLAY BALL on the sweet spot (only counted with the ball meter up: a ball coming to him)
+ *   and on the sweet spot PLAY BALL or SWAT, whichever is worth more from where he is (a pick `pickWorth`
+ *   catches; only counted with the ball meter up: a ball coming to him)
  * - every policy, once it has steered (`Play.defManual`), chases a carrier and dives the moment he's in reach
  * - `jump`: sits on the receiver nearest him from the snap (where he'll be, `jumpLead` s on), eyes on the QB,
  *   then the hawk's ball
  * - `shadow`: runs with the receiver nearest him (as he was `latency` s ago), then the hawk's ball
  */
 export type BotPolicy = 'assign' | 'hawk' | 'jump' | 'shadow';
-export const BOT = { jumpLead: 0.6, stop: 0.4 };
+export const BOT = { jumpLead: 0.6, stop: 0.4, pickWorth: 3 };
 
 /** An 8-way stick toward `v`, as keys give it. */
 function stick(v: Vec): Vec {
@@ -90,7 +92,14 @@ export class DefBot {
       inp.ax = stick({ x: to.x - d.pos.x, y: to.y - d.pos.y });
       if (!this.pressed && play.ballTimeLeft() <= USER_DEF.lead + 1 / 120) {
         this.pressed = true;
-        inp.hits.add('Space');
+        // The better call from where he is (`BOT.pickWorth` a pick against a catch): the oracle's ceiling.
+        const edge = play.ballEdge(d);
+        const o = { pos: 1, cth: 70 };
+        const worth = (k: 'play' | 'swat') => {
+          const r = callOdds(k, edge, { cth: d.r.cth, prc: d.r.prc }, o);
+          return r.int * BOT.pickWorth - r.catch;
+        };
+        inp.hits.add(worth('play') > worth('swat') ? 'Space' : 'KeyE');
       }
       return inp.asInput();
     }

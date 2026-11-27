@@ -2,6 +2,36 @@
 
 _Last updated: 2026-11-26_
 
+## PLAY DEFENSE, pass 4: one bar; position decides PLAY BALL or SWAT (2026-11-27)
+The changes (docs/USERDEF.md, "Pass 4"):
+- **One window on the meter for both calls.** SPACE goes for the pick and E swats it down.
+- **The edge** (`Play.ballEdge`): at the press, his closeness to where the ball comes down against the receiver's, plus undercutting or a step on him.
+- **The call's odds** come from `callOdds` and `USER_CALL` at that edge. PLAY BALL is the gamble: picks from a good spot, caught over him from a bad one. SWAT is the safe knock-down.
+- **The adjustment:** in reach of the spot at the press, he homes on the ball. A pick comes down in his hands, and a breakup pops off him (`startDeflect`).
+- **The verdict** names the read (UNDERCUT / A STEP / EVEN / TRAILING). Nothing on screen gives it away before the press.
+- The old `skillMul` / `intMul` multipliers are gone. Nothing pressed is still the AI's contest.
+- **Drill:** the DEFENSE DRILL now calls passes only (`DRILL_FAMILIES`).
+
+Checks:
+- **Tests:** 557 pass. New ones cover the call table's tradeoff, the edge reading position, and the adjustment putting him at the catch point.
+- **Reports:** `drives` and `balance` are identical to pass 3.
+- **`npm run userdef` (48 drives): FLAGS none.**
+  - At CB1 the oracle hawk is now worth −0.05 to −0.13 points a drive and picks about 3× the AI's rate at his slot.
+  - At FS it's about even with the AI.
+  - At MLB, shadowing at a 0.15 s reaction time is −0.32 points a drive. That's just past the 0.3 flag line, which the flags only check at 0.25 s.
+
+**Retune (same day):** the first table made SPACE the better call everywhere, even when trailing. New table:
+- SWAT is incomplete about three times in four even trailing the receiver.
+- PLAY BALL is a coin flip from even and mostly caught over him from behind.
+- The better call now switches near even (tested).
+
+`npm run userdef` after the retune: FLAGS none.
+- At CB1 the hawk is worth −0.03 to −0.14 points a drive, with completions down to about 58% against the AI's 63%.
+- At FS it's about even with the AI.
+- The MLB rows are at most −0.28 points a drive.
+
+**Next:** tune `USER_CALL` and `USER_DEF.edge` by feel.
+
 ## PLAY DEFENSE, pass 3: manual and assisted, the ball meter, a sure dive (2026-11-27)
 Changes from play feedback (docs/USERDEF.md, "Pass 3"):
 - **Manual means manual.** The AI plays your man until you first touch WASD or Shift. After that, an idle stick stands him still.

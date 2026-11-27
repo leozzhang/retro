@@ -115,6 +115,20 @@ export function startBounce(ball: Ball): void {
   ball.vel = { x: (dx / l) * 5, y: (dy / l) * 5, z: 3.5 };
 }
 
+/** A ball knocked away at the catch point: off the defender who got a hand on it (`from`), popped up a little. */
+export function startDeflect(ball: Ball, from: { x: number; y: number }): void {
+  let dx = ball.pos.x - from.x;
+  let dy = ball.pos.y - from.y;
+  if (Math.hypot(dx, dy) < 0.2) {
+    // Square on it: it goes back the way it came, off to one side.
+    dx = ball.from.x - ball.to.x;
+    dy = ball.from.y - ball.to.y + 0.6 * (ball.to.x - ball.from.x >= 0 ? 1 : -1);
+  }
+  const l = Math.hypot(dx, dy) || 1;
+  ball.state = 'bounce';
+  ball.vel = { x: (dx / l) * 4, y: (dy / l) * 4, z: 4.5 };
+}
+
 export function updateBounce(ball: Ball, dt: number): void {
   ball.vel.z -= 22 * dt;
   ball.pos.x += ball.vel.x * dt;

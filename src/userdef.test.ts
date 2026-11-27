@@ -14,9 +14,8 @@ import { bigSnap } from './game/situation';
 import { botDrive, BotInput, DefBot, type BotPolicy } from './game/userDefBot';
 import { isEligible } from './sim/player';
 import { THROWS } from './sim/ball';
-import { CATCH_REACH } from './sim/catching';
 import type { Play } from './game/playState';
-import { catchOdds } from './sim/catching';
+import { CATCH_REACH, callOdds } from './sim/catching';
 
 /** PLAY DEFENSE (docs/USERDEF.md): the user on a defender, played through the same engine. */
 
@@ -90,16 +89,28 @@ describe('PLAY DEFENSE', () => {
     }
   });
 
-  it('a timed ball call only shifts the contest by its multipliers; none is the AI contest', () => {
-    const o = { pos: 0.8, cth: 80 };
-    const dd = { pos: 0.7, cth: 70, prc: 70 };
-    expect(catchOdds(o, [{ ...dd }])).toEqual(catchOdds(o, [{ ...dd, skillMul: 1, intMul: 1 }]));
-    const play = catchOdds(o, [{ ...dd, skillMul: 1, intMul: 2.2 }]);
-    const swat = catchOdds(o, [{ ...dd, skillMul: 1.35, intMul: 0.35 }]);
-    const ai = catchOdds(o, [dd]);
-    expect(play.int).toBeGreaterThan(ai.int);
-    expect(swat.catch).toBeLessThan(ai.catch);
-    expect(swat.int).toBeLessThan(ai.int);
+  it('the call on the ball: PLAY BALL gambles on position, SWAT plays it safe', () => {
+    const d = { cth: 70, prc: 70 };
+    const o = { pos: 0.9, cth: 75 };
+    const at = (k: 'play' | 'swat', e: number) => callOdds(k, e, d, o);
+    for (let e = -1; e < 1; e += 0.25) {
+      expect(at('play', e + 0.25).int).toBeGreaterThanOrEqual(at('play', e).int);
+      expect(at('play', e + 0.25).catch).toBeLessThanOrEqual(at('play', e).catch);
+      expect(at('swat', e + 0.25).catch).toBeLessThanOrEqual(at('swat', e).catch);
+      expect(at('swat', e).int).toBeLessThan(0.07);
+    }
+    // From a good spot the gamble picks it off far more; from a bad one it gets caught over him far more.
+    expect(at('play', 0.6).int).toBeGreaterThan(2 * at('swat', 0.6).int);
+    expect(at('play', -0.6).catch - at('swat', -0.6).catch).toBeGreaterThan(0.1);
+    // Each call has its spot: from a good one go for it, from behind him swat it (a pick worth 3 catches).
+    const worth = (k: 'play' | 'swat', e: number) => at(k, e).int * 3 - at(k, e).catch;
+    expect(worth('play', 0.5)).toBeGreaterThan(worth('swat', 0.5));
+    expect(worth('swat', -0.3)).toBeGreaterThan(worth('play', -0.3));
+    expect(worth('swat', -0.6)).toBeGreaterThan(worth('play', -0.6));
+    // The swat is the reliable knock-down: 70%+ incomplete even trailing him.
+    expect(1 - at('swat', -0.6).catch - at('swat', -0.6).int).toBeGreaterThan(0.7);
+    // Nobody to catch it: no catch.
+    expect(callOdds('play', 0, d, null).catch).toBe(0);
   });
 
   it('BIG PLAYS: 3rd and 4th down, the red zone, late, and the first snap of a half', () => {
@@ -227,5 +238,71 @@ describe('PLAY DEFENSE, pass 3: manual, assisted, the meter and the dive', () =>
     expect(contact / (contact + whiffs)).toBeGreaterThan(0.95);
     const sd = Math.sqrt(odds * (1 - odds / contact));
     expect(Math.abs(tackles - odds)).toBeLessThan(3.5 * sd);
+  });
+});
+
+describe('PLAY DEFENSE, pass 4: position and the adjustment', () => {
+  /** A snap stepped to its throw (FS on), or null if it never threw. */
+  const toThrow = (seed: number) => {
+    const run = firstSnap(seed, 'FS');
+    const inp = new BotInput();
+    while (!run.done() && run.play.phase !== 'air') run.step(inp.asInput());
+    const p = run.play;
+    return p.phase === 'air' && !p.pitch && p.ballTarget && p.intended && p.ballTimeLeft() > 0.35 ? run : null;
+  };
+
+  it('the edge reads position: undercutting the receiver is a good ball, trailing him a bad one', () => {
+    let n = 0;
+    for (let seed = 1; seed <= 40 && n < 4; seed++) {
+      const run = toThrow(seed);
+      if (!run) continue;
+      const p = run.play;
+      const d = p.defControlled!;
+      const o = p.intended!;
+      const land = p.ballTarget!;
+      const back = { x: p.ball.from.x - land.x, y: p.ball.from.y - land.y };
+      const l = Math.hypot(back.x, back.y);
+      const u = { x: back.x / l, y: back.y / l };
+      o.pos = { ...land };
+      o.vel = { x: 0, y: 0 };
+      d.vel = { x: 0, y: 0 };
+      d.pos = { x: land.x + u.x * 0.8, y: land.y + u.y * 0.8 };
+      expect(p.ballEdge(d)).toBeGreaterThan(0.3);
+      d.pos = { x: land.x - u.x * 2, y: land.y - u.y * 2 };
+      expect(p.ballEdge(d)).toBeLessThan(-0.3);
+      n++;
+    }
+    expect(n).toBeGreaterThanOrEqual(3);
+  });
+
+  it('a call in reach of the ball takes him to it: he is at the catch point when it comes down', () => {
+    let n = 0;
+    for (let seed = 1; seed <= 40 && n < 4; seed++) {
+      const run = toThrow(seed);
+      if (!run) continue;
+      const p = run.play;
+      const d = p.defControlled!;
+      const land = p.ballTarget!;
+      const inp = new BotInput();
+      // Off the spot by a few yards with the ball 0.35 s out at most.
+      while (p.phase === 'air' && p.ballTimeLeft() > 0.35) run.step(inp.asInput());
+      if (p.phase !== 'air') continue;
+      d.engagedBy = [];
+      d.pos = { x: land.x + 1.5, y: land.y + 1.5 };
+      d.vel = { x: 0, y: 0 };
+      (p as unknown as { defMeter: boolean }).defMeter = true;
+      inp.hits.add('KeyE');
+      run.step(inp.asInput());
+      expect(p.defBall?.home).toBe(true);
+      inp.reset();
+      let last = Infinity;
+      while (p.phase === 'air') {
+        last = Math.hypot(d.pos.x - land.x, d.pos.y - land.y);
+        run.step(inp.asInput());
+      }
+      expect(last).toBeLessThan(CATCH_REACH * 0.6);
+      n++;
+    }
+    expect(n).toBeGreaterThanOrEqual(3);
   });
 });

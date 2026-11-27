@@ -188,7 +188,7 @@ interface DefLive {
   /** The hit-stop left; the QB's vision cone as the user's man sees it (angle, how visible); the last verdict. */
   stop: number;
   cone: { ang: number; vis: number } | null;
-  verdict: { grade: string; ms: number; result: string; kind: 'play' | 'swat'; at: number } | null;
+  verdict: { grade: string; ms: number; result: string; kind: 'play' | 'swat'; edge: number; at: number } | null;
   done: (r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>) => void;
 }
 
@@ -324,7 +324,7 @@ const RUN_ZOOM = { x: 1.3, y: 1.9, slow: 0.7 };
  * PLAY DEFENSE's feel (docs/USERDEF.md): the live snap in slow motion (`slow`), slower still with a ball in the
  * air coming to him (`ballSlow`, while the ball meter is up); the field spread a little about the QB and your man (`spreadX`, `spreadY`);
  * the hit-stop (`hitStop` s of game time frozen) and the shake (`shake` px, `shakeTime` s) on a play you make;
- * the ball meter over his head (`meter`: `w` by `h` px, its middle `y` px over his feet, `fade` s in); the QB's vision cone (`cone`: its length in yd, its half-width from `wide` to `tight` degrees
+ * the ball meter over his head (`meter`: `w` by `h` px, `y` px over his feet, or `below` px under them when that's above `top`, `fade` s in); the QB's vision cone (`cone`: its length in yd, its half-width from `wide` to `tight` degrees
  * and its lag from `lagLo` to `lagHi` s by your man's `prc` 40 to 99, `fade` s in and out); the verdict
  * shown `verdictTime` s.
  */
@@ -333,7 +333,7 @@ const DRILL_FAMILIES: readonly string[] = ['quick', 'dropback', 'shot', 'pa', 'b
 const DEF_FEEL = {
   slow: 0.75, ballSlow: 0.55, spreadX: 1.15, spreadY: 1.3,
   hitStop: 0.12, shake: 3, shakeTime: 0.25,
-  meter: { w: 34, h: 4, y: 40, fade: 0.1 },
+  meter: { w: 34, h: 4, y: 40, top: 60, below: 10, fade: 0.1 },
   cone: { len: 24, wide: 22, tight: 7, lagLo: 0.35, lagHi: 0.05, fade: 0.15 },
   verdictTime: 1.3,
 };
@@ -4703,7 +4703,7 @@ export class Game {
         break;
     }
     const v = L.run?.play.defVerdict;
-    if ((f === 'pick' || f === 'pbu' || f === 'miss') && v) L.verdict = { grade: v.grade, ms: v.ms, result: v.result ?? '', kind: v.kind, at: this.t };
+    if ((f === 'pick' || f === 'pbu' || f === 'miss') && v) L.verdict = { grade: v.grade, ms: v.ms, result: v.result ?? '', kind: v.kind, edge: v.edge, at: this.t };
   }
 
   /** The QB's eyes as the user's man sees them (`DEF_FEEL.cone`): late and wide for a low-awareness man, fading in while he's looking. */
@@ -4875,9 +4875,9 @@ export class Game {
 
   /**
    * The ball meter (docs/USERDEF.md, `Play.ballMeter`): a little kick meter over his head, up only for a ball
-   * coming to him. The needle sweeps to the middle `USER_DEF.lead` before the ball's down: the gold core is
-   * PLAY BALL's window (SPACE), the green around it SWAT's (E), both by his hands and narrower for a ball he
-   * hasn't found. A press freezes the needle where it was, colored by how it landed.
+   * coming to him. The needle sweeps to the middle `USER_DEF.lead` before the ball's down: the gold band is the
+   * window for either call (SPACE goes for the pick, E swats it), its bright core PERFECT, by his hands and
+   * narrower for a ball he hasn't found. A press freezes the needle where it was, colored by how it landed.
    */
   private drawBallMeter(g: CanvasRenderingContext2D, play: Play): void {
     const d = play.defControlled;
@@ -4890,7 +4890,8 @@ export class Game {
     const M = DEF_FEEL.meter;
     const s = this.cam.toScreen(d.pos.x, d.pos.y);
     const X = Math.round(s.x - M.w / 2);
-    const Y = Math.round(s.y - M.y);
+    // Over his head, or under his feet when that would sit under the header lines.
+    const Y = Math.round(s.y - M.y < M.top ? s.y + M.below : s.y - M.y);
     const at = (e: number) => X + Math.round(((e + 1) / 2) * M.w);
     g.save();
     g.globalAlpha = clamp((this.t - this.meterAt) / M.fade, 0, 1);
@@ -4904,14 +4905,13 @@ export class Game {
       g.fillStyle = color;
       g.fillRect(l, Y, Math.max(1, r - l), M.h);
     };
-    band(m.swat, '#4fbf5f');
-    band(m.play, '#ffd23f');
+    band(m.win, '#c99a1e');
+    band(m.perfect, '#ffe27a');
     const e = m.pressed ?? m.e;
     let col = '#ffffff';
     if (m.pressed !== null) {
       const off = Math.abs(m.pressed);
-      const win = m.kind === 'play' ? m.play : m.swat;
-      col = off <= win ? (m.kind === 'play' ? '#ffd23f' : '#7dff7d') : '#ff5a5a';
+      col = off <= m.perfect ? '#ffffff' : off <= m.win ? '#ffd23f' : '#ff5a5a';
     }
     g.fillStyle = 'rgba(8,10,14,0.9)';
     g.fillRect(at(e) - 2, Y - 3, 4, M.h + 6);
@@ -4933,7 +4933,9 @@ export class Game {
     g.fillStyle = 'rgba(8,10,14,0.62)';
     g.fillRect(VIEW_W / 2 - 120, y - 6, 240, 52);
     text(g, v.grade, VIEW_W / 2, y, { size: 16, align: 'center', color: flash ? '#ffffff' : color });
-    text(g, `${v.kind === 'play' ? 'PLAY BALL' : 'SWAT'}${v.grade === 'PERFECT' ? '' : `  ${v.ms} MS ${v.grade === 'LATE' ? 'LATE' : 'EARLY'}`}`, VIEW_W / 2, y + 23, { align: 'center', color: '#cfe3ff' });
+    // The read he made it from: where he was on the receiver when he pressed (`Play.ballEdge`).
+    const read = v.edge >= 0.4 ? 'UNDERCUT' : v.edge >= 0.1 ? 'A STEP' : v.edge > -0.2 ? 'EVEN' : 'TRAILING';
+    text(g, `${v.kind === 'play' ? 'PLAY BALL' : 'SWAT'}, ${read}${v.grade === 'PERFECT' ? '' : `  ${v.ms} MS ${v.grade === 'LATE' ? 'LATE' : 'EARLY'}`}`, VIEW_W / 2, y + 23, { align: 'center', color: '#cfe3ff' });
     if (v.result) text(g, v.result, VIEW_W / 2, y + 34, { align: 'center', color: v.result === 'CAUGHT' ? '#ff9a5a' : '#ffffff' });
   }
 
@@ -4961,7 +4963,7 @@ export class Game {
     }
     // What he can do right now.
     const meter = play.ballMeter();
-    if (meter && !play.defBall) drawHint(g, 'SPACE ON THE GOLD: PLAY THE BALL   E ON THE GREEN: SWAT IT');
+    if (meter && !play.defBall) drawHint(g, 'ON THE GOLD:  SPACE GO FOR THE PICK   E SWAT IT DOWN');
     else if (play.phase === 'air' && d && !play.defBall && !meter) drawHint(g, 'BALL IN THE AIR: GO GET TO IT');
     else if (play.diveReach()) drawHint(g, 'SPACE: TACKLE HIM');
     else if (!play.thrown && play.carrier === play.qb && !play.defEyes()) drawHint(g, 'WASD: MOVE   SHIFT: READ THE QB   T: TIMEOUT');

@@ -9,8 +9,8 @@ import type { Input } from '../engine/input';
 import { add, clamp, dist, gauss, len, lerp, norm, scale, sub, type Rng, type Vec } from '../engine/math';
 import { teamUniform } from '../render/sprites';
 import { ANTIC, cutKeep, eyesOf, facingQB, FIND, interceptTime, isRusher, KEY, matchZones, PREVENT, PURSUIT_ANGLE, PURSUIT_LEAD, readyAt, ROUTE_SIDELINE, receiverFind, returnerAI, thinkDefense, thinkOffense, zoneSpot } from '../sim/ai';
-import { hotness, launch, makeBall, passParams, startBounce, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
-import { CATCH_REACH, catchGrade, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
+import { hotness, launch, makeBall, passParams, startBounce, startDeflect, THROW_KINDS, THROWS, updateBounce, updateFlight, type Ball, type ThrowKind } from '../sim/ball';
+import { CATCH_REACH, callOdds, catchGrade, CROWD, HANDOFF_ODDS, PITCH_REACH, pitchOdds, PLACEMENT, reachScore, resolveCatch, type CatchGrade } from '../sim/catching';
 import { CELEBRATE, heldBall, releaseVel, spinTurns, startCelebration } from '../sim/celebrate';
 import {
   accelOf, breaksInside, endurance, isEligible, JUKE, knockDown, makePlayer, maxSpeed, seek, setPose, startJuke, stepPlayer, tickTimers, leanMul, LEAN_FX, type Lean, type Player,
@@ -147,11 +147,17 @@ export const DIVE_TACKLE = { range: 1.7, closing: 1.0, odds: 0.55, down: 1.0, pa
 /**
  * The user's defender on a CPU snap (docs/USERDEF.md): the read is the user's, the body is the player's.
  * - `backpedal`: his speed with LOOK held (head around to the QB or the ball) moving away from the QB
- * - the ball, PLAY BALL or SWAT pressed in flight: the sweet spot is `lead` s before it arrives, within a
- *   half-window from `window[kind]` (lo..hi by his hands, `cth` 60% and `prc` 40%), down to `blindWindow` of
- *   it for a ball he hasn't seen (`readyAt`). Timed (`on`) or not (`off`), each scales his contest skill and
- *   his pick odds (sim/catching.ts `skillMul`, `intMul`). A PLAY BALL that misses and is caught leaves him on
- *   the turf `whiff` s (the YAC is the price of the gamble).
+ * - the ball, PLAY BALL (SPACE) or SWAT (E) pressed in flight (pass 4): one window for both, the sweet spot
+ *   `lead` s before it arrives, a half-window from `window` (lo..hi by his hands, `cth` 60% and `prc` 40%), down
+ *   to `blindWindow` of it for a ball he hasn't seen (`readyAt`). Which call pays is his position at the press
+ *   (`Play.ballEdge`, `edge`): his closeness to where the ball comes down against the receiver's (both carried
+ *   on at their speed to the arrival, with `slack` yd of extra reach). Undercutting him (on the thrower's side
+ *   of him by `under` yd) it's `underKeep` of that plus `underBonus`; a step on him (level or ahead, running
+ *   with him) adds `stepBonus`. A timed call
+ *   plays sim/catching.ts `callOdds` (`USER_CALL`) at that edge, less `timingCost` for GOOD rather than PERFECT.
+ *   Mistimed, PLAY BALL is the trailing row `missEdge` worse and a catch over him leaves him on the turf `whiff`
+ *   s; SWAT is the AI's contest. In reach of the spot at the press, he homes on it (`homeSpeed` of his speed,
+ *   PLAY BALL `homeFront` yd in front of the receiver): the call's own adjustment, as the dive's.
  * - the dive (SPACE with the carrier in reach): he lays out, homing on the carrier for `lunge` s at
  *   `lungeSpeed` × his top speed. In reach means within `diveFrom` yd and catchable inside the lunge, so it all
  *   but always makes contact; contact is the CPU's own tackle roll (`contactOdds`), his tackling and nothing
@@ -170,12 +176,13 @@ export const DIVE_TACKLE = { range: 1.7, closing: 1.0, odds: 0.55, down: 1.0, pa
 export const USER_DEF = {
   backpedal: 0.8,
   lead: 0.2,
-  window: { play: [0.05, 0.11], swat: [0.12, 0.22] },
+  window: [0.07, 0.14],
   blindWindow: 0.3,
-  ball: {
-    play: { on: { skill: 1.0, int: 2.2 }, off: { skill: 0.45, int: 0.3 } },
-    swat: { on: { skill: 1.35, int: 0.35 }, off: { skill: 0.8, int: 0.5 } },
-  },
+  edge: { slack: 1, under: 0.5, underBonus: 0.45, underKeep: 0.5, stepBonus: 0.15 },
+  timingCost: 0.15,
+  missEdge: 0.5,
+  homeSpeed: 0.9,
+  homeFront: 0.3,
   whiff: 0.7,
   diveFrom: 3.2,
   diveBuffer: 0.2,
@@ -407,8 +414,8 @@ export class Play {
   /** LOOK held this step. */
   defLook = false;
   /** PLAY BALL or SWAT, pressed in flight: which and when; and how it went at the ball. */
-  defBall: { kind: 'play' | 'swat'; t: number } | null = null;
-  defVerdict: { kind: 'play' | 'swat'; timed: boolean; early: boolean; grade: 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE'; ms: number; result?: string } | null = null;
+  defBall: { kind: 'play' | 'swat'; t: number; edge: number; home: boolean } | null = null;
+  defVerdict: { kind: 'play' | 'swat'; timed: boolean; early: boolean; grade: 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE'; ms: number; edge: number; result?: string } | null = null;
   /** He's committed (in the air on a jump, mid-chop, laid out): until when, at what share of his speed. */
   defCommit: { until: number; speed: number } | null = null;
   /** Laid out for the carrier: until when, and whether it's been decided. */
@@ -1785,17 +1792,21 @@ export class Play {
     const graded = bestO && !this.passTipped ? catchGrade(bestO === this.intended ? bestO.track : null, land, so, len(bestO.vel), bestO.diving) : null;
     const grade = graded?.grade ?? 'clean';
     const lunge = grade === 'dive' ? 1 : grade === 'reach' ? PLACEMENT.reachLunge : 0;
+    // The user's man at the ball with a call: his call's odds (`ballCall`), the other defenders crowding it.
+    const u = this.defControlled;
+    const uIn = !!u && defs.some((x) => x.p === u);
+    const crowd = defs.reduce((w, x) => (x.p === u ? w : w + Math.pow(clamp(x.s, 0, 1), CROWD.posExp)), 0);
+    const call = uIn && !oob ? this.ballCall(u!, bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit } : null, crowd) : undefined;
     const res = oob
       ? 'miss'
       : resolveCatch(
           bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet, ready: this.catchReady, hot, lunge } : null,
-          defs.map(({ p, s }) => ({ pos: s, cth: p.r.cth, prc: p.r.prc, ready: readyAt(p, this.time), ...(p === this.defControlled ? this.ballCall(p) : {}) })),
+          defs.map(({ p, s }) => ({ pos: s, cth: p.r.cth, prc: p.r.prc, ready: readyAt(p, this.time) })),
           this.rng,
           this.passTipped ? 0 : THROWS[this.thrownKind].jump,
+          call,
         );
 
-    const u = this.defControlled;
-    const uIn = !!u && defs.some((x) => x.p === u);
     const v = uIn ? this.defVerdict : null;
     if (v) {
       v.result = res === 'int' ? 'PICKED OFF!' : res === 'pbu' ? 'BROKEN UP' : res === 'catch' ? 'CAUGHT' : 'INCOMPLETE';
@@ -1824,8 +1835,8 @@ export class Play {
       else this.popup('CATCH!', bestO.pos, '#ffffff');
       return;
     }
-    // His own timed jump at the ball: the pick is his.
-    if (res === 'int' && v && v.kind === 'play' && v.timed) bestD = u;
+    // His call at the ball: the pick, or the breakup, is his.
+    if (res === 'int' && call) bestD = u;
     if (res === 'int' && bestD) {
       this.giveBall(bestD);
       this.phase = 'run';
@@ -1837,10 +1848,13 @@ export class Play {
     }
 
     let sub = this.passTipped && this.tipper ? `Tipped by #${this.tipper.num} ${this.tipper.name}` : 'Nobody home';
+    let deflect: Vec | null = null;
     if (oob) sub = 'Out of bounds';
     else if (res === 'pbu' && bestD) {
-      if (v && v.timed) bestD = u!;
-      setPose(bestD, 'catch', 0.4);
+      if (call) bestD = u!;
+      // His swat chops it down; his jump gets a hand on it. Either way it comes off him.
+      setPose(bestD, bestD === u && v?.kind === 'swat' ? 'swat' : 'catch', bestD === u && v?.kind === 'swat' ? 0.25 : 0.4);
+      if (bestD === u) deflect = u.pos;
       sub = `Broken up by #${bestD.num} ${bestD.name}`;
     } else if (res === 'drop' && bestO) {
       setPose(bestO, 'catch', 0.3);
@@ -1848,7 +1862,8 @@ export class Play {
     }
     // A diver who didn't come up with it ends up on the turf all the same.
     for (const p of this.off) if (p.diving) knockDown(p, 0.9);
-    startBounce(this.ball);
+    if (deflect) startDeflect(this.ball, deflect);
+    else startBounce(this.ball);
     this.end({ type: 'incomplete', spot: this.los, spotY: this.ballY, text: 'INCOMPLETE', sub, color: '#ffffff' });
   }
 
@@ -1872,17 +1887,24 @@ export class Play {
     if (this.phase === 'air' && !this.defMeter && this.ballComing(d)) this.defMeter = true;
     if (this.phase === 'air' && this.defMeter && !this.defBall && !d.down && !d.engagedBy.length) {
       // Up for it, or the chop: committed either way (`USER_DEF`). Only on a ball coming to him (the meter).
-      if (input.hit('Space')) {
-        this.defBall = { kind: 'play', t: this.time };
-        const t = Math.min(USER_DEF.leapTime, this.ballTimeLeft() + 0.12);
-        this.defCommit = { until: this.time + t, speed: USER_DEF.leapSpeed };
-        setPose(d, 'leap', t);
-        this.defFx.push('leap');
-      } else if (input.hit('KeyE')) {
-        this.defBall = { kind: 'swat', t: this.time };
-        this.defCommit = { until: this.time + USER_DEF.swatTime, speed: USER_DEF.swatSpeed };
-        setPose(d, 'swat', USER_DEF.swatTime);
-        this.defFx.push('swat');
+      // Which call pays is where he is right now (`ballEdge`); in reach of the spot he takes himself to it.
+      const kind = input.hit('Space') ? 'play' : input.hit('KeyE') ? 'swat' : null;
+      if (kind) {
+        const left = this.ballTimeLeft();
+        const home = this.canHome(d);
+        this.defBall = { kind, t: this.time, edge: this.ballEdge(d), home };
+        if (kind === 'play') {
+          const t = Math.min(USER_DEF.leapTime, left + 0.12);
+          this.defCommit = { until: this.time + t, speed: USER_DEF.leapSpeed };
+          setPose(d, 'leap', t);
+          this.defFx.push('leap');
+        } else {
+          // The chop lands on the ball: he winds up now and swings as it gets there.
+          const t = Math.max(USER_DEF.swatTime, left + 0.1);
+          this.defCommit = { until: this.time + t, speed: USER_DEF.swatSpeed };
+          setPose(d, 'swat', t);
+          this.defFx.push('swat');
+        }
       }
     }
     const c = this.carrier;
@@ -1896,6 +1918,15 @@ export class Play {
       return;
     }
     if (this.defCommit && this.time < this.defCommit.until && !d.down) {
+      const b = this.defBall;
+      if (b?.home && this.phase === 'air' && this.ballTarget) {
+        // His call's own adjustment: onto the ball (PLAY BALL takes it a step in front of the receiver).
+        const to = this.homeSpot(b.kind);
+        const gap = dist(d.pos, to);
+        const sp = Math.min(maxSpeed(d) * USER_DEF.homeSpeed, gap / Math.max(0.05, this.ballTimeLeft()));
+        d.want = gap > 0.05 ? scale(norm(sub(to, d.pos)), sp) : { x: 0, y: 0 };
+        return;
+      }
       // In the air or mid-chop: he carries what he had, slowed, wherever the stick says.
       const keep = this.defCommit.speed;
       d.want = moving ? scale(norm(ax), maxSpeed(d) * keep) : scale(d.vel, keep);
@@ -1990,10 +2021,10 @@ export class Play {
 
   /**
    * The ball meter over his head (`USER_DEF.meterSpan`), for a ball coming to him: the needle `e` (-1..1, the
-   * middle `USER_DEF.lead` before it lands), PLAY BALL's and SWAT's half-windows on the same scale, and where
-   * he pressed (null until he does). Null when no ball's coming his way.
+   * middle `USER_DEF.lead` before it lands), the window (`win`, one for both calls) and its PERFECT core on the
+   * same scale, and where and how he pressed (null until he does). Null when no ball's coming his way.
    */
-  ballMeter(): { e: number; play: number; swat: number; pressed: number | null; kind: 'play' | 'swat' | null } | null {
+  ballMeter(): { e: number; win: number; perfect: number; pressed: number | null; kind: 'play' | 'swat' | null } | null {
     const d = this.defControlled;
     if (!d || this.phase !== 'air' || this.pitch || !this.ballTarget) return null;
     if (!this.defMeter && !this.ballComing(d)) return null;
@@ -2001,35 +2032,107 @@ export class Play {
     const left = this.ballTimeLeft();
     const at = (t: number) => clamp((t - (this.time + left - USER_DEF.lead)) / S, -1, 1);
     const b = this.defBall;
-    return { e: at(this.time), play: this.ballWindow('play') / S, swat: this.ballWindow('swat') / S, pressed: b ? at(b.t) : null, kind: b?.kind ?? null };
+    const win = this.ballWindow() / S;
+    return { e: at(this.time), win, perfect: win * USER_DEF.perfect, pressed: b ? at(b.t) : null, kind: b?.kind ?? null };
   }
 
   /**
-   * The half-window of his PLAY BALL or SWAT on the ball in the air (`USER_DEF.window` by his hands, shrunk by
-   * how much of a look he'll have had at it when it comes down), for the timing ring.
+   * The half-window of his PLAY BALL or SWAT (one for both: `USER_DEF.window` by his hands, shrunk by how much of
+   * a look he'll have had at the ball when it comes down), for the meter.
    */
-  ballWindow(kind: 'play' | 'swat'): number {
+  ballWindow(): number {
     const p = this.defControlled;
     if (!p) return 0;
-    const hands = (p.r.cth * 0.6 + p.r.prc * 0.4) / 100;
-    const [lo, hi] = USER_DEF.window[kind];
-    return lerp(lo, hi, clamp(hands, 0, 1)) * lerp(USER_DEF.blindWindow, 1, readyAt(p, this.time + this.ballTimeLeft()));
+    return this.windowAt(p, this.time + this.ballTimeLeft());
   }
 
-  /** His PLAY BALL or SWAT against the ball arriving now (`USER_DEF`), as multipliers on his contest; none pressed is the AI's contest. */
-  private ballCall(p: Player): { skillMul?: number; intMul?: number } {
-    const b = this.defBall;
-    if (!b) return {};
+  private windowAt(p: Player, t: number): number {
     const hands = (p.r.cth * 0.6 + p.r.prc * 0.4) / 100;
-    const [lo, hi] = USER_DEF.window[b.kind];
-    const half = lerp(lo, hi, clamp(hands, 0, 1)) * lerp(USER_DEF.blindWindow, 1, readyAt(p, this.time));
-    const lead = this.time - b.t;
-    const off = lead - USER_DEF.lead;
+    const [lo, hi] = USER_DEF.window;
+    return lerp(lo, hi, clamp(hands, 0, 1)) * lerp(USER_DEF.blindWindow, 1, readyAt(p, t));
+  }
+
+  /** The receiver the ball's going to: the one it was thrown to, else the nearest eligible man to where it comes down. */
+  private ballFor(): Player | null {
+    if (this.intended) return this.intended;
+    const land = this.ballTarget;
+    if (!land) return null;
+    let best: Player | null = null;
+    let bd = Infinity;
+    for (const o of this.off) {
+      if (!isEligible(o) || o.down) continue;
+      const dd = dist(o.pos, land);
+      if (dd < bd) {
+        bd = dd;
+        best = o;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * His position on the ball against the receiver's (`USER_DEF.edge`), -1 (trailing, the receiver's ball) to +1
+   * (undercutting him, the defender's ball): closeness to where it comes down, both carried on `left` s at their
+   * speed, with `slack` yd of extra reach; then a bonus for being on the thrower's side of him, or a step on him.
+   */
+  ballEdge(d: Player): number {
+    const land = this.ballTarget;
+    if (!land) return 0;
+    const E = USER_DEF.edge;
+    const left = this.ballTimeLeft();
+    const reach = (CATCH_REACH * (this.passTipped ? 1 : THROWS[this.thrownKind].reach) + E.slack) / CATCH_REACH;
+    const near = (p: Player) => Math.pow(reachScore(dist(add(p.pos, scale(p.vel, left)), land), reach), 0.6);
+    const o = this.ballFor();
+    let edge = near(d) - (o ? near(o) : 0);
+    if (o) {
+      const back = norm(sub(this.ball.from, land));
+      const rel = sub(d.pos, o.pos);
+      // In front of him, the ball's his first: being a step farther from the spot counts for half.
+      if (rel.x * back.x + rel.y * back.y > E.under) edge = edge * E.underKeep + E.underBonus;
+      else {
+        const run = len(o.vel) > 1 ? norm(o.vel) : norm(sub(land, o.pos));
+        const ahead = rel.x * run.x + rel.y * run.y;
+        const side = Math.abs(rel.x * run.y - rel.y * run.x);
+        if (ahead > -0.3 && side < 1.5) edge += E.stepBonus;
+      }
+    }
+    return clamp(edge, -1, 1);
+  }
+
+  /** He can get himself to the ball by the time it's down: in reach of the spot, at `USER_DEF.homeSpeed`. */
+  private canHome(d: Player): boolean {
+    const land = this.ballTarget;
+    if (!land || d.down || d.engagedBy.length) return false;
+    const reach = CATCH_REACH * (this.passTipped ? 1 : THROWS[this.thrownKind].reach);
+    return dist(d.pos, land) <= reach + maxSpeed(d) * USER_DEF.homeSpeed * this.ballTimeLeft();
+  }
+
+  /** Where his call takes him: the ball's spot; PLAY BALL a step in front of the receiver, toward the thrower. */
+  private homeSpot(kind: 'play' | 'swat'): Vec {
+    const land = this.ballTarget!;
+    if (kind === 'swat') return land;
+    const back = norm(sub(this.ball.from, land));
+    return add(land, scale(back, USER_DEF.homeFront));
+  }
+
+  /**
+   * His PLAY BALL or SWAT against the ball arriving now (`USER_DEF`): the odds his call plays (sim/catching.ts
+   * `callOdds` at his edge from the press), or none for the AI's contest (nothing pressed, or a mistimed SWAT).
+   * `crowd`: the other defenders at the ball, by how well they're under it.
+   */
+  private ballCall(p: Player, o: { pos: number; cth: number; cit?: number } | null, crowd: number): { catch: number; int: number } | undefined {
+    const b = this.defBall;
+    if (!b) return undefined;
+    const U = USER_DEF;
+    const half = this.windowAt(p, this.time);
+    const off = this.time - b.t - U.lead;
     const timed = Math.abs(off) <= half;
-    const grade = Math.abs(off) <= half * USER_DEF.perfect ? 'PERFECT' : timed ? 'GOOD' : off > 0 ? 'EARLY' : 'LATE';
-    this.defVerdict = { kind: b.kind, timed, early: off > 0, grade, ms: Math.round(Math.abs(off) * 1000) };
-    const m = USER_DEF.ball[b.kind][timed ? 'on' : 'off'];
-    return { skillMul: m.skill, intMul: m.int };
+    const perfect = Math.abs(off) <= half * U.perfect;
+    const grade = perfect ? 'PERFECT' : timed ? 'GOOD' : off > 0 ? 'EARLY' : 'LATE';
+    this.defVerdict = { kind: b.kind, timed, early: off > 0, grade, ms: Math.round(Math.abs(off) * 1000), edge: b.edge };
+    if (!timed && b.kind === 'swat') return undefined;
+    const edge = timed ? b.edge - (perfect ? 0 : U.timingCost) : -1 - U.missEdge;
+    return callOdds(b.kind, edge, { cth: p.r.cth, prc: p.r.prc }, o, crowd);
   }
 
   /**
