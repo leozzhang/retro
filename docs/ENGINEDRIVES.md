@@ -746,6 +746,9 @@ The user's simulated games (SIM GAME, the simulated quarters, the exhibition's S
   - `KickRun` steps a kick, so played games now play the CPU's punts and kickoffs to you live (mirrored).
   - The fair-catch and return flags above are fixed: punts 38% fair caught and 6.8-yard returns; kickoff returns about 18 yards.
 
+## Phase 7 (first test build, 2026-11-26): playing a defender
+The user can play one of the back seven on CPU snaps (PLAY DEFENSE). See [USERDEF.md](USERDEF.md). `engineDrive` is now `runDrive(driveSteps(...))` and `engineSnap` a stepped `SnapRun`, draw for draw.
+
 ## Not built yet (later phases)
 - Live substitutions in played games: garbage-time twos on the field, and rotations. Audibles already keep the called personnel ("Audibles" above); substitutions need who is on the field to be explicit per snap.
 - The fitted DC table for CPU-vs-CPU sims (phase 5).

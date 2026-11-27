@@ -2,6 +2,52 @@
 
 _Last updated: 2026-11-26_
 
+## PLAY DEFENSE, pass 2: feel, the QB's eyes, feedback (2026-11-26)
+Making the defender fun to play. Details in docs/USERDEF.md, "The feel".
+- **Slow motion:** 0.75 on a live defensive snap, 0.55 with the ball in the air and his eyes on it. The snap is stepped by the frame's dt, so it's smooth (`SnapRun.step(input, dt)`). The field spreads a little around the QB and your man.
+- **The QB's vision cone:**
+  - Seen only while your man's eyes are on the QB (Shift, or squared up to him).
+  - Clarity by his awareness: width, opacity and lag.
+  - Veteran QBs sometimes look you off.
+  - Display only (`CpuQb.eyesOn`, `lookAt`, `QB_EYES`); `npm run drives` is still byte-identical.
+- **Shift alone** now keeps the AI on his job with his eyes on the QB, so you can read the cone while he drops. In pass 1 it stopped him dead.
+- **Feedback:**
+  - the arms-up jump, the new `swat` pose and a lunge for the dive;
+  - the timing ring (gold PLAY BALL band, blue SWAT band), shown only if his eyes are on the ball;
+  - a PERFECT / GOOD / EARLY / LATE verdict with the ms and the result;
+  - hit-stop and shake on a pick, a breakup or a big hit;
+  - BIG HIT! and STUFFED! popups, whoosh, hit and crowd sounds;
+  - prompts that change with what he can do.
+- **Balance** (`npm run userdef`, 48 drives): with the jump's commitment, a perfect ball-hawk is about even with the AI (more picks, more yards given up), and freelancing costs 0.25–1.0 points a drive. No flags.
+- **Tests:** a slow-motion stepping test was added. Idle still equals the AI, tape and all. `npm test`: 550 passed.
+- **Checked in the browser** (headless Chrome, an exhibition on EVERY SNAP): the cone, the ring, the jump and swat poses, the verdicts (a PERFECT swat broke one up, credited to the corner), and the drive flow.
+
+## New: PLAY DEFENSE, first test build (2026-11-26)
+On CPU drives in a played game, the user can play one of the back seven live, with the DC still calling the defense. Design, controls and measurements are in docs/USERDEF.md.
+- **Setting:** PLAY DEFENSE: OFF (the default) / BIG PLAYS / EVERY SNAP, in the dynasty settings and on the exhibition screen (P). BIG PLAYS covers 3rd and 4th down, inside the 10, late and close, the last 0:40 of a half, overtime, and the CPU's first snap of a half.
+- **Plumbing:** the engine's drive is now a generator of snap requests (`driveSteps`), and a snap can be stepped (`SnapRun`). `engineDrive` is unchanged draw for draw: `npm run drives` is byte-identical but for its timing line. CPU drives and overtime possessions go through `playCpuDrive`.
+- **The defender:**
+  - With the stick idle the AI plays him (tested identical, tape and all).
+  - WASD runs him. LOOK (Shift) turns his head, and his eyes decide whether he sees the throw (`findAt`, readiness).
+  - PLAY BALL (Space) and SWAT (E) are timed multipliers on the existing catch contest.
+  - Space near the carrier is a diving tackle. While blocked, WASD picks his shoulder.
+  - T asks for the user's timeout at the whistle.
+- **Stats:** a live snap returns the same result as a headless one, so picks and tackles are credited to the real defender in the box score, grades and XP, exactly as the AI's are.
+- **Measured** (`npm run userdef`, new: an oracle on the defender with perfect information and a reaction time):
+  - A perfect ball-hawk is worth 0–0.26 points a drive.
+  - Freelancing at corner or safety gives up 0.2–0.8.
+  - No farming (his box score within 1.7× the AI's).
+  - One flag, small: hawk beats the AI everywhere.
+- **Tests:** src/userdef.test.ts (steps vs engineDrive, idle = AI, steering matters, credit, the contest multipliers, BIG PLAYS). `npm test`: 549 passed.
+- **Checked in the browser:** an exhibition drive on EVERY SNAP. Pick, snap, steer (mirrored stick), the result banner, the drive's end and the hand-off back to the user's call all work.
+- **Not yet:**
+  - the QB's eyes on screen;
+  - DL and edge rushers;
+  - live CPU two-point tries;
+  - the CPU OC learning the user's defender;
+  - `npm run balance` and `npm run season` weren't rerun (the change is behind a default-off setting, and `drives` is byte-identical).
+- **Next:** play it and tune `USER_DEF` (the windows, the lead, the LOOK cost) from feel and the report.
+
 ## Fixed: two first overall picks in one offseason; fans read the season like fans (2026-11-26)
 - **Draft news twice.** The offseason's carousel and draft news is copied into the next season's opening news. That copy had no year, so the program page dated last year's draft to this season, and during the next offseason the two drafts showed side by side. The copies now carry their year (`NewsItem.year`), and `newsYears` infers it for old saves. The program page dates them right, the chronicle doesn't keep them twice, and the next offseason's start drops them. The hub's offseason NEWS and the carousel's league list skip them on old saves. See PROGRAM.md.
 - **Fan pulse expectations** (display only). The fans' bar now blends the odds with the last 3 seasons (`fanBar`, `PULSE.history`), so a third straight 11-win year is "the standard", not "nobody saw this coming". A season that falls apart after a 5-0+ start or an AP top-10 peak (`fade`) leads the talk, and the record line goes quiet. A fresh upset loss (`upsetOdds`: favored by 72%+, or ranked and beaten by an unranked team or one 6+ spots lower) has its own heavy line in place of silence. Tests in src/program.test.ts.

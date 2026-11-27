@@ -1,0 +1,118 @@
+# Play defense (USERDEF)
+
+On CPU drives in a played game, the user can take one defender and play him live. The DC still calls the defense. The user picks which of the back seven to be before each snap, then plays his assignment, jumps a route, or shadows a man. Built 2026-11-26 (ENGINEDRIVES.md's phase 7); this is the first test build.
+
+## The setting
+**PLAY DEFENSE** (dynasty settings, `SeasonConfig.liveDefense`; P on the exhibition screen). Missing means OFF, which plays every CPU drive headless exactly as before.
+- **OFF**
+- **BIG PLAYS** (`bigSnap`, `BIG_SNAP` in game/situation.ts):
+  - 3rd and 4th down
+  - inside the user's 10
+  - a snap of leverage 0.5 or more (`leverage`, which counts late and close)
+  - the last 0:40 of a half
+  - overtime
+  - the CPU's first snap of each half (`Game.cpuSnapHalf`)
+- **EVERY SNAP**
+
+The snaps the user doesn't play run headless. They're shown by the CPU DRIVES watch level as before, minus the ones he played.
+
+## Controls
+| | |
+| --- | --- |
+| Pick (before the snap) | Q/E or W/S, or click; the back seven, top of the screen to the bottom. The one he played last is picked first. A dashed line shows his job: his man, his zone's spot (ringed), or the QB for a blitz or spy. The second header line names it |
+| Snap | Space |
+| Move | WASD at his top speed. Hold nothing and the AI plays him |
+| LOOK | Shift: his head around to the QB (to the ball once it's thrown). Backing away from the QB while looking, he moves at `backpedal` of his speed. Shift alone: the AI keeps playing his job with his eyes on the QB (backpedaling), so you can read the QB's vision cone while he drops |
+| Ball in the air | Space plays the ball, E swats it; one press a throw |
+| Diving tackle | Space within 1.7 yd of the carrier |
+| Blocked | WASD picks the shoulder he fights toward (`d.goal`); the block engine decides the shed |
+| Timeout | T asks for the user's timeout at the whistle (T again cancels) |
+
+## The feel (pass 2, 2026-11-26)
+- **Slow motion** (`DEF_FEEL` in game/game.ts): the live snap runs at `slow` (0.75), and at `ballSlow` (0.55) while a ball is in the air and his eyes are on it. The snap is stepped once a frame by the frame's slowed dt (`SnapRun.step(input, dt)`), so the motion is smooth and no key press is lost. The field spreads a little (`spreadX`, `spreadY`) about the QB and your man (`defFocus`).
+- **The QB's eyes: a vision cone.** `CpuQb.eyesOn` and `lookAt()` (game/cpuOffense.ts, `QB_EYES`) are display only; nothing he decides reads them, and they take no draws.
+  - Where he looks: his first read (his top target) before his read opens, then each scan's best-scoring receiver, open or not.
+  - Look-offs: a QB with `awr` 80+ opens to the other side 45% of the time for 0.45 s, on a stream of their own.
+  - When you see it: only while your man's eyes are on the QB (`Play.defEyes()`: LOOK, or squared up to him), before the throw. A little eye over his head says he's reading.
+  - How clearly, by his `prc` (`DEF_FEEL.cone`): its half-width from 22° (prc 40) to 7° (99), its opacity, and how late it follows the QB's real eyes (0.35 s to 0.05 s). A rookie sees a wide, faint, late wedge; a veteran a tight, crisp one.
+- **The timing ring.** Once his eyes are on a ball coming down within 7 yd of him, two bands sit around his feet: pale blue is SWAT's window, gold PLAY BALL's (`Play.ballWindow`, the same math as the contest). A ring closes on them and meets the middle `USER_DEF.lead` before the ball lands, gold while it's inside PLAY BALL's band. No look, no ring.
+- **Commitments.** PLAY BALL is a jump: the arms-up `leap` pose, `leapSpeed` (0.4) of his speed until the ball's down. SWAT is a chop: the new `swat` pose, `swatSpeed` (0.7) for `swatTime` (0.3 s). A mistimed jump that's caught leaves him on the turf.
+- **The dive** is a lunge (`startLunge`): the `dive` pose at `lungeSpeed` × his speed toward where the carrier is going, for `lunge` s. It's decided on contact (`tackleChance` × `dive`); a lunge that finds nobody is a WHIFF and leaves him down. A blinking red ring marks a carrier in range (`diveFrom`, 2.6 yd).
+- **The verdict.** PERFECT, GOOD, EARLY or LATE, by how many ms off the sweet spot, with what came of it (PICKED OFF!, BROKEN UP, CAUGHT). A pick or breakup freezes the play for `hitStop` and shakes the screen. A pick or breakup timed by him is credited to him.
+- **His tackles:** BIG HIT! at a closing speed of `bigHit` (7 yd/s) or more, STUFFED! behind the line, each with a heavy hit sound, the crowd and a shake.
+- **Sound:** a whoosh on the jump, the swat and the lunge (`swipe`), a hit on a breakup, the turf on a miss. The popups' cases are in game/sounds.ts.
+- **Prompts:** the hint line says what he can do right now: read the QB, play the ball or swat it on the gold ring, find the ball, lay out for the carrier.
+
+## The balance principle: the read is yours, the body is his
+Every AI knowledge limit is a timer that only gates the AI's decisions: `reactAt`, `fitAt`, `findAt`, `MAN_TRAIL`'s lag, `RUN_TELL`. A human steering `want` directly skips all of them. Following the precedent of the user's QB and runner, ratings limit **execution**, never **what the user sees**:
+1. **Reaction is the human's own.** A human's perceive-and-react time (0.2–0.3 s and a frame) sits in the AI's band (0.15–0.5 s by `mcv`/`zcv`/`prc`). There's no artificial delay; `npm run userdef` measures it.
+2. **No extra information.** No route lines, no landing marker, no offensive play name (the scorebug's right side says DEFENSE). The CPU attacks right to left on a mirrored camera, as on the CPU's kicks.
+3. **Knowledge lives in the contact math.** Once the user has touched the stick or LOOK (`Play.defManual`), his eyes are his own (`updateEyes`): 1 with LOOK held or facing the QB or ball, else 0. At the throw he finds the ball only if he's looking (`findAt`); in flight, the moment he looks. So `readyAt` and every catch contest and tip still read whether he saw it. A man defender trailing with his back turned who never looks plays the ball blind.
+4. **Ball skills are a timed commitment** (`USER_DEF` in game/playState.ts). The sweet spot is `lead` (0.2 s) before the ball arrives, within a half-window by his hands (`cth` 60%, `prc` 40%), shrunk to `blindWindow` of it for a ball he hasn't seen:
+
+   | Call | Half-window | Timed: contest skill, pick odds | Mistimed: contest skill, pick odds |
+   | --- | --- | --- | --- |
+   | PLAY BALL | 0.05–0.11 s | ×1.0, ×2.2 | ×0.45, ×0.3; caught anyway, he's down `whiff` (0.7 s) |
+   | SWAT | 0.12–0.22 s | ×1.35, ×0.35 | ×0.8, ×0.5 |
+
+   Nothing pressed is the AI's contest. The multipliers go into `catchOdds` (`Contender.skillMul`, `intMul`); undefined leaves the math bit-identical. A timed PLAY BALL that ends in a pick is his pick.
+5. **The body is his ratings.** Same acceleration (`accelOf`) and top speed (`SPEED`). There's no jog/sprint/stamina split, since AI defenders always run full. Tackles stay automatic by proximity (`checkTackles`). Steering, he makes no automatic diving tackle; that's his button, at `dive` (0.55) of a tackle, and a miss leaves him down.
+6. **Idle is the AI.** With nothing held, nothing the user's code touches runs. src/userdef.test.ts holds a bot with its hands off to the engine's drive, tape and all.
+7. **The offense answers for free.** `CpuQb` reads the live field, so he doesn't throw into a defender camping in a lane. His targets weight what's working this game (`qbCtx`, `targetPull`), so a corner who keeps shutting his man down sees fewer balls.
+
+## Stats and progression
+A live snap goes back into the drive's loop as the same `SnapResult` a headless snap makes. INTs, tackles and takeaways are credited to the defender who made them (`readSnap`), and the box score, grades and XP read them exactly as they read the AI's. Nothing marks a stat as the user's. The DC brain doesn't learn the user's freelancing as its own anticipation: `observe` drops the controlled man's `anticLog` entry.
+
+**Farming:** the userdef report's FLAGS compare the controlled slot's box score (5 × INT + TKL a drive) under a perfect oracle against the AI at that slot (`USERDEF.flag.statX`, 2.5×).
+
+## Code
+- `driveSteps` (game/engineDrive.ts): the possession as a generator that yields each snap request (`SnapReq`) and takes back its result (`SnapBack`, with the user's timeout). `engineDrive` is `runDrive(driveSteps(...))`, draw for draw.
+- `SnapRun`: one snap stepped: built and lined up when made, then `snap()`, `step(defInput)`, `done()`, `result()`. `engineSnap` runs it at once.
+- `Play.defControlled`, `defFlip` (mirrored stick), `defManual`, `defLook`, `defBall`, `defVerdict`; `defUserControl`, `ballCall`, `userDive` (game/playState.ts).
+- Game (game/game.ts):
+  - `playCpuDrive` is shared by `cpuDrive` and `otCpuTurn`;
+  - `pumpDefense` runs the drive on to the user's next snap;
+  - `startDefSnap` and `updateDefense` handle the 'defense' screen (stages pre, live, over);
+  - `renderDefense` and `renderDefenseHud` draw it.
+
+  Notices queued before the drive show first (`afterNotices: 'defense'`). The scorebug's clock is the drive's start advanced by the snaps so far (`defClock`); the drive burns its time on the real clock when it ends, as before.
+- `DefBot`, `BotInput` and `botDrive` (game/userDefBot.ts): the scripted user for the tests and the report.
+- Not live yet: CPU two-point tries (`cpuTwoPoint`) are simulated.
+
+## The report: `npm run userdef` (~1 min; `USERDEF_PAIRS`, `USERDEF_DRIVES`, `USERDEF_OUT`)
+An oracle plays the user's defender with perfect information and a reaction time (0.15, 0.25 and 0.35 s), at CB1, FS and MLB. The same matchups and seeds are played with the bot's hands off (the AI row). Policies:
+- `hawk`: his assignment until the throw, then to the landing spot, looking, with PLAY BALL on the sweet spot
+- `jump`: sits on the receiver nearest him (where he'll be 0.6 s on), eyes on the QB, then the hawk's ball
+- `shadow`: runs with the receiver nearest him, then the hawk's ball
+
+**FLAGS** (at 0.25 s):
+- the team's INT rate more than 2× the AI's;
+- more than 0.3 points a drive under the AI;
+- his box score more than 2.5× the AI's at his slot;
+- a policy better than the AI at every slot and reaction time.
+
+Run with `arch -arm64 env USERDEF_DRIVES=48 npm run userdef` (`arch` drops variables set in front of it).
+
+### Measured (2026-11-26, pass 2: with the jump and swat commitments)
+16 matchups × 48 drives from the 25 (768 drives a row; a row's points a drive have a standard error of about 0.1). The AI allows 1.76 points a drive, 62.1% completions and a 3.13% INT rate.
+
+| Slot | hawk (0.15 / 0.25 / 0.35 s) | jump | shadow |
+| --- | --- | --- | --- |
+| CB1 | +0.07 / +0.05 / +0.11 | +0.40 / +0.25 / +0.55 | +0.74 / +0.99 / +0.87 |
+| FS | −0.01 / −0.08 / −0.16 | +0.25 / +0.34 / +0.51 | +0.49 / +0.60 / +0.41 |
+| MLB | −0.07 / −0.24 / +0.02 | +0.04 / −0.19 / +0.06 | +0.00 / −0.01 / +0.04 |
+
+Points a drive against the AI: negative is better for the user's defense. **FLAGS: none.**
+
+- **A perfect ball-hawk is now about even with the AI** (−0.24 to +0.11). He trades more picks (the team's INT rate up to 4.6% from 3.1%) for the yards a slowed jump gives up when it doesn't come down with the ball. That's the intended risk and reward.
+- **Freelancing costs more than before.** Jumping or shadowing at corner or safety gives up 0.25–1.0 points a drive.
+- **No farming:** his box score stays within 1.5× the AI's at his slot.
+- **Pass 1** (no commitments): hawk was worth 0 to 0.26 points a drive, with one flag (hawk beat the AI everywhere).
+- **Slow motion** gives a human more real time: a 0.25 s reaction is about 0.19 s of game time, inside the band measured.
+
+## Next
+- Tune from the report and from play: the window widths, `lead`, the LOOK cost, and a plant cost on hard reversals if the oracle shows a clear edge. Mechanics, not information delays.
+- Play it and tune `DEF_FEEL` and `USER_DEF` by feel: the slow-motion pace, the cone's widths and lag, the windows, the commitments.
+- DL and edge rushers: the get-off (jumping the snap against offside) and rush moves by direction (`PLAN`, sim/passPro.ts).
+- The CPU OC learning the user's defender (a mirror of game/habits.ts): throwing away from, or testing, the man he always plays (DEFENSE.md, "The CPU's drives could learn your defensive play").
+- Live CPU two-point tries; presnap cheats (±2 yd) that the CPU QB's check reads.

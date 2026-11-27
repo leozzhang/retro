@@ -20,6 +20,9 @@ export interface Contender {
   hot?: number;
   /** Receiver only: 0..1, how far he had to stretch for it (`PLACEMENT`: a reach, a dive). */
   lunge?: number;
+  /** Defender only: the user's timed PLAY BALL or SWAT on him (game/playState.ts `USER_DEF`): × his contest skill, × his pick odds. */
+  skillMul?: number;
+  intMul?: number;
 }
 
 /**
@@ -114,10 +117,12 @@ function defSkill(d: Contender, exp: number): { pos: number; skill: number; intB
   const dJump = Math.pow(clamp(d.pos, 0, 1), exp);
   const dReady = d.ready ?? 1;
   const dHands = d.cth * 0.6 + (d.prc ?? d.cth) * 0.4;
+  const skill = dJump * (0.6 + (0.4 * dHands) / 100) * lerp(READY.dContest, 1, dReady);
+  const intBase = clamp(0.08 + 0.5 * dPos * (dHands / 100), 0, 0.7) * dReady;
   return {
     pos: clamp(d.pos, 0, 1),
-    skill: dJump * (0.6 + (0.4 * dHands) / 100) * lerp(READY.dContest, 1, dReady),
-    intBase: clamp(0.08 + 0.5 * dPos * (dHands / 100), 0, 0.7) * dReady,
+    skill: d.skillMul === undefined ? skill : skill * d.skillMul,
+    intBase: d.intMul === undefined ? intBase : Math.min(0.9, intBase * d.intMul),
   };
 }
 

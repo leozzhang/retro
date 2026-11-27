@@ -129,6 +129,15 @@ class FieldSounds {
       case 'PICKED OFF!':
         sfx('catch', { rate: 0.9 });
         break;
+      // PLAY DEFENSE (docs/USERDEF.md): the user's man made it.
+      case 'BIG HIT!':
+      case 'STUFFED!':
+        sfx('hitHeavy');
+        react(forHome(w.ctx, false), true);
+        break;
+      case 'WHIFF':
+        sfx('ground', { gain: 0.8 });
+        break;
       case 'TIPPED!':
         sfx('hitLight', { rate: 1.6, gain: 0.8 });
         break;

@@ -1,5 +1,5 @@
 import { disguiseName, pickDefCall, pickDisguise, rushers, type DefCall, type DefTags, type Disguise } from '../data/defenses';
-import { clockOut, goForTwo, tempo as situationTempo, type Situation } from './situation';
+import { bigSnap, clockOut, goForTwo, tempo as situationTempo, type Situation } from './situation';
 import { defIdentity, pickLineGame, preventLevel, situationMix, sticks } from '../data/identity';
 import { FORMATIONS, LEGACY, PLAY_TABS, PLAYBOOK, playsOfKind, type PlayDef } from '../data/plays';
 import { ocBook, ocStyle, STYLES } from '../data/offStyles';
@@ -13,7 +13,7 @@ import { POSITIONS } from '../data/positions';
 import { CONFERENCES } from '../data/fbs/profile';
 import { DEF_SLOTS, teamById, TEAMS, type RosterPlayer, type Team } from '../data/teams';
 import { Camera } from '../engine/camera';
-import { FIELD_W, OPP_GOAL, OWN_GOAL, STEP, VIEW_H, VIEW_W } from '../engine/constants';
+import { FIELD_LEN, FIELD_W, OPP_GOAL, OWN_GOAL, STEP, VIEW_H, VIEW_W } from '../engine/constants';
 import type { Input } from '../engine/input';
 import { audioPrefs, audioRunning, setAudioPref, type AudioPrefs } from '../engine/audio';
 import { music, type MusicMode } from '../engine/music';
@@ -22,7 +22,7 @@ import { armClick, noteHit, takeClick, tracked } from '../engine/clicks';
 import { CREDITS } from '../data/audio';
 import { crowd as stadium } from './crowd';
 import { fieldSounds } from './sounds';
-import { hashString, mulberry32, type Rng, type Vec3 } from '../engine/math';
+import { clamp, hashString, lerp, mulberry32, type Rng, type Vec3 } from '../engine/math';
 import {
   creditCpuDrive, creditUserFg, creditUserSnap, finishLiveBox, liveGamePlays, newLiveBox, storyAgainst, storyCpuDrive, storyUserEnd, storyUserPoints,
   storyUserSnap, userCredit, type LiveBox, type SnapAt, type UserSnap,
@@ -46,7 +46,7 @@ import {
   type NavItem, type SeasonView,
 } from '../render/seasonScreen';
 import {
-  drawAudioSettings, drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
+  drawAudioSettings, drawBackdrop, drawExhibition, drawMainMenu, drawNewTeam, drawSettings, drawSlots, EXHIBITION_LINE2_Y, GO_BTN, SIM_GAME_BTN, menuRect, PANEL_CONF_Y, PANEL_TEAM_Y, settingArrows, settingRect,
   slotConfirmRects, slotDeleteRect, slotRect, type MenuItem, type SettingRow, type SlotsView,
 } from '../render/menuScreen';
 import {
@@ -95,7 +95,7 @@ import { autoGamePlan, setUserDepth, useStaffDepth } from '../season/staff';
 import { loadStarred, toggleStar } from './starred';
 import { squadFor, staffFor } from '../season/world';
 import { mergeFilm, rosterRead } from './offModel';
-import { driveStream, engineDrive, engineTry, type EngineDrive, type EngineSide, type EngineSnap } from './engineDrive';
+import { driveSteps, driveStream, engineTry, playReq, runDrive, SnapRun, type EngineDrive, type EngineSide, type EngineSnap, type SnapBack, type SnapReq } from './engineDrive';
 import { newOcBrain, ocAdjustments, ocHalftime, type OcBrain } from './ocBrain';
 import { offIdentity } from '../data/offIdentity';
 import { adjustments, anticFor, callFor, checkFor, recheckFor, releanFor, lastRead, halftime as brainHalftime, headline, laneOf, ourLine, teamSmarts, leansFor, newBrain, newDrive, observe, type DefBrain, type DefenseIq } from './defBrain';
@@ -119,7 +119,9 @@ import { KickPlay } from './kickPlay';
 import { AUTO_INPUT } from './autopilot';
 import { CpuKicker, forecast, kickoffCall, puntCall, returnCall, windAlong, type KickContext, type KickForecast } from './cpuKicker';
 import { KICKOFF_FROM, kickCaption, kickoffRun, puntRun, returnerOf, SAFETY_KICK_FROM, type EngineKick, type KickRun } from './engineKick';
-import { HARD_COUNT, Play } from './playState';
+import { HARD_COUNT, Play, USER_DEF, type DefFx } from './playState';
+import { zoneSpot } from '../sim/ai';
+import type { Player } from '../sim/player';
 import { personnelOf, resolvePlay } from './resolvePlay';
 import {
   applyKick, applyOutcome, applyTry, downDistance, fieldLabel, movesChains, OVERTIME, PAT, xpOdds, startDrive, userStartAfter,
@@ -127,7 +129,7 @@ import {
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
 
-type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'notice' | 'final' | 'game' | 'wrap' | 'audio';
+type Screen = 'title' | 'exhibition' | 'slots' | 'newTeam' | 'newSettings' | 'settings' | 'roster' | 'season' | 'team' | 'program' | 'office' | 'playbook' | 'prep' | 'portal' | 'carousel' | 'departures' | 'recruit' | 'call' | 'play' | 'kick' | 'defense' | 'notice' | 'final' | 'game' | 'wrap' | 'audio';
 
 /**
  * What the call screen offers: the full playbook, the choice after a touchdown,
@@ -158,6 +160,37 @@ const IQ_OPTIONS: DefenseIq[] = ['STATIC', 'NORMAL', 'SHARP'];
 const ASSIST_OPTIONS: RunAssist[] = ['FULL', 'LIGHT', 'OFF'];
 const READ_OPTIONS: NonNullable<SeasonConfig['readHelp']>[] = ['FULL', 'SHELL', 'OFF'];
 const WRAP_OPTIONS: NonNullable<SeasonConfig['wrap']>[] = ['all', 'big', 'off'];
+type LiveDefense = NonNullable<SeasonConfig['liveDefense']>;
+const LIVE_DEF: LiveDefense[] = ['off', 'key', 'all'];
+const LIVE_DEF_LABEL: Record<LiveDefense, string> = { off: 'OFF', key: 'BIG PLAYS', all: 'EVERY SNAP' };
+
+/**
+ * A CPU possession with the user on a defender (docs/USERDEF.md): the drive's steps (`driveSteps`) and what
+ * they've logged, the clock it started on, the snap on the field (stepped live), the snaps the user played, and
+ * where the drive goes when it ends.
+ */
+interface DefLive {
+  gen: Generator<SnapReq, EngineDrive, SnapBack>;
+  plays: SimPlay[];
+  snaps: (EngineSnap | undefined)[];
+  clock0: Clock;
+  run: SnapRun | null;
+  req: SnapReq | null;
+  /** Before the snap (picking the man), stepping it, or the whistle's banner. */
+  stage: 'pre' | 'live' | 'over';
+  /** The man the user is on; the ones he can pick (the back seven, top to bottom). */
+  pick: Player | null;
+  picks: Player[];
+  userTimeout: boolean;
+  acc: number;
+  overT: number;
+  played: Set<SimPlay>;
+  /** The hit-stop left; the QB's vision cone as the user's man sees it (angle, how visible); the last verdict. */
+  stop: number;
+  cone: { ang: number; vis: number } | null;
+  verdict: { grade: string; ms: number; result: string; kind: 'play' | 'swat'; at: number } | null;
+  done: (r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>) => void;
+}
 
 /**
  * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
@@ -190,6 +223,12 @@ const SETTINGS: {
     options: ['SUMMARY', ...KEY_LABELS, 'EVERY SNAP'], start: 2,
     apply: (c, i) => (c.keyPlays = { ...c.keyPlays, defense: WATCH_LEVELS[i] }),
     read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).defense),
+  },
+  {
+    label: 'PLAY DEFENSE', help: 'ON CPU DRIVES, PLAY ONE DEFENDER YOURSELF: NEVER, ON THE BIG SNAPS, OR EVERY SNAP',
+    options: ['OFF', 'BIG PLAYS', 'EVERY SNAP'], start: 0,
+    apply: (c, i) => (c.liveDefense = LIVE_DEF[i]),
+    read: (c) => Math.max(0, LIVE_DEF.indexOf(c.liveDefense ?? 'off')),
   },
   {
     label: 'DEFENSE IQ', help: 'HOW MUCH THE CPU DEFENSE LEARNS YOUR OFFENSE DURING A GAME',
@@ -281,6 +320,22 @@ const REEL_CROP = 0.42;
  * runs at `slow` speed (game clock included) so the blocks can be read.
  */
 const RUN_ZOOM = { x: 1.3, y: 1.9, slow: 0.7 };
+/**
+ * PLAY DEFENSE's feel (docs/USERDEF.md): the live snap in slow motion (`slow`), slower still with the ball in the
+ * air and his eyes on it (`ballSlow`); the field spread a little about the QB and your man (`spreadX`, `spreadY`);
+ * the hit-stop (`hitStop` s of game time frozen) and the shake (`shake` px, `shakeTime` s) on a play you make;
+ * the timing ring (`ringNear` yd from the ball's spot, `ringIn` px around his feet, `ringRate` px a second
+ * of flight); the QB's vision cone (`cone`: its length in yd, its half-width from `wide` to `tight` degrees
+ * and its lag from `lagLo` to `lagHi` s by your man's `prc` 40 to 99, `fade` s in and out); the verdict
+ * shown `verdictTime` s.
+ */
+const DEF_FEEL = {
+  slow: 0.75, ballSlow: 0.55, spreadX: 1.15, spreadY: 1.3,
+  hitStop: 0.12, shake: 3, shakeTime: 0.25,
+  ringNear: 7, ringIn: 9, ringRate: 32,
+  cone: { len: 24, wide: 22, tight: 7, lagLo: 0.35, lagHi: 0.05, fade: 0.15 },
+  verdictTime: 1.3,
+};
 
 // Call screen layout: tip, playbook tabs, formation chips, then a 3x3 grid of cards.
 const CALL_Y = 92;
@@ -505,10 +560,20 @@ export class Game {
   private exhibitionIq: DefenseIq = 'NORMAL';
   private exhibitionAssist: RunAssist = 'FULL';
   private exhibitionAimSlow = false;
+  /** PLAY DEFENSE in an exhibition (a dynasty's is `SeasonConfig.liveDefense`). */
+  private exhibitionLiveDef: LiveDefense = 'off';
+  /** A CPU drive with the user on a defender, and the slot he played last (picked first next time). */
+  private defLive: DefLive | null = null;
+  private defSlot: string | null = null;
+  /** The half (0, 1, then overtime) of the CPU's last snap: its first snap of a half is a big one. */
+  private cpuSnapHalf = -1;
+  /** The screen shake left (s) and its size (px). */
+  private shakeT = 0;
+  private shakeAmp = 0;
   private applied: Applied | null = null;
   private notices: Notice[] = [];
   /** Where the game goes once the notice queue is empty. */
-  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' | 'game' | 'cpuKick' = 'call';
+  private afterNotices: 'call' | 'final' | 'kickoff' | 'pat' | 'game' | 'cpuKick' | 'defense' = 'call';
   /** The CPU's punt or kickoff to the user, played live after the notices (`startCpuKick`), and the one on the field. */
   private pendingCpuKick: { unit: 'punt' | 'kickoff'; yard: number } | null = null;
   private cpuKick: { run: KickRun; unit: 'punt' | 'kickoff'; yard: number; result: EngineKick | null; banner: { title: string; line: string } | null } | null = null;
@@ -585,12 +650,17 @@ export class Game {
 
   /** On the field: a play, a kick, the call screen, a notice or the final. */
   private inGame(): boolean {
-    return this.screen === 'call' || this.screen === 'play' || this.screen === 'kick' || this.screen === 'notice' || this.screen === 'final';
+    return this.screen === 'call' || this.screen === 'play' || this.screen === 'kick' || this.screen === 'defense' || this.screen === 'notice' || this.screen === 'final';
   }
 
   /** The READ HELP setting: the dynasty's in a season game; exhibitions show the whole read. */
   private readHelp(): NonNullable<SeasonConfig['readHelp']> {
     return this.seasonGame && this.season ? this.season.config.readHelp ?? 'FULL' : 'FULL';
+  }
+
+  /** The PLAY DEFENSE setting: the dynasty's in a season game, the exhibition's otherwise. */
+  private liveDefense(): LiveDefense {
+    return this.seasonGame && this.season ? this.season.config.liveDefense ?? 'off' : this.exhibitionLiveDef;
   }
 
   /** The SLOW AIM setting: the dynasty's in a season game, the exhibition's otherwise. */
@@ -613,6 +683,11 @@ export class Game {
     if (slow && this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
     if (this.screen === 'play' && this.play?.playDef.kind === 'run' && this.play.phase !== 'presnap' && this.play.phase !== 'over') return RUN_ZOOM.slow;
     if (slow && this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
+    if (this.screen === 'defense' && this.defLive?.stage === 'live') {
+      const p = this.defLive.run?.play;
+      const d = p?.defControlled;
+      return p && d && p.phase === 'air' && p.time >= d.findAt ? DEF_FEEL.ballSlow : DEF_FEEL.slow;
+    }
     return 1;
   }
 
@@ -683,6 +758,9 @@ export class Game {
         break;
       case 'kick':
         this.updateKick(dt, input);
+        break;
+      case 'defense':
+        this.updateDefense(dt, input);
         break;
       case 'notice':
         if (this.notices[0]?.show) this.updateShows(dt, input);
@@ -838,6 +916,7 @@ export class Game {
     const userHome = !!this.user && this.homeId === this.user.id;
     const show = scr === 'notice' ? this.notices[0]?.show : undefined;
     if (scr === 'play') fieldSounds.play(this.play, { userBall: true, userHome, down: this.drive.down });
+    else if (scr === 'defense') fieldSounds.play(this.play, { userBall: false, userHome });
     else if (show?.play) fieldSounds.play(show.play, { userBall: show.userBall, userHome });
     else fieldSounds.play(null, { userBall: true, userHome });
     if (scr === 'kick') fieldSounds.kick(this.kick, { userBall: true, userHome });
@@ -855,7 +934,7 @@ export class Game {
       this.lastToast = t;
     }
     // The menus: keys and clicks. The field's own keys (and the wrap, which has its own) stay quiet.
-    if (scr === 'play' || scr === 'kick' || scr === 'wrap' || prev === 'play' || prev === 'kick') {
+    if (scr === 'play' || scr === 'kick' || scr === 'defense' || scr === 'wrap' || prev === 'play' || prev === 'kick' || prev === 'defense') {
       this.lastHover = false;
       return;
     }
@@ -898,6 +977,8 @@ export class Game {
     if (input.hit('KeyL')) cycleAssist();
     const toggleAim = () => (this.exhibitionAimSlow = !this.exhibitionAimSlow);
     if (input.hit('KeyM')) toggleAim();
+    const cycleDef = () => (this.exhibitionLiveDef = LIVE_DEF[(LIVE_DEF.indexOf(this.exhibitionLiveDef) + 1) % LIVE_DEF.length]);
+    if (input.hit('KeyP')) cycleDef();
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -924,6 +1005,8 @@ export class Game {
         let at = VIEW_W / 2 - (segs.reduce((n, s) => n + s.length * 8, 0) + gap * (segs.length - 1)) / 2;
         const hit = segs.findIndex((s) => x < (at += s.length * 8 + gap) - gap / 2);
         [cycleKeys, cycleIq, cycleAssist, toggleAim][hit < 0 ? segs.length - 1 : hit]();
+      } else if (y >= EXHIBITION_LINE2_Y[0] && y < EXHIBITION_LINE2_Y[1]) {
+        cycleDef();
       } else if (inRect(x, y, GO_BTN)) {
         this.startGame();
         return;
@@ -2141,6 +2224,8 @@ export class Game {
    * defense's; the user's DC is always himself.
    */
   private setupEngine(): void {
+    this.cpuSnapHalf = -1;
+    this.defLive = null;
     const oc = this.ocOf(this.cpu);
     const userDc = this.dcOf(this.user);
     const userOc = this.ocOf(this.user);
@@ -3936,7 +4021,11 @@ export class Game {
     const otClock: DriveClock = {
       timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first', timeouts: { off: this.to.cpu, def: this.to.user },
     };
-    const { sim, plays, credit, snaps } = this.engineCpu(OVERTIME.start, otClock);
+    this.playCpuDrive(OVERTIME.start, otClock, (r, played) => this.otCpuDone(period, second, r, played));
+  }
+
+  private otCpuDone(period: number, second: boolean, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>): void {
+    const { sim, plays, credit, snaps } = r;
     this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, true, credit.snaps)));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
     // otherwise kick in the 1st overtime (unless only two ties it) and go for two after that.
@@ -3950,7 +4039,7 @@ export class Game {
       start: OVERTIME.start, result: sim.result, points, plays, credit, live: true,
     };
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
-    this.showCpuDrive(told, plays, snaps);
+    this.showCpuDrive(told, plays, snaps, played);
     this.score.cpu += points;
     if (sim.defPoints) {
       // The user's defense scored on the CPU's overtime possession: that ends it (NCAA).
@@ -4040,19 +4129,48 @@ export class Game {
    * and the engine's snaps (each on tape) aligned with `plays`.
    */
   private engineCpu(start: number, clock: DriveClock): { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] } {
+    const { gen, plays, snaps } = this.cpuSteps(start, clock);
+    return this.cpuCredited(runDrive(gen), plays, snaps);
+  }
+
+  /** A CPU possession's steps (`driveSteps`), with the logs it fills as it goes: `engineCpu` runs them at once, PLAY DEFENSE snap by snap. */
+  private cpuSteps(start: number, clock: DriveClock): { gen: Generator<SnapReq, EngineDrive, SnapBack>; plays: SimPlay[]; snaps: (EngineSnap | undefined)[] } {
     const plays: SimPlay[] = [];
     const snaps: (EngineSnap | undefined)[] = [];
     if (this.userDc) newDrive(this.userDc);
-    const sim = engineDrive(this.cpuOff!, this.userDef!, start, driveStream(this.rng), clock, {
+    const gen = driveSteps(this.cpuOff!, this.userDef!, start, driveStream(this.rng), clock, {
       brain: this.userDc, ocBrain: this.cpuOc, record: true, homeId: this.homeId,
       onPlay: (p, snap) => {
         plays.push(p);
         snaps.push(snap);
       },
     });
+    return { gen, plays, snaps };
+  }
+
+  private cpuCredited(sim: EngineDrive, plays: SimPlay[], snaps: (EngineSnap | undefined)[]): { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] } {
     const on = this.liveBox?.cpu.on ?? starters(this.cpuSquad);
     const dOn = this.liveBox?.user.on ?? starters(this.userSquad);
     return { sim, plays, credit: { snaps: plays.map((p, i) => engineCredit(p, snaps[i], on, dOn)) }, snaps };
+  }
+
+  /**
+   * A CPU possession, then `done` with it: at once (`engineCpu`), or, with PLAY DEFENSE on, stepped with the user
+   * on a defender for the snaps the setting picks (docs/USERDEF.md). `played` holds the snaps he played.
+   */
+  private playCpuDrive(start: number, clock: DriveClock, done: DefLive['done']): void {
+    if (this.liveDefense() === 'off') {
+      done(this.engineCpu(start, clock), new Set());
+      return;
+    }
+    const { gen, plays, snaps } = this.cpuSteps(start, clock);
+    this.defLive = {
+      gen, plays, snaps, clock0: { ...this.clock }, run: null, req: null, stage: 'pre', pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
+      played: new Set(), stop: 0, cone: null, verdict: null, done,
+    };
+    // What happened before it (the user's drive, a kick, the quarter) first.
+    if (this.notices.length) this.showNotices('defense');
+    else this.pumpDefense();
   }
 
   /**
@@ -4080,12 +4198,14 @@ export class Game {
    * Queue a CPU drive's key plays at the defense's key-play level (`all`: every snap), each the real snap on
    * tape with the user's call over it. The biggest go to the postgame reel's pool too.
    */
-  private showCpuDrive(d: StoryDrive, plays: SimPlay[] = [], snaps: (EngineSnap | undefined)[] = []): void {
+  private showCpuDrive(d: StoryDrive, plays: SimPlay[] = [], snaps: (EngineSnap | undefined)[] = [], played: Set<SimPlay> = new Set()): void {
     const level = this.keyLevel('defense');
     const at = new Map(plays.map((p, i) => [p, snaps[i]] as const));
     for (const [p, s] of at) if (s?.tape) this.keepCpuTape(p, s.tape);
     if (level === 'off') return;
     for (const k of pickDrive(d, level, 'defense')) {
+      // The snaps the user played on the field aren't shown again.
+      if (played.has(k.play)) continue;
       const s = at.get(k.play);
       this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0, s ? { tape: s.tape, note: this.snapNote(s, false) } : {}) });
     }
@@ -4340,6 +4460,437 @@ export class Game {
     this.liveDrives[0].plays.push({ gain: 0, down: 0, toGo: 0, kick, ...(this.snapLev ? { lev: this.snapLev } : {}) });
   }
 
+  // ------------------------------------------------------------ PLAY DEFENSE (docs/USERDEF.md)
+
+  /**
+   * Run the CPU's drive on to its next snap for the user (`liveSnap`), playing the rest at once; at its end, its
+   * `done`. `back` is the snap he just played.
+   */
+  private pumpDefense(back?: SnapBack): void {
+    const L = this.defLive!;
+    const n = L.plays.length;
+    let s = back ? L.gen.next(back) : L.gen.next();
+    // The first snap it logged is the one he played.
+    if (back && L.plays.length > n) L.played.add(L.plays[n]);
+    while (!s.done) {
+      const q = s.value;
+      if (this.liveSnap(q)) {
+        this.startDefSnap(q);
+        return;
+      }
+      s = L.gen.next({ r: playReq(q) });
+    }
+    const r = this.cpuCredited(s.value, L.plays, L.snaps);
+    this.defLive = null;
+    this.play = null;
+    this.cam.mirror = false;
+    this.cam.setZoom(1, 1, { x: 0, y: 0 });
+    L.done(r, L.played);
+  }
+
+  /** The game clock at a point of the drive on the field (the drive itself burns its time when it ends). */
+  private defClock(L: DefLive, secs: number): Clock {
+    const c = { ...L.clock0 };
+    advanceSim(c, secs);
+    return c;
+  }
+
+  /** Whether the user plays this CPU snap: every snap, or the big ones (`bigSnap`, and the CPU's first of a half). */
+  private liveSnap(q: SnapReq): boolean {
+    const level = this.liveDefense();
+    const c = this.defClock(this.defLive!, q.t);
+    const half = c.quarter <= 2 ? 0 : c.quarter <= 4 ? 1 : 2;
+    const first = half !== this.cpuSnapHalf;
+    this.cpuSnapHalf = half;
+    if (level === 'all') return true;
+    return level === 'key' && bigSnap(q.sit, q.lev, first);
+  }
+
+  /** Line the snap up live: the user picks his man before it (the one he played last, if he's out there). */
+  private startDefSnap(q: SnapReq): void {
+    const L = this.defLive!;
+    const run = new SnapRun(q.off, q.def, q.drive, q.sit, q.rng, q.brain, q.opts);
+    const play = run.play;
+    play.defFlip = true;
+    // The back seven, top of the screen to the bottom.
+    L.picks = play.def.filter((d) => d.role === 'LB' || d.role === 'CB' || d.role === 'S').sort((a, b) => a.pos.y - b.pos.y);
+    L.pick = L.picks.find((d) => d.slot === this.defSlot) ?? L.picks.find((d) => d.slot === 'MLB') ?? L.picks[0] ?? null;
+    play.defControlled = L.pick;
+    L.run = run;
+    L.req = q;
+    L.stage = 'pre';
+    L.userTimeout = false;
+    L.acc = 0;
+    L.overT = 0;
+    L.stop = 0;
+    L.cone = null;
+    L.verdict = null;
+    this.play = play;
+    this.kick = null;
+    this.cam.mirror = true;
+    this.cam.setZoom(1, 1, { x: q.drive.los, y: q.drive.ballY });
+    this.cam.follow(play.focusX(), 0.35);
+    this.screen = 'defense';
+  }
+
+  private updateDefense(dt: number, input: Input): void {
+    const L = this.defLive!;
+    this.shakeT = Math.max(0, this.shakeT - dt);
+    const run = L.run!;
+    const play = run.play;
+    // T: the user's timeout at the whistle (if he has one).
+    if (L.stage !== 'over' && input.hit('KeyT') && (L.req!.sit.defTO ?? 0) > 0) L.userTimeout = !L.userTimeout;
+    if (L.stage === 'pre') {
+      const k = L.picks.length;
+      if (k) {
+        const i = L.pick ? L.picks.indexOf(L.pick) : 0;
+        if (input.hit('KeyQ', 'KeyW', 'ArrowUp')) this.pickDefender(L.picks[(i + k - 1) % k]);
+        if (input.hit('KeyE', 'KeyS', 'ArrowDown')) this.pickDefender(L.picks[(i + 1) % k]);
+        if (input.mouse.pressed) {
+          const w = this.cam.toWorld(input.mouse.x, input.mouse.y);
+          let best: Player | null = null;
+          let bd = 3;
+          for (const d of L.picks) {
+            const dd = Math.hypot(d.pos.x - w.x, d.pos.y - w.y);
+            if (dd < bd) {
+              bd = dd;
+              best = d;
+            }
+          }
+          if (best) this.pickDefender(best);
+          input.mouse.pressed = false;
+        }
+      }
+      if (input.hit('Space', 'Enter')) {
+        L.stage = 'live';
+        if (L.pick) this.defSlot = L.pick.slot;
+        run.snap();
+        this.cam.setZoom(DEF_FEEL.spreadX, DEF_FEEL.spreadY, this.defFocus(play));
+      }
+      return;
+    }
+    if (L.stage === 'live') {
+      // One step a frame at the frame's (slowed) time, so the motion is smooth and no key press is lost; frozen on a hit-stop.
+      if (L.stop > 0) L.stop -= dt;
+      else if (dt > 0) run.step(input, dt);
+      for (const f of play.defFx) this.defFeedback(L, f);
+      play.defFx.length = 0;
+      this.stepCone(L, dt);
+      const lead = play.phase === 'run' ? 0.4 : play.phase === 'air' ? 0.45 : 0.35;
+      this.cam.follow(play.focusX(), lead);
+      this.cam.zoomFollow(this.defFocus(play));
+      if (run.done()) {
+        L.stage = 'over';
+        L.overT = 0;
+      }
+      return;
+    }
+    // The whistle: the result over the field, then the drive goes on.
+    L.overT += dt;
+    const skip = L.overT > 0.5 && (input.hit('Space', 'Enter') || input.mouse.pressed);
+    input.mouse.pressed = false;
+    if (skip || L.overT > 2.4) {
+      const r = run.result();
+      L.run = null;
+      this.pumpDefense({ r, userTimeout: L.userTimeout });
+    }
+  }
+
+  /** Where the spread camera holds on a live snap: between the QB and the user's man (the carrier once there is one). */
+  private defFocus(play: Play): { x: number; y: number } {
+    const d = play.defControlled;
+    const a = play.carrier && play.carrier !== play.qb ? play.carrier.pos : play.qb.pos;
+    return d ? { x: (a.x + d.pos.x) / 2, y: (a.y + d.pos.y) / 2 } : a;
+  }
+
+  /** The user's man made something happen (`DefFx`): the sound, the hit-stop, the shake, the verdict. */
+  private defFeedback(L: DefLive, f: DefFx): void {
+    const F = DEF_FEEL;
+    const shake = (k: number) => {
+      this.shakeAmp = F.shake * k;
+      this.shakeT = F.shakeTime * k;
+    };
+    switch (f) {
+      case 'leap':
+        sfx('swipe', { rate: 0.85, gain: 0.9 });
+        break;
+      case 'swat':
+        sfx('swipe', { rate: 1.25, gain: 0.9 });
+        break;
+      case 'lunge':
+        sfx('swipe', { rate: 0.7 });
+        break;
+      case 'pick':
+        L.stop = F.hitStop * 1.5;
+        shake(1);
+        break;
+      case 'pbu':
+        sfx('hit', { rate: 1.3, gain: 0.9 });
+        L.stop = F.hitStop;
+        shake(0.6);
+        break;
+      case 'miss':
+        sfx('ground', { gain: 0.7 });
+        break;
+      case 'bigHit':
+        L.stop = F.hitStop;
+        shake(1);
+        break;
+      default:
+        break;
+    }
+    const v = L.run?.play.defVerdict;
+    if ((f === 'pick' || f === 'pbu' || f === 'miss') && v) L.verdict = { grade: v.grade, ms: v.ms, result: v.result ?? '', kind: v.kind, at: this.t };
+  }
+
+  /** The QB's eyes as the user's man sees them (`DEF_FEEL.cone`): late and wide for a low-awareness man, fading in while he's looking. */
+  private stepCone(L: DefLive, dt: number): void {
+    const run = L.run;
+    const play = run?.play;
+    const d = play?.defControlled;
+    if (!run || !play || !d) return;
+    const C = DEF_FEEL.cone;
+    const k = clamp((d.r.prc - 40) / 59, 0, 1);
+    const at = run.qb.lookAt();
+    const want = Math.atan2(at.y - play.qb.pos.y, at.x - play.qb.pos.x);
+    const see = play.defEyes() && !play.thrown && (play.phase === 'snap' || play.phase === 'live') && play.carrier === play.qb;
+    if (!L.cone) L.cone = { ang: want, vis: 0 };
+    const c = L.cone;
+    let diff = want - c.ang;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    c.ang += diff * (1 - Math.exp(-dt / lerp(C.lagLo, C.lagHi, k)));
+    c.vis = clamp(c.vis + (see ? 1 : -1) * (dt / C.fade), 0, 1);
+  }
+
+  private pickDefender(d: Player): void {
+    const L = this.defLive!;
+    L.pick = d;
+    L.run!.play.defControlled = d;
+  }
+
+  /** What the man the user is on has on this call, in a few words. */
+  private defJob(play: Play, d: Player): string {
+    const a = d.assign;
+    if (!a) return 'READ AND REACT';
+    switch (a.kind) {
+      case 'man':
+        return `MAN ON ${d.manTarget ? `#${d.manTarget.num} ${d.manTarget.slot}` : a.target}`;
+      case 'deep':
+        return 'DEEP ZONE';
+      case 'robber':
+        return 'ROBBER: SIT IN THE MIDDLE, READ THE QB';
+      case 'zone':
+        return `${a.fit ? 'FIT THE RUN, THEN ' : ''}${String(a.spot).toUpperCase()} ZONE`;
+      case 'spy':
+        return 'SPY THE QB';
+      case 'rush':
+        return a.contain ? 'RUSH: CONTAIN THE QB' : play.tags?.game ? 'RUSH (STUNT)' : 'BLITZ';
+      default:
+        return '';
+    }
+  }
+
+  /** The defense on the field: his man's ring and job, the picks before the snap. Drawn over `drawPlay`. */
+  private renderDefense(g: CanvasRenderingContext2D, L: DefLive): void {
+    const play = L.run?.play ?? this.play;
+    if (!play) return;
+    const d = L.pick;
+    const ring = (p: Player, color: string, rx: number) => {
+      const s = this.cam.toScreen(p.pos.x, p.pos.y);
+      g.strokeStyle = color;
+      g.lineWidth = 1;
+      g.beginPath();
+      g.ellipse(Math.round(s.x), Math.round(s.y), rx, rx * 0.4, 0, 0, Math.PI * 2);
+      g.stroke();
+    };
+    if (L.stage === 'live') {
+      this.drawCone(g, L, play);
+      this.drawBallRing(g, play);
+      // A carrier he can lay out for: SPACE.
+      const c = play.carrier;
+      if (d && c && c.side === 'off' && play.phase === 'run' && !d.down && !play.defLunge && Math.hypot(c.pos.x - d.pos.x, c.pos.y - d.pos.y) <= USER_DEF.diveFrom) {
+        const blink = Math.floor(this.t * 6) % 2 === 0;
+        ring(c, blink ? '#ff5a5a' : '#ffb0a0', 9);
+      }
+    }
+    if (L.stage === 'pre') {
+      for (const p of L.picks) if (p !== d) ring(p, 'rgba(154,215,255,0.55)', 7);
+      if (d) {
+        // His job: the man he has, the spot his zone is, the QB he's after.
+        const s = this.cam.toScreen(d.pos.x, d.pos.y);
+        const a = d.assign;
+        let to: { x: number; y: number } | null = null;
+        if (a?.kind === 'man' && d.manTarget) to = d.manTarget.pos;
+        else if (a?.kind === 'zone') to = zoneSpot(play, a);
+        else if (a?.kind === 'rush' || a?.kind === 'spy') to = play.qb.pos;
+        if (to) {
+          const t = this.cam.toScreen(to.x, to.y);
+          g.strokeStyle = '#ffd23f';
+          g.setLineDash([3, 3]);
+          g.beginPath();
+          g.moveTo(Math.round(s.x), Math.round(s.y));
+          g.lineTo(Math.round(t.x), Math.round(t.y));
+          g.stroke();
+          g.setLineDash([]);
+          if (a?.kind === 'zone') {
+            g.beginPath();
+            g.ellipse(Math.round(t.x), Math.round(t.y), 10, 4, 0, 0, Math.PI * 2);
+            g.stroke();
+          }
+        }
+      }
+    }
+    if (d) {
+      ring(d, '#ffd23f', 8);
+      const s = this.cam.toScreen(d.pos.x, d.pos.y);
+      const x = Math.round(s.x);
+      const y = Math.round(s.y - 27);
+      g.fillStyle = '#ffd23f';
+      g.fillRect(x - 3, y, 7, 1);
+      g.fillRect(x - 2, y + 1, 5, 1);
+      g.fillRect(x - 1, y + 2, 3, 1);
+      g.fillRect(x, y + 3, 1, 1);
+      // His eyes on the QB (LOOK, or squared up to him): a little eye over his head.
+      if (L.stage === 'live' && play.defEyes() && !play.thrown) {
+        const ey = y - 7;
+        g.fillStyle = '#ffffff';
+        g.fillRect(x - 3, ey, 7, 3);
+        g.fillRect(x - 2, ey - 1, 5, 1);
+        g.fillRect(x - 2, ey + 3, 5, 1);
+        g.fillStyle = '#14202e';
+        g.fillRect(x - 1, ey, 3, 3);
+      }
+    }
+  }
+
+  /**
+   * The QB's eyes as the user's man sees them (`DEF_FEEL.cone`): a wedge from the QB, tight and crisp for a
+   * high-awareness man, wide and faint for a low one (`stepCone` sets its angle and how visible it is).
+   */
+  private drawCone(g: CanvasRenderingContext2D, L: DefLive, play: Play): void {
+    const c = L.cone;
+    const d = play.defControlled;
+    if (!c || !d || c.vis <= 0.01) return;
+    const C = DEF_FEEL.cone;
+    const k = clamp((d.r.prc - 40) / 59, 0, 1);
+    const half = (lerp(C.wide, C.tight, k) * Math.PI) / 180;
+    const q = play.qb.pos;
+    const o = this.cam.toScreen(q.x, q.y);
+    const pt = (a: number, r: number) => this.cam.toScreen(q.x + Math.cos(a) * r, q.y + Math.sin(a) * r);
+    const alpha = c.vis * lerp(0.35, 0.7, k);
+    // The wedge, brighter down the middle.
+    g.save();
+    g.fillStyle = `rgba(255,236,140,${(alpha * 0.32).toFixed(3)})`;
+    g.beginPath();
+    g.moveTo(o.x, o.y);
+    for (let i = 0; i <= 12; i++) {
+      const p = pt(c.ang - half + (2 * half * i) / 12, C.len);
+      g.lineTo(p.x, p.y);
+    }
+    g.closePath();
+    g.fill();
+    g.fillStyle = `rgba(255,236,140,${(alpha * 0.3).toFixed(3)})`;
+    g.beginPath();
+    g.moveTo(o.x, o.y);
+    for (let i = 0; i <= 6; i++) {
+      const p = pt(c.ang - half * 0.4 + (0.8 * half * i) / 6, C.len * 0.9);
+      g.lineTo(p.x, p.y);
+    }
+    g.closePath();
+    g.fill();
+    // Dotted edges.
+    g.fillStyle = `rgba(255,236,140,${alpha.toFixed(3)})`;
+    for (const side of [-1, 1]) {
+      for (let r = 2; r <= C.len; r += 1.2) {
+        const p = pt(c.ang + side * half, r);
+        g.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+      }
+    }
+    g.restore();
+  }
+
+  /**
+   * The timing ring (docs/USERDEF.md): once his eyes are on a ball coming down near him, a ring closes on his
+   * feet and meets the sweet band `USER_DEF.lead` before it lands: gold, PLAY BALL's window; blue, SWAT's.
+   */
+  private drawBallRing(g: CanvasRenderingContext2D, play: Play): void {
+    const d = play.defControlled;
+    const land = play.ballTarget;
+    if (!d || d.down || play.phase !== 'air' || !land || play.pitch || play.time < d.findAt) return;
+    const F = DEF_FEEL;
+    if (Math.hypot(land.x - d.pos.x, land.y - d.pos.y) > F.ringNear) return;
+    const s = this.cam.toScreen(d.pos.x, d.pos.y);
+    const x = Math.round(s.x);
+    const y = Math.round(s.y);
+    const tl = play.ballTimeLeft() - USER_DEF.lead;
+    const ell = (r: number, color: string, w = 1) => {
+      if (r <= 0.5) return;
+      g.strokeStyle = color;
+      g.lineWidth = w;
+      g.beginPath();
+      g.ellipse(x, y, r, r * 0.42, 0, 0, Math.PI * 2);
+      g.stroke();
+    };
+    const sw = play.ballWindow('swat') * F.ringRate;
+    const pb = play.ballWindow('play') * F.ringRate;
+    // The bands: SWAT's wide and pale, PLAY BALL's narrow and gold.
+    ell(F.ringIn, 'rgba(120,190,255,0.35)', Math.max(1, sw * 2));
+    ell(F.ringIn, 'rgba(255,210,63,0.75)', Math.max(1, pb * 2));
+    if (play.defBall) return;
+    const r = F.ringIn + tl * F.ringRate;
+    const hot = Math.abs(tl) * F.ringRate <= pb;
+    ell(r, hot ? '#ffd23f' : Math.abs(tl) * F.ringRate <= sw ? '#9ad7ff' : '#ffffff', hot ? 2 : 1);
+  }
+
+  /** The verdict on his play at the ball: the timing (PERFECT, GOOD, EARLY, LATE, by how much) and what came of it. */
+  private drawVerdict(g: CanvasRenderingContext2D, L: DefLive, y = 112): void {
+    const v = L.verdict;
+    if (!v) return;
+    const age = this.t - v.at;
+    if (age > DEF_FEEL.verdictTime + (L.stage === 'over' ? 1 : 0)) return;
+    const good = v.grade === 'PERFECT' || v.grade === 'GOOD';
+    const color = v.grade === 'PERFECT' ? '#ffd23f' : good ? '#7dff7d' : '#ff9a5a';
+    // It flashes white as it lands, then settles into its color.
+    const flash = age < 0.1;
+    g.fillStyle = 'rgba(8,10,14,0.62)';
+    g.fillRect(VIEW_W / 2 - 120, y - 6, 240, 52);
+    text(g, v.grade, VIEW_W / 2, y, { size: 16, align: 'center', color: flash ? '#ffffff' : color });
+    text(g, `${v.kind === 'play' ? 'PLAY BALL' : 'SWAT'}${v.grade === 'PERFECT' ? '' : `  ${v.ms} MS ${v.grade === 'LATE' ? 'LATE' : 'EARLY'}`}`, VIEW_W / 2, y + 23, { align: 'center', color: '#cfe3ff' });
+    if (v.result) text(g, v.result, VIEW_W / 2, y + 34, { align: 'center', color: v.result === 'CAUGHT' ? '#ff9a5a' : '#ffffff' });
+  }
+
+  private renderDefenseHud(g: CanvasRenderingContext2D, L: DefLive): void {
+    const play = L.run?.play ?? this.play;
+    if (!play) return;
+    if (L.stage === 'over' && play.outcome) {
+      // Above the result's banner.
+      this.drawVerdict(g, L, 40);
+      const o = play.outcome;
+      drawBanner(g, o.text, o.sub, o.color, L.userTimeout ? 'TIMEOUT, DEFENSE' : '');
+      drawHint(g, 'CLICK OR SPACE TO CONTINUE');
+      return;
+    }
+    const call = `YOUR D: ${play.defCall.name.toUpperCase()}${play.tags?.prevent ? ', PREVENT' : ''}`;
+    text(g, call, VIEW_W / 2, 34, { size: 8, align: 'center', color: '#ffd23f' });
+    const d = L.pick;
+    if (d) text(g, `#${d.num} ${d.name.toUpperCase()} (${d.slot}): ${this.defJob(play, d)}`, VIEW_W / 2, 46, { align: 'center', color: '#cfe3ff' });
+    if (L.userTimeout) text(g, 'TIMEOUT AT THE WHISTLE (T TO CANCEL)', VIEW_W / 2, 58, { align: 'center', color: '#ff9a5a' });
+    this.drawVerdict(g, L);
+    if (L.stage === 'pre') {
+      drawHint(g, 'Q/E OR CLICK: PICK YOUR MAN   SPACE: SNAP   T: TIMEOUT');
+      return;
+    }
+    // What he can do right now.
+    const c = play.carrier;
+    const near = !!d && !!c && c.side === 'off' && play.phase === 'run' && Math.hypot(c.pos.x - d.pos.x, c.pos.y - d.pos.y) <= USER_DEF.diveFrom;
+    if (play.phase === 'air' && d && play.time >= d.findAt && !play.defBall) drawHint(g, 'SPACE: PLAY THE BALL   E: SWAT IT   (ON THE GOLD RING)');
+    else if (play.phase === 'air' && d && !play.defBall) drawHint(g, 'BALL IN THE AIR: SHIFT TO FIND IT');
+    else if (near && !play.defLunge) drawHint(g, 'SPACE: LAY OUT FOR HIM');
+    else if (!play.thrown && play.carrier === play.qb && !play.defEyes()) drawHint(g, 'WASD: MOVE   SHIFT: READ THE QB   T: TIMEOUT');
+    else drawHint(g, 'WASD: MOVE   SHIFT: LOOK   T: TIMEOUT');
+  }
+
   /**
    * A CPU possession from `from` (yards from its own goal), played through the engine against the user's
    * defense (`engineCpu`), burning game clock. The spot is rounded: it's where a live play or kick ended.
@@ -4353,7 +4904,15 @@ export class Game {
     const dc: DriveClock = {
       timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs, timeouts: { off: this.to.cpu, def: this.to.user },
     };
-    const { sim, plays, credit, snaps } = this.engineCpu(start, dc);
+    this.playCpuDrive(start, dc, (r, played) => this.cpuDriveDone(start, left, diff, r, played));
+  }
+
+  /** A CPU possession is over (`cpuDrive`): the timeouts, the logs and box score, its key plays, the clock, and what comes next. */
+  private cpuDriveDone(
+    start: number, left: number, diff: number, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>,
+  ): void {
+    const c = this.clock;
+    const { sim, plays, credit, snaps } = r;
     const called = { user: 0, cpu: 0 };
     if (sim.timeouts) {
       this.to = { user: sim.timeouts.def, cpu: sim.timeouts.off };
@@ -4373,7 +4932,7 @@ export class Game {
     const td = sim.result === 'TOUCHDOWN';
     if (td) told.points = 6;
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
-    this.showCpuDrive(told, plays, snaps);
+    this.showCpuDrive(told, plays, snaps, played);
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += told.points;
     const said = this.userDc ? headline(this.userDc, playName) : null;
@@ -4456,6 +5015,7 @@ export class Game {
     else if (this.afterNotices === 'kickoff') this.toCall('kickoff');
     else if (this.afterNotices === 'pat') this.toCall('pat');
     else if (this.afterNotices === 'cpuKick' && this.pendingCpuKick) this.startCpuKick();
+    else if (this.afterNotices === 'defense' && this.defLive) this.pumpDefense();
     else this.toCall();
   }
 
@@ -4640,18 +5200,31 @@ export class Game {
       drawShow(g, show, this.showCtx, this.crowd!, this.debug);
       return;
     }
+    const shaking = this.screen === 'defense' && this.shakeT > 0;
+    if (shaking) {
+      const a = this.shakeAmp * (this.shakeT / DEF_FEEL.shakeTime);
+      g.save();
+      g.translate(Math.round((Math.random() - 0.5) * 2 * a), Math.round((Math.random() - 0.5) * 2 * a));
+    }
     drawField(g, this.cam, this.user, this.cpu, this.crowd!);
     const kickoff = this.callMode === 'kickoff' || this.kick?.unit === 'kickoff';
+    const dl = this.screen === 'defense' ? this.defLive : null;
     if (this.cpuKick) drawLines(g, this.cam, this.cpuKick.run.kp.los, this.cpuKick.run.kp.los);
+    else if (dl?.req) drawLines(g, this.cam, dl.req.drive.los, dl.req.drive.firstDownX);
     else drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
     if (this.kick) drawKickPlay(g, this.cam, this.kick, this.debug);
-    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, false, this.runAssist(), this.menuMouse);
+    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, !!dl, this.runAssist(), this.menuMouse);
     else this.drawBallSpot(g);
+    if (dl) this.renderDefense(g, dl);
+    if (shaking) g.restore();
 
-    const center = this.watchOnly ? 'FINAL' : this.cpuKick ? `${this.cpu.abbr} ${this.cpuKick.unit === 'punt' ? 'PUNTS' : 'KICKS OFF'}` : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
-    const right = this.watchOnly ? 'SIMULATED' : this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
+    const dq = dl?.req;
+    const center = dq ? `${this.cpu.abbr} ${downDistance(dq.drive)}  ${fieldLabel(FIELD_LEN - dq.drive.los)}` : this.watchOnly ? 'FINAL' : this.cpuKick ? `${this.cpu.abbr} ${this.cpuKick.unit === 'punt' ? 'PUNTS' : 'KICKS OFF'}` : kickoff ? 'KICKOFF' : `${downDistance(this.drive)}  ${fieldLabel(this.drive.los)}`;
+    const right = dq ? 'DEFENSE' : this.watchOnly ? 'SIMULATED' : this.kick ? this.kick.def.name.toUpperCase() : this.play ? this.play.playDef.name.toUpperCase() : 'PLAY CALL';
     const shown = this.screen === 'notice' ? this.notices[0] : undefined;
-    drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockText(this.clock), center, right, {
+    const dp = dl?.run?.play;
+    const clockNow = dl && dq ? clockText(this.defClock(dl, dq.t + (dp && dl.stage !== 'pre' ? dp.time - dp.snapTime : 0))) : clockText(this.clock);
+    drawScorebug(g, this.user, this.cpu, shown?.score ?? this.score, shown?.clock ?? clockNow, center, right, {
       ...(shown?.to ?? this.to), max: this.toMax(),
     });
     const huddle =
@@ -4691,6 +5264,7 @@ export class Game {
       }
       drawHint(g, 'CLICK OR SPACE TO CONTINUE');
     } else if (this.screen === 'final') this.renderFinal(g);
+    else if (dl) this.renderDefenseHud(g, dl);
     else if (this.kick) this.renderKickHud(g, this.kick);
     else if (this.play) this.renderPlayHud(g, this.play);
     if (this.debug && this.brain && lastRead && (this.screen === 'call' || this.screen === 'play')) this.renderDcDebug(g);
@@ -5092,7 +5666,7 @@ export class Game {
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
         drawExhibition(
           g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`,
-          this.exhibitionOptions().join('  '), x, y,
+          this.exhibitionOptions().join('  '), x, y, `PLAY DEFENSE: ${LIVE_DEF_LABEL[this.exhibitionLiveDef]} (P)`,
         );
         break;
       case 'slots':

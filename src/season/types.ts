@@ -50,6 +50,8 @@ export interface SeasonConfig {
   kicks?: 'watch' | 'result';
   /** Slow motion while the QB aims a pass in live games. Missing means off. */
   aimSlow?: boolean;
+  /** PLAY DEFENSE: on CPU drives in live games the user plays one defender: never, on the big snaps, or every snap (docs/USERDEF.md). Missing means off. */
+  liveDefense?: 'off' | 'key' | 'all';
   /** The presnap read line in live games: the shell and the rest of the look, the shell only, or nothing. Missing means FULL. */
   readHelp?: 'FULL' | 'SHELL' | 'OFF';
   /** The CPU defense disguises its coverage before the snap in live games (data/defenses.ts `Disguise`). Missing means on. */

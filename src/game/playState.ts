@@ -145,6 +145,45 @@ export const RUN_PICKUP = 1.1;
 export const BODY = { r: 0.6, keep: 0.75, band: 3 };
 export const DIVE_TACKLE = { range: 1.7, closing: 1.0, odds: 0.55, down: 1.0, past: 5 };
 /**
+ * The user's defender on a CPU snap (docs/USERDEF.md): the read is the user's, the body is the player's.
+ * - `backpedal`: his speed with LOOK held (head around to the QB or the ball) moving away from the QB
+ * - the ball, PLAY BALL or SWAT pressed in flight: the sweet spot is `lead` s before it arrives, within a
+ *   half-window from `window[kind]` (lo..hi by his hands, `cth` 60% and `prc` 40%), down to `blindWindow` of
+ *   it for a ball he hasn't seen (`readyAt`). Timed (`on`) or not (`off`), each scales his contest skill and
+ *   his pick odds (sim/catching.ts `skillMul`, `intMul`). A PLAY BALL that misses and is caught leaves him on
+ *   the turf `whiff` s (the YAC is the price of the gamble).
+ * - `dive`: a diving tackle he lays out for himself (SPACE within `diveFrom` yd): he flies `lunge` s at
+ *   `lungeSpeed` × his top speed at where the carrier's going; on contact it's `dive` of a tackle, and a lunge
+ *   that finds nobody leaves him down (WHIFF)
+ * - the feel (pass 2): a PLAY BALL is a jump, `leapSpeed` of his speed until the ball's down or `leapTime`;
+ *   a SWAT a chop, `swatSpeed` for `swatTime`. The verdict is PERFECT inside `perfect` of the half-window,
+ *   GOOD inside it, else EARLY or LATE. A tackle at `bigHit` yd/s of closing speed is a BIG HIT
+ */
+export const USER_DEF = {
+  backpedal: 0.8,
+  lead: 0.2,
+  window: { play: [0.05, 0.11], swat: [0.12, 0.22] },
+  blindWindow: 0.3,
+  ball: {
+    play: { on: { skill: 1.0, int: 2.2 }, off: { skill: 0.45, int: 0.3 } },
+    swat: { on: { skill: 1.35, int: 0.35 }, off: { skill: 0.8, int: 0.5 } },
+  },
+  whiff: 0.7,
+  dive: 0.55,
+  diveFrom: 2.6,
+  lunge: 0.32,
+  lungeSpeed: 1.15,
+  leapSpeed: 0.4,
+  leapTime: 0.55,
+  swatSpeed: 0.7,
+  swatTime: 0.3,
+  perfect: 0.4,
+  bigHit: 7,
+};
+
+/** What the user's defender just did, for the game's feedback (sound, hit-stop, shake); display only. */
+export type DefFx = 'leap' | 'swat' | 'pick' | 'pbu' | 'miss' | 'hit' | 'bigHit' | 'lunge' | 'whiff';
+/**
  * Seconds of full sprint from a full bar, from the least to the most enduring player, eased by
  * `endurance` squared: a pocket QB about 1.5 s, a mobile QB about 2.3, a WR about 2.9.
  */
@@ -343,6 +382,23 @@ export class Play {
   recoverer: Player | null = null;
   /** The player the user is steering (QB pre-throw, ball carrier after a catch). */
   controlled: Player | null = null;
+  /** The defender the user plays on a CPU snap (docs/USERDEF.md); the AI plays him while the stick is idle. */
+  defControlled: Player | null = null;
+  /** The view is mirrored: the user's stick is flipped in x. */
+  defFlip = false;
+  /** He's taken the stick this snap: from then on his eyes are the user's (LOOK), not the AI's. */
+  defManual = false;
+  /** LOOK held this step. */
+  defLook = false;
+  /** PLAY BALL or SWAT, pressed in flight: which and when; and how it went at the ball. */
+  defBall: { kind: 'play' | 'swat'; t: number } | null = null;
+  defVerdict: { kind: 'play' | 'swat'; timed: boolean; early: boolean; grade: 'PERFECT' | 'GOOD' | 'EARLY' | 'LATE'; ms: number; result?: string } | null = null;
+  /** He's committed (in the air on a jump, mid-chop, laid out): until when, at what share of his speed. */
+  defCommit: { until: number; speed: number } | null = null;
+  /** Laid out for the carrier: until when, and whether it's been decided. */
+  defLunge: { until: number; done: boolean } | null = null;
+  /** Feedback the game takes off each frame (`DefFx`). */
+  defFx: DefFx[] = [];
   aim: Aim | null = null;
   ballTarget: Vec | null = null;
   intended: Player | null = null;
@@ -1037,7 +1093,7 @@ export class Play {
     }
   }
 
-  update(dt: number, input: Input, cam: Camera): void {
+  update(dt: number, input: Input, cam: Camera, defInput?: Input): void {
     this.time += dt;
     for (const p of this.players) tickTimers(p, dt);
     if (this.phase !== 'presnap') this.recordHistory();
@@ -1076,6 +1132,7 @@ export class Play {
     }
     if (this.phase === 'presnap') this.presnapMoves();
     if (this.controlled) this.userControl(input, dt);
+    if (this.defControlled && defInput) this.defUserControl(defInput);
     this.pile();
     this.drag(dt);
 
@@ -1612,6 +1669,9 @@ export class Play {
         d.findAt = d.reactAt;
       }
     }
+    // The user's defender sees it leave his hand if he's looking, and not if he isn't (`updateEyes` finds it later).
+    const u = this.defControlled;
+    if (u && this.defManual && !u.down) u.findAt = u.eyes >= 1 ? this.time + FIND.base : Infinity;
   }
 
   /**
@@ -1708,12 +1768,21 @@ export class Play {
       ? 'miss'
       : resolveCatch(
           bestO ? { pos: so, cth: bestO.r.cth, cit: bestO.r.cit, set: this.catchSet, ready: this.catchReady, hot, lunge } : null,
-          defs.map(({ p, s }) => ({ pos: s, cth: p.r.cth, prc: p.r.prc, ready: readyAt(p, this.time) })),
+          defs.map(({ p, s }) => ({ pos: s, cth: p.r.cth, prc: p.r.prc, ready: readyAt(p, this.time), ...(p === this.defControlled ? this.ballCall(p) : {}) })),
           this.rng,
           this.passTipped ? 0 : THROWS[this.thrownKind].jump,
         );
 
+    const u = this.defControlled;
+    const uIn = !!u && defs.some((x) => x.p === u);
+    const v = uIn ? this.defVerdict : null;
+    if (v) {
+      v.result = res === 'int' ? 'PICKED OFF!' : res === 'pbu' ? 'BROKEN UP' : res === 'catch' ? 'CAUGHT' : 'INCOMPLETE';
+      this.defFx.push(res === 'int' ? 'pick' : res === 'pbu' ? 'pbu' : res === 'catch' ? 'miss' : 'pbu');
+    }
     if (res === 'catch' && bestO) {
+      // A missed jump at the ball: he's on the turf and the catch goes for more.
+      if (v && v.kind === 'play' && !v.timed) knockDown(u!, USER_DEF.whiff);
       this.caught = true;
       this.giveBall(bestO);
       this.controlled = bestO;
@@ -1734,6 +1803,8 @@ export class Play {
       else this.popup('CATCH!', bestO.pos, '#ffffff');
       return;
     }
+    // His own timed jump at the ball: the pick is his.
+    if (res === 'int' && v && v.kind === 'play' && v.timed) bestD = u;
     if (res === 'int' && bestD) {
       this.giveBall(bestD);
       this.phase = 'run';
@@ -1747,6 +1818,7 @@ export class Play {
     let sub = this.passTipped && this.tipper ? `Tipped by #${this.tipper.num} ${this.tipper.name}` : 'Nobody home';
     if (oob) sub = 'Out of bounds';
     else if (res === 'pbu' && bestD) {
+      if (v && v.timed) bestD = u!;
       setPose(bestD, 'catch', 0.4);
       sub = `Broken up by #${bestD.num} ${bestD.name}`;
     } else if (res === 'drop' && bestO) {
@@ -1760,6 +1832,135 @@ export class Play {
   }
 
   // ------------------------------------------------------------ user control
+
+  /**
+   * The user's defender (docs/USERDEF.md), after the AI has had its say: with the stick idle the AI plays
+   * him. The stick runs him at his top speed (`USER_DEF.backpedal` looking back at the QB); SHIFT is LOOK
+   * (alone: the AI plays his job with his eyes on the QB); in flight SPACE plays the ball and E swats it; with a carrier in front of him
+   * SPACE lays out for him. On a block the stick picks the shoulder he fights to.
+   */
+  private defUserControl(input: Input): void {
+    const d = this.defControlled!;
+    if (this.phase === 'presnap' || this.phase === 'over') return;
+    const raw = input.axis();
+    const ax = this.defFlip ? { x: -raw.x, y: raw.y } : raw;
+    const look = input.isDown('ShiftLeft', 'ShiftRight');
+    const moving = ax.x !== 0 || ax.y !== 0;
+    this.defLook = look;
+    if (moving || look) this.defManual = true;
+    if (this.phase === 'air' && !this.defBall && !d.down && !d.engagedBy.length) {
+      // Up for it, or the chop: committed either way (`USER_DEF`).
+      if (input.hit('Space')) {
+        this.defBall = { kind: 'play', t: this.time };
+        const t = Math.min(USER_DEF.leapTime, this.ballTimeLeft() + 0.12);
+        this.defCommit = { until: this.time + t, speed: USER_DEF.leapSpeed };
+        setPose(d, 'leap', t);
+        this.defFx.push('leap');
+      } else if (input.hit('KeyE')) {
+        this.defBall = { kind: 'swat', t: this.time };
+        this.defCommit = { until: this.time + USER_DEF.swatTime, speed: USER_DEF.swatSpeed };
+        setPose(d, 'swat', USER_DEF.swatTime);
+        this.defFx.push('swat');
+      }
+    }
+    const c = this.carrier;
+    if (this.phase === 'run' && c && c.side === 'off' && c !== d && !this.defLunge && input.hit('Space')) this.startLunge(d, c);
+    if (this.defLunge) {
+      this.stepLunge(d);
+      return;
+    }
+    if (this.defCommit && this.time < this.defCommit.until && !d.down) {
+      // In the air or mid-chop: he carries what he had, slowed, wherever the stick says.
+      const keep = this.defCommit.speed;
+      d.want = moving ? scale(norm(ax), maxSpeed(d) * keep) : scale(d.vel, keep);
+      return;
+    }
+    if (d.down || d.stun > 0 || (!moving && !look)) return;
+    if (d.engagedBy.length) {
+      if (moving) d.goal = add(d.pos, scale(norm(ax), 4));
+      return;
+    }
+    const toQb = norm(sub(this.qb.pos, d.pos));
+    if (!moving) {
+      // LOOK alone: the AI plays his job, his eyes on the QB, backpedaling (slower) when it takes him away from him.
+      const v = len(d.want);
+      if (c !== d && v > 0.5 && (d.want.x * toQb.x + d.want.y * toQb.y) / v < -0.3) d.want = scale(d.want, USER_DEF.backpedal);
+      return;
+    }
+    const dir = norm(ax);
+    const away = c !== d && dir.x * toQb.x + dir.y * toQb.y < -0.3;
+    d.want = scale(dir, maxSpeed(d) * (look && away ? USER_DEF.backpedal : 1));
+  }
+
+  /**
+   * The half-window of his PLAY BALL or SWAT on the ball in the air (`USER_DEF.window` by his hands, shrunk by
+   * how much of a look he'll have had at it when it comes down), for the timing ring.
+   */
+  ballWindow(kind: 'play' | 'swat'): number {
+    const p = this.defControlled;
+    if (!p) return 0;
+    const hands = (p.r.cth * 0.6 + p.r.prc * 0.4) / 100;
+    const [lo, hi] = USER_DEF.window[kind];
+    return lerp(lo, hi, clamp(hands, 0, 1)) * lerp(USER_DEF.blindWindow, 1, readyAt(p, this.time + this.ballTimeLeft()));
+  }
+
+  /** His PLAY BALL or SWAT against the ball arriving now (`USER_DEF`), as multipliers on his contest; none pressed is the AI's contest. */
+  private ballCall(p: Player): { skillMul?: number; intMul?: number } {
+    const b = this.defBall;
+    if (!b) return {};
+    const hands = (p.r.cth * 0.6 + p.r.prc * 0.4) / 100;
+    const [lo, hi] = USER_DEF.window[b.kind];
+    const half = lerp(lo, hi, clamp(hands, 0, 1)) * lerp(USER_DEF.blindWindow, 1, readyAt(p, this.time));
+    const lead = this.time - b.t;
+    const off = lead - USER_DEF.lead;
+    const timed = Math.abs(off) <= half;
+    const grade = Math.abs(off) <= half * USER_DEF.perfect ? 'PERFECT' : timed ? 'GOOD' : off > 0 ? 'EARLY' : 'LATE';
+    this.defVerdict = { kind: b.kind, timed, early: off > 0, grade, ms: Math.round(Math.abs(off) * 1000) };
+    const m = USER_DEF.ball[b.kind][timed ? 'on' : 'off'];
+    return { skillMul: m.skill, intMul: m.int };
+  }
+
+  /** He lays out for the carrier (`USER_DEF.dive`): a lunge at where he's going, decided on contact. */
+  private startLunge(d: Player, c: Player): void {
+    if (d.down || d.stun > 0 || d.engagedBy.length || d.engaged || c.down || dist(d.pos, c.pos) > USER_DEF.diveFrom) return;
+    const U = USER_DEF;
+    const to = add(c.pos, scale(c.vel, U.lunge * 0.6));
+    d.vel = scale(norm(sub(to, d.pos)), maxSpeed(d) * U.lungeSpeed);
+    d.tackleCd = U.lunge + 0.05; // no auto tackle in the air: the lunge decides it
+    this.defLunge = { until: this.time + U.lunge, done: false };
+    setPose(d, 'dive', U.lunge + 0.3);
+    this.defFx.push('lunge');
+  }
+
+  private stepLunge(d: Player): void {
+    const L = this.defLunge!;
+    d.want = d.vel;
+    const c = this.carrier;
+    if (!L.done && c && c.side === 'off' && !c.down && dist(d.pos, c.pos) <= TACKLE_RANGE + 0.35) {
+      L.done = true;
+      if (this.rng() < tackleChance(d.r.tkl, c.r.elu, c.r.str) * USER_DEF.dive) {
+        this.defLunge = null;
+        this.tackled(c, d);
+        return;
+      }
+    }
+    if (this.time >= L.until || L.done || this.phase !== 'run') {
+      this.defLunge = null;
+      knockDown(d, DIVE_TACKLE.down);
+      d.tackleCd = DIVE_TACKLE.down + 0.6;
+      if (this.phase === 'run') {
+        this.popup('WHIFF', d.pos, '#ff9a5a');
+        this.defFx.push('whiff');
+      }
+    }
+  }
+
+  /** The user's defender has his eyes on the QB (LOOK, or facing him): he can read the QB's (the vision cone). */
+  defEyes(): boolean {
+    const d = this.defControlled;
+    if (!d || d.down) return false;
+    return this.defLook || ((this.qb.pos.x - d.pos.x) * d.facing >= 0 && d.eyes > 0);
+  }
 
   private userControl(input: Input, dt: number): void {
     const c = this.controlled!;
@@ -2053,7 +2254,7 @@ export class Play {
       if (t.down || t.tackleCd > 0 || t.engaged || t.role === 'QB') continue;
       const arm = t.engagedBy.length > 0;
       const d = dist(t.pos, c.pos);
-      if (!arm && d > TACKLE_RANGE && d <= DIVE_TACKLE.range && this.diveAt(t, c, d)) return;
+      if (!arm && d > TACKLE_RANGE && d <= DIVE_TACKLE.range && !(t === this.defControlled && this.defManual) && this.diveAt(t, c, d)) return;
       if (d > (!arm ? TACKLE_RANGE : this.runBlocking() ? RUN_CONTROL.armReach : TACKLE_RANGE * 0.8)) continue;
       // A run-blocked defender's reach depends on how much of the block he's won (`armOdds`); pass pro's is flat.
       const armOdds = arm ? (this.runBlocking() ? runArmOdds(t) : ARM_TACKLE) * (levered(t, c.pos) ? ARM_LEVERED : 1) : 1;
@@ -2122,6 +2323,14 @@ export class Play {
   }
 
   private tackled(c: Player, t: Player): void {
+    // The user's defender made it (PLAY DEFENSE): a big hit, a stop behind the line, or just the tackle.
+    if (t === this.defControlled && c.side === 'off') {
+      const closing = len(sub(t.vel, c.vel));
+      const big = closing >= USER_DEF.bigHit;
+      if (big) this.popup('BIG HIT!', c.pos, '#ffd23f');
+      else if (c.pos.x < this.los) this.popup('STUFFED!', c.pos, '#ffd23f');
+      this.defFx.push(big || c.pos.x < this.los ? 'bigHit' : 'hit');
+    }
     c.wrap = 0;
     c.wrapBy = null;
     // Carriers going forward fall forward (yards after contact); returners and sacks don't.
@@ -2199,6 +2408,14 @@ export class Play {
     for (const p of this.players) {
       p.eyes = eyesOf(this, p);
       if (!reading || p.down) continue;
+      if (p === this.defControlled && this.defManual) {
+        // The user's: LOOK turns his head to the QB (the ball once it's in the air); otherwise he sees what he's facing.
+        const at = this.phase === 'air' ? this.ball.pos.x : this.qb.pos.x;
+        if (this.defLook && !p.engagedBy.length) p.facing = at < p.pos.x ? -1 : 1;
+        p.eyes = this.defLook || (at - p.pos.x) * p.facing >= 0 ? 1 : 0;
+        if (this.phase === 'air' && p.eyes >= 1) p.findAt = Math.min(p.findAt, this.time + FIND.base);
+        continue;
+      }
       if (p.side === 'def') {
         const broke = this.phase === 'air' && this.time >= p.reactAt;
         if (!broke && p.eyes > 0.5 && !p.engagedBy.length && !this.scramble) p.facing = this.qb.pos.x < p.pos.x ? -1 : 1;

@@ -119,7 +119,10 @@ export function drawTeamPanel(g: CanvasRenderingContext2D, t: Team, cx: number, 
 export const PANEL_TEAM_Y = [110, 218] as const;
 export const PANEL_CONF_Y = [218, 234] as const;
 
-export function drawExhibition(g: CanvasRenderingContext2D, user: Team, cpu: Team, quarter: string, keys: string, mx: number, my: number): void {
+/** The exhibition's second options line, under the buttons (PLAY DEFENSE): its rows for clicks. */
+export const EXHIBITION_LINE2_Y = [316, 328] as const;
+
+export function drawExhibition(g: CanvasRenderingContext2D, user: Team, cpu: Team, quarter: string, keys: string, mx: number, my: number, keys2 = ''): void {
   drawTeamPanel(g, user, 160, 'YOUR TEAM', 'A/D TEAM  W/S CONF', true);
   drawTeamPanel(g, cpu, 480, 'OPPONENT', 'ARROW KEYS', false);
   text(g, 'VS', VIEW_W / 2, 152, { size: 16, align: 'center', color: '#ffffff' });
@@ -131,6 +134,10 @@ export function drawExhibition(g: CanvasRenderingContext2D, user: Team, cpu: Tea
   g.fillStyle = hot ? '#2c3d58' : '#1f2a3a';
   g.fillRect(b.x, b.y, b.w, b.h);
   text(g, 'SIM GAME', b.x + b.w / 2, b.y + 6, { align: 'center', color: hot ? GOLD : '#ffffff', shadow: false });
+  if (keys2) {
+    const [y0, y1] = EXHIBITION_LINE2_Y;
+    text(g, keys2, VIEW_W / 2, y0 + 2, { align: 'center', color: my >= y0 && my < y1 ? GOLD : SOFT, shadow: false });
+  }
   drawHint(g, 'ENTER: KICK OFF   X: SIM GAME   R / T: ROSTERS   ESC: BACK');
 }
 

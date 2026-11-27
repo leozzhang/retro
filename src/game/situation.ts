@@ -196,3 +196,15 @@ export function spikeNow(s: Situation): boolean {
   if (s.down <= 3 && s.secsLeft <= S.spikeKickSecs && fgDistance(s) <= S.fgMax && fieldGoalHelps(s)) return true;
   return s.down <= 2 && s.secsLeft <= S.spikeSecs && clockOut(s);
 }
+
+/**
+ * PLAY DEFENSE's BIG PLAYS (docs/USERDEF.md): the CPU snaps the user plays. 3rd and 4th down, inside `redZone`
+ * yards of the goal he's defending, a snap of `lev` leverage or more (`leverage`: late and close counts), the
+ * last `lastSecs` of a half, overtime, and the CPU's first snap of a half (`first`).
+ */
+export const BIG_SNAP = { redZone: 10, lev: 0.5, lastSecs: 40 };
+
+export function bigSnap(s: Situation, lev: number, first: boolean): boolean {
+  const B = BIG_SNAP;
+  return first || s.down >= 3 || s.yardsToGoal <= B.redZone || lev >= B.lev || s.secsLeft <= B.lastSecs || !!s.ot;
+}

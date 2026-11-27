@@ -307,7 +307,8 @@ export function lookOf(play: Play, p: Player): Look {
   const behind = (play.qb.pos.x - p.pos.x) * p.facing < 0;
   const head = p.side === 'off' && p.passRoute && !p.isBlocker && p.eyes > 0.5 && behind;
   const air = play.phase === 'air' && play.ballTarget && !play.pitch;
-  const found = p.side === 'off' ? play.time >= p.findAt : play.time >= p.reactAt;
+  // The user's defender (PLAY DEFENSE) finds it with his own eyes (`findAt`), not the AI's break.
+  const found = p.side === 'off' || (p === play.defControlled && play.defManual) ? play.time >= p.findAt : play.time >= p.reactAt;
   const hands = !!air && found && dist(p.pos, play.ballTarget!) < HANDS_RANGE;
   if (hands) return (play.ballTarget!.x - p.pos.x) * p.facing < -0.5 ? 'backHands' : 'hands';
   return head && play.phase !== 'presnap' && play.phase !== 'run' && play.phase !== 'over' ? 'back' : 'fwd';

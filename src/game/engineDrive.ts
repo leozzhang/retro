@@ -198,94 +198,149 @@ export function showFormation(book: readonly PlayDef[], play: PlayDef, rng: Rng)
 /** The defenders' play recognition by slot, for their leans. */
 const prcOf = (r: Record<string, RosterPlayer>) => Object.fromEntries(DEF_SLOTS.map((sl) => [sl, r[sl]?.r.prc ?? 60]));
 
-/** One snap through the engine, from the offense's `drive` (in world x, the offense attacking +x). */
-export function engineSnap(
-  off: EngineSide, def: EngineSide, drive: Drive, sit: Situation, rng: Rng, brain: DefBrain | null,
-  opts: { noDisguise?: boolean; heave?: boolean; noCheck?: boolean; lev?: number; ocBrain?: OcBrain | null; record?: boolean; homeId?: string; hurry?: boolean } = {},
-) {
-  let { call, tags, press, disguise } = defCall(def, brain, sit, rng, !!opts.noDisguise);
-  let playDef = ocCall(off.oc, sit, rng, opts.heave, opts.ocBrain ?? null);
-  // A designed shift (`OffIdentity.shift`): he breaks the huddle in another formation of the personnel and
-  // shifts into the called one. Not with the clock running out on him. The defense reads the look it's shown.
-  const shows = !!off.oc.id && !opts.heave && !opts.hurry && !clockOut(sit) && rng() < off.oc.id.shift ? showFormation(off.oc.book, playDef, rng) : null;
-  const huddle = shows ?? playDef;
-  if (brain) {
-    const c = checkFor(brain, def.ident, huddle, call, sit.down, sit.toGo, sit.yardsToGoal, sit);
-    if (c) {
-      call = c;
-      disguise = null;
-      if (tags.game && rushers(c) !== 4) tags = { ...tags, game: undefined };
-    }
-  }
-  // The QB reads what they show and may check out of a bad look (`ocCheck`), on the play stream.
-  let checked: PlayDef | null = null;
-  const ob = opts.ocBrain ?? null;
-  const read = presnapRead(def.ident, call, disguise, sit, ob);
-  const qbPrc = off.roster.QB?.r.prc ?? 60;
-  if (!opts.heave && !opts.noCheck) {
-    checked = ocCheck(off.oc, playDef, read, sit, qbPrc, rng, ob, softCorners(press, tags));
-    if (checked) playDef = checked;
-  }
-  const prc = prcOf(def.roster);
-  // Everyone plays the snap with his confidence at its leverage, as in a played game (`Game.startPlay`): ratings
-  // shift by it (`clutchRoster`), and a shaken QB's nerves are aim lag rather than lost accuracy (`shakenAimLag`).
-  const lev = opts.lev ?? 0;
-  const at = { down: sit.down, toGo: sit.toGo, yardsToGoal: sit.yardsToGoal };
-  // A designed shift, or a check to another formation, is a shift: the defense sees it and may answer. The huddle's look comes first.
-  const shifted = playDef.formation.name !== huddle.formation.name;
-  const offRoster = clutchRoster(off.roster, lev, true);
-  const defRoster = clutchRoster(def.roster, lev);
-  const antic = brain ? anticFor(brain, prc) : undefined;
-  let reads = brain ? leansFor(brain, prc, call, shifted ? huddle : playDef, at) : undefined;
-  let flip = rng() < 0.5;
-  const setup = (p: PlayDef, f: boolean, from?: Play) => new Play({
-    offTeam: off.team, defTeam: def.team, offRoster, defRoster,
-    aimNerves: shakenAimLag(off.roster.QB?.conf ?? 0, lev), play: p, defCall: call, press, tags,
-    habits: brain ? brain.habits : undefined, antic, reads,
-    los: drive.los, ballY: drive.ballY, flip: f, disguise, rng, ...(opts.homeId ? { homeId: opts.homeId } : {}),
-    ...(clockOut(sit) ? { clockOut: true } : {}), ...(from ? { from } : {}),
-  });
-  let rechecked = false;
-  let play: Play;
-  if (shifted) {
-    const lined = setup(huddle, flip);
+export type SnapOpts = { noDisguise?: boolean; heave?: boolean; noCheck?: boolean; lev?: number; ocBrain?: OcBrain | null; record?: boolean; homeId?: string; hurry?: boolean };
+
+/**
+ * One snap through the engine, stepped: built and lined up (the calls, the checks, a shift) when made, then
+ * `snap()` and `step()` to the whistle. Headless, `engineSnap` runs it at once; a played game steps it live
+ * with the user on one defender (`step(defInput)`, docs/USERDEF.md). Without one it's the same snap.
+ */
+export class SnapRun {
+  readonly play: Play;
+  readonly qb: CpuQb;
+  private readonly rec: ReturnType<typeof newRecorder> | null;
+  private readonly checked: boolean;
+  private readonly shifted: boolean;
+  private readonly rechecked: boolean;
+  readonly shiftSecs: number;
+  private readonly shown: string;
+  private readonly soft: number;
+  /** Seconds stepped since the snap. */
+  private t = 0;
+  private readonly drive: Drive;
+
+  constructor(off: EngineSide, def: EngineSide, drive: Drive, sit: Situation, rng: Rng, brain: DefBrain | null, opts: SnapOpts = {}) {
+    let { call, tags, press, disguise } = defCall(def, brain, sit, rng, !!opts.noDisguise);
+    let playDef = ocCall(off.oc, sit, rng, opts.heave, opts.ocBrain ?? null);
+    // A designed shift (`OffIdentity.shift`): he breaks the huddle in another formation of the personnel and
+    // shifts into the called one. Not with the clock running out on him. The defense reads the look it's shown.
+    const shows = !!off.oc.id && !opts.heave && !opts.hurry && !clockOut(sit) && rng() < off.oc.id.shift ? showFormation(off.oc.book, playDef, rng) : null;
+    const huddle = shows ?? playDef;
     if (brain) {
-      const c = recheckFor(brain, def.ident, playDef, call, sit.down, sit.toGo, sit.yardsToGoal, opts.hurry ? ENGINE_SHIFT.hurry : ENGINE_SHIFT.clock, sit);
+      const c = checkFor(brain, def.ident, huddle, call, sit.down, sit.toGo, sit.yardsToGoal, sit);
       if (c) {
         call = c;
-        disguise = null; // a late check is played straight
+        disguise = null;
         if (tags.game && rushers(c) !== 4) tags = { ...tags, game: undefined };
-        rechecked = true;
       }
-      reads = releanFor(brain, prc, call, playDef, at, reads);
     }
-    // The strength stays where it lined up (its own flip rule would mirror it).
-    flip = resolvePlay(playDef, drive.ballY, false).mirrored !== lined.resolved.mirrored;
-    play = setup(playDef, flip, lined);
-  } else {
-    play = setup(playDef, flip);
+    // The QB reads what they show and may check out of a bad look (`ocCheck`), on the play stream.
+    let checked: PlayDef | null = null;
+    const ob = opts.ocBrain ?? null;
+    const read = presnapRead(def.ident, call, disguise, sit, ob);
+    const qbPrc = off.roster.QB?.r.prc ?? 60;
+    if (!opts.heave && !opts.noCheck) {
+      checked = ocCheck(off.oc, playDef, read, sit, qbPrc, rng, ob, softCorners(press, tags));
+      if (checked) playDef = checked;
+    }
+    const prc = prcOf(def.roster);
+    // Everyone plays the snap with his confidence at its leverage, as in a played game (`Game.startPlay`): ratings
+    // shift by it (`clutchRoster`), and a shaken QB's nerves are aim lag rather than lost accuracy (`shakenAimLag`).
+    const lev = opts.lev ?? 0;
+    const at = { down: sit.down, toGo: sit.toGo, yardsToGoal: sit.yardsToGoal };
+    // A designed shift, or a check to another formation, is a shift: the defense sees it and may answer. The huddle's look comes first.
+    const shifted = playDef.formation.name !== huddle.formation.name;
+    const offRoster = clutchRoster(off.roster, lev, true);
+    const defRoster = clutchRoster(def.roster, lev);
+    const antic = brain ? anticFor(brain, prc) : undefined;
+    let reads = brain ? leansFor(brain, prc, call, shifted ? huddle : playDef, at) : undefined;
+    let flip = rng() < 0.5;
+    const setup = (p: PlayDef, f: boolean, from?: Play) => new Play({
+      offTeam: off.team, defTeam: def.team, offRoster, defRoster,
+      aimNerves: shakenAimLag(off.roster.QB?.conf ?? 0, lev), play: p, defCall: call, press, tags,
+      habits: brain ? brain.habits : undefined, antic, reads,
+      los: drive.los, ballY: drive.ballY, flip: f, disguise, rng, ...(opts.homeId ? { homeId: opts.homeId } : {}),
+      ...(clockOut(sit) ? { clockOut: true } : {}), ...(from ? { from } : {}),
+    });
+    let rechecked = false;
+    let play: Play;
+    if (shifted) {
+      const lined = setup(huddle, flip);
+      if (brain) {
+        const c = recheckFor(brain, def.ident, playDef, call, sit.down, sit.toGo, sit.yardsToGoal, opts.hurry ? ENGINE_SHIFT.hurry : ENGINE_SHIFT.clock, sit);
+        if (c) {
+          call = c;
+          disguise = null; // a late check is played straight
+          if (tags.game && rushers(c) !== 4) tags = { ...tags, game: undefined };
+          rechecked = true;
+        }
+        reads = releanFor(brain, prc, call, playDef, at, reads);
+      }
+      // The strength stays where it lined up (its own flip rule would mirror it).
+      flip = resolvePlay(playDef, drive.ballY, false).mirrored !== lined.resolved.mirrored;
+      play = setup(playDef, flip, lined);
+    } else {
+      play = setup(playDef, flip);
+    }
+    const qb = new CpuQb(play, (rng() * 2 ** 31) >>> 0, { ...qbCtx(off, sit, ob), defPull: off.oc.id ? (d, rt) => defPull(ob, d, rt) : null });
+    const rec = opts.record ? newRecorder(play) : null;
+    if (rec) recordFrame(rec, 0);
+    // The shift: everyone to his new spot, set, then the snap.
+    let shiftSecs = 0;
+    while (shifted && !play.canSnap() && shiftSecs < ENGINE_SHIFT.max) {
+      play.update(STEP, IDLE, cam);
+      shiftSecs += STEP;
+      if (rec) recordFrame(rec, STEP);
+    }
+    this.drive = drive;
+    this.play = play;
+    this.qb = qb;
+    this.rec = rec;
+    this.checked = !!checked;
+    this.shifted = shifted;
+    this.rechecked = rechecked;
+    this.shiftSecs = shiftSecs;
+    this.shown = disguise?.show ?? call.shell;
+    this.soft = softCorners(press, tags);
   }
-  const qb = new CpuQb(play, (rng() * 2 ** 31) >>> 0, { ...qbCtx(off, sit, ob), defPull: off.oc.id ? (d, rt) => defPull(ob, d, rt) : null });
-  const rec = opts.record ? newRecorder(play) : null;
-  if (rec) recordFrame(rec, 0);
-  // The shift: everyone to his new spot, set, then the snap.
-  let shiftSecs = 0;
-  while (shifted && !play.canSnap() && shiftSecs < ENGINE_SHIFT.max) {
-    play.update(STEP, IDLE, cam);
-    shiftSecs += STEP;
-    if (rec) recordFrame(rec, STEP);
+
+  snap(): void {
+    this.play.snap();
   }
-  play.snap();
-  for (let i = 0; i < MAX_SECS / STEP && play.phase !== 'over'; i++) {
-    qb.step();
-    play.update(STEP, qb.input, cam);
-    if (rec) recordFrame(rec, STEP);
+
+  /**
+   * One step of the snap; `defInput` steers the user's defender (`Play.defControlled`). A played game steps it
+   * by its frame's `dt` (slow motion, docs/USERDEF.md); headless it's `STEP`.
+   */
+  step(defInput?: Input, dt = STEP): void {
+    this.qb.step();
+    this.play.update(dt, this.qb.input, cam, defInput);
+    if (this.rec) recordFrame(this.rec, dt);
+    this.t += dt;
   }
-  const o: PlayOutcome = play.outcome ?? { type: 'tackle', spot: play.carrier?.pos.x ?? drive.los, spotY: drive.ballY, text: '', sub: '', color: '' };
-  return { play, o, qb: qb.log, checked: !!checked, shifted, rechecked, shiftSecs, shown: disguise?.show ?? call.shell, soft: softCorners(press, tags),
-    /** The snap's tape, run on past the whistle: call it once the snap has been read. */
-    tape: (): Tape | undefined => (rec ? (tapeTail(play, qb, rec), rec.tape) : undefined),
-  };
+
+  done(): boolean {
+    return this.play.phase === 'over' || this.t >= MAX_SECS - STEP / 2;
+  }
+
+  result() {
+    const { play, qb, rec } = this;
+    const o: PlayOutcome = play.outcome ?? { type: 'tackle', spot: play.carrier?.pos.x ?? this.drive.los, spotY: this.drive.ballY, text: '', sub: '', color: '' };
+    return { play, o, qb: qb.log, checked: this.checked, shifted: this.shifted, rechecked: this.rechecked, shiftSecs: this.shiftSecs, shown: this.shown, soft: this.soft,
+      /** The snap's tape, run on past the whistle: call it once the snap has been read. */
+      tape: (): Tape | undefined => (rec ? (tapeTail(play, qb, rec), rec.tape) : undefined),
+    };
+  }
+}
+
+export type SnapResult = ReturnType<SnapRun['result']>;
+
+/** One snap through the engine, from the offense's `drive` (in world x, the offense attacking +x), run to the whistle. */
+export function engineSnap(off: EngineSide, def: EngineSide, drive: Drive, sit: Situation, rng: Rng, brain: DefBrain | null, opts: SnapOpts = {}): SnapResult {
+  const r = new SnapRun(off, def, drive, sit, rng, brain, opts);
+  r.snap();
+  while (!r.done()) r.step();
+  return r.result();
 }
 
 /**
@@ -377,6 +432,44 @@ function lostFumble(play: Play, o: PlayOutcome, rng: Rng): boolean {
  * `clock`. `clock.lead` should be set: the engine's offense always reads the score.
  */
 export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng: Rng, clock: DriveClock, opts: EngineOpts): EngineDrive {
+  return runDrive(driveSteps(off, def, start, rng, clock, opts));
+}
+
+/** A snap the drive wants played (`driveSteps`): run it with `engineSnap`, or step it live as a `SnapRun`. */
+export interface SnapReq {
+  off: EngineSide;
+  def: EngineSide;
+  drive: Drive;
+  sit: Situation;
+  rng: Rng;
+  brain: DefBrain | null;
+  opts: SnapOpts;
+  /** Seconds of the drive gone before it. */
+  t: number;
+  lev: number;
+}
+
+/** What a snap played live sends back besides its result: the user called his timeout during it (game/timeouts.ts). */
+export interface SnapBack {
+  r: SnapResult;
+  userTimeout?: boolean;
+}
+
+/** The snap a request asks for, played at once. */
+export const playReq = (q: SnapReq): SnapResult => engineSnap(q.off, q.def, q.drive, q.sit, q.rng, q.brain, q.opts);
+
+/** A drive's steps played headless to its end. */
+export function runDrive(g: Generator<SnapReq, EngineDrive, SnapBack>): EngineDrive {
+  let s = g.next();
+  while (!s.done) s = g.next({ r: playReq(s.value) });
+  return s.value;
+}
+
+/**
+ * The possession as steps (`engineDrive`): it yields each snap it wants played and takes back its result,
+ * so a played game can step a snap live (docs/USERDEF.md). Run headless, it's `engineDrive`, draw for draw.
+ */
+export function* driveSteps(off: EngineSide, def: EngineSide, start: number, rng: Rng, clock: DriveClock, opts: EngineOpts): Generator<SnapReq, EngineDrive, SnapBack> {
   const brain = opts.brain;
   const pace = opts.pace ?? clock.pace ?? 1;
   let drive: Drive = { los: OWN_GOAL + clamp(start, 1, 99), ballY: FIELD_W / 2, down: 1, firstDownX: Math.min(OPP_GOAL, OWN_GOAL + clamp(start, 1, 99) + 10) };
@@ -424,10 +517,14 @@ export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng
     const heave = desperate(sit) && !clock.quarterBreak;
     plays++;
     const at = { yard, t: secs };
-    const { play, o, qb, checked, shifted, rechecked, shiftSecs, shown, soft, tape: tapeOf } = engineSnap(off, def, drive, sit, rng, brain, {
-      noDisguise: opts.noDisguise, heave, noCheck: opts.noCheck, lev, ocBrain: opts.ocBrain, record: opts.record, homeId: opts.homeId,
-      ...(tmp === 'hurry' ? { hurry: true } : {}),
-    });
+    const back: SnapBack = yield {
+      off, def, drive, sit, rng, brain, t: secs, lev,
+      opts: {
+        noDisguise: opts.noDisguise, heave, noCheck: opts.noCheck, lev, ocBrain: opts.ocBrain, record: opts.record, homeId: opts.homeId,
+        ...(tmp === 'hurry' ? { hurry: true } : {}),
+      },
+    };
+    const { play, o, qb, checked, shifted, rechecked, shiftSecs, shown, soft, tape: tapeOf } = back.r;
     const twoMin = sit.secsLeft <= TWO_MIN;
     // A shift on a running clock runs it that much longer before the snap.
     const cost = (heave ? 8 : snapSecs(o, tmp, pace, rng, twoMin)) + (stopped ? 0 : shiftSecs);
@@ -447,7 +544,7 @@ export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng
         scrambled: play.scramble, kept: play.kept, air: play.ballTarget && play.thrown ? play.ballTarget.x - drive.los : 0,
         handedOff: play.handedOff, lane: laneOf(play), tags: play.tags, target: play.thrown ? play.intended?.slot ?? null : null,
         lost: turnover || o.type === 'sack',
-        throw: play.throwRecord(gain), antic: Object.fromEntries([...play.anticLog].map(([d, r]) => [d.slot, r])),
+        throw: play.throwRecord(gain), antic: Object.fromEntries([...play.anticLog].filter(([d]) => !(play.defManual && d === play.defControlled)).map(([d, r]) => [d.slot, r])),
         ...(shifted ? { shifted: true } : {}),
       });
     }
@@ -487,7 +584,8 @@ export function engineDrive(off: EngineSide, def: EngineSide, start: number, rng
     if (to && !heave && secs < clock.timeLeft) {
       const running = !clockStopped(o, twoMin);
       const now = sitNow();
-      const who = timeoutAt(running ? { ...now, secsLeft: now.secsLeft + cost - TIMEOUTS.playSecs } : now, running, rng);
+      // The user's own timeout, called during a snap he played (the defense's: his side is `def` here).
+      const who = back.userTimeout && to.def > 0 ? 'def' as const : timeoutAt(running ? { ...now, secsLeft: now.secsLeft + cost - TIMEOUTS.playSecs } : now, running, rng);
       if (who) {
         if (running) secs += Math.min(0, TIMEOUTS.playSecs - cost);
         stopped = true;

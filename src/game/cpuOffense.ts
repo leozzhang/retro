@@ -371,7 +371,18 @@ export interface QbLog {
  * The CPU QB on one snap. Call `step` before each `play.update(STEP, qb.input, cam)`. His own stream
  * (from `seed`) drives his misreads, so the play's stream isn't touched by how he reads.
  */
+/**
+ * The QB's eyes, for show only (PLAY DEFENSE's vision cone, docs/USERDEF.md): nothing he decides reads them.
+ * Before his read opens he looks at his first read (his top target); on each scan, at that scan's best-scoring
+ * receiver, open or not. A QB of `lookOffAwr`+ opens to the other side `lookOffOdds` of the time, for the
+ * first `lookOff` s of his read (a look-off), on a stream of his own (`seed ^ salt`).
+ */
+export const QB_EYES = { lookOffAwr: 80, lookOffOdds: 0.45, lookOff: 0.45, salt: 0x51e7e };
+
 export class CpuQb {
+  /** Who his eyes are on (display only, `QB_EYES`). */
+  eyesOn: Player | null = null;
+  private readonly lookOff: boolean;
   readonly log: QbLog = { at: null, why: null, scrambled: false, rpoGive: null };
   input: Input = IDLE;
   private readonly r: Rng;
@@ -441,6 +452,33 @@ export class CpuQb {
       this.rpoGive = null;
     }
     this.log.rpoGive = this.rpoGive;
+    // His eyes (display only): his first read, and whether he'll look off, on a stream of their own.
+    let first: Player | null = null;
+    let fp = -Infinity;
+    for (const o of play.off) {
+      if (!isEligible(o) || o.isBlocker || !o.routeName || o === play.qb) continue;
+      const v = this.pull[o.slot] ?? 0;
+      if (v > fp) {
+        fp = v;
+        first = o;
+      }
+    }
+    this.eyesOn = first;
+    this.lookOff = awr >= QB_EYES.lookOffAwr && mulberry32(seed ^ QB_EYES.salt)() < QB_EYES.lookOffOdds;
+  }
+
+  /**
+   * Where his eyes point right now (display only): the man they're on, through a look-off to the other side
+   * at the top of his read; downfield in the middle with nobody to look at; the ball once it's gone.
+   */
+  lookAt(): Vec {
+    const play = this.play;
+    const qb = play.qb;
+    if (play.thrown && play.ballTarget) return play.ballTarget;
+    const at = this.eyesOn && !this.eyesOn.down ? this.eyesOn.pos : { x: qb.pos.x + 15, y: play.ballY };
+    const since = play.time - play.snapTime;
+    if (this.lookOff && since < this.window + QB_EYES.lookOff) return { x: at.x, y: 2 * qb.pos.y - at.y };
+    return at;
   }
 
   /** One step: the handoff, the throw, the scramble, or the throwaway; then whoever has the ball runs on the AI. */
@@ -517,6 +555,7 @@ export class CpuQb {
     const reach = CPU_QB.reach[play.playDef.tags.family] ?? CPU_QB.reach.dropback;
     let best: Player | null = null;
     let score = -Infinity;
+    let top = -Infinity;
     for (const o of this.ready()) {
       const at = this.windowAt(o);
       const d = clamp(at.depth, 0, CPU_QB.cap);
@@ -528,6 +567,11 @@ export class CpuQb {
       if (w >= need && sc > score) {
         best = o;
         score = sc;
+      }
+      // His eyes go to the best of them, open or not (display only).
+      if (sc > top) {
+        top = sc;
+        this.eyesOn = o;
       }
     }
     if (best) {

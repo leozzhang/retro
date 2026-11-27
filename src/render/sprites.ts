@@ -5,6 +5,8 @@ export type Pose =
   | 'throw' | 'throwEnd' | 'catch' | 'down'
   // a hard catch (docs/PASSING.md, placement): stretched out for it on his feet, laid out in the air
   | 'reach' | 'dive'
+  // a defender chopping at a ball (PLAY DEFENSE's SWAT, docs/USERDEF.md)
+  | 'swat'
   // blocking: driving a man back, locked up even, knocked off balance
   | 'drive' | 'fight' | 'stumble'
   // feet stepping on a moving block (one foot up, then the other), and a pass set (hands up, the kick slide)
@@ -393,6 +395,28 @@ function drawReach(P: Px, u: Uniform, skin: string, ball: boolean): void {
   if (ball) drawHeldBall(P, 12, 9);
 }
 
+/** Chopping at a ball: squared up on bent legs, the near arm whipped down across in front, the far arm up high. */
+function drawSwat(P: Px, u: Uniform, skin: string): void {
+  // Legs split, knees bent.
+  P(4, 13, 3, 2, u.pants); P(3, 15, 2, 3, u.socks); P(2, 18, 3, 1, u.shoe);
+  P(8, 13, 3, 2, u.pants); P(9, 15, 2, 3, u.socks); P(9, 18, 3, 1, u.shoe);
+  P(4, 11, 7, 2, u.pants);
+  // Torso, turned into the chop.
+  P(4, 6, 7, 5, u.jersey);
+  P(6, 7, 3, 2, u.trim);
+  // Helmet, eyes on the ball.
+  P(6, 0, 4, 1, u.stripe);
+  P(5, 1, 6, 1, u.helmet);
+  P(5, 2, 4, 2, u.helmet);
+  P(9, 2, 2, 2, skin);
+  P(11, 2, 1, 3, u.mask);
+  P(5, 4, 4, 1, u.helmet);
+  P(6, 2, 2, 2, u.logo);
+  // The far arm up, the near arm chopping down and out in front.
+  P(3, 2, 1, 4, u.jersey); P(3, 0, 1, 2, skin);
+  P(11, 6, 2, 1, u.jersey); P(13, 7, 2, 1, u.jersey); P(15, 8, 1, 1, u.jersey); P(16, 9, 2, 1, skin);
+}
+
 /** Laid out in the air, body flat and parallel to the turf, arms out past his helmet (the ball in his hands). */
 function drawDive(P: Px, u: Uniform, skin: string, ball: boolean): void {
   P(-2, 12, 2, 2, u.shoe);
@@ -461,6 +485,7 @@ function paint(u: Uniform, skin: string, pose: Pose, look: Look, ball: boolean):
   else if (pose === 'drive' || pose === 'drive1' || pose === 'drive2') drawDrive(P, u, skin, pose === 'drive' ? 0 : pose === 'drive1' ? 1 : 2);
   else if (pose === 'reach') drawReach(P, u, skin, ball && carriesBall(pose, look));
   else if (pose === 'dive') drawDive(P, u, skin, ball && carriesBall(pose, look));
+  else if (pose === 'swat') drawSwat(P, u, skin);
   else drawUpright(P, u, skin, pose, look, ball && carriesBall(pose, look));
   outline(g, SPR_W, SPR_H);
   return c;
