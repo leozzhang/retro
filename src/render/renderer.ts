@@ -10,7 +10,7 @@ import { endurance, poseOf, type Player } from '../sim/player';
 import type { Tape, TapeFrame } from '../game/tape';
 import { laneScores, levered } from '../sim/runBlocking';
 import { ANCHOR_X, ANCHOR_Y, carriesBall, getBallSprite, getSprite, POSE_LIFT, spinFrame, type Look } from './sprites';
-import { drawNumberTags, routeColors } from './numberTags';
+import { defenseColors, drawNumberTags, routeColors } from './numberTags';
 import { ROUTE_COLORS } from './playDiagram';
 import { text } from './text';
 
@@ -379,11 +379,12 @@ export function drawTape(g: CanvasRenderingContext2D, cam: Camera, tape: Tape, f
 /**
  * `replay`: a key-play replay, the CPU on both sides, so none of the user's aids (routes, ring, handoff
  * hint, daylight, number tags). `assist` is the RUN ASSIST setting; `mouse` (view px) picks the player
- * whose name shows before the snap.
+ * whose name shows before the snap. `defense`: PLAY DEFENSE, a replay's aids off but the number tags on
+ * (`defenseColors`: no routes to color, so the receivers are ringed in white and his man in gold).
  */
 export function drawPlay(
   g: CanvasRenderingContext2D, cam: Camera, play: Play, debug: boolean, replay = false, assist: RunAssist = 'FULL',
-  mouse?: { x: number; y: number },
+  mouse?: { x: number; y: number }, defense = false,
 ): void {
   const presnap = play.phase === 'presnap';
   if (presnap && !replay) drawRoutePreview(g, cam, play);
@@ -444,6 +445,7 @@ export function drawPlay(
   }
 
   if (!replay) drawNumberTags(g, cam, play, routeColors(play, ROUTE_COLORS), mouse, ctl);
+  else if (defense) drawNumberTags(g, cam, play, defenseColors(play), mouse, play.defControlled);
 
   if (ctl) {
     const s = cam.toScreen(ctl.pos.x, ctl.pos.y);

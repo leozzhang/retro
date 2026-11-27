@@ -2,6 +2,14 @@
 
 _Last updated: 2026-11-26_
 
+## PLAY DEFENSE: number tags (2026-11-27)
+The offense's tags now show on defense (docs/USERDEF.md, "Number tags"):
+- number chips before the snap, with the receivers ringed white and his man in man coverage ringed gold;
+- the name on hover;
+- the receivers' dots once the ball is snapped.
+
+They're drawn by `drawPlay(..., defense)` through `defenseColors`. Display only.
+
 ## PLAY DEFENSE, pass 4: one bar; position decides PLAY BALL or SWAT (2026-11-27)
 The changes (docs/USERDEF.md, "Pass 4"):
 - **One window on the meter for both calls.** SPACE goes for the pick and E swats it down.

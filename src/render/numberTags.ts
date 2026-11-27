@@ -20,6 +20,9 @@ const TAGS = {
   live: 0.9,
   /** Hover: how near the mouse must be to the middle of his sprite (view px). */
   hoverR: 9,
+  /** PLAY DEFENSE (`defenseColors`): the receivers' ring and dot, and his man's. */
+  theirs: '#e8e8e8',
+  mine: '#ffd23f',
 };
 
 /** 3x5 digits, rows top to bottom, bit 2 the left column. */
@@ -29,6 +32,17 @@ const DIGITS: number[][] = [
 ];
 
 const NO_TAG = new Set(['OL', 'DL', 'K', 'P']);
+
+/**
+ * PLAY DEFENSE's tags: the offense's routes are theirs to know, so every eligible receiver gets the same
+ * white ring and dot, and the man the user's defender has in man coverage gets gold.
+ */
+export function defenseColors(play: Play): Map<Player, string> {
+  const out = new Map<Player, string>();
+  const man = play.defControlled?.assign?.kind === 'man' ? play.defControlled.manTarget : null;
+  for (const p of play.off) if (isEligible(p)) out.set(p, p === man ? TAGS.mine : TAGS.theirs);
+  return out;
+}
 
 /** The route preview's colors by receiver, in the preview's order (renderer.ts `drawRoutePreview`). */
 export function routeColors(play: Play, colors: string[]): Map<Player, string> {

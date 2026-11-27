@@ -5292,7 +5292,7 @@ export class Game {
     else if (dl?.req) drawLines(g, this.cam, dl.req.drive.los, dl.req.drive.firstDownX);
     else drawLines(g, this.cam, kickoff ? KICKOFF_LINE : this.drive.los, kickoff || this.kick ? OPP_GOAL : this.drive.firstDownX);
     if (this.kick) drawKickPlay(g, this.cam, this.kick, this.debug);
-    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, !!dl, this.runAssist(), this.menuMouse);
+    else if (this.play) drawPlay(g, this.cam, this.play, this.debug, !!dl, this.runAssist(), this.menuMouse, !!dl);
     else this.drawBallSpot(g);
     if (dl) this.renderDefense(g, dl);
     if (shaking) g.restore();

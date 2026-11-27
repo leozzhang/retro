@@ -97,6 +97,13 @@ The snaps the user doesn't play run headless. They're shown by the CPU DRIVES wa
   - The odds come from the edge at the press, so the adjustment only makes the picture match.
   - A pick comes down in his hands. A breakup is his chop (SWAT) or a hand on it (PLAY BALL), and the ball pops off him (`startDeflect`, sim/ball.ts).
 
+### Number tags (2026-11-27)
+The offense's number tags, on defense (`drawNumberTags` with `defenseColors`, render/numberTags.ts):
+- **Before the snap**, every player but the linemen wears his number chip. The receivers' chips are ringed white, and the man he has in man coverage is ringed gold.
+- **Hovering** anyone before the snap shows his position and name over his head.
+- **After the snap**, each receiver's chip shrinks to a dot (gold for his man) until the ball is caught or run.
+- Display only.
+
 ## The balance principle: the read is yours, the body is his
 Every AI knowledge limit is a timer that only gates the AI's decisions: `reactAt`, `fitAt`, `findAt`, `MAN_TRAIL`'s lag, `RUN_TELL`. A human steering `want` directly skips all of them. Following the precedent of the user's QB and runner, ratings limit **execution**, never **what the user sees**:
 1. **Reaction is the human's own.** A human's perceive-and-react time (0.2–0.3 s and a frame) sits in the AI's band (0.15–0.5 s by `mcv`/`zcv`/`prc`). There's no artificial delay; `npm run userdef` measures it.
