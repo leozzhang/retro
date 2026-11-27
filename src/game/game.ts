@@ -107,7 +107,7 @@ import { newStory, type DriveCredit, type GameStory, type StoryDrive } from '../
 import type { DriveLog, GameResult, KeyLevel, Moment, OfficeState, SeasonGame, SeasonState } from '../season/types';
 import type { SimPlay as LiveSimPlay } from './rules';
 import { cueShow, drawShow, drawShowStill, keyShow, prefetchShow, showFocus, updateShow, type KeyShow, type ShowCtx } from './highlights';
-import { WATCH_LEVELS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
+import { WATCH_LEVELS, KEY_PLAYS, KEY_TITLE, keyLevels, pickDrive, pickGame, type KeyPlay } from './keyPlays';
 import { CALM, fgDistance, predictKick, type Wind } from '../sim/kicking';
 import { text, textWidth } from '../render/text';
 import {
@@ -196,14 +196,32 @@ interface DefLive {
   userTimeout: boolean;
   acc: number;
   overT: number;
-  /** The snaps on the field, played or watched: not shown again after the drive. */
-  played: Set<SimPlay>;
+  /** The snaps on the field, played or watched, and the key plays already shown (`DriveShown`). */
+  shown: DriveShown;
+  /** The drive's place in the game, for its key plays' shows before it's over (`flushKeyPlays`). */
+  frame: DriveFrame;
+  /** The snap he plays next, held while the key plays before it are shown. */
+  pending: SnapReq | null;
   /** The hit-stop left; the QB's vision cone as the user's man sees it (angle, how visible); the last verdict. */
   stop: number;
   cone: { ang: number; vis: number } | null;
   verdict: { grade: string; ms: number; result: string; kind: 'play' | 'swat'; edge: number; at: number } | null;
-  done: (r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>) => void;
+  done: (r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, shown: DriveShown) => void;
 }
+
+/**
+ * What of a CPU drive the user has seen so far with PLAY DEFENSE on, so its key plays stay in order: the snaps
+ * on the field (`played`, never shown again), the snap index the shows have caught up to (`from`), and how many
+ * key plays have been shown (`used`, out of `KEY_PLAYS.perDrive`).
+ */
+interface DriveShown {
+  played: Set<SimPlay>;
+  from: number;
+  used: number;
+}
+
+/** A CPU drive's place in the game: its story without the snaps and the result. */
+type DriveFrame = Pick<StoryDrive, 'off' | 'half' | 'left' | 'qSecs' | 'score' | 'start'>;
 
 /**
  * The dynasty settings, one row each: its options, the one picked first for a new dynasty, what it
@@ -4072,10 +4090,13 @@ export class Game {
     const otClock: DriveClock = {
       timeLeft: Infinity, hurry: false, milk: false, lead: this.score.cpu - this.score.user, ot: second ? 'second' : 'first', timeouts: { off: this.to.cpu, def: this.to.user },
     };
-    this.playCpuDrive(OVERTIME.start, otClock, (r, played) => this.otCpuDone(period, second, r, played));
+    const frame: DriveFrame = {
+      off: this.cpu.id, half: period + 1, left: 0, qSecs: this.clock.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user }, start: OVERTIME.start,
+    };
+    this.playCpuDrive(OVERTIME.start, otClock, frame, (r, shown) => this.otCpuDone(period, second, r, shown));
   }
 
-  private otCpuDone(period: number, second: boolean, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>): void {
+  private otCpuDone(period: number, second: boolean, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, shown: DriveShown): void {
     const { sim, plays, credit, snaps } = r;
     this.liveDrives?.push(this.withSubs(driveLog(this.cpu.id, plays, sim, true, credit.snaps)));
     // The drive sim's touchdown has the kick in it. Going second, a lead after the six ends the game;
@@ -4090,7 +4111,7 @@ export class Game {
       start: OVERTIME.start, result: sim.result, points, plays, credit, live: true,
     };
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
-    this.showCpuDrive(told, plays, snaps, played);
+    this.showCpuDrive(told, plays, snaps, shown);
     this.score.cpu += points;
     if (sim.defPoints) {
       // The user's defense scored on the CPU's overtime possession: that ends it (NCAA).
@@ -4200,24 +4221,28 @@ export class Game {
   }
 
   private cpuCredited(sim: EngineDrive, plays: SimPlay[], snaps: (EngineSnap | undefined)[]): { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] } {
+    return { sim, plays, credit: this.cpuCredit(plays, snaps), snaps };
+  }
+
+  private cpuCredit(plays: SimPlay[], snaps: (EngineSnap | undefined)[]): DriveCredit {
     const on = this.liveBox?.cpu.on ?? starters(this.cpuSquad);
     const dOn = this.liveBox?.user.on ?? starters(this.userSquad);
-    return { sim, plays, credit: { snaps: plays.map((p, i) => engineCredit(p, snaps[i], on, dOn)) }, snaps };
+    return { snaps: plays.map((p, i) => engineCredit(p, snaps[i], on, dOn)) };
   }
 
   /**
    * A CPU possession, then `done` with it: at once (`engineCpu`), or, with PLAY DEFENSE on, stepped with the user
    * on a defender for the snaps the setting picks (docs/USERDEF.md). `played` holds the snaps he played.
    */
-  private playCpuDrive(start: number, clock: DriveClock, done: DefLive['done']): void {
+  private playCpuDrive(start: number, clock: DriveClock, frame: DriveFrame, done: DefLive['done']): void {
     if (this.liveDefense() === 'off') {
-      done(this.engineCpu(start, clock), new Set());
+      done(this.engineCpu(start, clock), { played: new Set(), from: 0, used: 0 });
       return;
     }
     const { gen, plays, snaps } = this.cpuSteps(start, clock);
     this.defLive = {
       gen, plays, snaps, clock0: { ...this.clock }, run: null, req: null, stage: 'pre', watch: false, pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
-      played: new Set(), stop: 0, cone: null, verdict: null, done,
+      shown: { played: new Set(), from: 0, used: 0 }, frame, pending: null, stop: 0, cone: null, verdict: null, done,
     };
     // What happened before it (the user's drive, a kick, the quarter) first.
     if (this.notices.length) this.showNotices('defense');
@@ -4249,17 +4274,42 @@ export class Game {
    * Queue a CPU drive's key plays at the defense's key-play level (`all`: every snap), each the real snap on
    * tape with the user's call over it. The biggest go to the postgame reel's pool too.
    */
-  private showCpuDrive(d: StoryDrive, plays: SimPlay[] = [], snaps: (EngineSnap | undefined)[] = [], played: Set<SimPlay> = new Set()): void {
+  private showCpuDrive(d: StoryDrive, plays: SimPlay[] = [], snaps: (EngineSnap | undefined)[] = [], shown?: DriveShown): void {
     const level = this.keyLevel('defense');
     const at = new Map(plays.map((p, i) => [p, snaps[i]] as const));
     for (const [p, s] of at) if (s?.tape) this.keepCpuTape(p, s.tape);
     if (level === 'off') return;
-    for (const k of pickDrive(d, level, 'defense')) {
-      // The snaps the user played on the field aren't shown again.
-      if (played.has(k.play)) continue;
-      const s = at.get(k.play);
-      this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0, s ? { tape: s.tape, note: this.snapNote(s, false) } : {}) });
+    // With PLAY DEFENSE, only the key plays after the last snap he played are left (`flushKeyPlays`).
+    const cap = shown ? KEY_PLAYS.perDrive.defense[level] - shown.used : undefined;
+    for (const k of pickDrive(d, level, 'defense', { from: shown?.from, cap })) {
+      // The snaps on the field aren't shown again.
+      if (shown?.played.has(k.play)) continue;
+      this.showCpuSnap(k, at.get(k.play));
     }
+  }
+
+  private showCpuSnap(k: KeyPlay, s: EngineSnap | undefined): void {
+    this.notify({ title: '', sub: '', extra: '', show: keyShow(k, this.showCtx!, (Math.random() * 2 ** 31) >>> 0, s ? { tape: s.tape, note: this.snapNote(s, false) } : {}) });
+  }
+
+  /**
+   * Before a snap the user plays on a CPU drive: queue the drive's key plays since the last one he played, so
+   * nothing is shown after a snap that came later (the key-play levels; with every snap shown, the snaps he
+   * doesn't play are on the field in order already). Whether any were queued.
+   */
+  private flushKeyPlays(L: DefLive): boolean {
+    const level = this.keyLevel('defense');
+    const n = L.plays.length;
+    if (this.drill || level === 'off' || level === 'all' || n <= L.shown.from) return false;
+    const credit = this.cpuCredit(L.plays, L.snaps);
+    const d: StoryDrive = { ...L.frame, result: 'PUNT', points: 0, plays: L.plays.slice(), credit, live: true };
+    const at = new Map(L.plays.map((p, i) => [p, L.snaps[i]] as const));
+    const picks = pickDrive(d, level, 'defense', { from: L.shown.from, cap: KEY_PLAYS.perDrive.defense[level] - L.shown.used, open: true })
+      .filter((k) => !L.shown.played.has(k.play));
+    for (const k of picks) this.showCpuSnap(k, at.get(k.play));
+    L.shown.from = n;
+    L.shown.used += picks.length;
+    return picks.length > 0;
   }
 
   /** Keep a CPU snap's tape for the postgame reel if it's one of the game's best (as `keepTape`). */
@@ -4549,7 +4599,8 @@ export class Game {
     }
     this.defLive = {
       gen: reps(), plays: [], snaps: [], clock0: { ...this.clock }, run: null, req: null, stage: 'pre', watch: false, pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
-      played: new Set(), stop: 0, cone: null, verdict: null, done: () => this.endDrill(),
+      shown: { played: new Set(), from: 0, used: 0 }, frame: { off: '', half: 0, left: 0, qSecs: 0, score: {}, start: 25 }, pending: null,
+      stop: 0, cone: null, verdict: null, done: () => this.endDrill(),
     };
     this.pumpDefense();
   }
@@ -4569,13 +4620,25 @@ export class Game {
    */
   private pumpDefense(back?: SnapBack): void {
     const L = this.defLive!;
+    // Back from the key plays before his snap (`flushKeyPlays`): that snap now.
+    if (L.pending) {
+      const q = L.pending;
+      L.pending = null;
+      this.startDefSnap(q);
+      return;
+    }
     const n = L.plays.length;
     let s = back ? L.gen.next(back) : L.gen.next();
     // The first snap it logged is the one he played.
-    if (back && L.plays.length > n) L.played.add(L.plays[n]);
+    if (back && L.plays.length > n) L.shown.played.add(L.plays[n]);
     while (!s.done) {
       const q = s.value;
       if (this.liveSnap(q)) {
+        if (this.flushKeyPlays(L)) {
+          L.pending = q;
+          this.showNotices('defense');
+          return;
+        }
         this.startDefSnap(q);
         return;
       }
@@ -4591,7 +4654,7 @@ export class Game {
     this.play = null;
     this.cam.mirror = false;
     this.cam.setZoom(1, 1, { x: 0, y: 0 });
-    L.done(r, L.played);
+    L.done(r, L.shown);
   }
 
   /** The game clock at a point of the drive on the field (the drive itself burns its time when it ends). */
@@ -5052,12 +5115,15 @@ export class Game {
     const dc: DriveClock = {
       timeLeft: left, hurry: false, milk: false, lead: diff, finalHalf: c.quarter >= 3, qSecs: c.qSecs, timeouts: { off: this.to.cpu, def: this.to.user },
     };
-    this.playCpuDrive(start, dc, (r, played) => this.cpuDriveDone(start, left, diff, r, played));
+    const frame: DriveFrame = {
+      off: this.cpu.id, half: c.quarter <= 2 ? 0 : 1, left, qSecs: c.qSecs, score: { [this.cpu.id]: this.score.cpu, [this.user.id]: this.score.user }, start,
+    };
+    this.playCpuDrive(start, dc, frame, (r, shown) => this.cpuDriveDone(start, left, diff, r, shown));
   }
 
   /** A CPU possession is over (`cpuDrive`): the timeouts, the logs and box score, its key plays, the clock, and what comes next. */
   private cpuDriveDone(
-    start: number, left: number, diff: number, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, played: Set<SimPlay>,
+    start: number, left: number, diff: number, r: { sim: EngineDrive; plays: SimPlay[]; credit: DriveCredit; snaps: (EngineSnap | undefined)[] }, shown: DriveShown,
   ): void {
     const c = this.clock;
     const { sim, plays, credit, snaps } = r;
@@ -5080,7 +5146,7 @@ export class Game {
     const td = sim.result === 'TOUCHDOWN';
     if (td) told.points = 6;
     if (this.liveBox) creditCpuDrive(this.liveBox, sim, plays, credit.snaps, told);
-    this.showCpuDrive(told, plays, snaps, played);
+    this.showCpuDrive(told, plays, snaps, shown);
     const { halfOver } = advanceSim(c, sim.secs);
     this.score.cpu += told.points;
     const said = this.userDc ? headline(this.userDc, playName) : null;

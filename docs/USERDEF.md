@@ -25,7 +25,9 @@ How the settings enforce it:
 
 The snaps he doesn't play:
 - **With CPU DRIVES on EVERY SNAP**, they run live on the field in their place in the drive, with the AI on every defender (`DefLive.watch`). The snap holds `DEF_FEEL.watchHold` s at the line and plays at full speed. SPACE skips it to the whistle.
-- **At the key-play levels**, they run headless, and the drive's key plays he didn't play are shown after it, as before.
+- **At the key-play levels**, they run headless. Before each snap he plays, the drive's key plays since the last one he played are shown (`Game.flushKeyPlays`, `pickDrive`'s `from`, `cap` and `open`). The rest are shown after the drive.
+  - Nothing is shown after a snap that came later.
+  - The drive's `perDrive` cap holds across the pieces, and his own snaps don't count against it.
 
 ## Controls
 | | |

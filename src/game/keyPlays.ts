@@ -123,12 +123,16 @@ function classify(d: StoryDrive, p: SimPlay, snap: SnapCredit | undefined, last:
   return null;
 }
 
-/** Every snap of a drive worth showing at some level, in order; with `every`, the rest too (as `snap`, priority 0), but never a punt, a kneel or a spike. */
-export function driveEvents(d: StoryDrive, view: KeyView, every = false): KeyPlay[] {
+/**
+ * Every snap of a drive worth showing at some level, in order; with `every`, the rest too (as `snap`, priority 0),
+ * but never a punt, a kneel or a spike. `open`: the drive is still going (PLAY DEFENSE shows its key plays so far
+ * before a snap the user plays), so none of its snaps is its last.
+ */
+export function driveEvents(d: StoryDrive, view: KeyView, every = false, open = false): KeyPlay[] {
   const plays = withFourthDowns(d);
   // The last snap before the drive's kick or end, for red-zone stops.
   let lastSnap = -1;
-  plays.forEach(([p], i) => {
+  if (!open) plays.forEach(([p], i) => {
     if (!isKick(p)) lastSnap = i;
   });
   const out: KeyPlay[] = [];
@@ -169,12 +173,18 @@ const placeIn = (story: GameStory) => {
 export const byImportance = (a: KeyPlay, b: KeyPlay) => b.priority - a.priority || Math.abs(b.play.gain) - Math.abs(a.play.gain);
 const inOrder = (a: KeyPlay, b: KeyPlay) => a.play.t - b.play.t;
 
-/** A drive's key plays at `level`, in order. */
-export function pickDrive(d: StoryDrive, level: KeyLevel, view: KeyView): KeyPlay[] {
+/**
+ * A drive's key plays at `level`, in order. PLAY DEFENSE shows a CPU drive's key plays in pieces, each before the
+ * next snap the user plays: `from` (a snap index) leaves out the ones already behind him, `cap` is what's left of
+ * the drive's `perDrive`, and `open` marks a drive still going (`driveEvents`).
+ */
+export function pickDrive(d: StoryDrive, level: KeyLevel, view: KeyView, opts: { from?: number; cap?: number; open?: boolean } = {}): KeyPlay[] {
   const T = KEY_PLAYS;
-  if (level === 'all') return driveEvents(d, view, true);
-  const ev = driveEvents(d, view).filter((k) => k.priority >= T.minPriority[level]);
-  return ev.sort(byImportance).slice(0, T.perDrive[view][level]).sort(inOrder);
+  const from = opts.from ?? 0;
+  const after = (k: KeyPlay) => !from || d.plays.indexOf(k.play) >= from;
+  if (level === 'all') return driveEvents(d, view, true, opts.open).filter(after);
+  const ev = driveEvents(d, view, false, opts.open).filter((k) => k.priority >= T.minPriority[level] && after(k));
+  return ev.sort(byImportance).slice(0, Math.max(0, opts.cap ?? T.perDrive[view][level])).sort(inOrder);
 }
 
 /** A simulated stretch's key plays at `level`, in order: each drive's picks, then each quarter's cap. */

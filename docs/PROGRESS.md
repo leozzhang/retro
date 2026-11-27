@@ -9,6 +9,7 @@ _Last updated: 2026-11-26_
 - PLAY DEFENSE is capped by CPU DRIVES: SUMMARY allows OFF, the key-play levels allow BIG PLAYS, and EVERY SNAP allows EVERY SNAP.
 - Both settings pages and the exhibition's keys enforce it.
 - With every snap shown, the snaps he doesn't play run live and in order with the AI on defense (`DefLive.watch`, SPACE skips).
+- At the key-play levels, a drive's key plays are shown before the next snap he plays (`flushKeyPlays`), not after the drive, so the game stays in order.
 
 Details are in docs/USERDEF.md.
 

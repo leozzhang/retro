@@ -86,6 +86,28 @@ describe('highlights', () => {
     });
   });
 
+  it('key plays in pieces (PLAY DEFENSE): each piece only from its snap on, in order, within the drive\'s cap', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const story = newStory('georgia', 'alabama');
+      simGame(uga, bama, mulberry32(seed), { story });
+      for (const d0 of story.drives) {
+        const d = { ...d0, live: true };
+        if (d.plays.length < 4) continue;
+        for (const level of ['lean', 'normal', 'full'] as const) {
+          // Shown in two pieces split at the middle snap, as before a snap the user plays.
+          const cut = Math.floor(d.plays.length / 2);
+          const head = pickDrive({ ...d, plays: d.plays.slice(0, cut) }, level, 'defense', { open: true });
+          const tail = pickDrive(d, level, 'defense', { from: cut, cap: KEY_PLAYS.perDrive.defense[level] - head.length });
+          const at = [...head, ...tail].map((k) => d.plays.indexOf(k.play));
+          expect(head.every((k) => d.plays.indexOf(k.play) < cut)).toBe(true);
+          expect(tail.every((k) => d.plays.indexOf(k.play) >= cut)).toBe(true);
+          expect(at).toEqual([...at].sort((a, b) => a - b));
+          expect(head.length + tail.length).toBeLessThanOrEqual(KEY_PLAYS.perDrive.defense[level]);
+        }
+      }
+    }
+  });
+
   it('key plays: levels nest, caps hold, scores and turnovers always show', () => {
     for (let seed = 1; seed <= 30; seed++) {
       const story = newStory('georgia', 'alabama');
