@@ -807,7 +807,12 @@ export class Play {
         d.press = false;
         d.turned = false;
         d.cushion = 7;
-        return this.overWidest(slot, off, 7, 1);
+        // Off over his own man, outside leverage. Not the widest man on CB1's or CB2's side: when the formation is
+        // flipped his man is across the field, and he'd sprint there at the snap leaving him open.
+        const t = d.manTarget;
+        if (!t) return this.overWidest(slot, off, 7, 1);
+        const out = Math.sign(t.pos.y - by) || (slot === 'CB1' ? -1 : 1);
+        return { x: los + 7, y: clamp(t.pos.y + out, 1, FIELD_W - 1) };
       }
     }
     return null;

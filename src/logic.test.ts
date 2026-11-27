@@ -1545,6 +1545,19 @@ describe('coverage disguise and presnap motion', () => {
     expect(shown.isDisguised()).toBe(true);
   });
 
+  it('man corners shown off line up over their own man, the formation flipped or not (not across the field)', () => {
+    for (const flip of [false, true]) {
+      const p = new Play({
+        offTeam: m.off, defTeam: m.def, offRoster: m.offR, defRoster: m.defR, play: PLAYBOOK.find((x) => x.id === 'four-verts')!,
+        defCall: DEF_CALLS.find((c) => c.id === '2-man')!, press: {}, los: 35, ballY: 26.65, rng: mulberry32(3), flip,
+        disguise: { show: 'two-high', weight: 1, corners: 'off' },
+      });
+      for (const d of p.def.filter((x) => (x.slot === 'CB1' || x.slot === 'CB2') && x.assign?.kind === 'man')) {
+        expect(Math.abs(d.pos.y - d.manTarget!.pos.y)).toBeLessThan(3);
+      }
+    }
+  });
+
   it('Cover 3 shown two-high spins at the snap: the down safety comes up from 13 yards', () => {
     const p = make('c3', { show: 'two-high', weight: 1 }, 3, 'slant-flat');
     const ss = p.def.find((d) => d.slot === 'SS')!;

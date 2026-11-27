@@ -124,7 +124,7 @@ import { zoneSpot } from '../sim/ai';
 import type { Player } from '../sim/player';
 import { personnelOf, resolvePlay } from './resolvePlay';
 import {
-  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, movesChains, OVERTIME, PAT, xpOdds, startDrive, userStartAfter,
+  applyKick, applyOutcome, applyTry, downDistance, fieldLabel, movesChains, OVERTIME, PAT, snapSituation, xpOdds, startDrive, userStartAfter,
   type Applied, type Drive, type DriveClock, type KickOutcome, type PlayOutcome, type SimPlay,
 } from './rules';
 import { newWind, nextQuarterWind, windLabel } from './wind';
@@ -567,6 +567,8 @@ export class Game {
   private defSlot: string | null = null;
   /** The half (0, 1, then overtime) of the CPU's last snap: its first snap of a half is a big one. */
   private cpuSnapHalf = -1;
+  /** The DEFENSE DRILL (temporary, for testing PLAY DEFENSE): random CPU snaps back to back, and how many so far. */
+  private drill: { reps: number } | null = null;
   /** The screen shake left (s) and its size (px). */
   private shakeT = 0;
   private shakeAmp = 0;
@@ -979,6 +981,10 @@ export class Game {
     if (input.hit('KeyM')) toggleAim();
     const cycleDef = () => (this.exhibitionLiveDef = LIVE_DEF[(LIVE_DEF.indexOf(this.exhibitionLiveDef) + 1) % LIVE_DEF.length]);
     if (input.hit('KeyP')) cycleDef();
+    if (input.hit('KeyG')) {
+      this.startDrill();
+      return;
+    }
     const userRoster = input.hit('KeyR');
     if (userRoster || input.hit('KeyT')) {
       this.rosterIdx = userRoster ? this.userIdx : this.cpuIdx;
@@ -4463,6 +4469,52 @@ export class Game {
   // ------------------------------------------------------------ PLAY DEFENSE (docs/USERDEF.md)
 
   /**
+   * The DEFENSE DRILL (temporary): the exhibition's teams, then CPU snaps one after another from random
+   * situations (down, distance, spot, hash, score and clock), every one played by the user. No drives, no
+   * offense, nothing kept. ESC goes back to the exhibition screen.
+   */
+  private startDrill(): void {
+    this.startGame();
+    this.notices = [];
+    this.drill = { reps: 0 };
+    const rng = driveStream(this.rng);
+    const self = this;
+    function* reps(): Generator<SnapReq, EngineDrive, SnapBack> {
+      for (;;) {
+        const down = 1 + Math.floor(rng() * 4);
+        const yard = 5 + Math.floor(rng() * 90);
+        const toGo = Math.min(100 - yard, down === 1 ? 10 : 1 + Math.floor(rng() * 14));
+        const los = OWN_GOAL + yard;
+        const drive = { los, ballY: FIELD_W / 2 + (rng() < 0.5 ? -1 : 1) * Math.floor(rng() * 3) * 3.1, down, firstDownX: Math.min(OPP_GOAL, los + toGo) };
+        const late = rng() < 0.2;
+        const lead = Math.round((rng() - 0.5) * 24);
+        const clock: DriveClock = { timeLeft: late ? 30 + rng() * 150 : 300 + rng() * 1200, hurry: false, milk: false, lead, finalHalf: late || rng() < 0.5, qSecs: 900, timeouts: { off: 3, def: 3 } };
+        const sit = snapSituation(clock, down, toGo, yard, 0);
+        const lev = leverage(down, 100 - yard, late && Math.abs(lead) <= 8);
+        self.drill!.reps++;
+        yield {
+          off: self.cpuOff!, def: self.userDef!, drive, sit, rng, brain: self.userDc, t: 0, lev,
+          opts: { lev, ocBrain: self.cpuOc, homeId: self.homeId, ...(situationTempo(sit) === 'hurry' ? { hurry: true } : {}) },
+        };
+      }
+    }
+    this.defLive = {
+      gen: reps(), plays: [], snaps: [], clock0: { ...this.clock }, run: null, req: null, stage: 'pre', pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
+      played: new Set(), stop: 0, cone: null, verdict: null, done: () => this.endDrill(),
+    };
+    this.pumpDefense();
+  }
+
+  private endDrill(): void {
+    this.drill = null;
+    this.defLive = null;
+    this.play = null;
+    this.cam.mirror = false;
+    this.cam.setZoom(1, 1, { x: 0, y: 0 });
+    this.screen = 'exhibition';
+  }
+
+  /**
    * Run the CPU's drive on to its next snap for the user (`liveSnap`), playing the rest at once; at its end, its
    * `done`. `back` is the snap he just played.
    */
@@ -4497,6 +4549,7 @@ export class Game {
 
   /** Whether the user plays this CPU snap: every snap, or the big ones (`bigSnap`, and the CPU's first of a half). */
   private liveSnap(q: SnapReq): boolean {
+    if (this.drill) return true;
     const level = this.liveDefense();
     const c = this.defClock(this.defLive!, q.t);
     const half = c.quarter <= 2 ? 0 : c.quarter <= 4 ? 1 : 2;
@@ -4534,6 +4587,10 @@ export class Game {
   }
 
   private updateDefense(dt: number, input: Input): void {
+    if (this.drill && input.hit('Escape', 'Backspace')) {
+      this.endDrill();
+      return;
+    }
     const L = this.defLive!;
     this.shakeT = Math.max(0, this.shakeT - dt);
     const run = L.run!;
@@ -4863,6 +4920,7 @@ export class Game {
   private renderDefenseHud(g: CanvasRenderingContext2D, L: DefLive): void {
     const play = L.run?.play ?? this.play;
     if (!play) return;
+    if (this.drill) text(g, `DEFENSE DRILL: REP ${this.drill.reps}   ESC: EXIT`, 4, 352 - 14, { size: 8, color: '#9ad7ff' });
     if (L.stage === 'over' && play.outcome) {
       // Above the result's banner.
       this.drawVerdict(g, L, 40);
@@ -5666,7 +5724,7 @@ export class Game {
         drawBackdrop(g, this.cam, user, cpu, this.crowd, 'EXHIBITION', 'ANY TWO TEAMS, ONE GAME');
         drawExhibition(
           g, user, cpu, `${QUARTER_LABELS[this.qIdx]}: ${QUARTER_OPTIONS[this.qIdx]}:00 QUARTERS, ~${QUARTER_DRIVES[this.qIdx]} DRIVES`,
-          this.exhibitionOptions().join('  '), x, y, `PLAY DEFENSE: ${LIVE_DEF_LABEL[this.exhibitionLiveDef]} (P)`,
+          this.exhibitionOptions().join('  '), x, y, `PLAY DEFENSE: ${LIVE_DEF_LABEL[this.exhibitionLiveDef]} (P)   DEFENSE DRILL (G)`,
         );
         break;
       case 'slots':

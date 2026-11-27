@@ -128,6 +128,8 @@ describe('next man up', () => {
     // WR1 missed last game (he's not in last game's lineup) but has started all season.
     ts.st = { ...ts.st };
     for (const [k, v] of Object.entries(ts.st)) if (v === wr1.id) delete ts.st[k];
+    // The WR4 is a package player: not in last game's lineup (a simulated season can have started him at Z).
+    for (const [k, v] of Object.entries(ts.st)) if (wr4 && v === wr4.id) delete ts.st[k];
     ((ts.progress ??= {})[wr1.id] ??= { xp: 0, lvl: 0, d: {} }).gs = ts.gp;
     // The slot receiver is out for the season, and so is the WR4 (a package player).
     ts.injuries = { ...(ts.injuries ?? {}), [slot.id]: { weeks: 99, type: 'TEST', season: true }, ...(wr4 ? { [wr4.id]: { weeks: 99, type: 'TEST', season: true } } : {}) };

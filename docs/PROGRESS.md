@@ -2,6 +2,18 @@
 
 _Last updated: 2026-11-26_
 
+## Fixed: man corners shown off lined up across the field (2026-11-26)
+- **Symptom:** in 2 Man Under, Cover 1 Robber and other man calls, CB1 and CB2 sometimes started across the field from their man, sprinted over at the snap and left him open.
+- **Cause:** the presnap disguise that shows man corners "off" (`disguiseSpot`, `g.corners === 'off'`) put each corner over the widest receiver on his slot's fixed side (CB1 toward y = 0, CB2 the far side), not over his own man. On a flipped formation his man was on the other side.
+  - A probe of 3,000 CPU snaps found it on about 30% of disguised man-corner snaps (298 of 976), every one a flipped formation, and never without a disguise.
+- **Fix:** the off corner shows over his own man with outside leverage at 7 yd (`game/playState.ts`). The probe now finds none.
+- **Regression test:** src/logic.test.ts, "man corners shown off line up over their own man", which fails on the old code.
+- **Measured:**
+  - `npm run balance` is byte-identical (the harness doesn't disguise).
+  - `npm run drives` moved within noise: engine 1.54 to 1.60 points a drive; man-heavy DCs 1.59 to 1.57.
+  - Two seed-pinned tests got robust fixtures: EVERY SNAP now finds a seed with a return touchdown instead of assuming seed 1; next man up removes the WR4 from last game's lineup, since the season sim had started him at Z.
+  - `npm test`: 551 passed.
+
 ## PLAY DEFENSE, pass 2: feel, the QB's eyes, feedback (2026-11-26)
 Making the defender fun to play. Details in docs/USERDEF.md, "The feel".
 - **Slow motion:** 0.75 on a live defensive snap, 0.55 with the ball in the air and his eyes on it. The snap is stepped by the frame's dt, so it's smooth (`SnapRun.step(input, dt)`). The field spreads a little around the QB and your man.

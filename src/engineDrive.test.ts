@@ -270,10 +270,17 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
 
   it('EVERY SNAP plays every snap and kick of a game to its end: kicks and snaps on tape, extra points as kicks', () => {
     const [h, a] = [team('georgia'), team('alabama')];
-    const story = newStory('georgia', 'alabama');
-    const watch: SnapWatch = new Map();
-    // Seed 1 has one kick run back for a touchdown.
-    engineGame(h, a, mulberry32(1), { story, watch, record: true });
+    // The first seed with a kick run back for a touchdown (seed 1 had one until the engine changed).
+    let story = newStory('georgia', 'alabama');
+    let watch: SnapWatch = new Map();
+    let returns = 0;
+    for (let seed = 1; seed <= 40 && !returns; seed++) {
+      story = newStory('georgia', 'alabama');
+      watch = new Map();
+      engineGame(h, a, mulberry32(seed), { story, watch, record: true });
+      returns = pickGame(story, 'all').filter((k) => k.kick?.result === 'returnTd').length;
+    }
+    expect(returns).toBeGreaterThan(0);
     const side = (t: typeof h, home: boolean) => ({ team: t.squad.team, roster: onField(t.squad), home, dc: t.dc });
     const ctx = { user: h.squad.team, cpu: a.squad.team, userSide: side(h, true), cpuSide: side(a, false), userPass: 0.5, cpuPass: 0.5 };
     const picks = pickGame(story, 'all');
@@ -292,8 +299,8 @@ describe('the engine game: the user\'s simulated games (Phase 4)', () => {
       for (let i = 0; i < 60 / STEP && !done; i++) done = updateShow(sh, STEP);
       expect(done).toBe(true);
     }
-    expect(scored).toBe(1);
-  }, 120_000);
+    expect(scored).toBe(returns);
+  }, 240_000);
 
   it('a part hands the field the right quarter, and the brains it was given go on learning', () => {
     for (const to of [2, 3, 4]) {
