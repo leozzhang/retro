@@ -163,6 +163,13 @@ const WRAP_OPTIONS: NonNullable<SeasonConfig['wrap']>[] = ['all', 'big', 'off'];
 type LiveDefense = NonNullable<SeasonConfig['liveDefense']>;
 const LIVE_DEF: LiveDefense[] = ['off', 'key', 'all'];
 const LIVE_DEF_LABEL: Record<LiveDefense, string> = { off: 'OFF', key: 'BIG PLAYS', all: 'EVERY SNAP' };
+/**
+ * PLAY DEFENSE can't go past CPU DRIVES: a snap he plays is a snap that's shown. A summary shows none, the key
+ * plays leave room for the big snaps, and every snap for every snap.
+ */
+const liveDefCap = (keys: KeyLevel): LiveDefense => (keys === 'off' ? 'off' : keys === 'all' ? 'all' : 'key');
+const capLiveDef = (live: LiveDefense, keys: KeyLevel): LiveDefense =>
+  LIVE_DEF[Math.min(LIVE_DEF.indexOf(live), LIVE_DEF.indexOf(liveDefCap(keys)))];
 
 /**
  * A CPU possession with the user on a defender (docs/USERDEF.md): the drive's steps (`driveSteps`) and what
@@ -178,12 +185,18 @@ interface DefLive {
   req: SnapReq | null;
   /** Before the snap (picking the man), stepping it, or the whistle's banner. */
   stage: 'pre' | 'live' | 'over';
+  /**
+   * A snap CPU DRIVES shows but PLAY DEFENSE doesn't give him: run live on the field with the AI on every
+   * defender, in its place in the drive (SPACE skips to the whistle).
+   */
+  watch: boolean;
   /** The man the user is on; the ones he can pick (the back seven, top to bottom). */
   pick: Player | null;
   picks: Player[];
   userTimeout: boolean;
   acc: number;
   overT: number;
+  /** The snaps on the field, played or watched: not shown again after the drive. */
   played: Set<SimPlay>;
   /** The hit-stop left; the QB's vision cone as the user's man sees it (angle, how visible); the last verdict. */
   stop: number;
@@ -225,7 +238,7 @@ const SETTINGS: {
     read: (c) => WATCH_LEVELS.indexOf(keyLevels(c).defense),
   },
   {
-    label: 'PLAY DEFENSE', help: 'ON CPU DRIVES, PLAY ONE DEFENDER YOURSELF: NEVER, ON THE BIG SNAPS, OR EVERY SNAP',
+    label: 'PLAY DEFENSE', help: 'PLAY ONE DEFENDER ON THE CPU DRIVES YOU SEE: NEVER, THE BIG SNAPS, OR EVERY SNAP. NO HIGHER THAN CPU DRIVES',
     options: ['OFF', 'BIG PLAYS', 'EVERY SNAP'], start: 0,
     apply: (c, i) => (c.liveDefense = LIVE_DEF[i]),
     read: (c) => Math.max(0, LIVE_DEF.indexOf(c.liveDefense ?? 'off')),
@@ -320,6 +333,10 @@ const REEL_CROP = 0.42;
  * runs at `slow` speed (game clock included) so the blocks can be read.
  */
 const RUN_ZOOM = { x: 1.3, y: 1.9, slow: 0.7 };
+/** The CPU DRIVES and PLAY DEFENSE rows, kept in step (`Game.fitLiveDef`). */
+const DRIVES_ROW = SETTINGS.findIndex((r) => r.label === 'CPU DRIVES');
+const LIVE_ROW = SETTINGS.findIndex((r) => r.label === 'PLAY DEFENSE');
+
 /**
  * PLAY DEFENSE's feel (docs/USERDEF.md): the live snap in slow motion (`slow`), slower still with a ball in the
  * air coming to him (`ballSlow`, while the ball meter is up); the field spread a little about the QB and your man (`spreadX`, `spreadY`);
@@ -336,6 +353,8 @@ const DEF_FEEL = {
   meter: { w: 34, h: 4, y: 40, top: 60, below: 10, fade: 0.1 },
   cone: { len: 24, wide: 22, tight: 7, lagLo: 0.35, lagHi: 0.05, fade: 0.15 },
   verdictTime: 1.3,
+  /** A watched snap (`DefLive.watch`): how long it sits at the line before it snaps itself (s). */
+  watchHold: 0.9,
 };
 
 // Call screen layout: tip, playbook tabs, formation chips, then a 3x3 grid of cards.
@@ -665,7 +684,8 @@ export class Game {
 
   /** The PLAY DEFENSE setting: the dynasty's in a season game, the exhibition's otherwise. */
   private liveDefense(): LiveDefense {
-    return this.seasonGame && this.season ? this.season.config.liveDefense ?? 'off' : this.exhibitionLiveDef;
+    const live = this.seasonGame && this.season ? this.season.config.liveDefense ?? 'off' : this.exhibitionLiveDef;
+    return capLiveDef(live, this.keyLevel('defense'));
   }
 
   /** The SLOW AIM setting: the dynasty's in a season game, the exhibition's otherwise. */
@@ -688,7 +708,7 @@ export class Game {
     if (slow && this.screen === 'play' && this.play?.aim) return AIM_TIME_SCALE;
     if (this.screen === 'play' && this.play?.playDef.kind === 'run' && this.play.phase !== 'presnap' && this.play.phase !== 'over') return RUN_ZOOM.slow;
     if (slow && this.screen === 'kick' && this.kick?.aim && this.kick.unit === 'punt') return AIM_TIME_SCALE;
-    if (this.screen === 'defense' && this.defLive?.stage === 'live') {
+    if (this.screen === 'defense' && this.defLive?.stage === 'live' && !this.defLive.watch) {
       const p = this.defLive.run?.play;
       return p?.ballMeter() ? DEF_FEEL.ballSlow : DEF_FEEL.slow;
     }
@@ -973,7 +993,10 @@ export class Game {
     if (input.hit('ArrowDown')) this.cpuIdx = this.stepConference(this.cpuIdx, 1, this.userIdx);
     if (input.hit('KeyQ')) this.qIdx = (this.qIdx + nq - 1) % nq;
     if (input.hit('KeyE')) this.qIdx = (this.qIdx + 1) % nq;
-    const cycleKeys = () => (this.exhibitionKeys = WATCH_LEVELS[(WATCH_LEVELS.indexOf(this.exhibitionKeys) + 1) % WATCH_LEVELS.length]);
+    const cycleKeys = () => {
+      this.exhibitionKeys = WATCH_LEVELS[(WATCH_LEVELS.indexOf(this.exhibitionKeys) + 1) % WATCH_LEVELS.length];
+      this.exhibitionLiveDef = capLiveDef(this.exhibitionLiveDef, this.exhibitionKeys);
+    };
     if (input.hit('KeyK')) cycleKeys();
     const cycleIq = () => (this.exhibitionIq = IQ_OPTIONS[(IQ_OPTIONS.indexOf(this.exhibitionIq) + 1) % IQ_OPTIONS.length]);
     if (input.hit('KeyI')) cycleIq();
@@ -981,7 +1004,11 @@ export class Game {
     if (input.hit('KeyL')) cycleAssist();
     const toggleAim = () => (this.exhibitionAimSlow = !this.exhibitionAimSlow);
     if (input.hit('KeyM')) toggleAim();
-    const cycleDef = () => (this.exhibitionLiveDef = LIVE_DEF[(LIVE_DEF.indexOf(this.exhibitionLiveDef) + 1) % LIVE_DEF.length]);
+    // Past what DRIVES shows, it wraps to OFF (`capLiveDef`).
+    const cycleDef = () => {
+      const next = LIVE_DEF[(LIVE_DEF.indexOf(this.exhibitionLiveDef) + 1) % LIVE_DEF.length];
+      this.exhibitionLiveDef = capLiveDef(next, this.exhibitionKeys) === next ? next : 'off';
+    };
     if (input.hit('KeyP')) cycleDef();
     if (input.hit('KeyG')) {
       this.startDrill();
@@ -1135,6 +1162,7 @@ export class Game {
     const change = (row: number, d: number) => {
       const k = SETTINGS[row].options.length;
       this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
+      this.fitLiveDef(row, d);
     };
     if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
     if (input.hit('KeyD', 'ArrowRight')) change(this.settingSel, 1);
@@ -1732,9 +1760,22 @@ export class Game {
 
   // ------------------------------------------------------------ dynasty settings
 
+  /**
+   * Keep PLAY DEFENSE at or under CPU DRIVES after a row changed by `d`: stepping PLAY DEFENSE past the cap
+   * skips on to the next option it allows (wrapping to OFF), and lowering CPU DRIVES pulls it down.
+   */
+  private fitLiveDef(row: number, d: number): void {
+    const idx = this.settingIdx;
+    const cap = LIVE_DEF.indexOf(liveDefCap(WATCH_LEVELS[idx[DRIVES_ROW]]));
+    const k = LIVE_DEF.length;
+    if (row === LIVE_ROW) while (idx[LIVE_ROW] > cap) idx[LIVE_ROW] = (idx[LIVE_ROW] + (d || 1) + k) % k;
+    else idx[LIVE_ROW] = Math.min(idx[LIVE_ROW], cap);
+  }
+
   private toSettings(): void {
     const c = this.season!.config;
     this.settingIdx = SETTINGS.map((r) => Math.max(0, r.read(c)));
+    this.fitLiveDef(DRIVES_ROW, 0);
     this.settingSel = 0;
     this.screen = 'settings';
   }
@@ -1758,7 +1799,9 @@ export class Game {
       if (SETTINGS[row].newOnly) return;
       const k = SETTINGS[row].options.length;
       this.settingIdx[row] = (this.settingIdx[row] + d + k) % k;
+      this.fitLiveDef(row, d);
       SETTINGS[row].apply(c, this.settingIdx[row]);
+      SETTINGS[LIVE_ROW].apply(c, this.settingIdx[LIVE_ROW]);
       this.save();
     };
     if (input.hit('KeyA', 'ArrowLeft')) change(this.settingSel, -1);
@@ -4173,7 +4216,7 @@ export class Game {
     }
     const { gen, plays, snaps } = this.cpuSteps(start, clock);
     this.defLive = {
-      gen, plays, snaps, clock0: { ...this.clock }, run: null, req: null, stage: 'pre', pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
+      gen, plays, snaps, clock0: { ...this.clock }, run: null, req: null, stage: 'pre', watch: false, pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
       played: new Set(), stop: 0, cone: null, verdict: null, done,
     };
     // What happened before it (the user's drive, a kick, the quarter) first.
@@ -4505,7 +4548,7 @@ export class Game {
       }
     }
     this.defLive = {
-      gen: reps(), plays: [], snaps: [], clock0: { ...this.clock }, run: null, req: null, stage: 'pre', pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
+      gen: reps(), plays: [], snaps: [], clock0: { ...this.clock }, run: null, req: null, stage: 'pre', watch: false, pick: null, picks: [], userTimeout: false, acc: 0, overT: 0,
       played: new Set(), stop: 0, cone: null, verdict: null, done: () => this.endDrill(),
     };
     this.pumpDefense();
@@ -4534,6 +4577,11 @@ export class Game {
       const q = s.value;
       if (this.liveSnap(q)) {
         this.startDefSnap(q);
+        return;
+      }
+      // Every snap shown: the ones he doesn't play run on the field in order, not after the drive.
+      if (this.keyLevel('defense') === 'all') {
+        this.startDefSnap(q, true);
         return;
       }
       s = L.gen.next({ r: playReq(q) });
@@ -4566,14 +4614,15 @@ export class Game {
   }
 
   /** Line the snap up live: the user picks his man before it (the one he played last, if he's out there). */
-  private startDefSnap(q: SnapReq): void {
+  private startDefSnap(q: SnapReq, watch = false): void {
     const L = this.defLive!;
     const run = new SnapRun(q.off, q.def, q.drive, q.sit, q.rng, q.brain, q.opts);
     const play = run.play;
     play.defFlip = true;
-    // The back seven, top of the screen to the bottom.
-    L.picks = play.def.filter((d) => d.role === 'LB' || d.role === 'CB' || d.role === 'S').sort((a, b) => a.pos.y - b.pos.y);
+    // The back seven, top of the screen to the bottom (none to pick on a snap he watches).
+    L.picks = watch ? [] : play.def.filter((d) => d.role === 'LB' || d.role === 'CB' || d.role === 'S').sort((a, b) => a.pos.y - b.pos.y);
     L.pick = L.picks.find((d) => d.slot === this.defSlot) ?? L.picks.find((d) => d.slot === 'MLB') ?? L.picks[0] ?? null;
+    L.watch = watch;
     play.defControlled = L.pick;
     L.run = run;
     L.req = q;
@@ -4603,6 +4652,16 @@ export class Game {
     const play = run.play;
     // T: the user's timeout at the whistle (if he has one).
     if (L.stage !== 'over' && input.hit('KeyT') && (L.req!.sit.defTO ?? 0) > 0) L.userTimeout = !L.userTimeout;
+    if (L.stage === 'pre' && L.watch) {
+      L.acc += dt;
+      if (L.acc >= DEF_FEEL.watchHold || input.hit('Space', 'Enter')) {
+        L.stage = 'live';
+        L.acc = 0;
+        run.snap();
+        this.cam.setZoom(DEF_FEEL.spreadX, DEF_FEEL.spreadY, this.defFocus(play));
+      }
+      return;
+    }
     if (L.stage === 'pre') {
       const k = L.picks.length;
       if (k) {
@@ -4631,6 +4690,11 @@ export class Game {
         this.cam.setZoom(DEF_FEEL.spreadX, DEF_FEEL.spreadY, this.defFocus(play));
       }
       return;
+    }
+    if (L.stage === 'live' && L.watch && input.hit('Space', 'Enter')) {
+      // Skip a watched snap to its whistle.
+      while (!run.done()) run.step();
+      play.defFx.length = 0;
     }
     if (L.stage === 'live') {
       // One step a frame at the frame's (slowed) time, so the motion is smooth and no key press is lost; frozen on a hit-stop.
@@ -4955,8 +5019,13 @@ export class Game {
     text(g, call, VIEW_W / 2, 34, { size: 8, align: 'center', color: '#ffd23f' });
     const d = L.pick;
     if (d) text(g, `#${d.num} ${d.name.toUpperCase()} (${d.slot}): ${this.defJob(play, d)}`, VIEW_W / 2, 46, { align: 'center', color: '#cfe3ff' });
+    else if (L.watch) text(g, 'WATCHING: THE BIG SNAPS ARE YOURS', VIEW_W / 2, 46, { align: 'center', color: '#cfe3ff' });
     if (L.userTimeout) text(g, 'TIMEOUT AT THE WHISTLE (T TO CANCEL)', VIEW_W / 2, 58, { align: 'center', color: '#ff9a5a' });
     this.drawVerdict(g, L);
+    if (L.watch) {
+      drawHint(g, L.stage === 'pre' ? 'SPACE: SNAP   T: TIMEOUT' : 'SPACE: SKIP   T: TIMEOUT');
+      return;
+    }
     if (L.stage === 'pre') {
       drawHint(g, 'Q/E OR CLICK: PICK YOUR MAN   SPACE: SNAP   T: TIMEOUT');
       return;

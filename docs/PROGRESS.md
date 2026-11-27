@@ -2,6 +2,16 @@
 
 _Last updated: 2026-11-26_
 
+## PLAY DEFENSE vs CPU DRIVES: what's shown and what's played (2026-11-27)
+**The bug:** with PLAY DEFENSE on, the snaps he didn't play ran headless, and CPU DRIVES' shows were queued only after the drive. So with EVERY SNAP plus BIG PLAYS, he played 3rd down live, then watched 1st and 2nd down replayed after it. PLAY DEFENSE could also be set higher than CPU DRIVES, for example EVERY SNAP with a SUMMARY.
+
+**The fix:**
+- PLAY DEFENSE is capped by CPU DRIVES: SUMMARY allows OFF, the key-play levels allow BIG PLAYS, and EVERY SNAP allows EVERY SNAP.
+- Both settings pages and the exhibition's keys enforce it.
+- With every snap shown, the snaps he doesn't play run live and in order with the AI on defense (`DefLive.watch`, SPACE skips).
+
+Details are in docs/USERDEF.md.
+
 ## PLAY DEFENSE: number tags (2026-11-27)
 The offense's tags now show on defense (docs/USERDEF.md, "Number tags"):
 - number chips before the snap, with the receivers ringed white and his man in man coverage ringed gold;

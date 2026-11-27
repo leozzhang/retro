@@ -14,7 +14,18 @@ On CPU drives in a played game, the user can take one defender and play him live
   - the CPU's first snap of each half (`Game.cpuSnapHalf`)
 - **EVERY SNAP**
 
-The snaps the user doesn't play run headless. They're shown by the CPU DRIVES watch level as before, minus the ones he played.
+**PLAY DEFENSE can't be set higher than CPU DRIVES**, because a snap he plays is a snap that's shown (`liveDefCap` and `capLiveDef` in game/game.ts):
+- SUMMARY allows OFF only.
+- The key-play levels (LEAN, NORMAL, FULL) allow up to BIG PLAYS.
+- EVERY SNAP allows EVERY SNAP.
+
+How the settings enforce it:
+- On both settings pages, stepping PLAY DEFENSE past the cap wraps it to OFF, and lowering CPU DRIVES pulls PLAY DEFENSE down with it (`Game.fitLiveDef`). The exhibition's P and K do the same.
+- An older save that breaks the rule plays at the cap (`Game.liveDefense`).
+
+The snaps he doesn't play:
+- **With CPU DRIVES on EVERY SNAP**, they run live on the field in their place in the drive, with the AI on every defender (`DefLive.watch`). The snap holds `DEF_FEEL.watchHold` s at the line and plays at full speed. SPACE skips it to the whistle.
+- **At the key-play levels**, they run headless, and the drive's key plays he didn't play are shown after it, as before.
 
 ## Controls
 | | |
